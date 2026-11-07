@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Key Screen Home</title>
+<style>
+/* =====================================================================
+   wmbugo — Key screen: Home (SCR-04). Illustration only; the spines are the contract.
+   GOVERNING SPINE SECTIONS
+     DESIGN.md   Colors (Glass locked recipe, Gradient), Typography (roles, tnum), Components > Home hero card
+                 (states table), Amount mask, Limit bar, Chips, Other library components (tab bar, + button),
+                 Elevation & Depth, Layout & Spacing (Home vertical rhythm)
+     EXPERIENCE  Information Architecture (tabs Home · Activity · + · Insights · Plan; header Accounts + avatar),
+                 Component Patterns > Home hero card, Limit bar; State Patterns > Hero states, Amounts hidden;
+                 Privacy & Hidden Amounts; Voice and Tone
+     PRD §6.3    Home card initial order: header (greeting, date, days-to-payday chip) > hero > "N to check" >
+                 Income and expense > per-category budgets > ...
+   TOKENS USED (DESIGN.md hex only)
+     bg-canvas #F8FAFC / #0F172A · bg-surface #FFFFFF / #1E293B · bg-muted #E2E8F0 / #334155
+     text-primary #0F172A / #F8FAFC · text-secondary #475569 / #CBD5E1 · accent-primary #0F766E / #5EEAD4
+     semantic-income #15803D / #86EFAC · semantic-warning #B45309 / #FCD34D
+     gradient-brand #2DD4BF > #0F766E > #164E63 · glow-*-dark = brand stops at 0x72 (44.7%, cap 45%)
+     glass-tint #164E63 @ 80% (light, #164E63CC) / 62% (dark, #164E639F) · glass-border #5EEAD438
+     on-glass-primary #F8FAFC · on-glass-secondary-dark #CBD5E1 · on-glass-accent #5EEAD4 · on-glass-warning #FCD34D
+     limit-tick outline bg-canvas-dark #0F172A · border-hairline #E2E8F0 / #F8FAFC0F · cat-rose / cat-pink
+     Page chrome (outside phones): bg-muted #E2E8F0 page, text-primary #0F172A ink.
+   TEXT-ON-GLASS CONTRAST (scratchpad contrast.js, WCAG 2.x, alpha-composited, worst backdrop)
+     Light hero, 80% over gradient start #2DD4BF -> #1B6975: #F8FAFC 6.05:1 PASS
+     Light hero, 80% over gradient mid #0F766E  -> #155665: #F8FAFC 7.87:1 PASS
+     Light tab bar, 80% over white card #FFFFFF  -> #457182: #F8FAFC 5.08:1 PASS (labels); #5EEAD4 icon 3.59:1, #FCD34D dot 3.68:1 (non-text >=3 PASS)
+     Dark hero, 62% over glow start 45% on canvas -> #185967: #F8FAFC 7.49:1, #CBD5E1 5.28:1 PASS; #FCD34D 5.44:1
+     Dark tab bar, 62% over #1E293B card -> #194054: #F8FAFC 10.56:1, #CBD5E1 7.44:1 PASS
+     Solid: income #15803D on #FFFFFF 5.02:1; warning #B45309 on #FFFFFF 5.02:1; #475569 on #FFFFFF 7.58:1
+   ===================================================================== */
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#E2E8F0;color:#0F172A;font-family:Inter,"Inter Variable",system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",sans-serif;padding:24px 16px 48px}
+.pagehead{max-width:800px;margin:0 auto 20px}
+.pagehead h1{font-size:20px;line-height:26px;font-weight:600}
+.pagehead p{font-size:14px;line-height:20px;margin-top:4px;max-width:900px;color:#475569}
+.grid{display:flex;flex-wrap:wrap;gap:40px 32px;justify-content:center;align-items:flex-start;max-width:800px;margin:0 auto}
+figure{width:360px;max-width:100%}
+figcaption{font-size:14px;line-height:20px;font-weight:500;margin-bottom:10px}
+figcaption span{display:block;font-weight:400;color:#475569;font-size:13px;line-height:18px}
+.i{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.i.f{fill:currentColor;stroke:none}
+.i.sm{width:16px;height:16px}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+
+/* ---------- phone + themes ---------- */
+.phone{position:relative;width:360px;max-width:100%;height:800px;border-radius:32px;overflow:hidden;
+  box-shadow:0 0 0 8px #0F172A;isolation:isolate;background:var(--canvas);color:var(--t1)}
+.light{--canvas:#F8FAFC;--surface:#FFFFFF;--muted:#E2E8F0;--t1:#0F172A;--t2:#475569;--accent:#0F766E;--income:#15803D;--warn:#B45309;--hair:#E2E8F0;--ctl:#475569;
+  --glass:rgba(22,78,99,.80);--ogs:#F8FAFC;--fill:#F8FAFC}
+.dark{--canvas:#0F172A;--surface:#1E293B;--muted:#334155;--t1:#F8FAFC;--t2:#CBD5E1;--accent:#5EEAD4;--income:#86EFAC;--warn:#FCD34D;--hair:rgba(248,250,252,.06);--ctl:#94A3B8;
+  --glass:rgba(22,78,99,.62);--ogs:#CBD5E1;--fill:#5EEAD4}
+.backdrop{position:absolute;inset:0;z-index:0;pointer-events:none}
+.light .band{position:absolute;left:0;right:0;top:96px;height:176px;border-radius:0 0 16px 16px;
+  background:linear-gradient(135deg,#2DD4BF 0%,#0F766E 50%,#164E63 100%)}
+.dark .backdrop{background:
+  radial-gradient(circle at 18% 16%,#2DD4BF72 0,transparent 42%),
+  radial-gradient(circle at 88% 26%,#0F766E72 0,transparent 46%),
+  radial-gradient(circle at 50% 40%,#164E6372 0,transparent 55%)}
+.scroll{position:relative;z-index:1;padding:0 16px 120px}
+.status{height:28px;display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:500;color:var(--t1)}
+.head{display:flex;align-items:center;gap:4px;min-height:64px}
+.head .who{flex:1;min-width:0}
+.head .who b{display:block;font-size:20px;line-height:26px;font-weight:600}
+.head .who small{display:block;font-size:13px;line-height:18px;color:var(--t2)}
+.iconbtn{width:48px;height:48px;display:grid;place-items:center;border-radius:9999px;color:var(--t1)}
+.pchip{display:inline-flex;align-items:center;min-height:32px;padding:0 12px;border-radius:9999px;border:1px solid var(--ctl);font-size:14px;line-height:20px;font-weight:500;color:var(--t1);margin:4px 0 0}
+.chiprow{display:flex;align-items:center;height:48px;margin-bottom:12px}
+
+/* ---------- glass + hero ---------- */
+.glass{background:var(--glass);border:1px solid #5EEAD438;-webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px)}
+.hero{border-radius:16px;padding:16px;color:#F8FAFC}
+.hero .top{display:flex;justify-content:space-between;align-items:flex-start}
+.hero .lab{font-size:14px;line-height:20px;font-weight:500;display:flex;align-items:center;gap:6px;padding-top:4px}
+.hero .lab .i{color:#FCD34D}
+.hero .eye{width:48px;height:48px;margin:-12px -12px -12px 0;display:grid;place-items:center;color:#F8FAFC}
+.hero .amt{font-size:40px;line-height:48px;font-weight:600;letter-spacing:-.5px;margin:2px 0 12px}
+.hbar{position:relative;height:8px;border-radius:9999px;background:rgba(248,250,252,.16)}
+.hbar .fill{position:absolute;left:0;top:0;bottom:0;border-radius:9999px;background:var(--fill)}
+.hbar .fill.cut{border-radius:9999px 0 0 9999px}
+.hbar .over{position:absolute;top:0;bottom:0;right:0;border-radius:0 9999px 9999px 0;
+  background:repeating-linear-gradient(45deg,#FCD34D 0 2px,#164E63 2px 4px)}
+.hbar .tick{position:absolute;top:-3px;width:2px;height:14px;background:#F8FAFC;box-shadow:0 0 0 1px #0F172A;border-radius:1px}
+.hbar.ghost{background:transparent}
+.hcap{font-size:13px;line-height:18px;color:var(--ogs);margin-top:8px}
+.hday{font-size:13px;line-height:18px;color:var(--ogs);margin-top:2px}
+.hacc{display:flex;gap:16px;font-size:13px;line-height:18px;color:var(--ogs);margin-top:12px;padding-top:12px;border-top:1px solid rgba(248,250,252,.16)}
+.hacc b{color:#F8FAFC;font-weight:600}
+
+/* ---------- solid cards ---------- */
+.card{background:var(--surface);border-radius:12px;padding:16px;margin-top:12px}
+.hero + .card{margin-top:16px}
+.card .ct{display:flex;justify-content:space-between;align-items:baseline}
+.card .ct b{font-size:17px;line-height:24px;font-weight:500}
+.card .ct small{font-size:13px;line-height:18px;color:var(--t2)}
+.check{display:flex;align-items:center;gap:12px;min-height:48px}
+.check .tx{flex:1}
+.check .tx small{display:block;font-size:13px;line-height:18px;color:var(--t2)}
+.check .i{color:var(--t2)}
+.ie{display:flex;gap:16px;margin-top:12px}
+.ie div{flex:1}
+.ie small{display:block;font-size:13px;line-height:18px;color:var(--t2)}
+.ie b{font-size:16px;line-height:24px;font-weight:600}
+.ie .inc{color:var(--income)}
+.brow{margin-top:14px}
+.brow .bl{display:flex;justify-content:space-between;font-size:14px;line-height:20px;font-weight:500;margin-bottom:6px}
+.brow .bl span:last-child{font-weight:400;color:var(--t2);font-size:13px}
+.lbar{position:relative;height:8px;border-radius:9999px;background:var(--muted)}
+.lbar .fill{position:absolute;left:0;top:0;bottom:0;border-radius:9999px;background:var(--accent)}
+.lbar .fill.cut{border-radius:9999px 0 0 9999px}
+.lbar .over{position:absolute;top:0;bottom:0;right:0;border-radius:0 9999px 9999px 0;background:repeating-linear-gradient(45deg,var(--warn) 0 2px,var(--muted) 2px 4px)}
+.lbar .tick{position:absolute;top:-3px;width:2px;height:14px;background:var(--t1);border-radius:1px}
+.lbar.ghost{background:transparent}
+.bstat{font-size:13px;line-height:18px;color:var(--t2);margin-top:6px;display:flex;align-items:center;gap:4px}
+.bstat.w{color:var(--warn)}
+
+/* ---------- tab bar (glass) ---------- */
+.tabbar{position:absolute;z-index:3;left:0;right:0;bottom:0;min-height:80px;padding:0 4px 16px;border-width:1px 0 0;
+  display:flex;align-items:center;justify-content:space-around;color:#F8FAFC}
+.tab{width:64px;min-height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px;line-height:16px;color:var(--ogs);position:relative}
+.tab.on{color:#F8FAFC;font-weight:500}
+.tab.on .i{color:#5EEAD4}
+.tab .dot{position:absolute;top:8px;left:38px;width:8px;height:8px;border-radius:9999px;background:#FCD34D}
+.plus{width:56px;height:56px;border-radius:9999px;display:grid;place-items:center;color:#FFFFFF;border:1px solid #5EEAD438;
+  background:linear-gradient(135deg,#2DD4BF,#0F766E 50%,#164E63);box-shadow:0 4px 12px rgba(15,23,42,.30)}
+.plus .i{width:28px;height:28px;stroke-width:2}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="eye" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="eye-slash" viewBox="0 0 24 24"><path d="M4 4l16 16"/><path d="M9.9 5.2A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.1 3.9M6.6 6.6C3.7 8.4 2 12 2 12s3.6 7 10 7a9.6 9.6 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></symbol>
+  <symbol id="warn" viewBox="0 0 24 24"><path d="M12 3.5L2.5 20h19L12 3.5z"/><path d="M12 10v4.5"/><path d="M12 17.3v.2"/></symbol>
+  <symbol id="wallet" viewBox="0 0 24 24"><path d="M4 7.5V6a2 2 0 0 1 2-2h11v3.5"/><rect x="3" y="7.5" width="18" height="12.5" rx="2"/><path d="M16.5 13.75h.01"/></symbol>
+  <symbol id="user" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.6 18.4c1.4-1.9 3.3-2.9 5.4-2.9s4 1 5.4 2.9"/></symbol>
+  <symbol id="caret" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+  <symbol id="house" viewBox="0 0 24 24"><path d="M3.5 10.5L12 4l8.5 6.5V20a1 1 0 0 1-1 1H15v-6H9v6H4.5a1 1 0 0 1-1-1z"/></symbol>
+  <symbol id="house-f" viewBox="0 0 24 24"><path d="M12 3.2l9.3 7.1V20a1.6 1.6 0 0 1-1.6 1.6h-5.2v-6.1h-5v6.1H4.3A1.6 1.6 0 0 1 2.7 20v-9.7z"/></symbol>
+  <symbol id="rows" viewBox="0 0 24 24"><rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M7.5 9h9M7.5 12h9M7.5 15h6"/></symbol>
+  <symbol id="chart" viewBox="0 0 24 24"><path d="M3 20.5h18"/><rect x="5" y="11" width="3" height="7" rx=".5"/><rect x="10.5" y="5" width="3" height="13" rx=".5"/><rect x="16" y="8.5" width="3" height="9.5" rx=".5"/></symbol>
+  <symbol id="cal" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></symbol>
+  <symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+</svg>
+
+<div class="pagehead">
+  <h1>Home (SCR-04): key screen</h1>
+  <p>Row 1: the normal under-budget state in light and dark. Row 2: the over-budget state (light) and the amounts-hidden state (dark). Cards follow PRD §6.3 order: hero, "N to check" (only when pending), Income and expense, Budgets, and so on below the fold. The glass tab bar follows the IA order Home · Activity · ＋ · Insights · Plan.</p>
+</div>
+
+<div class="grid">
+
+<!-- ================= 1. LIGHT · UNDER BUDGET ================= -->
+<figure>
+  <figcaption>Light · under budget<span>Hero on 80% teal glass over the gradient band; 3 to check pending, so the dot shows on Activity</span></figcaption>
+  <div class="phone light">
+    <div class="backdrop"><div class="band"></div></div>
+    <div class="scroll">
+      <div class="status num"><span>9:41</span><span>5G · 82%</span></div>
+      <div class="head">
+        <div class="who"><b>Good evening</b><small>Sat, 7 Nov</small></div>
+        <span class="iconbtn" aria-label="Accounts"><svg class="i"><use href="#wallet"/></svg></span>
+        <span class="iconbtn" aria-label="Settings"><svg class="i"><use href="#user"/></svg></span>
+      </div>
+      <div class="glass hero" style="margin-top:16px">
+        <div class="top"><span class="lab">Left in budget</span><span class="eye" aria-label="Hide amounts"><svg class="i"><use href="#eye"/></svg></span></div>
+        <div class="amt num">₹11,860</div>
+        <div class="hbar"><div class="fill" style="width:40.7%"></div></div>
+        <div class="hcap num">₹8,140 of ₹20,000</div>
+        <div class="hday num">~₹988/day · 12 days left</div>
+        <div class="hacc num"><span>In accounts <b>₹52,300</b></span><span>Card dues <b>₹4,100</b></span></div>
+      </div>
+      <div class="card"><div class="check"><div class="tx"><b style="font-size:17px;line-height:24px;font-weight:500">3 to check</b><small>Waiting for you</small></div><svg class="i"><use href="#caret"/></svg></div></div>
+      <div class="card">
+        <div class="ct"><b>Income and expense</b><small>This period</small></div>
+        <div class="ie num"><div><small>Income</small><b class="inc">+₹85,000</b></div><div><small>Spent</small><b>₹8,140</b></div></div>
+      </div>
+      <div class="card">
+        <div class="ct"><b>Budgets</b><small>This period</small></div>
+        <div class="brow"><div class="bl num"><span>Food &amp; Drinks</span><span>₹3,400 of ₹4,000</span></div><div class="lbar"><div class="fill" style="width:85%"></div></div><div class="bstat">85% used</div></div>
+        <div class="brow"><div class="bl num"><span>Shopping</span><span>₹1,200 of ₹3,000</span></div><div class="lbar"><div class="fill" style="width:40%"></div></div></div>
+      </div>
+    </div>
+    <nav class="tabbar glass">
+      <span class="tab on"><svg class="i f"><use href="#house-f"/></svg>Home</span>
+      <span class="tab"><svg class="i"><use href="#rows"/></svg>Activity<i class="dot"></i></span>
+      <span class="plus" aria-label="Add entry"><svg class="i"><use href="#plus"/></svg></span>
+      <span class="tab"><svg class="i"><use href="#chart"/></svg>Insights</span>
+      <span class="tab"><svg class="i"><use href="#cal"/></svg>Plan</span>
+    </nav>
+  </div>
+</figure>
+
+<!-- ================= 2. DARK · UNDER BUDGET ================= -->
+<figure>
+  <figcaption>Dark · under budget<span>62% teal glass (locked floor) over brand glows capped at 45%; secondary on-glass ink #CBD5E1</span></figcaption>
+  <div class="phone dark">
+    <div class="backdrop"></div>
+    <div class="scroll">
+      <div class="status num"><span>9:41</span><span>5G · 82%</span></div>
+      <div class="head">
+        <div class="who"><b>Good evening</b><small>Sat, 7 Nov</small></div>
+        <span class="iconbtn"><svg class="i"><use href="#wallet"/></svg></span>
+        <span class="iconbtn"><svg class="i"><use href="#user"/></svg></span>
+      </div>
+      <div class="glass hero" style="margin-top:16px">
+        <div class="top"><span class="lab">Left in budget</span><span class="eye"><svg class="i"><use href="#eye"/></svg></span></div>
+        <div class="amt num">₹11,860</div>
+        <div class="hbar"><div class="fill" style="width:40.7%"></div></div>
+        <div class="hcap num">₹8,140 of ₹20,000</div>
+        <div class="hday num">~₹988/day · 12 days left</div>
+        <div class="hacc num"><span>In accounts <b>₹52,300</b></span><span>Card dues <b>₹4,100</b></span></div>
+      </div>
+      <div class="card"><div class="check"><div class="tx"><b style="font-size:17px;line-height:24px;font-weight:500">3 to check</b><small>Waiting for you</small></div><svg class="i"><use href="#caret"/></svg></div></div>
+      <div class="card">
+        <div class="ct"><b>Income and expense</b><small>This period</small></div>
+        <div class="ie num"><div><small>Income</small><b class="inc">+₹85,000</b></div><div><small>Spent</small><b>₹8,140</b></div></div>
+      </div>
+      <div class="card">
+        <div class="ct"><b>Budgets</b><small>This period</small></div>
+        <div class="brow"><div class="bl num"><span>Food &amp; Drinks</span><span>₹3,400 of ₹4,000</span></div><div class="lbar"><div class="fill" style="width:85%"></div></div><div class="bstat">85% used</div></div>
+        <div class="brow"><div class="bl num"><span>Shopping</span><span>₹1,200 of ₹3,000</span></div><div class="lbar"><div class="fill" style="width:40%"></div></div></div>
+      </div>
+    </div>
+    <nav class="tabbar glass">
+      <span class="tab on"><svg class="i f"><use href="#house-f"/></svg>Home</span>
+      <span class="tab"><svg class="i"><use href="#rows"/></svg>Activity<i class="dot"></i></span>
+      <span class="plus"><svg class="i"><use href="#plus"/></svg></span>
+      <span class="tab"><svg class="i"><use href="#chart"/></svg>Insights</span>
+      <span class="tab"><svg class="i"><use href="#cal"/></svg>Plan</span>
+    </nav>
+  </div>
+</figure>
+
+<!-- ================= 3. LIGHT · OVER BUDGET ================= -->
+<figure>
+  <figcaption>Light · over budget<span>Warning icon + "Over budget", unsigned amount, fill to the limit tick then hatched overflow (capped at 20%), days-only line. Nothing pending, so no "N to check" card and no dot</span></figcaption>
+  <div class="phone light">
+    <div class="backdrop"><div class="band"></div></div>
+    <div class="scroll">
+      <div class="status num"><span>9:41</span><span>5G · 82%</span></div>
+      <div class="head">
+        <div class="who"><b>Good evening</b><small>Mon, 23 Nov</small></div>
+        <span class="iconbtn"><svg class="i"><use href="#wallet"/></svg></span>
+        <span class="iconbtn"><svg class="i"><use href="#user"/></svg></span>
+      </div>
+      <div class="glass hero" style="margin-top:16px">
+        <div class="top"><span class="lab"><svg class="i sm" style="width:20px;height:20px"><use href="#warn"/></svg>Over budget</span><span class="eye"><svg class="i"><use href="#eye"/></svg></span></div>
+        <div class="amt num">₹2,340</div>
+        <!-- 2,340 over a 20,000 limit = 11.7% of budget: tick at 89.5% of track, overflow 10.5% (under the 20% cap). 1dp knockout gap each side of the tick. -->
+        <div class="hbar"><div class="fill cut" style="width:calc(89.5% - 2px)"></div><div class="tick" style="left:calc(89.5% - 1px)"></div><div class="over" style="width:calc(10.5% - 2px)"></div></div>
+        <div class="hcap num">₹22,340 of ₹20,000</div>
+        <div class="hday num">5 days to payday</div>
+        <div class="hacc num"><span>In accounts <b>₹38,900</b></span><span>Card dues <b>₹9,750</b></span></div>
+      </div>
+      <div class="card">
+        <div class="ct"><b>Income and expense</b><small>This period</small></div>
+        <div class="ie num"><div><small>Income</small><b class="inc">+₹85,000</b></div><div><small>Spent</small><b>₹22,340</b></div></div>
+      </div>
+      <div class="card">
+        <div class="ct"><b>Budgets</b><small>This period</small></div>
+        <!-- 4,600 of 4,000: 15% over; tick at 87%, overflow 13% -->
+        <div class="brow"><div class="bl num"><span>Food &amp; Drinks</span><span>₹4,600 of ₹4,000</span></div><div class="lbar"><div class="fill cut" style="width:calc(87% - 2px)"></div><div class="tick" style="left:calc(87% - 1px)"></div><div class="over" style="width:calc(13% - 2px)"></div></div><div class="bstat w num"><svg class="i sm"><use href="#warn"/></svg>Over by ₹600</div></div>
+        <div class="brow"><div class="bl num"><span>Shopping</span><span>₹2,100 of ₹3,000</span></div><div class="lbar"><div class="fill" style="width:70%"></div></div></div>
+      </div>
+    </div>
+    <nav class="tabbar glass">
+      <span class="tab on"><svg class="i f"><use href="#house-f"/></svg>Home</span>
+      <span class="tab"><svg class="i"><use href="#rows"/></svg>Activity</span>
+      <span class="plus"><svg class="i"><use href="#plus"/></svg></span>
+      <span class="tab"><svg class="i"><use href="#chart"/></svg>Insights</span>
+      <span class="tab"><svg class="i"><use href="#cal"/></svg>Plan</span>
+    </nav>
+  </div>
+</figure>
+
+<!-- ================= 4. DARK · AMOUNTS HIDDEN ================= -->
+<figure>
+  <figcaption>Dark · amounts hidden<span>Every amount is "₹ ••••" (fixed four dots); hero bar and budget bars hidden with their space kept; labels unchanged; eye-slash</span></figcaption>
+  <div class="phone dark">
+    <div class="backdrop"></div>
+    <div class="scroll">
+      <div class="status num"><span>9:41</span><span>5G · 82%</span></div>
+      <div class="head">
+        <div class="who"><b>Good evening</b><small>Sat, 7 Nov</small></div>
+        <span class="iconbtn"><svg class="i"><use href="#wallet"/></svg></span>
+        <span class="iconbtn"><svg class="i"><use href="#user"/></svg></span>
+      </div>
+      <div class="glass hero" style="margin-top:16px">
+        <div class="top"><span class="lab">Left in budget</span><span class="eye" aria-label="Show amounts"><svg class="i"><use href="#eye-slash"/></svg></span></div>
+        <div class="amt num" aria-label="Amount hidden">₹ ••••</div>
+        <div class="hbar ghost" aria-hidden="true"></div>
+        <div class="hcap num">₹ •••• of ₹ ••••</div>
+        <div class="hday num">~₹ ••••/day · 12 days left</div>
+        <div class="hacc num"><span>In accounts <b>₹ ••••</b></span><span>Card dues <b>₹ ••••</b></span></div>
+      </div>
+      <div class="card"><div class="check"><div class="tx"><b style="font-size:17px;line-height:24px;font-weight:500">3 to check</b><small>Waiting for you</small></div><svg class="i"><use href="#caret"/></svg></div></div>
+      <div class="card">
+        <div class="ct"><b>Income and expense</b><small>This period</small></div>
+        <div class="ie num"><div><small>Income</small><b class="inc">+₹ ••••</b></div><div><small>Spent</small><b>₹ ••••</b></div></div>
+      </div>
+      <div class="card">
+        <div class="ct"><b>Budgets</b><small>This period</small></div>
+        <!-- "85% used" status not rendered while masked: ratio text is hidden with the bars (DESIGN.md Components > Amount mask) -->
+        <div class="brow"><div class="bl num"><span>Food &amp; Drinks</span><span>₹ •••• of ₹ ••••</span></div><div class="lbar ghost"></div></div>
+        <div class="brow"><div class="bl num"><span>Shopping</span><span>₹ •••• of ₹ ••••</span></div><div class="lbar ghost"></div></div>
+      </div>
+    </div>
+    <nav class="tabbar glass">
+      <span class="tab on"><svg class="i f"><use href="#house-f"/></svg>Home</span>
+      <span class="tab"><svg class="i"><use href="#rows"/></svg>Activity<i class="dot"></i></span>
+      <span class="plus"><svg class="i"><use href="#plus"/></svg></span>
+      <span class="tab"><svg class="i"><use href="#chart"/></svg>Insights</span>
+      <span class="tab"><svg class="i"><use href="#cal"/></svg>Plan</span>
+    </nav>
+  </div>
+</figure>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Key Screen Capture Batch</title>
+<style>
+/* =====================================================================
+   wmbugo — Key screen: capture sheet, batch (SCR-27). Illustration only; the spines are the contract.
+   GOVERNING SPINE SECTIONS
+     DESIGN.md   Components > Capture sheet (capture-sheet tokens), Buttons, Colors > Glass (dark 62% floor, <=45% cap on
+                 any gradient behind dark glass incl. the header band; light 80%), Gradient, Elevation (sticky footer is
+                 solid fallback, never glass on glass), Typography (headline amount tnum, caption grid labels)
+     EXPERIENCE  Component Patterns > Capture sheet, Swipe cards, Category icon grid; Interaction Primitives (every gesture
+                 has a visible control: Later, Previous / Skip; sheets; banned blind Approve all);
+                 Capture Surfaces outside the App > Capture sheet; Voice and Tone ("Adds itself at 9:00 pm unless you reject it")
+   TOKENS USED (DESIGN.md hex only)
+     scrim #0F172A99 · glass-tint #164E63 @ 62% (dark) / 80% (light) · glass-border #5EEAD438
+     gradient-brand #2DD4BF > #0F766E > #164E63 (header band; dark at 45% = cap, light full strength)
+     glass-fallback #155665 (light footer) / glass-fallback-dark #1A3C4F (dark footer)
+     on-glass-primary #F8FAFC · on-glass-secondary-dark #CBD5E1 · on-glass-accent #5EEAD4 · bg-canvas-dark #0F172A (selected ink)
+     button-primary #0F766E > #164E63, #FFFFFF label · button-secondary dark: 1px #5EEAD4 + #5EEAD4 label
+     Host app placeholder (worst case: a light app): bg-surface #FFFFFF, bg-muted #E2E8F0, border-hairline #E2E8F0.
+     Page chrome: #E2E8F0 page, #0F172A ink.
+   TEXT-ON-GLASS CONTRAST (scratchpad contrast.js, WCAG 2.x, alpha-composited; host = white app under the 60% scrim)
+     DARK band:  62% glass over band start #2DD4BF @45% over scrim-on-white -> #2D6D79
+                 #F8FAFC 5.63:1 PASS · #CBD5E1 3.97:1 FAIL -> band text uses #F8FAFC only (hierarchy by type role)
+                 (over a dark host #1E293B: #F8FAFC 7.33, #CBD5E1 5.17)
+     DARK body:  62% glass over scrim-on-white -> #385C6E: #F8FAFC 6.84:1, #CBD5E1 4.82:1 PASS; #5EEAD4 4.84:1 (fills/icons)
+     LIGHT band: 80% glass over full band start #2DD4BF -> #1B6975: #F8FAFC 6.05:1 PASS
+     LIGHT body: 80% glass over scrim-on-white -> #285669: #F8FAFC 7.69:1 PASS
+     Footers:    #F8FAFC on #1A3C4F 11.13:1 · #5EEAD4 on #1A3C4F 7.87:1 · #F8FAFC on #155665 7.87:1
+                 #FFFFFF on button-primary 5.47:1 (#0F766E) to 9.11:1 (#164E63)
+                 Light Reject = button-secondary-on-footer (DESIGN.md Buttons): accent #0F766E on #155665 would be 1.50:1,
+                 so outline + label are on-glass-primary #F8FAFC (7.87:1). Dark keeps #5EEAD4 on #1A3C4F (7.87:1).
+     Band text: on-glass-primary only, both modes (DESIGN.md Colors > Glass; dark #CBD5E1 over band 3.96:1).
+     Selected grid cell: #0F172A on #5EEAD4 12.07:1.
+   ===================================================================== */
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#E2E8F0;color:#0F172A;font-family:Inter,"Inter Variable",system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",sans-serif;padding:24px 16px 48px}
+.pagehead{max-width:1100px;margin:0 auto 20px}
+.pagehead h1{font-size:20px;line-height:26px;font-weight:600}
+.pagehead p{font-size:14px;line-height:20px;margin-top:4px;max-width:900px;color:#475569}
+.grid{display:flex;flex-wrap:wrap;gap:40px;justify-content:center;align-items:flex-start;max-width:1100px;margin:0 auto}
+figure{width:360px;max-width:100%}
+figcaption{font-size:14px;line-height:20px;font-weight:500;margin-bottom:10px}
+figcaption span{display:block;font-weight:400;color:#475569;font-size:13px;line-height:18px}
+.i{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.i.f{fill:currentColor;stroke:none}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+
+.phone{position:relative;width:360px;height:820px;border-radius:32px;overflow:hidden;box-shadow:0 0 0 8px #0F172A;isolation:isolate;background:#FFFFFF}
+/* host app placeholder: deliberately text-free, light (worst case behind the scrim) */
+.host{position:absolute;inset:0;padding:40px 16px 0;display:flex;flex-direction:column;gap:12px}
+.host .bar{height:48px;border-radius:8px;background:#E2E8F0}
+.host .blk{height:72px;border-radius:12px;background:#FFFFFF;box-shadow:inset 0 0 0 1px #E2E8F0;display:flex;align-items:center;gap:12px;padding:0 12px}
+.host .blk i{width:40px;height:40px;border-radius:9999px;background:#E2E8F0;flex:none}
+.host .blk b{height:12px;flex:1;border-radius:8px;background:#E2E8F0}
+.host .big{height:160px;border-radius:12px;background:#E2E8F0}
+.scrim{position:absolute;inset:0;background:#0F172A99}
+
+/* ---------- sheet ---------- */
+.sheet{position:absolute;left:0;right:0;bottom:0;height:70%;border-radius:16px 16px 0 0;overflow:hidden;color:#F8FAFC;
+  border:1px solid #5EEAD438;border-bottom:0;-webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px);display:flex;flex-direction:column}
+.sheet .band{position:absolute;left:0;right:0;top:0;height:132px;background:linear-gradient(135deg,#2DD4BF,#0F766E 50%,#164E63)}
+.dark .band{opacity:.45}           /* LOCKED CAP: gradient behind dark glass <= 45% */
+.sheet .tint{position:absolute;inset:0}
+.dark .tint{background:#164E639F}  /* 62% LOCKED FLOOR */
+.light .tint{background:#164E63CC} /* 80% */
+.body{position:relative;flex:1;min-height:0;overflow:hidden;padding:0 16px}
+.grab{width:32px;height:4px;border-radius:9999px;margin:8px auto 4px;background:rgba(248,250,252,.6)}
+.dark .grab{background:rgba(203,213,225,.6)}  /* grabber is non-text */
+.hd,.pager{color:#F8FAFC}  /* band: primary ink only, both modes */
+.hd{display:flex;align-items:flex-start;gap:8px;min-height:112px;padding-top:4px}
+.hd .who{flex:1}
+.amount{font-size:28px;line-height:34px;font-weight:600}
+.merch{font-size:16px;line-height:24px;font-weight:500}
+.acct{font-size:13px;line-height:18px;color:#F8FAFC}   /* band: primary ink only (see contrast note) */
+.tbtn{min-height:48px;min-width:48px;padding:0 8px;display:inline-grid;place-items:center;color:#F8FAFC;font-size:14px;line-height:20px;font-weight:500;text-decoration:underline;text-underline-offset:3px}
+.hd .tbtn{margin:-6px -8px 0 0}
+.pager{display:flex;align-items:center;justify-content:space-between;margin:4px -8px 0}
+.pager .pos{font-size:14px;line-height:20px;font-weight:500}
+.dots{display:flex;gap:6px;justify-content:center;margin:0 0 12px}
+.dots i{width:6px;height:6px;border-radius:9999px;background:rgba(248,250,252,.4)}
+.dark .dots i{background:rgba(203,213,225,.4)}
+.dots i.on{background:#5EEAD4}
+.cats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.cell{display:flex;flex-direction:column;align-items:center;gap:4px;min-height:48px}
+.tile{position:relative;width:100%;height:48px;border-radius:12px;display:grid;place-items:center;background:rgba(248,250,252,.12);color:#F8FAFC}
+.tile .chev{position:absolute;right:4px;bottom:4px;width:12px;height:12px;stroke-width:2}
+.cell.sel .tile{background:#5EEAD4;color:#0F172A}
+.cell span{font-size:13px;line-height:18px;text-align:center;color:#F8FAFC;min-height:36px}
+.cell.sel span{font-weight:500}
+.apply{display:flex;margin:4px -8px 0}
+.cbrow{display:flex;align-items:center;gap:12px;min-height:48px;margin-top:4px}
+.box{width:24px;height:24px;border-radius:4px;background:#5EEAD4;color:#0F172A;display:grid;place-items:center;flex:none}
+.box .i{width:18px;height:18px;stroke-width:2.5}
+.cbrow span{font-size:16px;line-height:24px}
+.auto{font-size:13px;line-height:18px;margin-top:4px}
+.dark .auto{color:#CBD5E1}
+.light .auto{color:#F8FAFC}
+.foot{position:relative;display:flex;gap:12px;padding:12px 16px 20px}
+.dark .foot{background:#1A3C4F}
+.light .foot{background:#155665}
+.btn{flex:1;min-height:48px;border-radius:12px;display:grid;place-items:center;font-size:14px;line-height:20px;font-weight:500}
+.btn.pri{background:linear-gradient(135deg,#0F766E,#164E63);color:#FFFFFF}
+.dark .btn.sec{border:1px solid #5EEAD4;color:#5EEAD4}
+.light .btn.sec{border:1px solid #F8FAFC;color:#F8FAFC}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="food" viewBox="0 0 24 24"><path d="M7 3v18M4.5 3v5a2.5 2.5 0 0 0 5 0V3"/><path d="M18 21V3c-2.2 0-3.5 3-3.5 6.5S15.8 14 18 14"/></symbol>
+  <symbol id="food-f" viewBox="0 0 24 24"><path d="M4 2.5h1.5v5.3a1 1 0 0 0 .75.97V2.5h1.5v6.27a1 1 0 0 0 .75-.97V2.5H10v5.5a3 3 0 0 1-2.25 2.9V21h-1.5V10.9A3 3 0 0 1 4 8z"/><path d="M18.75 2.5V21h-1.5v-6.3c-2.3-.3-3.5-2.4-3.5-5.2 0-3.9 1.5-7 5-7z"/></symbol>
+  <symbol id="cart" viewBox="0 0 24 24"><path d="M2.5 4h2.2l2.5 11.5h11l2.3-8.5H6"/><circle cx="9" cy="19.5" r="1.3"/><circle cx="17" cy="19.5" r="1.3"/></symbol>
+  <symbol id="bus" viewBox="0 0 24 24"><rect x="5" y="3.5" width="14" height="14.5" rx="2.5"/><path d="M5 11h14M8 21v-3M16 21v-3"/><path d="M8.5 14.5h.01M15.5 14.5h.01"/></symbol>
+  <symbol id="bag" viewBox="0 0 24 24"><path d="M5 8h14l-1 12.5H6z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/></symbol>
+  <symbol id="bolt" viewBox="0 0 24 24"><path d="M13 2.5L4.5 13.5h6.5l-1 8 8.5-11h-6.5z"/></symbol>
+  <symbol id="film" viewBox="0 0 24 24"><rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M7.5 4v16M16.5 4v16M3.5 9h4M3.5 15h4M16.5 9h4M16.5 15h4"/></symbol>
+  <symbol id="heart" viewBox="0 0 24 24"><path d="M12 20s-8-4.6-8-10.2A4.4 4.4 0 0 1 12 7.2a4.4 4.4 0 0 1 8 2.6C20 15.4 12 20 12 20z"/></symbol>
+  <symbol id="dots" viewBox="0 0 24 24"><path d="M6 12h.01M12 12h.01M18 12h.01" stroke-width="3"/></symbol>
+  <symbol id="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+</svg>
+
+<div class="pagehead">
+  <h1>Capture sheet, batch (SCR-27): key screen</h1>
+  <p>A bottom sheet over the dimmed host app, here a light app (the worst case for contrast). Left: dark mode, card 2 of 4. Right: light mode, card 2 of 3 from the same merchant, so "Apply to all similar" appears. Swipe down or Later = decide later. Approve or Reject moves to the next card. There is no Approve all.</p>
+</div>
+
+<div class="grid">
+
+<!-- ================= DARK · CARD 2 OF 4 ================= -->
+<figure>
+  <figcaption>Dark · card 2 of 4<span>Header band at 45% under 62% glass; Previous / 2 of 4 / Skip with decorative dots; guessed category pre-selected; sticky solid footer</span></figcaption>
+  <div class="phone">
+    <div class="host" aria-hidden="true"><div class="bar"></div><div class="big"></div><div class="blk"><i></i><b></b></div><div class="blk"><i></i><b></b></div><div class="blk"><i></i><b></b></div></div>
+    <div class="scrim"></div>
+    <section class="sheet dark" role="dialog" aria-label="Check payment">
+      <div class="band"></div><div class="tint"></div>
+      <div class="body">
+        <div class="grab"></div>
+        <div class="hd">
+          <div class="who">
+            <div class="amount num">₹310</div>
+            <div class="merch">Zomato</div>
+            <div class="acct num">HDFC debit ••4821 · 8:42 pm</div>
+          </div>
+          <span class="tbtn">Later</span>
+        </div>
+        <div class="pager"><span class="tbtn">Previous</span><span class="pos num">2 of 4</span><span class="tbtn">Skip</span></div>
+        <div class="dots" aria-hidden="true"><i></i><i class="on"></i><i></i><i></i></div>
+        <div class="cats">
+          <div class="cell sel"><div class="tile"><svg class="i f"><use href="#food-f"/></svg><svg class="i chev"><use href="#chev"/></svg></div><span>Food &amp; Drinks</span></div>
+          <div class="cell"><div class="tile"><svg class="i"><use href="#cart"/></svg></div><span>Groceries</span></div>
+          <div class="cell"><div class="tile"><svg class="i"><use href="#bus"/></svg><svg class="i chev"><use href="#chev"/></svg></div><span>Transport</span></div>
+          <div class="cell"><div class="tile"><svg class="i"><use href="#bag"/></svg></div><span>Shopping</span></div>
+          <div class="cell"><div class="tile"><svg class="i"><use href="#bolt"/></svg></div><span>Bills &amp; Utilities</span></div>
+          <div class="cell"><div class="tile"><svg class="i"><use href="#film"/></svg></div><span>Entertain&shy;ment</span></div>
+          <div class="cell"><div class="tile"><svg class="i"><use href="#heart"/></svg></div><span>Healthcare</span></div>
+          <div class="cell"><div class="tile"><svg class="i"><use href="#dots"/></svg></div><span>Other</span></div>
+        </div>
+        <div class="cbrow"><span class="box"><svg class="i"><use href="#check"/></svg></span><span>Remember for this merchant</span></div>
+        <div class="auto">Adds itself at 9:00 pm unless you reject it</div>
+      </div>
+      <div class="foot"><span class="btn sec">Reject</span><span class="btn pri">Approve</span></div>
+    </section>
+  </div>
+</figure>
+
+<!-- ================= LIGHT · APPLY TO ALL SIMILAR ================= -->
+<figure>
+  <figcaption>Light · card 2 of 3, shared merchant<span>All three cards are Swiggy, so "Apply to all similar" is offered (no blind Approve all); full-strength band under 80% glass</span></figcaption>
+  <div class="phone">
+    <div class="host" aria-hidden="true"><div class="bar"></div><div class="big"></div><div class="blk"><i></i><b></b></div><div class="blk"><i></i><b></b></div><div class="blk"><i></i><b></b></div></div>
+    <div class="scrim"></div>
+    <section class="sheet light" role="dialog" aria-label="Check payment">
+      <div class="band"></div><div class="tint"></div>
+      <div class="body">
+        <div class="grab"></div>
+        <div class="hd">
+          <div class="who">
+            <div class="amount num">₹180</div>
+            <div class="merch">Swiggy</div>
+            <div class="acct num">HDFC debit ••4821 · 1:15 pm</div>
+          </div>
+          <span class="tbtn">Later</span>
+        </div>
+        <div class="pager"><span class="tbtn">Previous</span><span class="pos num">2 of 3</span><span class="tbtn">Skip</span></div>
+        <div class="dots" aria-hidden="true"><i></i><i class="on"></i><i></i></div>
+        <div class="cats">
+          <div class="cell sel"><div class="tile"><svg class="i f"><use href="#food-f"/></svg><svg class="i chev"><use href="#chev"/></svg></div><span>Food &amp; Drinks</span></div>
+          <div class="cell"><div class="tile"><svg class="i"><use href="#cart"/></svg></div><span>Groceries</span></div>
+          <div class="cell"><div class="tile"><svg class="i"><use href="#bus"/></svg><svg class="i chev"><use href="#chev"/></svg></div><span>Transport</span></div>
+          <div class="cell"><div class="tile"><svg class="i"><use href="#bag"/></svg></div><span>Shopping</span></div>
+          <div class="cell"><div class="tile"><svg class="i"><use href="#bolt"/></svg></div><span>Bills &amp; Utilities</span></div>
+          <div class="cell"><div class="tile"><svg class="i"><use href="#film"/></svg></div><span>Entertain&shy;ment</span></div>
+          <div class="cell"><div class="tile"><svg class="i"><use href="#heart"/></svg></div><span>Healthcare</span></div>
+          <div class="cell"><div class="tile"><svg class="i"><use href="#dots"/></svg></div><span>Other</span></div>
+        </div>
+        <div class="apply"><span class="tbtn">Apply to all similar</span></div>
+        <div class="cbrow"><span class="box"><svg class="i"><use href="#check"/></svg></span><span>Remember for this merchant</span></div>
+        <div class="auto">Adds itself at 9:00 pm unless you reject it</div>
+      </div>
+      <div class="foot"><span class="btn sec">Reject</span><span class="btn pri">Approve</span></div>
+    </section>
+  </div>
+</figure>
+
+</div>
+</body>
+</html>

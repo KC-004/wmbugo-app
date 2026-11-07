@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Key Screen Activity</title>
+<style>
+/* =====================================================================
+   wmbugo — Key screen: Activity list (SCR-07), light. Illustration only; the spines are the contract.
+   GOVERNING SPINE SECTIONS
+     DESIGN.md   Components > Activity row (row-state table), Chips (filter chip, Filters · N, Clear all, status-tag),
+                 category-icon-chip, Category palette, Typography > Large text (rule 2: amount stacks at fontScale >= 1.3),
+                 Colors > Glass (tab bar over white rows = worst case), Layout & Spacing (day header + rows, hairlines)
+     EXPERIENCE  Component Patterns > Activity row, Filter chip row, Selection mode (Select entry point);
+                 State Patterns > SCR-07; Information Architecture (Activity dot, no count); Voice and Tone (no minus signs);
+                 Accessibility Floor > Large text
+   TOKENS USED (DESIGN.md hex only)
+     bg-canvas #F8FAFC · bg-surface #FFFFFF · text-primary #0F172A · text-secondary #475569 · accent-primary #0F766E
+     semantic-income #15803D · semantic-transfer #1D4ED8 · semantic-warning #B45309 · border-control #475569
+     border-hairline #E2E8F0 · chip-selected #0F766E / #FFFFFF · status-tag bg #F8FAFC / fg #475569
+     cat-rose #E11D48 (Food & Drinks) · cat-sky #0284C7 (Transport, Refunds) · cat-lime #4D7C0F (Groceries)
+     cat-emerald #065F46 (Salary) · glass #164E63 @ 80% + border #5EEAD438 · on-glass #F8FAFC / #5EEAD4 / #FCD34D
+     category-icon-chip bg = cat hue at 16% (hex + 29 alpha). Page chrome: #E2E8F0 page, #0F172A ink.
+   TEXT-ON-GLASS CONTRAST (scratchpad contrast.js, WCAG 2.x)
+     Tab bar, 80% #164E63 over white row #FFFFFF -> #457182: #F8FAFC labels 5.08:1 PASS; #5EEAD4 active icon 3.59:1,
+     #FCD34D pending dot 3.68:1 (non-text >= 3:1 PASS). No other text sits on glass on this screen.
+   SOLID CONTRAST
+     Check tag #B45309 on tag bg #F8FAFC 4.80:1 PASS · tags #475569 on #F8FAFC 7.24:1 · income #15803D on #FFFFFF 5.02:1
+     chip-selected #FFFFFF on #0F766E 5.47:1 · subtitle #475569 on #FFFFFF 7.58:1
+   200% COLUMN: 320dp frame, every sp role x2 (body 32/48, caption 26/36, tag 24/32, label 28/40, title 40/52);
+     icon chip stays 40dp; amount stacks on its own line, right-aligned. Header: two rows (icons + More options, then title).
+     Tab bar: labels capped at 1.3x (15.6sp) then auto-fit to the 64dp slot (drawn at 14px). DESIGN.md Typography > Large text 5-7.
+   DAY HEADER SPENT: refund-net (EXPERIENCE Component Patterns > Activity row): Thu 5 Nov = 1,500 - 1,299 = 201.
+   ===================================================================== */
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#E2E8F0;color:#0F172A;font-family:Inter,"Inter Variable",system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",sans-serif;padding:24px 16px 48px}
+.pagehead{max-width:1100px;margin:0 auto 20px}
+.pagehead h1{font-size:20px;line-height:26px;font-weight:600}
+.pagehead p{font-size:14px;line-height:20px;margin-top:4px;max-width:900px;color:#475569}
+.grid{display:flex;flex-wrap:wrap;gap:40px;justify-content:center;align-items:flex-start;max-width:1100px;margin:0 auto}
+figure{max-width:100%}
+figcaption{font-size:14px;line-height:20px;font-weight:500;margin-bottom:10px;max-width:360px}
+figcaption span{display:block;font-weight:400;color:#475569;font-size:13px;line-height:18px}
+.note{font-size:13px;line-height:18px;color:#475569;margin-top:12px;max-width:320px}
+.i{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.i.f{fill:currentColor;stroke:none}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+
+.phone{position:relative;width:360px;height:1010px;border-radius:32px;overflow:hidden;box-shadow:0 0 0 8px #0F172A;background:#F8FAFC;color:#0F172A}
+.phone.p320{width:320px;height:1180px}
+.status{height:28px;display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:500;padding:0 16px}
+.head{display:flex;align-items:center;min-height:64px;padding:0 4px 0 16px}
+.head h2{flex:1;font-size:20px;line-height:26px;font-weight:600}
+.iconbtn{width:48px;height:48px;display:grid;place-items:center;color:#0F172A}
+.tbtn{min-height:48px;padding:0 8px;display:grid;place-items:center;color:#0F766E;font-size:14px;line-height:20px;font-weight:500}
+
+/* filter chip row: horizontally scrolling; 32dp chips with 48dp hit rows */
+.chips{display:flex;gap:8px;align-items:center;min-height:48px;padding:0 16px;overflow:hidden;white-space:nowrap}
+.chip{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 12px;border-radius:9999px;border:1px solid #475569;font-size:14px;line-height:20px;font-weight:500;color:#0F172A;flex:none}
+.chip.sel{background:#0F766E;border-color:#0F766E;color:#FFFFFF}
+.chip .i{width:18px;height:18px}
+
+.day{display:flex;justify-content:space-between;align-items:center;min-height:40px;padding:8px 16px;font-size:14px;line-height:20px;font-weight:500;color:#475569;margin-top:4px}
+.list{background:#FFFFFF}
+.row{position:relative;display:flex;align-items:center;gap:12px;min-height:64px;padding:8px 16px;background:#FFFFFF;border-bottom:1px solid #E2E8F0}
+.row.wait{outline:1px dashed #475569;outline-offset:-4px;border-radius:4px}
+.cchip{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;flex:none}
+.main{flex:1;min-width:0}
+.title{font-size:16px;line-height:24px;font-weight:500}
+.sub{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;font-size:13px;line-height:18px;color:#475569}
+.tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:9999px;background:#F8FAFC;color:#475569;font-size:12px;line-height:16px;font-weight:500;box-shadow:inset 0 0 0 1px #E2E8F0}
+.tag.w{color:#B45309}
+.wicon{color:#B45309;width:16px;height:16px}
+.amt{font-size:16px;line-height:24px;font-weight:600;text-align:right;white-space:nowrap;display:flex;align-items:center;gap:4px;justify-content:flex-end}
+.amt.inc{color:#15803D}
+.amt .i{width:16px;height:16px}
+.strike .title,.strike .amt{text-decoration:line-through;color:#475569}
+
+/* 200% font scale overrides */
+.p320 .status{font-size:12px}
+.p320 .head{flex-wrap:wrap;justify-content:flex-end;padding:0 4px 0 16px}
+.p320 .head .icons{display:flex;justify-content:flex-end;width:100%}
+.p320 .head h2{flex:0 0 100%;font-size:40px;line-height:52px;padding-bottom:4px}
+.p320 .tab{font-size:14px;line-height:18px}
+.p320 .tbtn{font-size:28px;line-height:40px}
+.p320 .chip{font-size:28px;line-height:40px;min-height:48px;padding:4px 16px}
+.p320 .chip .i{width:24px;height:24px}
+.p320 .chips{flex-wrap:nowrap}
+.p320 .day{display:block;font-size:28px;line-height:40px;padding:12px 16px}
+.p320 .day span{display:block}
+.p320 .row{align-items:flex-start;padding:12px 16px}
+.p320 .row .cchip{margin-top:4px}
+.p320 .title{font-size:32px;line-height:48px}
+.p320 .sub{font-size:26px;line-height:36px}
+.p320 .tag{font-size:24px;line-height:32px;padding:2px 12px}
+.p320 .wicon{width:26px;height:26px}
+.p320 .amt{font-size:32px;line-height:48px;margin-top:4px}
+
+/* tab bar (glass, light 80%) */
+.tabbar{position:absolute;left:0;right:0;bottom:0;min-height:80px;padding:0 4px 16px;display:flex;align-items:center;justify-content:space-around;
+  background:rgba(22,78,99,.80);border-top:1px solid #5EEAD438;-webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px)}
+.tab{width:64px;min-height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px;line-height:16px;color:#F8FAFC;position:relative}
+.tab.on{font-weight:500}
+.tab.on .i{color:#5EEAD4}
+.tab .dot{position:absolute;top:8px;left:38px;width:8px;height:8px;border-radius:9999px;background:#FCD34D}
+.plus{width:56px;height:56px;border-radius:9999px;display:grid;place-items:center;color:#FFFFFF;border:1px solid #5EEAD438;
+  background:linear-gradient(135deg,#2DD4BF,#0F766E 50%,#164E63);box-shadow:0 4px 12px rgba(15,23,42,.30)}
+.plus .i{width:28px;height:28px;stroke-width:2}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.3-4.3"/></symbol>
+  <symbol id="wallet" viewBox="0 0 24 24"><path d="M4 7.5V6a2 2 0 0 1 2-2h11v3.5"/><rect x="3" y="7.5" width="18" height="12.5" rx="2"/><path d="M16.5 13.75h.01"/></symbol>
+  <symbol id="user" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.6 18.4c1.4-1.9 3.3-2.9 5.4-2.9s4 1 5.4 2.9"/></symbol>
+  <symbol id="funnel" viewBox="0 0 24 24"><path d="M3.5 5h17l-6.5 7.5V19l-4 2v-8.5z"/></symbol>
+  <symbol id="x" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
+  <symbol id="warn" viewBox="0 0 24 24"><path d="M12 3.5L2.5 20h19L12 3.5z"/><path d="M12 10v4.5"/><path d="M12 17.3v.2"/></symbol>
+  <symbol id="food" viewBox="0 0 24 24"><path d="M7 3v18M4.5 3v5a2.5 2.5 0 0 0 5 0V3"/><path d="M18 21V3c-2.2 0-3.5 3-3.5 6.5S15.8 14 18 14"/></symbol>
+  <symbol id="bus" viewBox="0 0 24 24"><rect x="5" y="3.5" width="14" height="14.5" rx="2.5"/><path d="M5 11h14M8 21v-3M16 21v-3"/><path d="M8.5 14.5h.01M15.5 14.5h.01"/></symbol>
+  <symbol id="cart" viewBox="0 0 24 24"><path d="M2.5 4h2.2l2.5 11.5h11l2.3-8.5H6"/><circle cx="9" cy="19.5" r="1.3"/><circle cx="17" cy="19.5" r="1.3"/></symbol>
+  <symbol id="swap" viewBox="0 0 24 24"><path d="M4 8h15M15.5 4.5L19 8l-3.5 3.5M20 16H5M8.5 12.5L5 16l3.5 3.5"/></symbol>
+  <symbol id="return" viewBox="0 0 24 24"><path d="M9 14.5L4 9.5l5-5"/><path d="M4 9.5h10.5a5.5 5.5 0 0 1 0 11H11"/></symbol>
+  <symbol id="brief" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5.2A1.2 1.2 0 0 1 10.2 4h3.6A1.2 1.2 0 0 1 15 5.2V7M3 12.5h18"/></symbol>
+  <symbol id="house" viewBox="0 0 24 24"><path d="M3.5 10.5L12 4l8.5 6.5V20a1 1 0 0 1-1 1H15v-6H9v6H4.5a1 1 0 0 1-1-1z"/></symbol>
+  <symbol id="rows-f" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M5.5 3.2h13a2.8 2.8 0 0 1 2.8 2.8v12a2.8 2.8 0 0 1-2.8 2.8h-13A2.8 2.8 0 0 1 2.7 18V6a2.8 2.8 0 0 1 2.8-2.8zM7.5 8.2v1.6h9V8.2zm0 3v1.6h9v-1.6zm0 3v1.6h6v-1.6z"/></symbol>
+  <symbol id="chart" viewBox="0 0 24 24"><path d="M3 20.5h18"/><rect x="5" y="11" width="3" height="7" rx=".5"/><rect x="10.5" y="5" width="3" height="13" rx=".5"/><rect x="16" y="8.5" width="3" height="9.5" rx=".5"/></symbol>
+  <symbol id="cal" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></symbol>
+  <symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="more" viewBox="0 0 24 24"><path d="M12 5.5h.01M12 12h.01M12 18.5h.01" stroke-width="3"/></symbol>
+</svg>
+
+<div class="pagehead">
+  <h1>Activity (SCR-07): key screen</h1>
+  <p>Left: the list in light mode at 100% text, with two active filters, day headers showing refund-net Spent for the filtered day (expenses minus refunds; pending, reversed, transfers and income excluded: Thu ₹1,500 fuel − ₹1,299 refund = ₹201), and one row for each state. Right: the same list at 200% font scale on a 320dp frame. Each amount moves to its own line (rule C1) and is never shortened; the header splits into two rows with Select in More options; tab labels cap at 1.3× and auto-fit.</p>
+</div>
+
+<div class="grid">
+
+<!-- ================= 100% · 360dp ================= -->
+<figure>
+  <figcaption>Light · 100% · 360dp<span>Filters · 2 + two removable chips + Clear all; rows: plain, guessed, waiting, Check, transfer, plain, reversed, income, refund, plain (last rows scroll under the glass tab bar)</span></figcaption>
+  <div class="phone">
+    <div class="status num"><span>9:41</span><span>5G · 82%</span></div>
+    <div class="head">
+      <h2>Activity</h2>
+      <span class="iconbtn" aria-label="Search"><svg class="i"><use href="#search"/></svg></span>
+      <span class="tbtn">Select</span>
+      <span class="iconbtn" aria-label="Accounts"><svg class="i"><use href="#wallet"/></svg></span>
+      <span class="iconbtn" aria-label="Settings"><svg class="i"><use href="#user"/></svg></span>
+    </div>
+    <div class="chips">
+      <span class="chip"><svg class="i"><use href="#funnel"/></svg>Filters · 2</span>
+      <span class="chip sel" aria-label="Remove filter: HDFC debit">HDFC debit<svg class="i"><use href="#x"/></svg></span>
+      <span class="chip sel" aria-label="Remove filter: Last 7 days">Last 7 days<svg class="i"><use href="#x"/></svg></span>
+      <span class="chip">Clear all</span>
+    </div>
+
+    <div class="day num"><span>Today · Sat 7 Nov</span><span>Spent ₹1,032</span></div>
+    <div class="list">
+      <div class="row"><span class="cchip" style="background:#E11D4829;color:#E11D48"><svg class="i"><use href="#food"/></svg></span>
+        <div class="main"><div class="title">Swiggy</div><div class="sub">Food &amp; Drinks · HDFC debit</div></div><div class="amt num">₹420</div></div>
+      <div class="row"><span class="cchip" style="background:#E11D4829;color:#E11D48"><svg class="i"><use href="#food"/></svg></span>
+        <div class="main"><div class="title">Swiggy Instamart</div><div class="sub">Food &amp; Drinks · HDFC debit <span class="tag">guessed</span></div></div><div class="amt num">₹612</div></div>
+      <div class="row wait"><span class="cchip" style="background:#E11D4829;color:#E11D48"><svg class="i"><use href="#food"/></svg></span>
+        <div class="main"><div class="title">Zomato</div><div class="sub">Food &amp; Drinks · HDFC debit <span class="tag">waiting</span></div></div><div class="amt num">₹310</div></div>
+      <div class="row"><span class="cchip" style="background:#0284C729;color:#0284C7"><svg class="i"><use href="#bus"/></svg></span>
+        <div class="main"><div class="title">Uber</div><div class="sub">Transport · HDFC debit <svg class="i wicon"><use href="#warn"/></svg><span class="tag w">Check</span></div></div><div class="amt num">₹186</div></div>
+    </div>
+
+    <div class="day num"><span>Yesterday · Fri 6 Nov</span><span>Spent ₹60</span></div>
+    <div class="list">
+      <div class="row"><span class="cchip" style="background:#F8FAFC;color:#1D4ED8"><svg class="i"><use href="#swap"/></svg></span>
+        <div class="main"><div class="title">To ICICI savings</div><div class="sub">Transfer · HDFC debit</div></div><div class="amt num">₹5,000</div></div>
+      <div class="row"><span class="cchip" style="background:#0284C729;color:#0284C7"><svg class="i"><use href="#bus"/></svg></span>
+        <div class="main"><div class="title">Metro</div><div class="sub">Transport · HDFC debit</div></div><div class="amt num">₹60</div></div>
+      <div class="row strike"><span class="cchip" style="background:#4D7C0F29;color:#4D7C0F"><svg class="i"><use href="#cart"/></svg></span>
+        <div class="main"><div class="title">BigBasket</div><div class="sub">Groceries · HDFC debit <span class="tag">reversed</span></div></div><div class="amt num">₹1,264</div></div>
+    </div>
+
+    <div class="day num"><span>Thu 5 Nov</span><span>Spent ₹201</span></div>
+    <div class="list">
+      <div class="row"><span class="cchip" style="background:#065F4629;color:#065F46"><svg class="i"><use href="#brief"/></svg></span>
+        <div class="main"><div class="title">Acme Technologies</div><div class="sub">Salary · HDFC debit</div></div><div class="amt inc num">+₹85,000</div></div>
+      <div class="row"><span class="cchip" style="background:#0284C729;color:#0284C7"><svg class="i"><use href="#return"/></svg></span>
+        <div class="main"><div class="title">Myntra</div><div class="sub">Refunds · HDFC debit</div></div><div class="amt inc num"><svg class="i"><use href="#return"/></svg>+₹1,299</div></div>
+      <div class="row"><span class="cchip" style="background:#0284C729;color:#0284C7"><svg class="i"><use href="#bus"/></svg></span>
+        <div class="main"><div class="title">HP Petrol</div><div class="sub">Transport · HDFC debit</div></div><div class="amt num">₹1,500</div></div>
+    </div>
+
+    <nav class="tabbar">
+      <span class="tab"><svg class="i"><use href="#house"/></svg>Home</span>
+      <span class="tab on"><svg class="i f"><use href="#rows-f"/></svg>Activity<i class="dot"></i></span>
+      <span class="plus" aria-label="Add entry"><svg class="i"><use href="#plus"/></svg></span>
+      <span class="tab"><svg class="i"><use href="#chart"/></svg>Insights</span>
+      <span class="tab"><svg class="i"><use href="#cal"/></svg>Plan</span>
+    </nav>
+  </div>
+</figure>
+
+<!-- ================= 200% · 320dp ================= -->
+<figure>
+  <figcaption>Light · 200% font scale · 320dp<span>Each amount sits on its own line, right-aligned in tabular figures; the subtitle and tags wrap; the icon chip stays 40dp; the chip row scrolls</span></figcaption>
+  <div class="phone p320">
+    <div class="status num"><span>9:41</span><span>5G · 82%</span></div>
+    <div class="head">
+      <div class="icons">
+        <span class="iconbtn" aria-label="Search"><svg class="i"><use href="#search"/></svg></span>
+        <span class="iconbtn" aria-label="More options"><svg class="i"><use href="#more"/></svg></span>
+        <span class="iconbtn" aria-label="Accounts"><svg class="i"><use href="#wallet"/></svg></span>
+        <span class="iconbtn" aria-label="Settings"><svg class="i"><use href="#user"/></svg></span>
+      </div>
+      <h2>Activity</h2>
+    </div>
+    <div class="chips">
+      <span class="chip"><svg class="i"><use href="#funnel"/></svg>Filters · 2</span>
+      <span class="chip sel">HDFC debit<svg class="i"><use href="#x"/></svg></span>
+      <span class="chip sel">Last 7 days<svg class="i"><use href="#x"/></svg></span>
+    </div>
+    <div class="day num"><span>Today · Sat 7 Nov</span><span>Spent ₹1,032</span></div>
+    <div class="list">
+      <div class="row"><span class="cchip" style="background:#E11D4829;color:#E11D48"><svg class="i"><use href="#food"/></svg></span>
+        <div class="main"><div class="title">Swiggy</div><div class="sub">Food &amp; Drinks · HDFC debit</div><div class="amt num">₹420</div></div></div>
+      <div class="row"><span class="cchip" style="background:#E11D4829;color:#E11D48"><svg class="i"><use href="#food"/></svg></span>
+        <div class="main"><div class="title">Swiggy Instamart</div><div class="sub">Food &amp; Drinks · HDFC debit <span class="tag">guessed</span></div><div class="amt num">₹612</div></div></div>
+      <div class="row wait"><span class="cchip" style="background:#E11D4829;color:#E11D48"><svg class="i"><use href="#food"/></svg></span>
+        <div class="main"><div class="title">Zomato</div><div class="sub">Food &amp; Drinks · HDFC debit <span class="tag">waiting</span></div><div class="amt num">₹310</div></div></div>
+      <div class="row"><span class="cchip" style="background:#0284C729;color:#0284C7"><svg class="i"><use href="#bus"/></svg></span>
+        <div class="main"><div class="title">Uber</div><div class="sub">Transport · HDFC debit <svg class="i wicon"><use href="#warn"/></svg><span class="tag w">Check</span></div><div class="amt num">₹186</div></div></div>
+    </div>
+    <div class="day num"><span>Thu 5 Nov</span><span>Spent ₹201</span></div>
+    <div class="list">
+      <div class="row"><span class="cchip" style="background:#065F4629;color:#065F46"><svg class="i"><use href="#brief"/></svg></span>
+        <div class="main"><div class="title">Acme Technologies</div><div class="sub">Salary · HDFC debit</div><div class="amt inc num">+₹85,000</div></div></div>
+      <div class="row"><span class="cchip" style="background:#0284C729;color:#0284C7"><svg class="i"><use href="#return"/></svg></span>
+        <div class="main"><div class="title">Myntra</div><div class="sub">Refunds · HDFC debit</div><div class="amt inc num"><svg class="i"><use href="#return"/></svg>+₹1,299</div></div></div>
+    </div>
+    <nav class="tabbar">
+      <span class="tab"><svg class="i"><use href="#house"/></svg>Home</span>
+      <span class="tab on"><svg class="i f"><use href="#rows-f"/></svg>Activity<i class="dot"></i></span>
+      <span class="plus" aria-label="Add entry"><svg class="i"><use href="#plus"/></svg></span>
+      <span class="tab"><svg class="i"><use href="#chart"/></svg>Insights</span>
+      <span class="tab"><svg class="i"><use href="#cal"/></svg>Plan</span>
+    </nav>
+  </div>
+  <p class="note">Header: two rows at large text; <code>Select</code> lives in More options (⋮). Tab bar: labels capped at 1.3× then auto-fit to the 64dp slot; long-press a tab shows its full-size label. Day headers stack date over Spent.</p>
+</figure>
+
+</div>
+</body>
+</html>

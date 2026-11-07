@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PRD Validation: wmbugo — PRD v1.2.0-draft</title>
+<style>
+  :root {
+    --bg: #fafaf9;
+    --surface: #ffffff;
+    --border: #e7e5e4;
+    --text: #1c1917;
+    --muted: #78716c;
+
+    --verdict-strong: #16a34a;
+    --verdict-adequate: #65a30d;
+    --verdict-thin: #d97706;
+    --verdict-broken: #dc2626;
+
+    --sev-low: #64748b;
+    --sev-medium: #ca8a04;
+    --sev-high: #ea580c;
+    --sev-critical: #dc2626;
+
+    --grade-exc: #16a34a;
+    --grade-good: #65a30d;
+    --grade-fair: #d97706;
+    --grade-poor: #dc2626;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    font-size: 15px;
+  }
+  .container { max-width: 960px; margin: 0 auto; padding: 32px 24px 64px; }
+
+  header.report-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+  .title h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+  .title .subtitle { color: var(--muted); font-size: 13px; margin-top: 4px; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .grade {
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-weight: 600;
+    color: white;
+    font-size: 15px;
+    white-space: nowrap;
+  }
+  .grade-excellent { background: var(--grade-exc); }
+  .grade-good { background: var(--grade-good); }
+  .grade-fair { background: var(--grade-fair); }
+  .grade-poor { background: var(--grade-poor); }
+
+  .synthesis {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--muted);
+    border-radius: 8px;
+    padding: 18px 22px;
+    margin-bottom: 24px;
+    font-size: 15.5px;
+  }
+  .synthesis p { margin: 0 0 10px; }
+  .synthesis p:last-child { margin-bottom: 0; }
+
+  .dimension-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  .dim-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .dim-card .dim-name { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .dim-card .dim-verdict { font-size: 14px; font-weight: 600; }
+
+  section.dimension, section.reviewer-section { margin-bottom: 14px; }
+  section.dimension details, section.reviewer-section details {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  section summary {
+    padding: 14px 20px;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  section summary::-webkit-details-marker { display: none; }
+  section summary::before {
+    content: "▸";
+    display: inline-block;
+    color: var(--muted);
+    transition: transform 0.15s ease;
+  }
+  section details[open] summary::before { transform: rotate(90deg); }
+  section summary h2 {
+    display: inline;
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    flex: 1;
+  }
+  .verdict-pill {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: white;
+  }
+  .verdict-strong { background: var(--verdict-strong); }
+  .verdict-adequate { background: var(--verdict-adequate); }
+  .verdict-thin { background: var(--verdict-thin); }
+  .verdict-broken { background: var(--verdict-broken); }
+
+  .dim-body { padding: 4px 20px 18px; }
+  .dim-judgment { color: var(--text); font-size: 14.5px; }
+  .dim-judgment p { margin: 0 0 10px; }
+
+  .findings-list { padding: 0 20px 4px; }
+  article.finding {
+    padding: 14px 0;
+    border-top: 1px solid var(--border);
+  }
+  article.finding:first-child { border-top: none; }
+  article.finding header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+  }
+  .badge {
+    font-size: 10.5px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    line-height: 1.4;
+  }
+  .badge-sev-low { background: rgba(100, 116, 139, 0.12); color: var(--sev-low); }
+  .badge-sev-medium { background: rgba(202, 138, 4, 0.14); color: var(--sev-medium); }
+  .badge-sev-high { background: rgba(234, 88, 12, 0.14); color: var(--sev-high); }
+  .badge-sev-critical { background: rgba(220, 38, 38, 0.14); color: var(--sev-critical); }
+  .finding-title { margin: 0; font-size: 15px; font-weight: 500; flex: 1; min-width: 200px; }
+  .finding-location { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px; color: var(--muted); }
+  .finding-note, .finding-fix { margin-top: 6px; font-size: 14px; }
+  .finding-fix strong { color: var(--muted); font-weight: 500; }
+
+  .reviewer-source {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  .mechanical {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-top: 24px;
+    font-size: 14px;
+  }
+  .mechanical h3 { margin: 0 0 10px; font-size: 14px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .mechanical ul { margin: 0; padding-left: 20px; }
+  .mechanical li { margin-bottom: 4px; color: var(--text); }
+
+  footer.report-footer {
+    margin-top: 40px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--muted);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  footer .meta { display: flex; gap: 24px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+  <div class="container">
+
+    <header class="report-header">
+      <div class="title">
+        <h1>wmbugo — PRD v1.2.0-draft — Validation Report</h1>
+        <div class="subtitle">input/docs/Idea_prd.md</div>
+      </div>
+      <div class="grade grade-poor">Poor</div>
+    </header>
+
+    <div class="synthesis">
+      <p>The core of this PRD is unusually strong. The financial model (§7), the decision register (§2), the named external gates (§24) and the superseded-source list (§23.1) make it decision-ready and correctness-focused in a way most consumer PRDs are not. The risk is in the v1.1/v1.2 edits. The "effortless capture" layer (DEC-21..25, CAP, LRN, SMS-010..014, OCR-009..013) was added as new sections, but the rest of the document was not updated to match. End-of-day auto-approve conflicts with the PRD's own duplicate-counting P0 and "unconfirmed" rules. §11 data model, §13 parity matrix, §4.1 scope list, §3.3 success metrics and §16.2 release criteria do not reflect the new features. "MVP" now quietly means "Phase 1 Android" without saying what iOS gets. Fix the critical auto-approve finding and the five high findings before UX, architecture or story work starts. Most of the fixes are bounded edits, not rethinks.</p>
+    </div>
+
+    <div class="dimension-summary">
+      <div class="dim-card">
+        <div class="dim-name">Decision-readiness</div>
+        <div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div>
+      </div>
+      <div class="dim-card">
+        <div class="dim-name">Substance over theater</div>
+        <div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div>
+      </div>
+      <div class="dim-card">
+        <div class="dim-name">Strategic coherence</div>
+        <div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div>
+      </div>
+      <div class="dim-card">
+        <div class="dim-name">Done-ness clarity</div>
+        <div class="dim-verdict" style="color: var(--verdict-thin)">thin</div>
+      </div>
+      <div class="dim-card">
+        <div class="dim-name">Scope honesty</div>
+        <div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div>
+      </div>
+      <div class="dim-card">
+        <div class="dim-name">Downstream usability</div>
+        <div class="dim-verdict" style="color: var(--verdict-thin)">thin</div>
+      </div>
+      <div class="dim-card">
+        <div class="dim-name">Shape fit</div>
+        <div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div>
+      </div>
+    </div>
+
+    <!-- Decision-readiness -->
+    <section class="dimension">
+      <details>
+        <summary>
+          <h2>Decision-readiness</h2>
+          <span class="verdict-pill verdict-adequate">adequate</span>
+        </summary>
+        <div class="dim-body">
+          <div class="dim-judgment">
+            <p>The decision register (§2) is the PRD's best asset. Each default has a baseline, a reason or trade-off, and a status, and the v1.1/v1.2 entries say what they supersede (e.g. DEC-01 "supersedes simultaneous launch", DEC-23 "supersedes 'explicit rules only'"). External gates (§24, GATE-01..11) have owner roles and required evidence. The v1.1 impact note honestly states that GATE-02 and GATE-05 "now sit on the Phase 1 critical path". The §8.11 delivery-risk callout names itemized OCR as the first fast-follow candidate. That is the kind of honest de-scoping plan a decision-maker needs.</p>
+            <p>What it dodges is the tension that v1.2 introduces. DEC-22's reason says "Capture the expense first; reconciliation is secondary". That directly reverses §6.1 principle 4 ("Correctness over delight"), the §7.4 integrity rules and the first P0 in §16.2 ("No known … duplicate confirmed counting"). The PRD never acknowledges the reversal. It also does not decide what the Phase 1 capture experience is if GATE-02 fails: DEC-07 ships "the no-SMS variant", but most of CAP and LRN, SCR-24/27 and FLOW-09 assume SMS. Neither tension has a <code>[NOTE FOR PM]</code> or an open question.</p>
+          </div>
+        </div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-critical">critical</span>
+              <h3 class="finding-title">End-of-day auto-approve can post duplicate and unverified captures as confirmed, breaking the PRD's own P0</h3>
+              <span class="finding-location">DEC-22, CAP-007, OCR-011, FIN-024, SMS-003, SMS-005, §7.4, §16.2</span>
+            </header>
+            <div class="finding-note">CAP-007 excludes from auto-approve only "captures flagged by SMS-011/SMS-012". It does not exclude captures that SMS-005 marks as "ambiguous matches", items carrying the <code>possible_duplicate</code> flag (FIN-024), or captures with "unknown parsed values", which SMS-003 says "remain unconfirmed". So an SMS debit for an expense the user already entered manually, or one that matches a scanned bill that OCR-011 "recorded directly as an expense", can be auto-confirmed at end of day as a second expense. OCR-011 also posts unmatched bills directly, with no Approve/Reject. That contradicts DEC-21 ("Approve / Reject is the single interaction for every automated capture") and FLOW-08 ("verify reconciliation → confirm"). DEC-22 also says "verified senders" while CAP-007 says "Unactioned captures", so the scope of auto-approve differs between the two.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Add a normative rule to CAP-007: auto-approve applies only to captures from verified senders (as defined in SMS-010) that have no <code>possible_duplicate</code> flag, no open review candidate, a fully parsed amount, account and direction, and a non-null category. Everything else stays <code>needs_review</code>. Make OCR-011 create a <code>needs_review</code> capture with an Approve prompt, or document it as an explicit DEC-21 exception. Add a §7.4 invariant and a §16.2 P0: "Auto-approve never confirms a capture that matches an existing confirmed transaction." Add a <code>[NOTE FOR PM]</code> under DEC-22 recording that it trades away the "Correctness over delight" principle, and what limits that trade.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">The Phase 1 no-SMS variant's capture experience is undefined</h3>
+              <span class="finding-location">DEC-07, §4.1, CAP, LRN, SCR-24/27, FLOW-09, §1.3 #4</span>
+            </header>
+            <div class="finding-note">If Play approval is not granted, the headline differentiator "automatic on-device SMS and bill capture" shrinks to OCR plus manual entry. The PRD does not say which CAP items (notification, floating dialog, grouping, auto-approve), LRN items and screens ship in that variant, or whether SMS-014's re-ask card is suppressed.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Add a short "No-SMS variant" subsection under §8.16 or §13.1 with a table that marks each CAP, LRN and SCR item as present, adapted (for OCR-only captures) or absent. Add one line to §1.3 #4 stating that the differentiator depends on GATE-02.</div>
+          </article>
+        </div>
+      </details>
+    </section>
+
+    <!-- Substance over theater -->
+    <section class="dimension">
+      <details>
+        <summary>
+          <h2>Substance over theater</h2>
+          <span class="verdict-pill verdict-adequate">adequate</span>
+        </summary>
+        <div class="dim-body">
+          <div class="dim-judgment">
+            <p>Most content is earned. The FIN invariants, the INS formulas (INS-015/016 with zero-baseline handling), BDG-008's safe-to-spend formula and §13.2's "No-network claim boundary" are specific to this product and drive behaviour. The NFRs mostly have thresholds (NFR-03..05, NFR-07, NFR-08). The differentiators in §1.3 are backed by requirements.</p>
+            <p>There is some furniture. §3.1 lists five personas, and none is cited by any decision, flow, FR or metric. §22.1 requires "persona/value" for every story, but the personas give stories nothing to trace to. A few NFRs are adjectives: NFR-06 "aims 60 FPS", NFR-07 "acceptable list scrolling", NFR-11 "appropriate hit target behavior". The vision statement (§1.1) is specific enough: the "without surrendering financial data to a cloud service" clause sets it apart in its category.</p>
+          </div>
+        </div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">Personas don't drive anything</h3>
+              <span class="finding-location">§3.1, §9, §22.1</span>
+            </header>
+            <div class="finding-note">There are five personas and no persona-to-decision or persona-to-flow links. The "Busy digital spender" is plainly the protagonist of v1.2, but is never named in it.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Cut to three or four personas and tag each FLOW and each DEC-21..25 with the persona it serves, or drop the persona element from the §22.1 Definition of Ready.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">Some NFRs are adjectives</h3>
+              <span class="finding-location">NFR-06, NFR-07, NFR-11</span>
+            </header>
+            <div class="finding-note">NFR-06 "aims 60 FPS", NFR-07 "acceptable list scrolling" and NFR-11 "appropriate hit target behavior" are not testable.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Replace them with bounds, e.g. "≤1% dropped frames over a 10k-row fling on the reference device", "48dp/44pt minimum target" (already in §6.2, so reference it), and "p95 frame time ≤16.7ms for list scroll".</div>
+          </article>
+        </div>
+      </details>
+    </section>
+
+    <!-- Strategic coherence -->
+    <section class="dimension">
+      <details>
+        <summary>
+          <h2>Strategic coherence</h2>
+          <span class="verdict-pill verdict-adequate">adequate</span>
+        </summary>
+        <div class="dim-body">
+          <div class="dim-judgment">
+            <p>There is a clear thesis: private, offline, correct and visual. v1.2 adds a fifth leg, "effortless capture", which follows from §1.2 problem 1 ("Logging every transaction manually is tedious"). Phasing follows the thesis, and the epic sequencing constraint ("ledger/correctness precedes auto-capture", §21) is principled.</p>
+            <p>The measurement side has not kept up. §3.3 measures onboarding, manual entry speed, invariants, offline use, stability, accessibility and comprehension. Nothing validates the capture thesis, and there are no counter-metrics. The v1.2 impact note says auto-approve "changes the trust model — usability study must confirm users understand auto-approved entries", but that never reaches §3.3 or §16.2's P1 usability criterion. Phase 1 is also no longer a minimum: it now holds the full old MVP plus OCR with itemization, SMS, capture review, learning and a home-screen widget, with only one item (OCR-012) named as a cut candidate.</p>
+          </div>
+        </div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">Success metrics and release criteria don't measure effortless capture or its risks</h3>
+              <span class="finding-location">§3.3, §16.2, §24.1 v1.2 impact note 1</span>
+            </header>
+            <div class="finding-note">§3.3 has nothing that validates the capture thesis and no counter-metrics; the impact note's usability requirement for auto-approve never reaches §3.3 or §16.2.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Add to §3.3, measured through usability studies or the synthetic fixture corpus to respect the no-telemetry rule: share of captures resolved with zero or one tap; category-correction rate falling over a multi-week diary study; SMS parse precision and recall on a synthetic Indian bank/UPI SMS corpus; OCR total/merchant/date extraction accuracy on a reference bill set. Add counter-metrics: wrong-category auto-approvals; scam-filter false positives on genuine bank SMS; users disabling capture notifications. Add "auto-approved entries understood (≥90%)" to the §16.2 P1 usability line.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">Phase 1 has no ordered cut list beyond OCR-012</h3>
+              <span class="finding-location">§4.1, §8.11 delivery-risk note, §20 M6, WMB-16</span>
+            </header>
+            <div class="finding-note">The scope grew twice in one day and the milestones were not re-baselined. M6 still reads "on-device receipt OCR and Android SMS" and does not mention WMB-16's capture review, learning and home-screen widget.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Add a ranked fast-follow list to §4.1 (e.g. OCR-012 itemization → LRN-004 item learning → CAP-005 batch "Apply to all similar" → HOM-007 widget) and add WMB-16 to M6.</div>
+          </article>
+        </div>
+      </details>
+    </section>
+
+    <!-- Done-ness clarity -->
+    <section class="dimension">
+      <details open>
+        <summary>
+          <h2>Done-ness clarity</h2>
+          <span class="verdict-pill verdict-thin">thin</span>
+        </summary>
+        <div class="dim-body">
+          <div class="dim-judgment">
+            <p>The ledger FRs are excellent: FIN-022 exact-paise reconciliation, BDG-008 formula, INS-015 baseline rule, the §7.4 acceptance rules and Appendix A's Given/When/Then contract. Most modules end with an <strong>Acceptance</strong> line. The v1.2 capture rules are a different matter. They introduce terms with no definition and heuristics that contradict other FRs, and they have no accuracy or latency bounds. Those are exactly the FRs downstream story creation will lean on hardest. CAP, LRN, OCR, SMS, REC, INS and SET have no <strong>Acceptance</strong> line at all (only ONB, ACC, TXN and BDG do).</p>
+          </div>
+        </div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">Capture rules have undefined terms and self-contradicting heuristics</h3>
+              <span class="finding-location">DEC-22, SMS-010, SMS-011, SMS-012, CAP-007, LRN-003</span>
+            </header>
+            <div class="finding-note">(a) "Verified sender" (DEC-22) and "unverified sender" (SMS-011) are never defined. SMS-010 already drops everything except "registered alphanumeric bank/UPI sender headers", so it is unclear what an <em>unverified</em> credit is; there is no stated sender allow-list source or update mechanism. (b) SMS-011 treats "claim/refund/KYC/prize wording" as scam, but SMS-003 requires parsing genuine "refund" SMS, so legitimate refunds would be suppressed. (c) SMS-012 flags any balance-chain mismatch; gaps are routine (missed SMS, non-SMS debits, multiple cards on one account) and no tolerance or reset rule is given. (d) "End of day … configurable time" (DEC-22, CAP-007) has no execution guarantee, while §25 forbids "mandatory always-running background services" and REC-003 disclaims exact-time delivery; the PRD does not say what happens if the job does not run. (e) The PRD does not say which category an auto-approved unknown merchant gets.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Add a glossary entry for verified sender, with a defined source such as a bundled DLT-header allow-list plus user-confirmed senders. Narrow SMS-011 to link plus claim/KYC/prize wording, or to credit plus non-allow-listed sender, and add a "genuine refund SMS is not flagged" test to §16.1 SMS. Give SMS-012 a reset rule (one mismatch resets the chain and flags only on large unexplained gaps). Define auto-approve as "best effort; on next app open any overdue pending captures are processed", and default unknown-merchant auto-approvals to "Uncategorized" in needs-categorization state.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">Capture has no accuracy or latency bounds</h3>
+              <span class="finding-location">NFR table §12, SMS-003, OCR-004</span>
+            </header>
+            <div class="finding-note">The only capture NFR is OCR latency (NFR-08). There is no target for SMS-arrival-to-notification latency, SMS parse accuracy, OCR field accuracy, or battery and background budget.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Add NFR-16..19: SMS→notification p95 (e.g. ≤5s when the process is alive), parse precision and recall on the fixture corpus, OCR total-field accuracy on a reference bill set, and a background CPU/battery budget verified on the GATE-03 device matrix.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">LRN-003's mixed-merchant trigger is fragile and cannot be undone</h3>
+              <span class="finding-location">LRN-003, LRN-005</span>
+            </header>
+            <div class="finding-note">"Two or more different categories" means one mis-tap permanently turns off auto-categorization for that merchant. Neither a recovery path nor a threshold is specified.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Define the trigger over the last N confirmations (e.g. 2 different categories within the last 5), and let users clear the mixed flag in SCR-28.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">Vague phrasing remains in older FRs</h3>
+              <span class="finding-location">CAT-001, BDG-007, REC-006, SET-003, OCR-007, OCR-001</span>
+            </header>
+            <div class="finding-note">"Sensible categories" (CAT-001), "recalculating carefully" (BDG-007), "Detect monthly calendar patterns carefully" (REC-006), "reasonable frequency caps" (SET-003), "fails gracefully" (OCR-007), "compress safely" (OCR-001).</div>
+            <div class="finding-fix"><strong>Fix:</strong> Replace each with a checkable rule or a test reference, e.g. REC-006 → "Jan 31 monthly → Feb 28/29 → Mar 31".</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">Only four modules have Acceptance lines</h3>
+              <span class="finding-location">ONB, ACC, TXN, BDG</span>
+            </header>
+            <div class="finding-note">CAP, LRN, OCR, SMS, REC, INS and SET have no Acceptance line.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Add one Acceptance line each to CAP, LRN, SMS and OCR. The §16.1 CAP/LRN suite rows are a good starting point.</div>
+          </article>
+        </div>
+      </details>
+    </section>
+
+    <!-- Scope honesty -->
+    <section class="dimension">
+      <details>
+        <summary>
+          <h2>Scope honesty</h2>
+          <span class="verdict-pill verdict-adequate">adequate</span>
+        </summary>
+        <div class="dim-body">
+          <div class="dim-judgment">
+            <p>Out-of-scope (§4.4) and Phase 3 (§4.3) are explicit, and DEC-06/DEC-13 de-scope honestly. §19's rule that Phase 1-free features "must not be retroactively paywalled without a product decision entry" is a good guardrail. The PRD uses named gates instead of <code>[ASSUMPTION]</code> tags, which suits a document at this stage. Open-item density is acceptable for a build-input PRD, because the gates carry owners.</p>
+            <p>The weakness is silent omission after the edits. §4.1 "MVP / Phase 1" was not updated for v1.2: CAP, LRN, the floating dialog, the home-screen widget and lock-screen approve are missing from the scope list, even though they are in §5.2 and §21. The v1.2 impact note lists items deferred to "Later, not Phase 1" (stop notifying consistent merchants, weekly privacy log), but they appear in no phase list.</p>
+          </div>
+        </div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">The §4.1 Phase 1 scope list omits every v1.2 feature</h3>
+              <span class="finding-location">§4.1 vs §8.16, §8.17, HOM-007, SCR-27..29, WMB-16; §24.1</span>
+            </header>
+            <div class="finding-note">Anyone reading §4 as the scope contract would leave out the headline differentiator. The §24.1 v1.2 "Decisions affected" list also omits §4.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Add §4.1 bullets for Approve/Reject capture review with floating dialog, end-of-day auto-approve, local learning (merchant, UPI ID, item), rejected-capture retention, the Android home-screen widget and lock-screen approve (opt-in). Add the two "Later" items from the v1.2 impact note to §4.2, and add §4 to the v1.2 change-log row.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">GATE-01 still requires sign-off on free/premium positioning for Phase 1</h3>
+              <span class="finding-location">§24 GATE-01 vs DEC-13, v1.1 impact note 3</span>
+            </header>
+            <div class="finding-note">Phase 1 is free-only per DEC-13, so premium positioning is not a Phase 1 gate.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Change GATE-01 to "Phase 1 free-only confirmation". Premium positioning belongs to GATE-11.</div>
+          </article>
+        </div>
+      </details>
+    </section>
+
+    <!-- Downstream usability -->
+    <section class="dimension">
+      <details open>
+        <summary>
+          <h2>Downstream usability</h2>
+          <span class="verdict-pill verdict-thin">thin</span>
+        </summary>
+        <div class="dim-body">
+          <div class="dim-judgment">
+            <p>This PRD is chain-top (§0: "single consolidated product input" for UX, architecture and stories), so this dimension matters a lot. Its IDs are disciplined and §16.3 sets a solid traceability format. But architecture will extract §11 and §13, and neither was updated for v1.1 or v1.2. Phase labels mix "MVP", "Phase 1", "MVP Android", "MVP (Android)" and "MVP conditional on Play approval" with no mapping to platforms. Key nouns also collide.</p>
+          </div>
+        </div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">The §11 data model is not updated for v1.2, and already lacked FIN-020 fields</h3>
+              <span class="finding-location">§11.1 vs FIN-020, FIN-024, CAP-007, LRN-001..005, SMS-011..013, OCR-012</span>
+            </header>
+            <div class="finding-note">There are no entities or fields for: learned merchant, UPI ID and item → category mappings, including the "mixed" flag (LRN-001..004); payee UPI ID and its user-given name (LRN-002); blocked senders (SMS-013, SCR-28); the sender allow-list or verified status; per-account last SMS balance for the balance chain (SMS-012); approval provenance (user-approved, auto-approved or rejected), which the evening summary (CAP-007) and the "Show rejected" filter (CAP-008) need; receipt line items with name, quantity and price (OCR-012) — <code>split</code> has only category, amount and memo; scam-suppressed captures, whose persistence is unspecified; SMS re-ask counters (SMS-014). <code>transaction</code> also lacks the <code>payment_method</code>, <code>tags</code> and source link that FIN-020 requires. <code>automation_rule</code> is not marked Phase 2 (SCR-25), so it is ambiguous whether LRN mappings are stored there.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Add <code>learned_mapping(id, key_kind[merchant|upi|item], key, category_id, mixed, confirmations, updated_at)</code>, <code>payee(upi_id, display_name)</code>, <code>sender(id, header, status[allowed|blocked], last_balance_minor?, account_id?)</code>, <code>receipt_item(id, attachment_id, transaction_id, name, qty?, amount_minor, split_id)</code> and <code>transaction.capture_resolution[user_approved|auto_approved|rejected]</code> plus <code>payment_method</code> and <code>tags</code>. State that <code>automation_rule</code> is Phase 2 and LRN does not use it. Add §11 to the v1.2 change-log row.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">The parity matrix and iOS scope ignore v1.2, and "MVP" is ambiguous across platforms</h3>
+              <span class="finding-location">§13, NFR-13, §5.2 Stage column, §21 Phase column, §16.2, §25</span>
+            </header>
+            <div class="finding-note">§13 has no rows for capture notifications with Approve/Reject, the floating dialog, the home-screen widget (iOS WidgetKit or none?), lock-screen approve, local learning, OCR-010 bill-match prompts, or the SMS scam/sender protections — yet NFR-13 requires a "Clear Android/iOS parity matrix". SCR-28 is "MVP" with no platform, while LRN is "Phase 1" and CAP is "Phase 1 Android"; it is unclear whether iOS in Phase 2 gets learning from manual and OCR entries. "MVP" is used as a synonym for "Phase 1" (§4.1 heading "MVP / Phase 1 — Android release (iOS built in parallel)"), so "SCR-xx MVP" could mean "built for both platforms but released on Android only" or "Android only".</div>
+            <div class="finding-fix"><strong>Fix:</strong> Retire "MVP" in favour of explicit labels: "Phase 1 (both platforms built; Android release)", "Phase 1 Android-only" and "Phase 2". Apply them to §5.2, the §8.9 table, §21, §16.2 and §25. Add the seven missing rows to §13, each with an iOS behaviour or "N/A + fallback".</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">The status model is incomplete for captures</h3>
+              <span class="finding-location">FIN-024, CAP-008, SMS-011, §10, HOM-001, SCR-10, SCR-29</span>
+            </header>
+            <div class="finding-note">"Rejected" maps to <code>excluded</code>, but TXN-005 also lets users exclude manual entries, so CAP-008's "Show rejected" filter is ambiguous. Scam-blocked items ("never posted") have no status. Pending captures (<code>needs_review</code>) and review-queue items (SCR-10, HOM-001) both appear, and SCR-29 shows "pending approvals"; the PRD does not say whether these are the same set.</div>
+            <div class="finding-fix"><strong>Fix:</strong> State in FIN-024 that pending captures appear in the review queue and are counted by the SCR-29 badge, or that they do not. Distinguish rejected from user-excluded through the capture-resolution field. Specify that scam-flagged SMS are not stored, or are stored as a redacted <code>source_record</code> with no transaction.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">Notification content contradicts the privacy default</h3>
+              <span class="finding-location">SEC-005 vs CAP-001, SMS-006</span>
+            </header>
+            <div class="finding-note">SEC-005 says "notifications have privacy-preserving contents by default", with only the lock-screen opt-in as an exception. CAP-001 requires every capture notification to show "amount, direction, merchant, account". It is unclear whether amounts appear in the unlocked notification shade by default.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Amend SEC-005 to say that capture notifications show details in the shade but use redacted public versions on the lock screen unless CAP-006 is enabled. Add a §16.1 SEC case for lock-screen redaction.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">Glossary collisions: "bill", "widget", "Scan/Snap"</h3>
+              <span class="finding-location">§10, REC, OCR-010..013, HOM-001..007, SCR-05, SCR-29, §5.1</span>
+            </header>
+            <div class="finding-note">"Bill" means both a payable (REC, "Bills &amp; Recurring", SCR-16) and a receipt ("Snap bill", "bill match", OCR-010..013, DEC-21). "Widget" means both a Home dashboard card (HOM-001..004, SCR-05 "Widget edit") and an Android home-screen widget (HOM-007, SCR-29, DEC-25). The Add sheet says "Scan" (§5.1) while the widget says "Snap bill".</div>
+            <div class="finding-fix"><strong>Fix:</strong> Add glossary entries and use one term each: "receipt" for scanned bills, "bill" for payables, "Home card" for dashboard widgets, "home-screen widget" for SCR-29.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">Flows are stale or missing for v1.2</h3>
+              <span class="finding-location">FLOW-08, FLOW-09, §9</span>
+            </header>
+            <div class="finding-note">FLOW-08 does not show OCR-010's Approve/Reject match prompt or OCR-011's default-Cash posting. There are no flows for re-approving a rejected capture, the evening auto-approve summary, managing learned merchants and blocked senders (SCR-28), or the home-screen widget entry.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Update FLOW-08 and add FLOW-13..16 for those paths.</div>
+          </article>
+        </div>
+      </details>
+    </section>
+
+    <!-- Shape fit -->
+    <section class="dimension">
+      <details>
+        <summary>
+          <h2>Shape fit</h2>
+          <span class="verdict-pill verdict-adequate">adequate</span>
+        </summary>
+        <div class="dim-body">
+          <div class="dim-judgment">
+            <p>This is a consumer product feeding a full BMAD chain, so a heavy, traceable PRD is the right shape. §9 provides flows instead of user journeys. They are step sequences with no named protagonist, which is acceptable for a UX handoff but loses the "who and why" that would discipline v1.2 choices such as auto-approve defaults. The PRD is not over-formalized: Appendix A and B contracts are useful exemplars. It is somewhat bloated with handoff mechanics: §0, Appendix C, GATE-10 and §25's checklist are process notes rather than product content.</p>
+          </div>
+        </div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">Flows have no protagonist</h3>
+              <span class="finding-location">§9</span>
+            </header>
+            <div class="finding-note">Flows are step sequences without a named user, losing the "who and why".</div>
+            <div class="finding-fix"><strong>Fix:</strong> Prefix each flow with the persona it serves, e.g. "FLOW-09 (Busy digital spender, Android with SMS approved)". This also resolves the persona-theater finding.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">Process furniture is mixed into product content</h3>
+              <span class="finding-location">§0, Appendix C, GATE-10, §25</span>
+            </header>
+            <div class="finding-note">BMAD handoff mechanics sit alongside product requirements. Appendix C's paths (<code>inputs/wmbugo_PRD_v1.md</code>) don't match the real file (<code>input/docs/Idea_prd.md</code>).</div>
+            <div class="finding-fix"><strong>Fix:</strong> Move these to a separate handoff note.</div>
+          </article>
+        </div>
+      </details>
+    </section>
+
+    <div class="mechanical">
+      <h3>Mechanical notes</h3>
+      <ul>
+        <li><strong>Change log table is broken</strong> (§24.1): a blank line separates the 1.1.0 and 1.2.0 rows, so in Markdown the 1.2.0 row renders as a separate, headerless table. There is no 1.0.0 baseline row, although the note below the table names 1.0.0.</li>
+        <li><strong>The v1.2 "Decisions affected" list is incomplete</strong>: it omits §1.3, §3.3 (not changed but should have been), §4.1, §6.1 principle 7, §9 FLOW-09, §10 glossary (Pending capture, Mixed merchant), §11 (not changed but should have been), §13 and the §16.1 CAP/LRN/SMS suite rows that <em>were</em> added.</li>
+        <li><strong>DEC-23 cross-reference is stale</strong>: it "supersedes 'explicit rules only' in FIN-025/CAT-005", but neither FIN-025 nor CAT-005 contains that phrase any more. Reword as "supersedes the pre-v1.2 explicit-rules-only wording".</li>
+        <li><strong>ID ordering</strong>: SCR-27..29 are listed before SCR-25..26 (§5.2). WMB-16 sits between WMB-12 and WMB-13 (§21). The IDs are unique and contiguous, but the ordering will confuse extraction. Either reorder or note "ordered by phase".</li>
+        <li><strong>Source-legend tags</strong> (§0: <code>[SRC]/[FIX]/[NEW]</code>) are missing on all v1.2 requirements (CAP-*, LRN-*, SMS-010..014, OCR-009..013, HOM-007) and on most older ones. Either tag them consistently or drop the legend claim.</li>
+        <li><strong>"v1" is overloaded</strong>: it means PRD version 1.x (§23, §24.1 note) and also release scope ("No remote event tracking is permitted in v1", §3.3; "no server users/roles in v1", §14). Use "Phase 1/Phase 2" for release scope.</li>
+        <li><strong>Phase labelling</strong>: some requirement lines carry inline phase tags (REC-005 "Phase 2", HOM-007 "Android, Phase 1", OCR-001..003 "MVP") and others carry none. The §8.12 heading says "Phase 1, policy gate" but §5.2 says "MVP Android, gated". Normalize to the labels proposed above.</li>
+        <li><strong>Glossary gaps</strong> (§10): there are no entries for capture, verified sender, auto-approve, blocked sender, learned mapping, rejected capture, or home-screen widget versus Home card.</li>
+        <li><strong>§16.1 PLAT</strong> includes "iOS picker/camera" without marking it as a Phase 2 release criterion, unlike the parenthetical in §16.2.</li>
+        <li><strong>Assumptions Index</strong>: none. The PRD uses gates (§24) instead of <code>[ASSUMPTION]</code> tags, which works here. The v1.2 impact note's "Later, not Phase 1" and "Dropped" items should still be indexed in §4.2 / §4.4.</li>
+        <li><strong>§25 checklist</strong> is all unchecked. Either tick the items that this version satisfies or label the section as a reviewer worksheet.</li>
+      </ul>
+    </div>
+
+    <footer class="report-footer">
+      <div class="meta">
+        <span>Rubric: C:\Users\KCPK\Documents\projects\wmbugo\wmbugo-app\.claude\skills\bmad-prd\assets\prd-validation-checklist.md</span>
+        <span>Review: review-rubric.md</span>
+        <span>Generated: 2026-11-01T00:00:00Z</span>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

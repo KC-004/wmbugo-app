@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>UX Design Validation: wmbugo-app</title>
+<style>
+  :root {
+    --bg: #fafaf9;
+    --surface: #ffffff;
+    --border: #e7e5e4;
+    --text: #1c1917;
+    --muted: #78716c;
+
+    --verdict-strong: #16a34a;
+    --verdict-adequate: #65a30d;
+    --verdict-thin: #d97706;
+    --verdict-broken: #dc2626;
+
+    --sev-low: #64748b;
+    --sev-medium: #ca8a04;
+    --sev-high: #ea580c;
+    --sev-critical: #dc2626;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    font-size: 15px;
+  }
+  .container { max-width: 960px; margin: 0 auto; padding: 32px 24px 64px; }
+
+  header.report-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+  .title h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+  .title .subtitle { color: var(--muted); font-size: 13px; margin-top: 4px; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+
+  .synthesis {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--muted);
+    border-radius: 8px;
+    padding: 18px 22px;
+    margin-bottom: 24px;
+    font-size: 15.5px;
+  }
+  .synthesis p { margin: 0 0 10px; }
+  .synthesis p:last-child { margin-bottom: 0; }
+
+  .dimension-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  .dim-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .dim-card .dim-name { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .dim-card .dim-verdict { font-size: 14px; font-weight: 600; }
+
+  section.dimension, section.reviewer-section { margin-bottom: 14px; }
+  section.dimension details, section.reviewer-section details {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  section summary {
+    padding: 14px 20px;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  section summary::-webkit-details-marker { display: none; }
+  section summary::before {
+    content: "▸";
+    display: inline-block;
+    color: var(--muted);
+    transition: transform 0.15s ease;
+  }
+  section details[open] summary::before { transform: rotate(90deg); }
+  section summary h2 {
+    display: inline;
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    flex: 1;
+  }
+  .verdict-pill {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: white;
+  }
+  .verdict-strong { background: var(--verdict-strong); }
+  .verdict-adequate { background: var(--verdict-adequate); }
+  .verdict-thin { background: var(--verdict-thin); }
+  .verdict-broken { background: var(--verdict-broken); }
+
+  .dim-body { padding: 4px 20px 18px; }
+  .dim-judgment { color: var(--text); font-size: 14.5px; }
+  .dim-judgment p { margin: 0 0 10px; }
+
+  .findings-list { padding: 0 20px 4px; }
+  article.finding {
+    padding: 14px 0;
+    border-top: 1px solid var(--border);
+  }
+  article.finding:first-child { border-top: none; }
+  article.finding header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+  }
+  .badge {
+    font-size: 10.5px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    line-height: 1.4;
+  }
+  .badge-sev-low { background: rgba(100, 116, 139, 0.12); color: var(--sev-low); }
+  .badge-sev-medium { background: rgba(202, 138, 4, 0.14); color: var(--sev-medium); }
+  .badge-sev-high { background: rgba(234, 88, 12, 0.14); color: var(--sev-high); }
+  .badge-sev-critical { background: rgba(220, 38, 38, 0.14); color: var(--sev-critical); }
+  .finding-title { margin: 0; font-size: 15px; font-weight: 500; flex: 1; min-width: 200px; }
+  .finding-location { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px; color: var(--muted); }
+  .finding-note, .finding-fix { margin-top: 6px; font-size: 14px; }
+  .finding-fix strong { color: var(--muted); font-weight: 500; }
+
+  .reviewer-source {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  .mechanical {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-top: 24px;
+    font-size: 14px;
+  }
+  .mechanical h3 { margin: 0 0 10px; font-size: 14px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .mechanical ul { margin: 0; padding-left: 20px; }
+  .mechanical li { margin-bottom: 4px; color: var(--text); }
+
+  footer.report-footer {
+    margin-top: 40px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--muted);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  footer .meta { display: flex; gap: 24px; flex-wrap: wrap; }
+  .verdict-na { background: var(--muted); }
+  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.92em; background: rgba(120,113,108,0.10); padding: 0 4px; border-radius: 3px; }
+</style>
+</head>
+<body>
+  <div class="container">
+    <header class="report-header">
+      <div class="title">
+        <h1>wmbugo-app — UX Design Validation Report</h1>
+        <div class="subtitle">_bmad-output/planning-artifacts/ux-designs/ux-wmbugo-app-2026-11-07/ (DESIGN.md + EXPERIENCE.md)</div>
+      </div>
+    </header>
+    <div class="synthesis">
+      <p>Pass 1 mechanical coverage finds a spine pair that is structurally sound and well sourced. Every PRD flow is present with protagonist, climax and failure path; every token reference resolves; shape order is canonical. The gaps are breadth: about 15 components lack a visual or behavioural spec, about 18 surfaces lean on global state patterns, 10 surfaces have no journey, and the light-glass tint, light fallback and type scale are still assumptions awaiting key-screen mocks. Pass 2 judgment categories (bloat, inheritance, shape fit) were not reviewed in this run.</p>
+      <p>The accessibility lens shifts the picture. The floor is declared rather than engineered, and some of the spine's own visual choices break it. Two critical issues touch money correctness: amounts cannot fit at 200% font scale without the truncation the spine forbids, and the capture batch's swipe + auto-advance can move TalkBack focus onto the next card's Approve button. The overspend cue (limit tick + hatch) measures 1.00–1.41:1 against the fill, so the stated "≥3:1 non-text" claim does not hold. Dark capture-sheet text over the uncapped gradient band fails (4.42:1). Focus indicators, disabled states, live regions and an accessible Undo duration are unspecified, and typed RESTORE is a cognitive and motor barrier. All are fixable inside the spines without changing a product decision. Counts across the report: 2 critical, 10 high, 23 medium, 10 low (accessibility alone: 2 / 9 / 19 / 8).</p>
+    </div>
+    <div class="dimension-summary">
+      <div class="dim-card">
+        <div class="dim-name">Flow coverage</div>
+        <div class="dim-verdict" style="color: var(--verdict-strong)">strong</div>
+      </div>
+      <div class="dim-card">
+        <div class="dim-name">Token completeness</div>
+        <div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div>
+      </div>
+      <div class="dim-card">
+        <div class="dim-name">Component coverage</div>
+        <div class="dim-verdict" style="color: var(--verdict-thin)">thin</div>
+      </div>
+      <div class="dim-card">
+        <div class="dim-name">State coverage</div>
+        <div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div>
+      </div>
+      <div class="dim-card">
+        <div class="dim-name">Visual reference coverage</div>
+        <div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div>
+      </div>
+      <div class="dim-card">
+        <div class="dim-name">Bloat & overspecification</div>
+        <div class="dim-verdict" style="color: var(--muted)">not reviewed</div>
+      </div>
+      <div class="dim-card">
+        <div class="dim-name">Inheritance discipline</div>
+        <div class="dim-verdict" style="color: var(--muted)">not reviewed</div>
+      </div>
+      <div class="dim-card">
+        <div class="dim-name">Shape fit</div>
+        <div class="dim-verdict" style="color: var(--muted)">not reviewed</div>
+      </div>
+    </div>
+    <section class="dimension">
+      <details>
+        <summary>
+          <h2>Flow coverage</h2>
+          <span class="verdict-pill verdict-strong">strong</span>
+        </summary>
+        <div class="dim-body">
+          <div class="dim-judgment">
+            <p>All 18 PRD §9 flows present with verbatim names, protagonist, numbered steps, climax and failure path. Surface-closure gap: 10 surfaces without a journey.</p>
+          </div>
+        </div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">Ten surfaces have no journey</h3>
+              <span class="finding-location">EXPERIENCE.md › Key Flows; Open Question 9</span>
+            </header>
+            <div class="finding-note">SCR-05, SCR-16, SCR-17, SCR-18, SCR-22, SCR-28, TXN-010 bulk recategorize, Recently deleted, SMS-014 re-ask card and evening summary have no flow. All 18 PRD flows are present with protagonist, steps, climax and failure path.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Add short flows (or explicit "settings-only, no journey" notes) for each surface, sourced from PRD requirements rather than invented.</div>
+          </article>
+        </div>
+      </details>
+    </section>
+    <section class="dimension">
+      <details>
+        <summary>
+          <h2>Token completeness</h2>
+          <span class="verdict-pill verdict-adequate">adequate</span>
+        </summary>
+        <div class="dim-body">
+          <div class="dim-judgment">
+            <p>66 token references all resolve; PRD §6.2 hex exact with light/dark pairs. Light glass, light fallback and type scale are [ASSUMPTION]; N/W/S dark variants and the category palette are missing.</p>
+          </div>
+        </div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">Light glass, light fallback and type scale are unverified assumptions</h3>
+              <span class="finding-location">DESIGN.md frontmatter <code>glass-surface</code>, <code>glass-fallback</code>, typography; Open Questions 1, 2, 4</span>
+            </header>
+            <div class="finding-note">Computed contrast passes, but the values are [ASSUMPTION]. Memlog wording "lighter alpha" conflicts with the computed need for ≥~75% tint.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Confirm the 80% tint, the #155665 fallback and the type scale at key-screen mocks; update the memlog to resolve the alpha wording.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">Needs/Wants/Savings lack dark variants; category palette undefined</h3>
+              <span class="finding-location">DESIGN.md › Colors › Needs / Wants / Savings; <code>category-icon-chip</code>; Open Questions 5, 8</span>
+            </header>
+            <div class="finding-note">needs #0F766E is 2.67:1 on dark surface; wants 2.49:1 and savings 1.48:1 on white. No validated category colour set exists for icon chips.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Add <code>needs-dark</code> / <code>wants-dark</code> / <code>savings-dark</code> and a validated category palette (≥3:1 icon on tint, both themes). See accessibility M10 and M14.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">Primary button gradient segment is an assumption</h3>
+              <span class="finding-location">DESIGN.md › <code>button-primary</code>; Open Question 3</span>
+            </header>
+            <div class="finding-note">The full gradient would put white labels on #2DD4BF (1.86:1); the mid→end segment proposal passes (5.47–9.11:1).</div>
+            <div class="finding-fix"><strong>Fix:</strong> Lock the mid→end segment as a decision.</div>
+          </article>
+        </div>
+      </details>
+    </section>
+    <section class="dimension">
+      <details open>
+        <summary>
+          <h2>Component coverage</h2>
+          <span class="verdict-pill verdict-thin">thin</span>
+        </summary>
+        <div class="dim-body">
+          <div class="dim-judgment">
+            <p>Core components (hero, row, chips, sheets, segmented, keypad, widget, empty state, tooltip, toast, loader, charts) are specified on both sides; about 15 others are missing one or both sides.</p>
+          </div>
+        </div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">About 15 components missing a visual and/or behavioural spec</h3>
+              <span class="finding-location">DESIGN.md › Components; EXPERIENCE.md › Component Patterns</span>
+            </header>
+            <div class="finding-note">Visual only: tab bar/＋, card (reorder/hide), buttons, KPI tile. Behaviour only: split editor, passphrase field, typed confirmation, settings group row, category icon grid, error retry. Neither: navigation rail, filter sheet, search field, period picker, duplicate evidence card, account-discovery prompt, receipt review layout, CSV stepper, account tiles, N/W/S bars, selection sheet, confirmation dialog.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Add a row for each on the missing side. Several accessibility findings (H7, M11, M17, M18, M19) supply the needed behaviour.</div>
+          </article>
+        </div>
+      </details>
+    </section>
+    <section class="dimension">
+      <details>
+        <summary>
+          <h2>State coverage</h2>
+          <span class="verdict-pill verdict-adequate">adequate</span>
+        </summary>
+        <div class="dim-body">
+          <div class="dim-judgment">
+            <p>Global patterns cover the PRD §6.4 set; the hero state table is complete; per-surface specifics exist for 11 surfaces. About 18 surfaces rely on global patterns only.</p>
+          </div>
+        </div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">About 18 surfaces rely on global state patterns only</h3>
+              <span class="finding-location">EXPERIENCE.md › State Patterns › Per-surface specifics</span>
+            </header>
+            <div class="finding-note">SCR-05, 06, 08, 09, 11, 12, 14, 15, 16, 17, 18, 21, 22, 28, 30 and onboarding SCR-01–03 error states have no surface-specific empty copy or states.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Add per-surface empty copy and error/permission rows, at least for SCR-06, 08, 11, 14 and onboarding.</div>
+          </article>
+        </div>
+      </details>
+    </section>
+    <section class="dimension">
+      <details>
+        <summary>
+          <h2>Visual reference coverage</h2>
+          <span class="verdict-pill verdict-adequate">adequate</span>
+        </summary>
+        <div class="dim-body">
+          <div class="dim-judgment">
+            <p>The one exploratory mock is linked from both spines with its purpose; spines-win-on-conflict stated once in each. No key-screen mocks yet.</p>
+          </div>
+        </div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">No key-screen mocks yet</h3>
+              <span class="finding-location">mockups/, wireframes/, imports/ (absent or empty)</span>
+            </header>
+            <div class="finding-note">Only .working/dark-glass-options.html exists; it is linked from both spines with what it illustrates. No orphans.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Produce key-screen mocks at Finalize and verify the glass and contrast assumptions on them.</div>
+          </article>
+        </div>
+      </details>
+    </section>
+    <section class="dimension">
+      <details>
+        <summary>
+          <h2>Bloat & overspecification</h2>
+          <span class="verdict-pill verdict-na">not reviewed</span>
+        </summary>
+        <div class="dim-body">
+          <div class="dim-judgment">
+            <p>Pass 2 lens not run in this validation.</p>
+          </div>
+        </div>
+      </details>
+    </section>
+    <section class="dimension">
+      <details>
+        <summary>
+          <h2>Inheritance discipline</h2>
+          <span class="verdict-pill verdict-na">not reviewed</span>
+        </summary>
+        <div class="dim-body">
+          <div class="dim-judgment">
+            <p>Pass 2 lens not run in this validation.</p>
+          </div>
+        </div>
+      </details>
+    </section>
+    <section class="dimension">
+      <details>
+        <summary>
+          <h2>Shape fit</h2>
+          <span class="verdict-pill verdict-na">not reviewed</span>
+        </summary>
+        <div class="dim-body">
+          <div class="dim-judgment">
+            <p>Pass 2 lens not run in this validation. (Pass 1 mechanical shape check: canonical DESIGN.md order and all EXPERIENCE.md required sections present.)</p>
+          </div>
+        </div>
+      </details>
+    </section>
+    <section class="reviewer-section">
+      <details>
+        <summary>
+          <h2>Accessibility review</h2>
+          <span class="reviewer-source">review-accessibility.md · 2 critical · 9 high · 19 medium · 8 low</span>
+        </summary>
+        <div class="dim-body">
+          <div class="dim-judgment">
+            <p>The spines get the foundations right: on-surface text pairs all pass (lowest 4.79:1, income on canvas), every Activity state carries an icon, sign or tag, amounts are unsigned with words for direction, there are no badges and no OK-only dialogs, and the Accessibility Floor names TalkBack, 200% scale, 48dp and reduced motion. But the floor is stated as an outcome, not as a mechanism, and several of the spine's own visual choices break it. Two problems hit money correctness directly. First, the 200% rule ("never truncate amounts, never wrap digits") cannot be met by a 40sp hero or a side-by-side row amount at 320dp, and the spine gives no reflow or scaling cap. Second, the capture batch's swipe-and-auto-advance pattern can move TalkBack focus onto the next card's Approve button. The overspend cue the spine relies on (limit tick + hatched overflow) is not perceivable: the tick is 1.00:1 against the fill in light mode and the stripes are 1.03:1 against the fill in dark mode. The claim "all load-bearing pairs ≥3:1 non-text, including the locked glass floor" (EXPERIENCE.md › Accessibility Floor) is therefore not true yet. Dark-mode capture-sheet text over the uncapped gradient band fails (4.42:1). Focus indicators, disabled states, live regions and the Undo time limit are not specified at all. Everything here can be fixed inside the spines without changing a product decision.</p>
+          </div>
+        </div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-critical">critical</span>
+              <h3 class="finding-title">C1. Amounts cannot meet "no truncation" at 200% font scale; no reflow mechanism specified</h3>
+              <span class="finding-location">DESIGN.md › Typography (<code>display-amount</code> 40sp, <code>amount</code> 16sp, "amounts wrap the label, never the number"); DESIGN.md › Components › Home hero card, Activity row; EXPERIENCE.md › Accessibility Floor.</span>
+            </header>
+            <div class="finding-note">At 200% the hero amount is ~80sp. Inter SemiBold tabular digits are ~0.6em wide, so <code>₹11,860</code> needs ~340dp and an en-IN lakh value <code>₹1,18,60,000</code> needs ~575dp. The hero's usable width at 320dp is 256dp (16dp margin + 16dp padding on each side). Android 14 non-linear scaling softens this, but minSdk is 26. Rows put the merchant and a 32sp amount side by side. In a finance app a clipped <code>₹1,18,6…</code> is a wrong number, and the spine bans both truncation and digit wrap without saying what happens instead. Developers will default to <code>numberOfLines={1}</code> and ellipsis.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Add a "Large text" rule to DESIGN.md › Typography and Components: 1. <code>display-amount</code> and <code>headline</code> cap scaling at <code>maxFontSizeMultiplier</code> 1.5 and then auto-fit the amount to the container width (<code>adjustsFontSizeToFit</code>, minimum 28sp). Never ellipsize an amount. 2. Activity row: when <code>fontScale ≥ 1.3</code>, or when the measured amount width is more than 40% of the row, stack the amount on its own line under the title (right-aligned, still tnum). The leading icon chip stays 40dp. 3. Hero <code>In accounts</code> and <code>Card dues</code> stack vertically above 1.3×. 4. Add a test matrix row to NFR-11: 320dp × 200% × en-IN 9-digit amount × hidden/over-budget states.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-critical">critical</span>
+              <h3 class="finding-title">C2. Capture batch: gesture-only navigation and auto-advance can misdirect TalkBack approvals</h3>
+              <span class="finding-location">EXPERIENCE.md › Interaction Primitives (swipe cards with auto-advance); Component Patterns › Swipe cards; DESIGN.md › Components › Capture sheet (page dots).</span>
+            </header>
+            <div class="finding-note">Moving between cards is a horizontal swipe only, and TalkBack consumes single-finger swipes. Approve and Reject auto-advance by replacing the card in place, so TalkBack focus stays on the same screen position, which now belongs to the next card's Approve button. A second double-tap approves a transaction the user never heard. Without a gesture there is no way to skip a card or go back to a previous one: the only paths are deciding now or leaving the whole batch. Switch Access and one-handed users have the same problem.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Spec in EXPERIENCE.md › Swipe cards: 1. Visible <code>Previous</code> / <code>Next</code> (or <code>Skip</code>) text buttons beside <code>N of M</code>, each 48dp, in addition to the swipe. Also expose them as TalkBack custom actions on the card. 2. After Approve or Reject, move accessibility focus to the new card's heading and announce <code>Approved Swiggy ₹420. Card 3 of 5: Zomato, 310 rupees, Food guessed</code>. 3. Ignore activation on the Approve and Reject buttons for 500ms after the card changes. 4. Under TalkBack or reduced motion, cross-fade instead of sliding. 5. Dots are decorative (<code>importantForAccessibility="no"</code>); <code>N of M</code> is the accessible position.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">H1. Over-budget limit tick and hatched overflow are not perceivable</h3>
+              <span class="finding-location">DESIGN.md frontmatter <code>components.hero-bar</code> (<code>limit-tick</code> = <code>on-glass-primary</code>, <code>fill</code> = <code>on-glass-primary</code> light / <code>on-glass-accent</code> dark, <code>overflow</code> = <code>on-glass-warning</code> stripes); Components › Home hero card › Over budget; EXPERIENCE.md › Accessibility Floor ("overspend = icon + label + hatch").</span>
+            </header>
+            <div class="finding-note">Computed: tick vs fill <strong>1.00:1</strong> in light (same colour) and <strong>1.41:1</strong> in dark. Overflow stripes vs fill: <strong>1.38:1</strong> in light and <strong>1.03:1</strong> in dark (#FCD34D vs #5EEAD4). Stripes vs track: 2.15–2.87:1 in light and 2.78:1 over the brightest dark glow. Fill vs track over white-backed light glass: 2.96:1. The "hatch" non-colour cue and the limit position both fall below 3:1. Over budget is still announced by the icon and label, but the bar cannot show where the limit is or how far over it the user went. The spine's ≥3:1 non-text claim does not hold.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Give the tick a 1dp <code>glass-tint</code> gap (knockout) on both sides, extend it 3dp above and below the bar (2×14dp is already taller than the 8dp bar; keep it), and use a contrasting colour (<code>bg-canvas-dark</code> outline around an <code>on-glass-primary</code> core). Draw the overflow as <code>on-glass-warning</code> stripes on a <strong><code>glass-tint</code> (dark) base</strong>, not on the track, separated from the fill by the tick gap. Re-verify with the script: stripe vs base ≥3:1, base vs fill ≥3:1. Fix the claim in Accessibility Floor to cite the verified numbers.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">H2. Dark capture sheet: text over the gradient header band fails contrast</h3>
+              <span class="finding-location">DESIGN.md › Components › Capture sheet ("<code>gradient.brand</code> header band behind the merchant/amount line"); Colors › Glass (the locked ≤45% glow cap applies only to Home glows).</span>
+            </header>
+            <div class="finding-note">The band is full-strength <code>gradient.brand</code>. Dark glass at the 62% floor over #2DD4BF gives <code>on-glass-primary</code> <strong>4.42:1</strong> and <code>on-glass-secondary-dark</code> <strong>3.12:1</strong>. The merchant line is <code>body</code>, not large text, so both fail. In light mode at 80% tint, secondary-as-#CBD5E1 would give 4.26:1. Light currently uses #F8FAFC there, which passes at 6.05:1.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Either cap the header band at the same ≤45% opacity as the glows (this gives the 7.49:1 case), or start the band at <code>gradient-brand-mid</code>. Add a rule to Colors › Glass: "Any gradient behind glass obeys the glow cap, Home or not."</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">H3. <code>on-glass-accent</code> used as text fails on light glass</h3>
+              <span class="finding-location">DESIGN.md › Components › Home hero card (No budget: <code>Set a limit →</code> link in <code>on-glass-accent</code>); <code>tab-bar.icon-active</code>; Colors › Glass.</span>
+            </header>
+            <div class="finding-note">#5EEAD4 on 80% light glass is <strong>4.28:1</strong> over #2DD4BF and <strong>3.59:1</strong> over white content. <code>Set a limit →</code> is <code>caption</code> (13sp), so it fails. Icons pass at ≥3:1. Any active tab label in accent would fail over white list content.</div>
+            <div class="finding-fix"><strong>Fix:</strong> On light glass, links and labels use <code>on-glass-primary</code> with an underline or the <code>→</code> glyph as the link cue. Reserve <code>on-glass-accent</code> for icons, fills and indicators in light mode. Add this to the "Ink on glass" bullet. If the tab bar gets labels, the active label uses <code>on-glass-primary</code> plus Medium weight; the filled icon carries the selection.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">H4. No focus indicator is specified (keyboard, Switch Access, hardware D-pad)</h3>
+              <span class="finding-location">DESIGN.md (no focus token or component state); EXPERIENCE.md › Accessibility Floor ("Focus order follows reading order").</span>
+            </header>
+            <div class="finding-note">WCAG 2.4.7 (Focus Visible) and 2.4.11 (Focus Not Obscured, new in 2.2 AA) apply to external keyboards, Chromebooks/tablets (≥600dp rail is in scope) and Switch Access, all of which draw focus on the app's own view, unlike TalkBack. With no UI kit, React Native draws nothing by default. The sticky glass tab bar, toasts and the capture sheet can also cover the focused row.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Add tokens <code>focus-ring</code> (2dp, <code>accent-primary</code> light / <code>accent-primary-dark</code> dark, 2dp offset; ≥3:1 against both the control and the surface: 5.47:1 and 9.89:1) and <code>focus-ring-on-glass</code> (<code>on-glass-primary</code>, 2dp). Spec: every focusable control shows it. Lists scroll the focused row clear of the tab bar and toast (scroll padding = tab bar + toast height).</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">H5. Undo toast is a time limit with no accessible duration</h3>
+              <span class="finding-location">EXPERIENCE.md › Component Patterns › Toast ("Duration [ASSUMPTION]"); Interaction Primitives › Undo toasts; Open Question 14.</span>
+            </header>
+            <div class="finding-note">Undo is the spine's main safety net for reversible actions ("act immediately + Undo"). A toast that times out removes it, and TalkBack users must navigate to the bottom of the screen to reach it. This is a WCAG 2.2.1 Timing Adjustable issue for a financial write.</div>
+            <div class="finding-fix"><strong>Fix:</strong> 1. Duration = <code>AccessibilityManager.getRecommendedTimeoutMillis(10 000, FLAG_CONTENT_CONTROLS)</code>, minimum 10s. 2. Pause while touched or focused, and stay until the next user action when TalkBack is on. 3. Announce <code>Saved. Undo available</code> via a polite live region. 4. Every Undo also has a durable path: entry detail › Restore, Show rejected, Recently deleted. Name that path in the toast spec.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">H6. Typed <code>RESTORE</code> confirmation is a cognitive and motor barrier</h3>
+              <span class="finding-location">EXPERIENCE.md › Component Patterns › Typed confirmation; Interaction Primitives; FLOW-10 step 5; <code>.memlog.md</code> (decision) Restore.</span>
+            </header>
+            <div class="finding-note">Typing an English capitalised word is hard for users with dyslexia, tremor, low literacy or a non-Latin IME. Autocorrect and auto-capitalisation fight it, and TalkBack users have to type letter by letter. Restore is often done under stress. The spine already has stronger safeguards: a preview card, a safety copy, and re-auth when lock is on.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Replace typing with a two-step explicit confirmation: a checkbox <code>I understand this replaces what's on this phone now</code> (48dp, full-row target) that enables <code>Restore</code>, plus re-auth when lock is on. If a typed check is kept, make it case-insensitive, trim whitespace, disable autocorrect and suggestions, localise the word, label the field <code>Type RESTORE to confirm</code>, and announce <code>Restore button enabled</code> when it matches.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">H7. Split editor: remainder not announced; disabled Save gives no reason</h3>
+              <span class="finding-location">EXPERIENCE.md › Component Patterns › Split editor; FLOW-05.</span>
+            </header>
+            <div class="finding-note"><code>Left to assign ₹X</code> and <code>₹X too much</code> change silently for screen-reader users, and Save is disabled with no announced reason. A TalkBack user hears only "Save, disabled".</div>
+            <div class="finding-fix"><strong>Fix:</strong> 1. Make the remainder line a polite live region, debounced 500ms after the last keystroke. 2. Give Save an accessibility hint: <code>Assign the remaining ₹X to save</code>. 3. Keep Save focusable when disabled (do not remove it from focus order). 4. <code>Fill</code> gets the label <code>Fill: assign ₹X to Groceries</code>. 5. Over-assignment uses the warning icon plus text, not colour alone.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">H8. Rejected, Reversed and Waiting rows rely on styling alone (visually and for TalkBack)</h3>
+              <span class="finding-location">DESIGN.md › Components › Activity row (Rejected = "whole row <code>text-secondary</code>"; Reversed = strikethrough; Waiting = dashed outline); EXPERIENCE.md › Accessibility Floor ("row states = tag text or outline style").</span>
+            </header>
+            <div class="finding-note">Rejected is distinguished by grey colour only, which fails 1.4.1 when mixed with live rows under Show rejected. Strikethrough and dashed outlines are not exposed to TalkBack. The capture vocabulary (<code>Waiting for you</code>, <code>Rejected</code>) exists but is not rendered on these rows.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Add status tags <code>rejected</code>, <code>reversed</code> and <code>waiting</code> to those row states, so every one of the 11 states has visible text. Keep the strikethrough and outline as secondary cues. Specify that the row's accessibility label includes the state word.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">H9. Sheets, keypad, segmented control and chips use fixed heights that break at 200%</h3>
+              <span class="finding-location">DESIGN.md frontmatter <code>segmented-control.height</code> 40dp, <code>keypad-key.height</code> 56dp, <code>chip.height</code> 32dp, <code>capture-sheet.height</code> 60–70%; Components › Add sheet.</span>
+            </header>
+            <div class="finding-note">At 200%, <code>Expense | Income | Transfer</code> label text (14sp→28sp) cannot fit three segments of about 96dp at 320dp width, so <code>Transfer</code> clips. 28sp keypad digits become 56sp inside 56dp keys. The Add sheet's stack (segmented, chips, account, amount, 4 keypad rows, Save) exceeds the screen, and Save sits bottom-right below the fold.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Turn heights into <strong>minimums</strong> (<code>min-height</code>) everywhere text lives. At ≥1.3×, the segmented control may wrap to a vertical radio list. Keypad keys grow (min 56dp), and keypad digits cap at <code>maxFontSizeMultiplier</code> 1.5. Sheets become scrollable with a sticky footer holding <code>Save</code> / <code>Approve</code> / <code>Reject</code>. The capture sheet may go full-height at large font scale.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M1. Segmented control: below 48dp and semantics unspecified</h3>
+              <span class="finding-location">DESIGN.md › Components › Segmented control (40dp); EXPERIENCE.md › Component Patterns › Segmented control.</span>
+            </header>
+            <div class="finding-note">A 40dp track is below NFR-11's 48dp target. The spec doesn't say whether segments are tabs or radios, so TalkBack may read "Income, button" with no state or position.</div>
+            <div class="finding-fix"><strong>Fix:</strong> 40dp visual, 48dp hit area (<code>hitSlop</code>). Each segment uses <code>accessibilityRole="radio"</code> inside a <code>radiogroup</code> labelled <code>Entry type</code>, with <code>selected</code> state and <code>1 of 3</code>. Announce the field change after a switch (<code>Transfer selected. From and To accounts shown</code>).</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M2. Filter chip removal: target, label and focus after removal unspecified</h3>
+              <span class="finding-location">EXPERIENCE.md › Component Patterns › Filter chip row ("tap ✕ removes"); DESIGN.md › Chips.</span>
+            </header>
+            <div class="finding-note">A ✕ icon inside a 32dp chip is far below 48dp if only the icon is the target. The label is unspecified, and focus is lost when the chip disappears.</div>
+            <div class="finding-fix"><strong>Fix:</strong> The whole chip is the remove target, labelled <code>Remove filter: HDFC debit</code>. After removal, focus moves to the next chip, or to <code>Filters · N</code> if none remain. Announce <code>Filter removed. 42 results</code>. <code>Clear all</code> announces the result count.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M3. Inline text links in the hero are below 48dp</h3>
+              <span class="finding-location">DESIGN.md › Home hero card (<code>Set a limit →</code>, <code>includes ₹X not classified — sort it</code>); EXPERIENCE.md › Free to use (<code>Set a limit →</code>).</span>
+            </header>
+            <div class="finding-note">Caption-size inline links fall below the 48dp target. <code>→</code> and <code>—</code> are read literally by TalkBack ("right arrow").</div>
+            <div class="finding-fix"><strong>Fix:</strong> Make each link a 48dp-tall row or button, with accessibility labels <code>Set a limit</code> and <code>Sort ₹X of unclassified spending</code>. Mark the arrows decorative.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M4. Hero card: nested controls and announcement unspecified</h3>
+              <span class="finding-location">EXPERIENCE.md › Component Patterns › Home hero card; Accessibility Floor.</span>
+            </header>
+            <div class="finding-note">The hero is a tap target (to SCR-15) that contains another control (the eye). Without a spec, TalkBack fragments it into 6–8 stops. <code>~₹988/day</code> will be read as "tilde 988 rupees slash day", and the bar has no progress semantics.</div>
+            <div class="finding-fix"><strong>Fix:</strong> The hero is one merged focus node: <code>Left in budget, 11,860 rupees. Spent 8,140 of 20,000. About 988 rupees per day, 12 days left. In accounts 52,300 rupees. Card dues 4,100 rupees. Double-tap for budget details</code>. The eye is a separate following node: <code>Hide amounts, toggle, off</code>. Over budget reads <code>Over budget by 2,340 rupees</code>. The bar is decorative inside the merged label. Provide a <code>accessibilityLabel</code> builder from the read model, not from the visible string.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M5. Activity row: merged announcement order and actions unspecified</h3>
+              <span class="finding-location">EXPERIENCE.md › Accessibility Floor ("Tags are read as part of the row"); Component Patterns › Activity row.</span>
+            </header>
+            <div class="finding-note">The announcement order, the direction word for unsigned expenses and the custom actions are not set. A Check row opening review is not discoverable.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Fix the order as merchant → amount with direction (<code>spent 420 rupees</code> / <code>income, plus 85,000 rupees</code> / <code>transfer 5,000 rupees</code> / <code>USD 12.99, waiting for currency</code>) → category → account → state tags → date. Check rows add the hint <code>Double-tap to review possible duplicate</code>. Add custom actions where the detail screen offers them (Recategorize, Delete), each with Undo.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M6. Gesture-only or hidden paths lack visible alternatives</h3>
+              <span class="finding-location">EXPERIENCE.md › Interaction Primitives (Sheets: swipe down = decide later; Long-press ＋ → camera; category cell → subcategories); Component Patterns › Category icon grid.</span>
+            </header>
+            <div class="finding-note">"Decide later" on the capture sheet is swipe-down or system Back only, with no visible button. Subcategories are reachable only by long-press in the capture grid. Long-press ＋ has no TalkBack action.</div>
+            <div class="finding-fix"><strong>Fix:</strong> 1. Add a visible <code>Later</code> text button in the capture-sheet header (48dp). 2. Category cells with subcategories show a small chevron or <code>More</code> cell. Picking the category opens an inline subcategory row (optional), and a custom action <code>Choose subcategory</code> is exposed. 3. ＋ exposes the custom action <code>Snap receipt</code>, and the Add sheet's <code>Snap receipt</code> chip is always present where OCR exists. 4. State in Interaction Primitives: "Every gesture has a visible control."</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M7. 21:00 auto-approve is a silent time limit on captures</h3>
+              <span class="finding-location">EXPERIENCE.md › FLOW-09 step 4; Capture Surfaces; Settings hub (<code>Auto-approve 21:00</code>).</span>
+            </header>
+            <div class="finding-note">Captures the user doesn't act on are written at 21:00. Users who are slow to interact are not told on the capture itself, so an unreviewed entry becomes a recorded fact.</div>
+            <div class="finding-fix"><strong>Fix:</strong> The capture sheet and notification state <code>Adds itself at 9:00 pm unless you reject it</code>, and TalkBack reads it. The time is adjustable (it already is) and can be turned off (<code>Never — always wait for me</code>). The evening summary links to Undo/Reject for those entries.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M8. Reduced-motion coverage incomplete</h3>
+              <span class="finding-location">EXPERIENCE.md › Interaction Primitives › Motion; Accessibility Floor; FLOW-08 step 2 (scan line); DESIGN.md › Hero (fade-in).</span>
+            </header>
+            <div class="finding-note">The OCR scan line (PRD OCR-014 says reduced motion shows the progress bar only), the card auto-advance transition, toast slide-in and the brief <code>All checked</code> dismissal are not covered.</div>
+            <div class="finding-fix"><strong>Fix:</strong> List every animated element with its reduced-motion form: scan line → static photo + determinate progress bar; card change → instant swap + focus move (C2); toasts and sheets → fade ≤150ms or none; <code>All checked</code> → stays until tapped, or 4s plus announcement. Respect both <code>ANIMATOR_DURATION_SCALE</code> and an in-app toggle.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M9. Widget and notification at 200% / large text</h3>
+              <span class="finding-location">EXPERIENCE.md › Capture Surfaces › Widget; Notifications › Evening summary; DESIGN.md › Home-screen widget.</span>
+            </header>
+            <div class="finding-note">A 4×1 cell is fixed height. <code>title-sm</code> at 34sp plus a caption and two buttons will clip in RemoteViews. Expanded notification lines <code>Merchant ₹amount · Category</code> get truncated by the system from the end, which cuts the amount off.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Widget: at large scale, drop the <code>N to check</code> caption to a second resize class (4×2), give the Snap and Add icon buttons 48dp with content descriptions, and never ellipsize the amount (ellipsize the label). Notification lines lead with the amount: <code>₹420 · Swiggy · Food</code>. Notification actions have full labels (<code>Approve ₹420 Swiggy</code>).</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M10. Needs / Wants / Savings series and chart series contrast</h3>
+              <span class="finding-location">DESIGN.md › Colors › Needs / Wants / Savings; Components (charts); EXPERIENCE.md › Charts; Open Question 8.</span>
+            </header>
+            <div class="finding-note">Against surfaces: wants 2.49:1 and savings 1.48:1 on white; needs 2.67:1 on dark surface. Between series: needs vs wants 2.20:1 and wants vs savings 1.68:1, so stacked or adjacent segments and the coin pie can't be told apart. Direct labels satisfy 1.4.11 only if every segment carries its own label. <code>semantic-expense</code> vs <code>semantic-income</code> in charts is hue-only.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Separate adjacent segments with a 2dp <code>bg-surface</code> gap. Label every segment directly (label + value + %), and put labels outside when a segment is too small to hold one. Give dark-mode variants (for example needs #2DD4BF on dark). Add pattern or marker shapes per series (solid, dotted, hatched) in comparison charts. Expense/income series also use the sign (<code>+</code>) and legend text. Keep <code>View as table</code> on every chart (already specced). Table rows are tappable, matching the bar-tap drill-down.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M11. Disabled-state visuals and semantics undefined</h3>
+              <span class="finding-location">DESIGN.md frontmatter <code>components</code> (no <code>disabled</code> for buttons/chips); EXPERIENCE.md › Split editor (Save disabled), Typed confirmation (Restore disabled).</span>
+            </header>
+            <div class="finding-note">Disabled controls are exempt from contrast, but they must look disabled in a way that does not rely on colour alone, and TalkBack must announce the state.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Add <code>button-primary-disabled</code>: solid <code>border-hairline</code> / <code>text-secondary</code> ink (7.58:1 for legibility), no gradient. Set <code>accessibilityState={{disabled:true}}</code> and a hint giving the reason (see H7).</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M12. One-time tips: focus behaviour and dismissal target unspecified</h3>
+              <span class="finding-location">EXPERIENCE.md › Interaction Primitives › One-time tips; DESIGN.md › Tooltip ("tap anywhere on it").</span>
+            </header>
+            <div class="finding-note">"Announced by TalkBack" and "never steals focus" conflict unless the mechanism is stated. A tooltip at 280dp can cover its anchor at 200%.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Announce via a polite live region. The tip is inserted in focus order immediately after its anchor, with a 48dp <code>Got it</code> button. At large scale it renders as an inline card under the anchor instead of a floating pointer.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M13. Passphrase entry: paste, password managers and strength feedback</h3>
+              <span class="finding-location">EXPERIENCE.md › Component Patterns › Passphrase field; FLOW-10.</span>
+            </header>
+            <div class="finding-note">WCAG 3.3.8 (Accessible Authentication, AA) requires that users can paste or use a password manager. The spec is silent, and secure-entry implementations often block paste. A mismatch between the passphrase and confirm fields and the strength hint have no announcement spec.</div>
+            <div class="finding-fix"><strong>Fix:</strong> State explicitly: paste allowed, <code>autoComplete="password-new"</code> / <code>"password"</code>, <code>Show</code> toggle labelled <code>Show passphrase, toggle</code>. The strength hint and the mismatch error (<code>Passphrases don't match</code>) are polite live regions, with text and an icon. A wrong passphrase on restore keeps the field content.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M14. Capture category grid: label text and category colours unspecified</h3>
+              <span class="finding-location">DESIGN.md › Capture sheet (category icon grid, 4 columns); <code>category-icon-chip</code> ("category colour at 16%"); Open Question 5.</span>
+            </header>
+            <div class="finding-note">The grid cells read as icon-only. Icons are ambiguous for cognitive users and need labels for TalkBack. With no palette, light category colours on their own 16% tint can land around 2.1:1 (e.g. #14B8A6).</div>
+            <div class="finding-fix"><strong>Fix:</strong> Put a text label under every icon (<code>caption</code>, 2 lines, never truncated to a single letter), with the accessibility label <code>Food, category</code>. Validate the category palette at ≥3:1 for each icon on its tint in both themes before it lands.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M15. Inline errors are not announced</h3>
+              <span class="finding-location">EXPERIENCE.md › State Patterns › Error; FLOW-02 failure ("inline error, all input kept").</span>
+            </header>
+            <div class="finding-note">Inline errors are invisible to TalkBack unless focus moves to them or they are announced.</div>
+            <div class="finding-fix"><strong>Fix:</strong> On submit failure, move accessibility focus to the first invalid field. The field's error text is attached to it (<code>accessibilityLabel</code> includes <code>Error: amount required</code>). Screen-level errors use an assertive live region once.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M16. Dark glass over light imagery falls below 4.5:1</h3>
+              <span class="finding-location">DESIGN.md › Colors › Glass (dark worst case computed only over glows and #1E293B).</span>
+            </header>
+            <div class="finding-note">Receipt photos (SCR-23, attachments in SCR-08) scroll under the dark-mode tab bar and sit behind sheets. Over white image areas the 62% glass gives #F8FAFC <strong>3.22:1</strong> and #CBD5E1 2.27:1.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Add a rule: glass over image content uses <code>glass-fallback-dark</code>, or raise the tab-bar tint to ≥80% when imagery is in the scroll view. Alternatively, inset images so they never pass under the tab bar.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M17. Home card reorder needs a non-drag alternative</h3>
+              <span class="finding-location">EXPERIENCE.md › IA (SCR-05 Home card editor); pass1-coverage (SCR-05 behaviour unspecified).</span>
+            </header>
+            <div class="finding-note">WCAG 2.5.7 (Dragging Movements, AA) requires a single-pointer alternative to drag-to-reorder.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Each card row has <code>Move up</code> / <code>Move down</code> buttons (or custom actions) and a <code>Hide</code> switch. Announce the new position (<code>Bills moved to position 2 of 6</code>).</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M18. Custom amount keypad accessibility</h3>
+              <span class="finding-location">EXPERIENCE.md › Component Patterns › Amount keypad; DESIGN.md › <code>keypad-key</code>.</span>
+            </header>
+            <div class="finding-note">A custom keypad replaces the IME, so TalkBack labels, the delete key and hardware-keyboard input must be designed in.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Keys are labelled <code>1</code>…<code>9</code>, <code>0</code>, <code>decimal point</code> (locale-aware) and <code>Delete</code>. The entered amount is a live region read in full (<code>12 point 50 dollars</code>). Hardware number keys and Backspace work. Long-press Delete clears, with a visible <code>Clear</code> alternative.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M19. Over-budget and threshold states beyond the hero have no non-colour spec</h3>
+              <span class="finding-location">EXPERIENCE.md › FLOW-06 (thresholds); IA (SCR-14/15 Budget list/detail); DESIGN.md › Colors (<code>semantic-warning</code> "over budget, limits, due soon").</span>
+            </header>
+            <div class="finding-note">Only the hero defines icon, label and hatch. Category budget bars, bill "due soon" and threshold statuses rely on <code>semantic-warning</code> with no required icon or text.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Generalise the hero rule into a <code>limit-bar</code> component (tick, overflow treatment, <code>Over by ₹X</code> text, warning icon). Require the text <code>Due in 2 days</code> / <code>80% used</code> next to any warning tint.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">L1. Page dots are below 3:1 and below the target size</h3>
+              <span class="finding-location">DESIGN.md › <code>capture-sheet.page-dots</code> (6dp; inactive vs glass 2.1–2.6:1, active vs inactive 1.7–2.1:1).</span>
+            </header>
+            <div class="finding-note">Acceptable only if the dots are decorative.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Mark them non-interactive and hidden from TalkBack. <code>N of M</code> carries the position (see C2).</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">L2. Dark toast has no boundary against cards</h3>
+              <span class="finding-location">DESIGN.md › <code>toast.background-dark</code> = <code>bg-surface-dark</code>.</span>
+            </header>
+            <div class="finding-note">Toast vs card: 1.00:1. Toast vs canvas: 1.22:1. The toast blends into the content under it.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Use #334155 or a 1px <code>glass-border</code> outline for the dark toast background.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">L3. Unselected chips and hairline borders are about 1.2:1</h3>
+              <span class="finding-location">DESIGN.md › <code>chip.border</code> (<code>border-hairline</code> #E2E8F0: 1.23:1 on white, 1.18:1 on canvas; dark: 1.19:1).</span>
+            </header>
+            <div class="finding-note">The chip's boundary is nearly invisible. The text label identifies the control, but its extent and hit area are unclear to low-vision users.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Unselected chips use a <code>text-secondary</code> 1px border, or a <code>bg-surface</code> fill on canvas.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">L4. Activity tab pending dot unspecified</h3>
+              <span class="finding-location">EXPERIENCE.md › IA (Activity: "small dot on the tab (no count)").</span>
+            </header>
+            <div class="finding-note">No colour, size or accessibility label is defined for the dot.</div>
+            <div class="finding-fix"><strong>Fix:</strong> 8dp <code>on-glass-warning</code> dot (3.68:1 or better on light glass). The tab label becomes <code>Activity, items to check</code>.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">L5. "Check" tag vs vocabulary</h3>
+              <span class="finding-location">DESIGN.md › Activity row (<code>Check</code> tag); EXPERIENCE.md › Voice and Tone (<code>Possible duplicate — check it</code>).</span>
+            </header>
+            <div class="finding-note"><code>Check</code> alone is ambiguous when spoken.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Use the tag <code>possible duplicate</code>, or keep the visible <code>Check</code> with the spoken label <code>possible duplicate, check it</code>.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">L6. <code>View as table</code> structure unspecified</h3>
+              <span class="finding-location">EXPERIENCE.md › Charts; PRD acceptance at line 618.</span>
+            </header>
+            <div class="finding-note">The table's structure for TalkBack is not specified.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Table rows are single merged nodes (<code>Food, 4,200 rupees, 32 percent</code>), the header row is announced as headers, the table follows the scope label (<code>Spent · HDFC only</code>), and the same drill-down applies on tap.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">L7. ＋ button icon over the light gradient region</h3>
+              <span class="finding-location">DESIGN.md › <code>add-button</code> (135° full <code>gradient.brand</code>).</span>
+            </header>
+            <div class="finding-note">White on #2DD4BF is 1.86:1. The plus arms span roughly 37–63% of the diagonal, near the mid stop (about 3–5:1), so the icon probably passes. It is unverified.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Verify ≥3:1 at the arm tips, or use the mid→end segment as <code>button-primary</code> does. Label the button <code>Add entry</code>, with the custom action <code>Snap receipt</code>.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">L8. Hidden amounts: mask spoken form and bar leak</h3>
+              <span class="finding-location">DESIGN.md › Hero (Amounts hidden: "bar shown"); Open Question 6.</span>
+            </header>
+            <div class="finding-note">A <code>••••</code> mask is read as "bullet" by some TalkBack versions. A visible bar or progress value still discloses the proportion spent.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Every masked amount carries the label <code>Amount hidden</code>, and the mask glyph is hidden from accessibility. Under hidden amounts the hero bar exposes no value, and chart tables mask values too.</div>
+          </article>
+        </div>
+      </details>
+    </section>
+    <div class="mechanical">
+      <h3>Mechanical notes</h3>
+      <ul>
+        <li>Pass 1 source is <code>.working/pass1-coverage.md</code> (distill step), not a <code>review-rubric.md</code>; Pass 2 categories 6–8 were not reviewed.</li>
+        <li>The Accessibility Floor in EXPERIENCE.md claims all load-bearing pairs meet ≥3:1 non-text "including the locked glass floor". Computed hero-bar tick, overflow and track pairs fall below that (see H1).</li>
+        <li>EXPERIENCE.md › SCR-07 says "11 row states"; DESIGN.md › Activity row table lists 12 (including Rejected).</li>
+        <li>DESIGN.md › Colors › Glass cites white on #2DD4BF as 1.68:1; WCAG 2.x computes 1.86:1 (white) / 1.78:1 (#F8FAFC). The conclusion is unchanged.</li>
+        <li>Contrast ratios computed with WCAG relative luminance, alpha-composited over worst-case backdrops (white content, #2DD4BF, the 45% glow, the scrim).</li>
+      </ul>
+    </div>
+    <footer class="report-footer">
+      <div class="meta">
+        <span>Rubric: .working/pass1-coverage.md (Pass 1 only)</span>
+        <span>Reviewers: review-accessibility.md</span>
+        <span>Generated: 2026-11-07T10:57:49</span>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

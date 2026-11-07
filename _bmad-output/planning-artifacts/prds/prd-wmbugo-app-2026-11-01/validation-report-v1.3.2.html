@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PRD Validation: wmbugo PRD v1.3.2</title>
+<style>
+  :root {
+    --bg: #fafaf9;
+    --surface: #ffffff;
+    --border: #e7e5e4;
+    --text: #1c1917;
+    --muted: #78716c;
+
+    --verdict-strong: #16a34a;
+    --verdict-adequate: #65a30d;
+    --verdict-thin: #d97706;
+    --verdict-broken: #dc2626;
+
+    --sev-low: #64748b;
+    --sev-medium: #ca8a04;
+    --sev-high: #ea580c;
+    --sev-critical: #dc2626;
+
+    --grade-exc: #16a34a;
+    --grade-good: #65a30d;
+    --grade-fair: #d97706;
+    --grade-poor: #dc2626;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    font-size: 15px;
+  }
+  .container { max-width: 960px; margin: 0 auto; padding: 32px 24px 64px; }
+
+  header.report-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+  .title h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+  .title .subtitle { color: var(--muted); font-size: 13px; margin-top: 4px; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .grade {
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-weight: 600;
+    color: white;
+    font-size: 15px;
+    white-space: nowrap;
+  }
+  .grade-excellent { background: var(--grade-exc); }
+  .grade-good { background: var(--grade-good); }
+  .grade-fair { background: var(--grade-fair); }
+  .grade-poor { background: var(--grade-poor); }
+
+  .synthesis {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--muted);
+    border-radius: 8px;
+    padding: 18px 22px;
+    margin-bottom: 24px;
+    font-size: 15.5px;
+  }
+  .synthesis p { margin: 0 0 10px; }
+  .synthesis p:last-child { margin-bottom: 0; }
+
+  .dimension-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  .dim-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .dim-card .dim-name { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .dim-card .dim-verdict { font-size: 14px; font-weight: 600; }
+
+  section.dimension, section.reviewer-section { margin-bottom: 14px; }
+  section.dimension details, section.reviewer-section details {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  section summary {
+    padding: 14px 20px;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  section summary::-webkit-details-marker { display: none; }
+  section summary::before {
+    content: "▸";
+    display: inline-block;
+    color: var(--muted);
+    transition: transform 0.15s ease;
+  }
+  section details[open] summary::before { transform: rotate(90deg); }
+  section summary h2 {
+    display: inline;
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    flex: 1;
+  }
+  .verdict-pill {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: white;
+  }
+  .verdict-strong { background: var(--verdict-strong); }
+  .verdict-adequate { background: var(--verdict-adequate); }
+  .verdict-thin { background: var(--verdict-thin); }
+  .verdict-broken { background: var(--verdict-broken); }
+
+  .dim-body { padding: 4px 20px 18px; }
+  .dim-judgment { color: var(--text); font-size: 14.5px; }
+  .dim-judgment p { margin: 0 0 10px; }
+
+  .findings-list { padding: 0 20px 4px; }
+  article.finding {
+    padding: 14px 0;
+    border-top: 1px solid var(--border);
+  }
+  article.finding:first-child { border-top: none; }
+  article.finding header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+  }
+  .badge {
+    font-size: 10.5px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    line-height: 1.4;
+  }
+  .badge-sev-low { background: rgba(100, 116, 139, 0.12); color: var(--sev-low); }
+  .badge-sev-medium { background: rgba(202, 138, 4, 0.14); color: var(--sev-medium); }
+  .badge-sev-high { background: rgba(234, 88, 12, 0.14); color: var(--sev-high); }
+  .badge-sev-critical { background: rgba(220, 38, 38, 0.14); color: var(--sev-critical); }
+  .finding-title { margin: 0; font-size: 15px; font-weight: 500; flex: 1; min-width: 200px; }
+  .finding-location { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px; color: var(--muted); }
+  .finding-note, .finding-fix { margin-top: 6px; font-size: 14px; }
+  .finding-fix strong { color: var(--muted); font-weight: 500; }
+
+  .reviewer-source {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  .mechanical {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-top: 24px;
+    font-size: 14px;
+  }
+  .mechanical h3 { margin: 0 0 10px; font-size: 14px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .mechanical ul { margin: 0; padding-left: 20px; }
+  .mechanical li { margin-bottom: 4px; color: var(--text); }
+
+  footer.report-footer {
+    margin-top: 40px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--muted);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  footer .meta { display: flex; gap: 24px; flex-wrap: wrap; }
+
+  .finding-note ul { margin: 4px 0 0; padding-left: 20px; }
+  .finding-note li { margin-bottom: 3px; }
+  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.92em; background: rgba(120,113,108,0.10); padding: 0 4px; border-radius: 3px; }
+</style>
+</head>
+<body>
+  <div class="container">
+
+    <header class="report-header">
+      <div class="title">
+        <h1>wmbugo PRD v1.3.2 — Validation Report</h1>
+        <div class="subtitle">_bmad-output/planning-artifacts/prds/prd-wmbugo-app-2026-11-01/prd.md</div>
+      </div>
+      <div class="grade grade-poor">Poor</div>
+    </header>
+
+    <div class="synthesis">
+      <p>v1.3.2 is a strong, decision-ready PRD. All the critical and high findings from the v1.3.0 reviews about double counting and the hero are closed in the text: auto-approve is always a write (FIN-026); manual duplicates are held, not counted (TXN-012); Savings is counted once, as net transfers (BDG-009); unclassified spending reduces "Left in budget" (§6.3); and duplicate matching, refunds, timezone and learning each have their own rule (FIN-027/028, FIN-002, LRN-008). The remaining risk is of two kinds. The first is semantic: the 50/30/20 Savings bar, which is the brand's mark, measures the wrong thing for the primary Indian persona, because in India the everyday bank account is literally a "savings account" and SIP investing cannot be modelled. The second comes from the latest fixes, which left stale or conflicting text around them: CAP-007 and FLOW-09 still say eligible captures "count as confirmed" before the FIN-026 write; CAP-012 introduces an automatic transfer link outside the FIN-026 contract; SET-005 redaction is not reflected in SEC-005 or CAP-001; FIN-014 retention contradicts DEC-24 and the status-mapping paragraph; and BDG-008 contradicts the GOAL acceptance on whether Free to use can go negative. None of these blocks UX work. Fix the CAP-007/CAP-012 contract text and the Savings definition before <code>bmad-architecture</code> freezes the schema.</p>
+      <p>The adversarial reviewer says the fixes "closed most of the earlier double-counting holes" and then "opened new ones where they meet each other". Its two criticals are ledger paths: the "same reference, opposite direction = reversal" rule turns ordinary own-account UPI transfers into reversals that cancel the debit (C1), and credits with no learned type still auto-approve, into an expense category (C2). Its eleven highs add more wrong-balance paths the rubric did not raise: a discovered account's opening balance is off by the very transaction that discovered it (H2), auto-approve can post to an account that does not exist yet (H3), a card-bill payment is counted twice through its two SMS legs (H4), "without a shared reference" can flood review for every repeat UPI payment (H5), Merge keeps a receipt defaulted to Cash over the card charge (H6), the 90-day purge deletes the fingerprints that keep rejected items rejected (H7), a dismissed UPI share dialog auto-approves a friend's forwarded screenshot as your spending (H8), and every discounted receipt trips the "items exceed total" mismatch (H11). Its verdict: "Do not freeze until the two critical findings and the high findings on the ledger path (H1–H7) are closed." The two reviewers agree on the stale CAP-007 read-time wording (adversarial H1, rubric medium), unlearned credits being auto-approvable (C2, rubric medium), the Savings bar failing the Indian persona (H10, rubric high) and the forbidden "savings" type in SCR-18 (H9, inside the rubric high), CAP-012 linking outside FIN-026 (H4, rubric medium, from different angles), retention vs DEC-24 and the backup copy (H7 and L6, rubric medium), blind Approve on a redacted notification (M8, rubric medium), Free to use clamping vs the GOAL acceptance (M6, rubric medium), the GATE-02 deadline (M16, rubric medium), the dismissed-UPI-dialog rule (H8, rubric low), the clock guard storage (M1, rubric downstream medium), and the leftover text (unallocated, INS-001 presets, §13.2 SMS-017, the addendum, data-model duplicates). Grade: Poor, because adversarial critical C2 is confirmed in the PRD text: CAP-007 puts no direction condition on auto-approve eligibility and confirms an unlearned capture "as 'Uncategorised'", which CAT-006 defines as a seeded expense-side category that feeds Not classified, so an unlearned salary credit is auto-approved onto the spending side (C1 is equally literal in FIN-027 and UPI-005; the rubric alone would grade Fair).</p>
+      <p>Progress since v1.3.0: of the 25 critical and high findings in the v1.3.0 report (5 critical, 20 high), 22 are resolved in the text and 3 are partly open. All four rubric highs are closed, and 18 of the 21 adversarial critical/high findings are fixed; the partly open ones are C1 (debits fixed, credits not), C3 (FIN-026 right, CAP-007 wording stale) and H16 (GATE-02 has a fallback but an unreachable deadline). This round finds 2 critical and 12 high, down from 5 and 20, and most of them are new edges created by the v1.3.1/1.3.2 fixes rather than carry-overs.</p>
+    </div>
+
+    <div class="dimension-summary">
+      <div class="dim-card">
+        <div class="dim-name">Decision-readiness</div>
+        <div class="dim-verdict" style="color: var(--verdict-strong)">strong</div>
+      </div>
+      <div class="dim-card">
+        <div class="dim-name">Substance over theater</div>
+        <div class="dim-verdict" style="color: var(--verdict-strong)">strong</div>
+      </div>
+      <div class="dim-card">
+        <div class="dim-name">Strategic coherence</div>
+        <div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div>
+      </div>
+      <div class="dim-card">
+        <div class="dim-name">Done-ness clarity</div>
+        <div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div>
+      </div>
+      <div class="dim-card">
+        <div class="dim-name">Scope honesty</div>
+        <div class="dim-verdict" style="color: var(--verdict-strong)">strong</div>
+      </div>
+      <div class="dim-card">
+        <div class="dim-name">Downstream usability</div>
+        <div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div>
+      </div>
+      <div class="dim-card">
+        <div class="dim-name">Shape fit</div>
+        <div class="dim-verdict" style="color: var(--verdict-strong)">strong</div>
+      </div>
+    </div>
+
+    <section class="dimension">
+      <details>
+        <summary>
+          <h2>Decision-readiness</h2>
+          <span class="verdict-pill verdict-strong">strong</span>
+        </summary>
+        <div class="dim-body">
+          <div class="dim-judgment">
+            <p>The decision register (§2, DEC-01..33) is still the strongest section. Each row gives a baseline, a reason, what was given up and what it supersedes. DEC-22 now states the always-write model plainly, and DEC-33 defines the pay cycle down to the early-salary rule. The approval status is now consistent everywhere: the header says "Final (frozen at v1.3.2 …)"; §0 says "frozen v1.3 PRD"; §20 M0 says "PRD approved and frozen (this version)"; §25 ticks owner acceptance.</p>
+            <p>§24 keeps named gates with solo-review substitutes. §20 moves GATE-02 to M1, adds a two-package fallback with a backup→restore migration path, and runs the betas on a Play closed track that also satisfies GATE-13. The one weak spot is that GATE-02 now has two deadlines, and no default if Google does not answer within the five-day M1 window.</p>
+          </div>
+        </div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">GATE-02 has two deadlines and no default if it cannot be resolved in M1</h3>
+              <span class="finding-location">§20 M1, §24 GATE-02, SMS-016</span>
+            </header>
+            <div class="finding-note"><ul><li>§20 M1 (2026-11-03 → 11-07) says "resolve GATE-02 … before choosing the application ID and flavor structure", and GATE-02 says "before the application ID is chosen (M1)".</li><li>SMS-016 still says "GATE-02 must confirm before M3".</li><li>The answer depends on Play policy interpretation, which is outside the developer's control, while M1 is five working days that also hold the ledger, encryption, migration and pipeline spikes.</li></ul></div>
+            <div class="finding-fix"><strong>Fix:</strong> Change SMS-016 to "before M1 (GATE-02)". Add a default to GATE-02: "If not confirmed by end of M1, choose the two-package structure (distinct application IDs) so no later migration is forced."</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">"Absorbed by the staged rollout" still overstates what §20 offers</h3>
+              <span class="finding-location">§4.1 last line; §24.1 impact notes for v1.3, note 2</span>
+            </header>
+            <div class="finding-note">Unchanged from the v1.3.0 review. Schedule pressure actually moves the undated M3–M5, which §20 states honestly.</div>
+            <div class="finding-fix"><strong>Fix:</strong> "Schedule pressure moves the M3–M5 dates (set at the M2 checkpoint), not scope."</div>
+          </article>
+        </div>
+      </details>
+    </section>
+    <section class="dimension">
+      <details>
+        <summary>
+          <h2>Substance over theater</h2>
+          <span class="verdict-pill verdict-strong">strong</span>
+        </summary>
+        <div class="dim-body">
+          <div class="dim-judgment">
+            <p>The content stays product-specific and load-bearing: SMS header normalization with concrete examples (<code>VM-HDFCBK-S</code> → <code>HDFCBK</code>, SMS-010); the per-(sender, mask) balance chain that excludes "Avl Lmt" (SMS-012); the tip tolerance of "0–30% above the receipt total" (FIN-027); the capture inbox before first unlock (SEC-001); "release build does not declare the <code>INTERNET</code> permission" (SEC-002), a structural guarantee rather than a promise; and the §16.3 reference-set protocol, with retention and deletion numbers.</p>
+            <p>Success metrics now measure the <em>correct</em> outcome ("correct amount, account and category after zero or one tap"), and the learning metric has a threshold ("fall by ≥ 30% from week 1 to week 3"). There are five personas, but each drives named flows.</p>
+          </div>
+        </div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">A few adjective bounds remain</h3>
+              <span class="finding-location">NFR-06, NFR-19, OCR-001, OCR-007, §6.6</span>
+            </header>
+            <div class="finding-note"><ul><li>NFR-06 "UI animation aims 60 FPS" and NFR-19 "keep 60 FPS scrolling" have no tolerance, unlike NFR-07's "≥ 95% of frames".</li><li>OCR-001 says "compress safely" and OCR-007 says "fails gracefully".</li><li>§6.6 says the fallback "must look intentional, not degraded".</li></ul></div>
+            <div class="finding-fix"><strong>Fix:</strong> Reuse the NFR-07 form for NFR-06 and NFR-19. For OCR-001, state the maximum dimension and quality. For OCR-007, state "manual entry offered within one tap; image kept".</div>
+          </article>
+        </div>
+      </details>
+    </section>
+    <section class="dimension">
+      <details>
+        <summary>
+          <h2>Strategic coherence</h2>
+          <span class="verdict-pill verdict-adequate">adequate</span>
+        </summary>
+        <div class="dim-body">
+          <div class="dim-judgment">
+            <p>The thesis is coherent: private, offline, correct, visual, effortless capture, with 50/30/20 as the mark. The v1.3.1 fixes made the two promised numbers arithmetically sound: §6.3 subtracts Not classified spending from the hero, and the HOM acceptance checks it ("₹12,000 with 'includes ₹3,000 not classified'"); BDG-009 counts each savings transfer once and nets withdrawals.</p>
+            <p>What holds this dimension at <em>adequate</em> is that the Savings bar's <em>definition</em> does not fit how the primary 50/30/20 protagonist (Arjun, Pune) keeps his money. On Plan, that same user is told to "Set a limit" although he has set one.</p>
+          </div>
+        </div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">The Savings bar measures the wrong thing for Indian users</h3>
+              <span class="finding-location">ACC-009, BDG-009, DEC-30, FIN-010, CAT-006, §4.3, SCR-18</span>
+            </header>
+            <div class="finding-note"><ul><li>ACC-009 invites users to mark "a savings or deposit account". In India the ordinary salary and transaction account is called a savings account (SB A/c), so the natural choice is to mark the everyday account.</li><li>BDG-009 then makes Savings "transfers in minus transfers out … can go below zero". Every card-bill payment (ACC-007), ATM withdrawal (FIN-013, CAP-012) and wallet top-up from that account is a transfer out, so Arjun's Savings bar sits deeply negative every month. Salary landing in that account is income, not a transfer, so it never counts.</li><li>The common Indian saving channels (SIP, RD, PPF, insurance) cannot be modelled as transfers. FIN-010 has no investment or deposit account type, and investment tracking is Phase 3 (§4.3). They therefore post as expenses, inflate Needs, Wants or Not classified, and reduce "Left in budget".</li><li>SCR-18 still lists a category type "need/want/savings", which contradicts CAT-006 ("Saving is never an expense category").</li><li>The result is that the brand-mark figure is wrong for the persona it is built for. Adversarial H9 and H10 agree.</li></ul></div>
+            <div class="finding-fix"><strong>Fix:</strong> Pick one. (a) Add an asset account kind "Savings &amp; investments" (balance optional); SIP/RD debits become transfers into it, and ACC-009 copy steers users away from marking their everyday account ("Don't mark the account your salary lands in"). (b) When no account is marked, define Savings as income − (needs + wants + not classified) and label the source. Either way, remove "savings" from SCR-18, and add an acceptance case: "salary account not marked; ₹42,000 card bill paid from it → Savings unchanged".</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">Free to use tells a 50/30/20-only user to "Set a limit"</h3>
+              <span class="finding-location">BDG-008 and its acceptance, §6.3 #2, HOM acceptance</span>
+            </header>
+            <div class="finding-note"><ul><li>The BDG acceptance says: with "no overall budget, … Free to use shows 'not enough information yet — Set a limit'".</li><li>§6.3 gives the same 50/30/20-only user a real "Left in budget" figure, (Needs + Wants targets) − spending.</li><li>BDG-008's <code>budget_remaining</code> is never defined for this setup, so Home and Plan disagree about whether a limit exists. This is Arjun's main flow (FLOW-14).</li></ul></div>
+            <div class="finding-fix"><strong>Fix:</strong> Define <code>budget_remaining</code> in BDG-008 as "the hero's Left in budget (§6.3), including the 50/30/20-only form". Limit the "Set a limit" case to "no overall budget and no 50/30/20".</div>
+          </article>
+        </div>
+      </details>
+    </section>
+    <section class="dimension">
+      <details>
+        <summary>
+          <h2>Done-ness clarity</h2>
+          <span class="verdict-pill verdict-adequate">adequate</span>
+        </summary>
+        <div class="dim-body">
+          <div class="dim-judgment">
+            <p>This dimension improved again. Every §8 module now has Given/When/Then acceptance, so the §25 claim is true. The v1.3.0 high findings are closed: TXN-012 is now <code>needs_review</code> + <code>possible_duplicate</code>, with its own status-mapping row and acceptance case; ONB, ACC, TXN and BDG carry worked GWT cases (₹80,000 → 40,000/24,000/16,000; Pay card bill; Adjust balance; the cross-period refund); FIN-026 gives a six-step contract, including versioned rules and a clock guard.</p>
+            <p>Being unforgiving, though: the latest fixes left contradictions in the text around them, and several v1.3.1/1.3.2 requirements have no acceptance case at all.</p>
+          </div>
+        </div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">CAP-007 and FLOW-09 still describe read-time auto-approval, contradicting FIN-026 (2)</h3>
+              <span class="finding-location">CAP-007, FLOW-09, FIN-026, DEC-22</span>
+            </header>
+            <div class="finding-note"><ul><li>FIN-026 (2): "Auto-approval is <strong>always a write, never derived on read</strong> … stay <code>needs_review</code> — 'Waiting for you' on every surface … until they are written".</li><li>CAP-007 still says eligible captures pending after the cutoff "<strong>count as confirmed</strong> and are materialized per FIN-026, <strong>so nothing depends on a background job running</strong>".</li><li>FLOW-09 says "eligible ignored items count as confirmed after the cutoff".</li><li>An agent building from CAP-007 can rebuild the derived model that v1.3.1 removed. Adversarial raises this as H1.</li></ul></div>
+            <div class="finding-fix"><strong>Fix:</strong> Change CAP-007 to "…are written as confirmed (<code>auto_approved</code>) per FIN-026, by a best-effort background job or the next app open; until then they are Waiting for you". Change FLOW-09 to "…are written as confirmed after the cutoff (FIN-026)".</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">CAP-012 auto-links transfers outside the FIN-026 contract</h3>
+              <span class="finding-location">CAP-012, CAP acceptance, CAP-007, FIN-024, FIN-026 (3), §11 capture_resolution</span>
+            </header>
+            <div class="finding-note"><ul><li>CAP-012: transfer-like captures "are never auto-approved … when both sides are known they are linked as a transfer". The CAP acceptance has this happen "when 21:00 passes … it is linked as a card payment if the card account exists".</li><li>That is an automatic financial write, but CAP-007 excludes transfer-like captures from auto-approve, FIN-026 covers only eligible captures, and <code>capture_resolution</code> has no value for it (<code>user_approved | auto_approved | rejected</code>).</li><li>Nothing says when the link happens, whether the clock guard and audit row apply, or how the user sees it. The trigger is text matching, so the case needs a visible, reversible state. Adversarial H4 shows the double-link this enables.</li></ul></div>
+            <div class="finding-fix"><strong>Fix:</strong> Either make auto-linking a FIN-026 write ("at the cutoff, transfer-like captures whose both sides are known are written as a confirmed transfer with <code>capture_resolution = auto_linked</code> and an audit row; label 'Recorded · linked as transfer'"), or require the user's tap. Add the value to §11 and the status-mapping table.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">Auto-approval of credits with no learned type is undefined</h3>
+              <span class="finding-location">CAP-007, CAP-004, CAT-006, FIN-028, INS-016</span>
+            </header>
+            <div class="finding-note"><ul><li>CAP-007 allows any direction and confirms an uncategorised capture "as 'Uncategorised' with the <code>needs_category</code> flag". Uncategorised is an <em>expense</em> category (CAT-006).</li><li>For a credit from a verified sender with no learned type, the PRD does not say whether it becomes income, a refund or a transfer. Income inflates "Kept N%"; FIN-028 says a refund is never income.</li><li>The v1.3.0 adversarial review (C1) asked for "any credit without a learned type" to be ineligible. Only the transfer-like part was adopted. Adversarial raises this as critical C2.</li></ul></div>
+            <div class="finding-fix"><strong>Fix:</strong> Add to CAP-007: "a credit is eligible only when its income type (CAP-004) is learned for that payer; otherwise it waits". Add a CAP acceptance case.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">App-lock notification redaction is stated in only one of the three places that govern it</h3>
+              <span class="finding-location">SET-005, SEC-005, CAP-001, SEC acceptance</span>
+            </header>
+            <div class="finding-note"><ul><li>SET-005 (v1.3.2): "With app lock on, capture notifications use the redacted public version (no amount or merchant) even on an unlocked device unless the user opts in".</li><li>SEC-005 still says the full details show "only when the device is unlocked", with no app-lock or hide-amounts exception.</li><li>CAP-001 still lets Approve/Reject run from the shade "without unlocking (it … reveals nothing new)". On a redacted notification that is a blind approval (adversarial M8).</li><li>No acceptance case covers notifications under app lock or under hide-amounts.</li></ul></div>
+            <div class="finding-fix"><strong>Fix:</strong> Restate the rule once in SEC-005 and reference it from CAP-001 and SET-005. Decide whether a redacted notification shows Approve/Reject at all (recommended: only "Review", which requires unlock). Add GWT cases for an unlocked device with app lock on, and for hide-amounts on.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">Free to use and goal over-assignment contradict each other</h3>
+              <span class="finding-location">BDG-008, GOAL-004, GOAL acceptance 4</span>
+            </header>
+            <div class="finding-note"><ul><li>BDG-008's formula is <code>max(0, min(…))</code>, so Free to use is never negative.</li><li>The GOAL acceptance says the app "shows Free to use honestly (it may be negative)".</li><li>GOAL-004 says "the same set-aside amount cannot be assigned to two goals", but the acceptance lets the user do it with a warning. Adversarial M6 agrees.</li></ul></div>
+            <div class="finding-fix"><strong>Fix:</strong> Pick one: either floor at 0 and block the second set-aside, or allow it and show a negative figure. Align BDG-008, GOAL-004 and the acceptance.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">The v1.3.2 retention rule contradicts older text and has no acceptance</h3>
+              <span class="finding-location">FIN-014, DEC-24, FIN-024, §7.3 status-mapping paragraph, CAP-008, FLOW-18, SEC-008</span>
+            </header>
+            <div class="finding-note"><ul><li>FIN-014 now purges soft-deleted manual entries after 30 days and rejected captures after 90 days, adds Delete permanently, and says "purges propagate to the next backup".</li><li>DEC-24, FIN-024 and CAP-008 still promise rejected captures "can be re-approved later" with no time limit.</li><li>The paragraph after the status mapping says a deleted manual entry "keeps its audit row and <strong>backup copy</strong>".</li><li>No GWT case covers the purge, "Show rejected" at day 91, or Delete permanently on an item that is part of a transfer or refund link. Adversarial H7 and L6 agree and add the lost-fingerprint path.</li></ul></div>
+            <div class="finding-fix"><strong>Fix:</strong> Add "(for 90 days, FIN-014)" to DEC-24, FIN-024 and CAP-008. Change "backup copy" to "copy in backups made before the purge". Add acceptance cases: "rejected capture at day 91 is gone from Show rejected"; "Delete permanently on a linked transfer removes both legs after confirmation" (or blocks it).</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">Many v1.3.1/1.3.2 additions have no GWT case</h3>
+              <span class="finding-location">§22.1, CAP-009, CAP-012, FIN-002, FIN-026 (6), FIN-027, IMP-001/002/005, BDG-007/008/009, §13.2, DEC-33</span>
+            </header>
+            <div class="finding-note"><ul><li>§22.1 makes such stories not Ready. These are covered only as §16.1 suite keywords or not at all:</li><li>CAP-009 account discovery (type pre-select, "available limit never used as a balance", (sender, mask) keying); CAP-012 debit choices.</li><li>FIN-002 cross-zone prompt and DST; FIN-026 (6) clock guard; FIN-027 Merge outcome.</li><li>IMP-001 encodings and decimal commas; IMP-002 flip sign and transfer-pair proposal; IMP-005 resume after interruption.</li><li>BDG-007 "effective now vs next period"; BDG-008 with the gate passing; the BDG-009 &gt;10% income update offer.</li><li>§13.2 dismissed UPI share dialog becoming pending and auto-approvable; DEC-33 early-salary rule.</li></ul></div>
+            <div class="finding-fix"><strong>Fix:</strong> Add one GWT case for each, using the module's existing style. The worked numbers already exist in the requirement text.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">INS-001 still diverges from §6.5</h3>
+              <span class="finding-location">INS-001, §6.5</span>
+            </header>
+            <div class="finding-note">It says "Presets as in §6.5" but then lists them again without "Yesterday" and with "Quarter, Year" instead of "This quarter, This year". Adversarial L2 agrees.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Drop the restated list and leave only "Presets as in §6.5".</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">The word "unallocated" still conflicts with "Not itemised"</h3>
+              <span class="finding-location">FIN-022, OCR-005 vs TXN-009</span>
+            </header>
+            <div class="finding-note">TXN-009 says "A receipt's 'Not itemised' amount is not unallocated". FIN-022 still says "Missing OCR items are handled by explicit <em>unallocated amount</em>", and OCR-005 says "unallocated discrepancy is explicit". FIN-022 is the invariant source GATE-07 checks fixtures against. Adversarial L1 agrees.</div>
+            <div class="finding-fix"><strong>Fix:</strong> In FIN-022 and OCR-005, write "a 'Not itemised' split row (TXN-009)".</div>
+          </article>
+        </div>
+      </details>
+    </section>
+    <section class="dimension">
+      <details>
+        <summary>
+          <h2>Scope honesty</h2>
+          <span class="verdict-pill verdict-strong">strong</span>
+        </summary>
+        <div class="dim-body">
+          <div class="dim-judgment">
+            <p>Scope is explicit throughout: §4.1 says "no ranked cut list"; §13.0a and §13.2 now state per-market capture behavior (outside India there are "no capture notifications, grouping, evening summary or auto-approve"); the feature-gating rule is single and explicit ("build supports it <strong>and</strong> the profile region is India"); the currency list is extended to match the market claims; §16.3 limits real reference data; the one <code>[ASSUMPTION]</code> (SMS-016) is tied to GATE-02 and its fallback.</p>
+            <p>Open-item density stays low and is appropriate for a green-light PRD.</p>
+          </div>
+        </div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">REC-007 and REC-008 still have no phase and no screen</h3>
+              <span class="finding-location">§8.6, §5.2, REC-005, INS-022</span>
+            </header>
+            <div class="finding-note">REC-007 "reject suggestions" only makes sense with REC-005 inference, which is Phase 2. REC-008's "Subscription page" has no SCR entry, and INS-022 is P2. Unchanged from v1.3.0.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Tag REC-007 as P2. Either tag REC-008 as P2 or fold it into SCR-16 with a P1 scope sentence.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">GATE-05 still requires "iOS/Android parity" as Phase 1 evidence</h3>
+              <span class="finding-location">§24 GATE-05, DEC-10</span>
+            </header>
+            <div class="finding-note">iOS OCR is Phase 2 (DEC-10).</div>
+            <div class="finding-fix"><strong>Fix:</strong> Mark that part "(Phase 2)".</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">The dismissed-UPI-dialog rule is scoped inconsistently</h3>
+              <span class="finding-location">§13.2 CAP row, SCR-29 row, DEC-22</span>
+            </header>
+            <div class="finding-note"><ul><li>The dismissal-becomes-pending rule is stated only for the India <strong>no-SMS</strong> build; the SMS build's behavior is unstated.</li><li>The other-markets text says the widget shows "N to check" only for review items such as import duplicates, while the SCR-29 row says the "pending count reflects UPI/receipt captures".</li><li>Treating a dismissal as implicit approval at 21:00 is a product choice that deserves a line in DEC-22. Adversarial H8 goes further and calls it a high.</li></ul></div>
+            <div class="finding-fix"><strong>Fix:</strong> Move the dismissal rule into UPI-003 or CAP-007 so it applies to both India builds. Make the SCR-29 row market-specific.</div>
+          </article>
+        </div>
+      </details>
+    </section>
+    <section class="dimension">
+      <details>
+        <summary>
+          <h2>Downstream usability</h2>
+          <span class="verdict-pill verdict-adequate">adequate</span>
+        </summary>
+        <div class="dim-body">
+          <div class="dim-judgment">
+            <p>This PRD feeds UX, architecture and stories, and most of it extracts cleanly: the status-mapping table has the "manual possible duplicate" row; §11 gained <code>refund_of_transaction_id</code>, <code>auto_approve_rule</code> history, <code>budget_alert_fired</code>, <code>capture_inbox</code>, <code>account_identifier</code> keyed by (sender, mask), <code>balance_chain</code>, goal and account display fields, and many-to-one provenance; RB0/RB1 replaces the P0/P1 collision; §16.1 marks the iOS cases as P2; the glass fallback names Android signals.</p>
+            <p>The remaining problems are data-model gaps behind the newest FRs, and a stale-text tail that crosses the PRD and the addendum.</p>
+          </div>
+        </div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">The §11 data model has gaps against the v1.3.x FRs</h3>
+              <span class="finding-location">§11</span>
+            </header>
+            <div class="finding-note"><ul><li><strong>Retention (FIN-014):</strong> no <code>excluded_at</code> or <code>deleted_at</code>, so the 30- and 90-day purges cannot be computed reliably from <code>updated_at</code>; a manual Delete and a review-queue exclude are both <code>excluded</code> with no <code>capture_resolution</code>. Add <code>removed_at</code> and <code>removal_kind[deleted|rejected|excluded]</code>.</li><li><strong>CAP-012 auto-link:</strong> no <code>capture_resolution</code> value for it.</li><li><strong>Duplicate auto-approve settings:</strong> <code>profile.auto_approve_enabled / auto_approve_cutoff_local / auto_approve_rule_effective_from</code> duplicate the versioned <code>auto_approve_rule</code> table. Keep only the table.</li><li><strong><code>transaction.before_tracking_started</code> is stored</strong>, but FIN-016 makes it derivable from <code>opening_effective_at</code>. Mark it derived.</li><li><code>account</code> has no <code>sort_order</code> (ACC-001); <code>import_batch</code> has no <code>raw_path?</code> or <code>retain_until?</code> (IMP-006); <code>recurring_rule</code> has no <code>kind</code> (REC-007).</li><li><strong>Goal links run both ways:</strong> <code>transaction.goal_id?</code> and <code>goal_allocation.transaction_id?</code>. Pick one.</li><li><strong>Clock guard (FIN-026 (6)):</strong> relies on "elapsed time since boot" but stores only <code>last_materialized_at</code>. State what is stored across reboots (adversarial M1 agrees).</li></ul></div>
+            <div class="finding-fix"><strong>Fix:</strong> Add the listed fields, drop the duplicates, and state the clock-guard storage.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">The stale-text sweep is incomplete</h3>
+              <span class="finding-location">DEC-21, §13.2, FIN-025, FLOW-15/17, Appendix A, §10, §3.3, §5.3, §13.0a, addendum §2–3</span>
+            </header>
+            <div class="finding-note"><ul><li>DEC-21 lists automated captures as "(SMS, bill match)", omitting UPI share and receipt match.</li><li>§13.2 says "SMS-001..016 … Absent" (SMS-017 exists) and "LRN-001..007 Present" (LRN-008/009 exist). FIN-025 says "per LRN-001–LRN-006".</li><li>FLOW-17 "amount = outstanding" vs ACC-007 statement due; FLOW-15 "bank account created" vs CAP-009 pre-select; Appendix A #2 "attach/create/exclude" vs OCR-010.</li><li>Glossary "Mixed merchant" and "Left in budget" are stale; "v1" still means the release in §3.3, §14, §19, §20 and §23; §5.3 says "dynamic island"; the §13.0a currency row lists 13 codes, the list below has 23.</li><li>Addendum: §3 widget "● count" vs HOM-007 "N to check"; §2 "within N minutes" vs FIN-027 ±1 day; §3 vocabulary lacks "Recorded · needs a category"; the receipt match omits Discard. The 1.3.2 change log claims the widget fix.</li></ul></div>
+            <div class="finding-fix"><strong>Fix:</strong> One sweep across the PRD and the addendum.</div>
+          </article>
+        </div>
+      </details>
+    </section>
+    <section class="dimension">
+      <details>
+        <summary>
+          <h2>Shape fit</h2>
+          <span class="verdict-pill verdict-strong">strong</span>
+        </summary>
+        <div class="dim-body">
+          <div class="dim-judgment">
+            <p>This is a consumer product at the top of a UX → architecture → stories chain, and it has the matching formality: named-protagonist flows, a screen inventory, traceable IDs, a test-traceability format (§16.4), Definition of Ready and Done, and a reference-set protocol. Technology candidates and UX detail stay in <code>addendum.md</code> under "the PRD wins on any conflict". Nothing is over-formalized for a solo build, because the chain-top role justifies the rigor.</p>
+            <p>No findings.</p>
+          </div>
+        </div>
+        <div class="findings-list">
+        </div>
+      </details>
+    </section>
+
+    <section class="reviewer-section">
+      <details>
+        <summary>
+          <h2>Adversarial review</h2>
+          <span class="reviewer-source">_bmad-output/planning-artifacts/prds/prd-wmbugo-app-2026-11-01/review-adversarial-general.md</span>
+        </summary>
+        <div class="dim-body">
+          <div class="dim-judgment">
+            <p><strong>Verdict:</strong> v1.3.1/v1.3.2 closed most of the earlier double-counting holes. The fixes then opened new ones where they meet each other. The "same reference, opposite direction = reversal" rule turns ordinary own-account UPI transfers into reversals. Credits with no learned type still auto-approve into an expense category. Account discovery, Merge and the retention purge each have a path that leaves a wrong balance or brings rejected money back. Do not freeze until the two critical findings and the high findings on the ledger path (H1–H7) are closed.</p>
+            <p><strong>Previous findings:</strong> 21 critical/high re-checked. 18 fixed; 3 partly open (C1 credits, C3 CAP-007 wording, H16 GATE-02 deadline). <strong>New findings:</strong> 2 critical · 11 high · 19 medium · 8 low. Owner decisions are not argued: every finding is about how the PRD specifies them.</p>
+          </div>
+        </div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-critical">critical</span>
+              <h3 class="finding-title">C1. Own-account UPI transfers are classified as reversals and cancel the debit</h3>
+              <span class="finding-location">FIN-027, UPI-005, FIN-028, SMS acceptance vs CAP-010, CAP-012, FLOW-16, DEC-29</span>
+            </header>
+            <div class="finding-note"><ul><li>Priya moves ₹5,000 from HDFC to her ICICI account by UPI. Both banks' SMS quote the <strong>same UPI RRN</strong>. That is how UPI references work.</li><li>The pipeline (DEC-29) runs FIN-027 matching first. Same reference, opposite direction, so FIN-028 applies: "a reversal of a failed payment cancels the original debit in the original's period". The HDFC debit is cancelled and the HDFC balance is ₹5,000 too high.</li><li>The ICICI credit is either swallowed as the reversal leg (ICICI ₹5,000 too low) or posted as well (total assets ₹5,000 too high). FLOW-16 and CAP-010 never get a chance, because nothing says whether transfer pairing or reversal detection is evaluated first.</li><li>The same hits a UPI payment to a known own wallet, and IMP-002 transfer-pair detection on CSV rows with shared references. RB0 "no known incorrect account balance" fails on one of the most common Indian money movements.</li><li>Verified in prd.md: FIN-027 and UPI-005 state the opposite-direction rule with no account condition, and DEC-29 gives no evaluation order.</li></ul></div>
+            <div class="finding-fix"><strong>Fix:</strong> Make the reference rule account-aware: same reference, opposite direction, <strong>same account</strong> → reversal or refund; <strong>two different owned accounts</strong> (or a known own masked identifier) → transfer pair (FIN-013 / CAP-010); credit on an <strong>unknown</strong> account → hold for review with the transfer choice pre-selected. State in DEC-29 that transfer pairing runs before reversal/refund linking. Add SMS, UPI and DEDUP fixtures for a same-RRN own-account transfer.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-critical">critical</span>
+              <h3 class="finding-title">C2. Unlearned credits still auto-approve, into an expense category</h3>
+              <span class="finding-location">CAP-007, CAT-006, §6.3 hero, CAP-004, INS-016, BDG-009 pre-fill</span>
+            </header>
+            <div class="finding-note"><ul><li>Arjun's ₹80,000 salary SMS arrives on the 25th from a verified sender, fully parsed, not transfer-like. He has no learned type for this payer yet, so it is CAP-007-eligible.</li><li>At 21:00 it is written as confirmed "Uncategorised". Uncategorised is the expense category with no type, so a literal implementation either (a) books ₹80,000 into <strong>Not classified</strong> and the 50/30/20 hero subtracts his salary as spending ("Left in budget −₹40,000 · includes ₹80,000 not classified"), or (b) treats it as income of an unknown kind, inflating "Kept N%" and, if it lands in Salary, the BDG-009 income pre-fill.</li><li>Unlinked refund credits and "From a person" repayments are auto-approved as income the same way.</li><li>C1 in v1.3.0 asked for "any credit without a learned type" to be ineligible. That part of the fix was not applied.</li><li>Verified in prd.md: CAP-007's eligibility list has no direction condition, and CAT-006 defines Uncategorised as a seeded expense-side category that feeds Not classified. Rubric raises the same gap as a medium.</li></ul></div>
+            <div class="finding-fix"><strong>Fix:</strong> In CAP-007, make credits eligible only when a credit type (Salary / Refund / From a person / own transfer) has been learned for that payer. Otherwise they stay <code>needs_review</code>. If the owner wants credits auto-approved anyway, define a separate "Uncategorised income" category that never enters Needs, Wants or Not classified. Add a CAP acceptance case: an unlearned salary credit at 21:00 is still Waiting for you, and Left in budget is unchanged.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">H1. CAP-007 still describes read-time auto-approve</h3>
+              <span class="finding-location">CAP-007 vs FIN-026(2), DEC-22, CAP acceptance</span>
+            </header>
+            <div class="finding-note"><ul><li>CAP-007: "Eligible captures still pending after the daily cutoff … <strong>count as confirmed</strong> and are materialized per FIN-026, <strong>so nothing depends on a background job running</strong>."</li><li>FIN-026(2): "always a write, never derived on read … stay <code>needs_review</code> … until they are written". DEC-22 depends on a best-effort job <strong>or</strong> the next open.</li><li>An agent given the CAP-007 story (WMB-16) implements a selector that counts eligible-past-cutoff items. That brings back every C3 failure: the widget disagrees with Home, the evening summary disagrees with Activity, and late duplicates shrink totals.</li></ul></div>
+            <div class="finding-fix"><strong>Fix:</strong> Replace the sentence with: "Eligible captures stay <code>needs_review</code> until written by FIN-026 (job or next open); nothing counts them before the write."</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">H2. A discovered account's opening balance is off by the very transaction that discovered it</h3>
+              <span class="finding-location">CAP-009, addendum §2 vs FIN-016</span>
+            </header>
+            <div class="finding-note"><ul><li>An ICICI debit SMS (₹1,200, Avl Bal ₹20,000) arrives at 10:02. Priya taps <em>Add it</em> at 13:40.</li><li>CAP-009 sets the opening balance to ₹21,200, the balance <strong>before</strong> the debit. FIN-016 timestamps the opening at 13:40, so the 10:02 debit is "before tracking started" and does not post.</li><li>The balance shows ₹21,200 against a real ₹20,000. Any other ICICI captures still waiting from earlier that day are also silently excluded.</li></ul></div>
+            <div class="finding-fix"><strong>Fix:</strong> For discovered accounts, set <code>opening_effective_at</code> to the instant just before the discovering transaction's <code>occurred_at</code>, or derive the opening balance as the available balance <em>after</em> the transaction and mark that transaction as before tracking. Add a GWT case with numbers.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">H3. Auto-approve can post to an account that does not exist yet</h3>
+              <span class="finding-location">CAP-007, CAP-009, FLOW-15</span>
+            </header>
+            <div class="finding-note"><ul><li>In week 1, Priya gets SMS from three masked accounts and ignores the "New account ••7730 — add it?" prompts.</li><li>The account is <em>parsed</em> (••7730), so the captures are eligible. At 21:00 FIN-026 must write <code>confirmed</code> postings, and there is no <code>account_id</code>.</li><li>Engineer A auto-creates an account, skipping CAP-009's choice and possibly duplicating one that should have been "One of mine". Engineer B crashes the materialization transaction, blocking every other auto-approval that night. Engineer C posts to the default account, which makes that balance wrong.</li></ul></div>
+            <div class="finding-fix"><strong>Fix:</strong> Eligibility requires the account to be <strong>resolved</strong> to an owned account, not just parsed. Unresolved captures stay Waiting with the discovery prompt. Add this to the CAP acceptance.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">H4. Card-bill payments are counted twice through the two SMS legs</h3>
+              <span class="finding-location">CAP-012, CAP-010, CAP-009, FIN-011</span>
+            </header>
+            <div class="finding-note"><ul><li>On the 5th, HDFC Bank sends "₹42,000 debited towards HDFC Credit Card ••1234". Transfer-like, both sides known, linked as a transfer: card dues fall ₹42,000.</li><li>Minutes later the issuer sends "Payment of ₹42,000 received on your card ••1234". A credit on the card, transfer-like by wording, other side a known own account. It is linked as <strong>another</strong> transfer, so dues fall again: ₹84,000 for one payment.</li><li>CAP-010's pairing only runs when the user marks a credit "Moved from my own account". Nothing says the second leg must find and merge into the first.</li></ul></div>
+            <div class="finding-fix"><strong>Fix:</strong> Before linking, a transfer-like capture must search for an existing transfer or transfer-like capture (opposite direction, same amount, FIN-027 window, same two accounts) and <strong>attach as the other leg's source record</strong>. It must never create a second transfer. Add CAP and DEDUP fixtures with both card-payment SMS.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">H5. "Without a shared reference" can be read two ways; one floods review for every repeat UPI payment</h3>
+              <span class="finding-location">FIN-027, IMP-004, TXN acceptance, SMS-005</span>
+            </header>
+            <div class="finding-note"><ul><li>Priya pays the same tea stall ₹20 by UPI at 09:10 and again at 16:30. Each SMS has its own RRN.</li><li>Reading A: the references differ, so no fuzzy check. Reading B: they have no <em>shared</em> reference, so the fuzzy rule applies and the second tea becomes <code>possible_duplicate</code>, never auto-approved. The daily metro top-up, the auto-rickshaw and the office canteen go the same way.</li><li>The only identical-purchase acceptance covers <strong>manual</strong> entries. The "≥ 70% resolved with zero or one tap" metric collapses under reading B.</li></ul></div>
+            <div class="finding-fix"><strong>Fix:</strong> State that when both items carry references and the references differ, they are <strong>not</strong> duplicates; the fuzzy rule applies only when at least one side has no reference. Add DEDUP cases for two same-day UPI payments to the same payee with different RRNs.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">H6. Merge keeps the earliest record, which is often a receipt defaulted to Cash</h3>
+              <span class="finding-location">FIN-027 Merge, OCR-011, TXN-012, OCR-012</span>
+            </header>
+            <div class="finding-note"><ul><li>Sara snaps a Tesco receipt at 18:05. New merchant, so Paid with defaults to <strong>Cash</strong>; Save confirms it, itemized into four categories.</li><li>At 18:07 the card debit arrives and is flagged <code>possible_duplicate</code>. She taps Merge. FIN-027 keeps "the earliest confirmed record", the Cash receipt, and the card charge is excluded. Cash balance is £64 too low and card dues are £64 too low.</li><li>The reverse order also fails: merging a receipt into an earlier SMS expense "lets the user choose the category", collapsing the receipt's itemized splits into one category.</li></ul></div>
+            <div class="finding-fix"><strong>Fix:</strong> Define Merge field by field: <strong>account and amount</strong> from the bank-sourced record (SMS, CSV or UPI) when present; <strong>splits and items</strong> from the receipt; <strong>merchant</strong> from the user's choice; <strong>timestamp</strong> the earliest. Add a GWT case with the receipt first and the card second.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">H7. The retention purge deletes the fingerprints that keep rejected items rejected</h3>
+              <span class="finding-location">FIN-014, IMP-005, UPI-005, DEC-24</span>
+            </header>
+            <div class="finding-note"><ul><li>In June, Sara rejects 6 rows from a bank CSV: card payments she had already recorded as transfers.</li><li>In October she imports a "last 6 months" export. The purged rows have no <code>source_record</code> fingerprint left, so they import again, this time as <strong>confirmed</strong> expenses. June spending rises by £1,900 and past totals she trusted change.</li><li>The same happens to a re-shared UPI screenshot after 90 days, and to a "Delete permanently" manual entry whose CSV row is re-imported. DEC-24 also still promises rejected captures "can be re-approved later", with no time limit.</li></ul></div>
+            <div class="finding-fix"><strong>Fix:</strong> Purging must keep a <strong>tombstone fingerprint</strong>: a non-financial hash of (source kind, reference/fingerprint, direction) plus <code>rejected</code>. Later matches go to review as "You rejected this before", never auto-confirmed. Update DEC-24 to "within 90 days". Add an IMP acceptance case for re-importing after the purge.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">H8. A dismissed UPI share dialog auto-approves, so a forwarded payment screenshot becomes your spending</h3>
+              <span class="finding-location">§13.2, CAP-007, UPI-002</span>
+            </header>
+            <div class="finding-note"><ul><li>A friend sends Priya a PhonePe "Paid ₹2,500 to Priya" screenshot on WhatsApp as proof of payment. She shares it to wmbugo out of curiosity and swipes the dialog away.</li><li>It is a "Paid" layout, so it is parsed as <strong>her</strong> debit. At 21:00 it is auto-approved as a ₹2,500 expense from her default account. The same happens to screenshots shared by mistake, or old ones from the gallery.</li><li>A dismissal is the user saying "not now" or "not this". Treating it as consent, and treating a screenshot as being as trustworthy as a verified bank sender, is backwards. The screenshot carries no proof that it came from this device's UPI account.</li></ul></div>
+            <div class="finding-fix"><strong>Fix:</strong> A dismissed share is <code>needs_review</code> and <strong>not</strong> auto-approve-eligible, or it is discarded with an Undo toast. If screenshots stay eligible at all, require the parsed payer account or VPA to match an owned account or a learned VPA. Add a UPI acceptance case: a dismissed screenshot is still Waiting the next morning.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">H9. SCR-18 offers a "savings" category type that the rest of the PRD forbids</h3>
+              <span class="finding-location">SCR-18 vs CAT-006, §10, §11.1 budget_type, DEC-30</span>
+            </header>
+            <div class="finding-note"><ul><li>The UX designer works from the screen inventory and draws a three-way type picker.</li><li>An agent builds the editor from SCR-18 and adds <code>savings</code> to the enum. The schema rejects it, or someone widens the schema. A "SIP" category typed savings then counts as an expense <em>and</em> feeds the Savings bar: the old C2 double count over again.</li></ul></div>
+            <div class="finding-fix"><strong>Fix:</strong> Change SCR-18 to "need/want (expense categories only)". If the owner wants SIPs in Savings, see H10; do not do it through a category type.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">H10. "Savings account" is a trap name in India, and SIPs still never reach the Savings bar</h3>
+              <span class="finding-location">ACC-009, BDG-009, FIN-010, DEC-30</span>
+            </header>
+            <div class="finding-note"><ul><li>In India almost every retail account is called a "Savings Account". Arjun marks his HDFC salary account as savings, because it <em>is</em> one. From then on every wallet transfer, card-bill payment and move to another account reduces Savings.</li><li>His Savings bar shows −₹38,000 every month, and the brand-mark feature tells him he saves nothing.</li><li>If he correctly leaves it unmarked, his real savings (₹10,000/month SIP debits, plus an RD) are expense debits to a non-account. They land in Needs, Wants or Not classified, and Savings is ₹0. Either way the core Indian persona sees a wrong Savings bar.</li></ul></div>
+            <div class="finding-fix"><strong>Fix:</strong> Rename the flag in the UI to "Money I'm saving (not for spending)" and explain that a bank's "savings account" label does not qualify it. Exclude card-bill payments out of a savings-marked account from Savings. Add a P1 <strong>Investments / deposits</strong> asset account type (or an "investment" transfer target) so SIP/RD debits count toward Savings without being expenses. Add a 5030 acceptance case covering a SIP debit.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">H11. Every discounted receipt trips the "items exceed total" mismatch</h3>
+              <span class="finding-location">OCR-005, FIN-022, OCR-004, §3.3</span>
+            </header>
+            <div class="finding-note"><ul><li>A Tesco receipt lists items totalling £52.40 and "Clubcard savings −£6.10", for a total of £46.30. Item amounts exceed the total, as they should.</li><li>A literal agent flags a mismatch and forces Sara to "fix the items or the total" on every supermarket receipt in the UK, US and SG, where loyalty prices are everywhere. The ≤ 20 s receipt metric and "saving with not-itemised is normal" both fail.</li><li>Discount allocation (line-level vs pro-rata) is unspecified, while tax has an exact rule.</li></ul></div>
+            <div class="finding-fix"><strong>Fix:</strong> The mismatch check is <strong>(items + tax + fees − discounts) &gt; total</strong>. Allocate a discount to its line when printed under an item; otherwise pro-rata like tax. Add an OCR fixture with a loyalty discount.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M1. The clock guard can block auto-approve for days, and "elapsed since boot" is lost on reboot</h3>
+              <span class="finding-location">FIN-026(6)</span>
+            </header>
+            <div class="finding-note"><ul><li>The clock jumps to 2027 (a dead CMOS battery or a bad network-time update); <code>last_materialized_at</code> is recorded as 2027; the clock is corrected. "Not earlier than the last time the app recorded" now blocks every write until 2027.</li><li>"Elapsed time since boot" resets on reboot, and the PRD gives no fallback. Two engineers will build different guards.</li></ul></div>
+            <div class="finding-fix"><strong>Fix:</strong> Store <code>(wall_time, elapsedRealtime, boot_count)</code> at each open; if boot_count is unchanged, trust the elapsed delta; after a reboot, trust the wall clock only if it is ≥ the stored wall_time and ≤ stored + 30 days, otherwise skip auto-approve until the next open and log it. Clamp the high-water mark so it never exceeds now + 1 day.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M2. Turning auto-approve off at 20:55 still approves today's captures</h3>
+              <span class="finding-location">FIN-026(4), CAP acceptance</span>
+            </header>
+            <div class="finding-note">Priya disables auto-approve at 20:55 because she wants to check today's six items herself. At 21:00 they are confirmed anyway. That is surprising, and it contradicts the "trust over pressure" principle.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Disabling, or moving the cutoff <em>later</em>, takes effect immediately for captures not yet written; only <em>tightening</em> changes need versioning. Alternatively, show "Takes effect tomorrow — today's 6 will still be recorded at 21:00".</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M3. The evening summary reports "recorded" before anything is written</h3>
+              <span class="finding-location">CAP-007, SET-003, addendum §3</span>
+            </header>
+            <div class="finding-note">The summary fires at 21:00 ("Today: 6 recorded · 2 categories guessed"), but the background job has not run, so all six are still <code>needs_review</code>. Priya opens it and sees "6 to check" on Home: two numbers that disagree, on the trust-critical path.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Build the summary only after the materialization write has committed, inside the same job. If the job did not run, word it "6 will be recorded when you open wmbugo".</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M4. The timezone rule contradicts its own example and leaves period membership open</h3>
+              <span class="finding-location">FIN-002</span>
+            </header>
+            <div class="finding-note"><ul><li>The rule prompts only when device and profile differ by "more than 6 hours". Its own example, "You're in Dubai time", is London→Dubai: 3–4 hours. That trip never prompts, nor does London→New York or Mumbai→London. The cutoff then fires at 16:00 in New York.</li><li>Is period membership by <code>local_date</code> or by the UTC instant in the profile zone? A Dubai 01:30 purchase on the 25th lands in different pay cycles under the two readings. CSV rows have a date only, and their zone is unstated.</li></ul></div>
+            <div class="finding-fix"><strong>Fix:</strong> Prompt on any offset difference ≥ 2 h lasting more than 24 h. Period membership uses <code>local_date</code>; date-only imports use the profile zone. Fix the example.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M5. A payday change splits the hero from Insights and leaves gap days</h3>
+              <span class="finding-location">BDG-002 vs DEC-33, §6.3</span>
+            </header>
+            <div class="finding-note">Arjun changes his payday from the 1st to the 25th on 10 November. Insights and Plan switch at once; the overall budget, and so the hero, stays on 1–30 November. From 25 to 30 November the hero and Insights describe different windows, and the first new cycle is not said.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Define the transition: the current period runs to the day before the new payday, then a short bridging period with a pro-rated target (or none), and DEC-33's default period changes at the same instant as the overall budget.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M6. GOAL-004 allows a negative Free to use; BDG-008 clamps it at zero</h3>
+              <span class="finding-location">GOAL-004 acceptance vs BDG-008</span>
+            </header>
+            <div class="finding-note">An agent implementing BDG-008 cannot pass the GOAL acceptance test, and an agent implementing the acceptance test breaks the formula.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Pick one. Recommended: drop <code>max(0, …)</code> and show a negative value as "Short by ₹X", since the PRD values honesty.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M7. Unlinked refunds, negative categories and reversals in closed periods</h3>
+              <span class="finding-location">BDG-006, §10 Budget used vs FIN-028</span>
+            </header>
+            <div class="finding-note"><ul><li>An agent reading BDG-006 ("minus <strong>linked</strong> refunds") ignores unlinked refunds in budgets, while Insights (FIN-028) subtracts them, so the two disagree.</li><li>A ₹9,000 November refund for an October TV, against ₹2,000 of November Shopping, gives Shopping −₹7,000, which can make the Wants bar negative and inflate Left in budget by ₹7,000.</li><li>A reversal on the 2nd for a payment on the 30th rewrites last month's totals after its alerts have fired.</li></ul></div>
+            <div class="finding-fix"><strong>Fix:</strong> Make §10 and BDG-006 read "minus refunds (linked or categorised)". State whether a category, Needs or Wants total can go below zero (recommended: clamp the bars at zero and show the surplus refund separately). Accept that reversals rewrite the original period, and say that alerts do not re-fire.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M8. Blind Approve: the notification hides the amount, but the Approve button is live</h3>
+              <span class="finding-location">SET-005, CAP-001</span>
+            </header>
+            <div class="finding-note">With app lock on, the shade shows "wmbugo · 1 new transaction [Approve] [Reject]". The user approves something they cannot see, which defeats the point of a one-tap check.</div>
+            <div class="finding-fix"><strong>Fix:</strong> When the redacted version is shown, offer only "Review" (which unlocks the app). Approve/Reject appear only on the full version.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M9. A credit from a new legitimate bank is scam-flagged, and the sender can never be confirmed through it</h3>
+              <span class="finding-location">SMS-011, SMS-017</span>
+            </header>
+            <div class="finding-note">A cooperative or small-finance bank not on the allow-list sends a salary credit; it is shown as "This looks like a scam — not added". SMS-017's "It's my bank" prompt is only reachable through a <em>debit</em>, so these users lose every credit until they happen to make a debit.</div>
+            <div class="finding-fix"><strong>Fix:</strong> A credit from a well-formed DLT header that is not allow-listed and has no link or prize wording gets the SMS-017 prompt and is held (<code>needs_review</code>). Only credits with links or claim wording, or from a phone number, are scam-flagged.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M10. "Cash withdrawal (to the Cash account)" assumes a Cash account exists</h3>
+              <span class="finding-location">CAP-012, ONB-002 ③, FIN-013</span>
+            </header>
+            <div class="finding-note">The user set up only HDFC at onboarding. An ATM SMS arrives and there is no Cash account to link to. The item waits forever ("when both sides are known"), or an agent posts it as an expense.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Choosing Cash withdrawal creates a Cash account on first use, with "balance not set" or ₹0 starting at that instant. State this.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M11. IDR and HUF hide decimals that are stored, which breaks round-trip and the keypad</h3>
+              <span class="finding-location">§13.0a, §7.4, FIN-001</span>
+            </header>
+            <div class="finding-note">A CSV row "Rp 12.345,67" is stored as 1234567, displays "Rp 12.346", and parses back as 1234600: the §7.4 invariant fails. Displayed totals stop summing to displayed rows, and it is unclear whether the keypad allows IDR decimals.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Use a display/entry exponent of 0 for IDR and HUF. Imports with non-zero minor units are rounded with a visible warning, or rejected. The round-trip invariant applies to the display exponent.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M12. "Profile region" is never defined</h3>
+              <span class="finding-location">ONB-002 ②, §13.0a, §11.1 profile.region</span>
+            </header>
+            <div class="finding-note">One engineer stores a market group ("UK/Europe"), another an ISO country. With a market group, the EUR locale cannot be chosen; with a country, the gating code has to map about 30 countries to "India".</div>
+            <div class="finding-fix"><strong>Fix:</strong> <code>region</code> is an ISO 3166 country code. Market group and default locale are derived from a country table, and the gating rule is <code>region == "IN"</code>.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M13. <code>account.masked_identifiers[]</code> duplicates <code>account_identifier</code> and brings back mask collisions</h3>
+              <span class="finding-location">§11.1 account, account_identifier, FIN-010</span>
+            </header>
+            <div class="finding-note">An agent matches captures against the convenient array on <code>account</code>. ICICI ••7730 and Axis ••7730 collide again (old H5).</div>
+            <div class="finding-fix"><strong>Fix:</strong> Remove <code>masked_identifiers[]</code> from <code>account</code>. FIN-010 refers to <code>account_identifier</code>.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M14. "No INTERNET permission" will be undone silently by the manifest merger</h3>
+              <span class="finding-location">SEC-002, SEC acceptance, addendum §1</span>
+            </header>
+            <div class="finding-note">React Native's template and several libraries declare <code>INTERNET</code>, and the merger adds them to the release manifest. Debug builds <em>need</em> INTERNET for Metro, so every developer test runs with network available; an SDK that quietly needs network works in debug and fails only in release.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Require <code>&lt;uses-permission android:name="android.permission.INTERNET" tools:node="remove"/&gt;</code> in the release source set and a CI step that runs <code>aapt dump permissions</code> on the release APK. Run the airplane-mode E2E suite (NFR-01) on the <strong>release</strong> variant.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M15. The capture inbox needs Direct Boot specifics the PRD never names</h3>
+              <span class="finding-location">SEC-001, §11.1 capture_inbox, NFR-16</span>
+            </header>
+            <div class="finding-note"><ul><li>Before first unlock, only receivers marked <code>android:directBootAware="true"</code> get <code>SMS_RECEIVED</code>, and only device-protected storage is writable. An agent that does not know this ships a receiver that never fires before unlock.</li><li>"Encrypted … readable without user authentication" needs a key available before unlock, which protects nothing against device theft. There is no inbox retention rule and no dedup rule for an SMS the OS re-delivers after unlock.</li></ul></div>
+            <div class="finding-fix"><strong>Fix:</strong> Name a direct-boot-aware receiver, device-protected storage, and a key usable only in direct boot. Drain within N seconds of unlock and delete drained rows. Dedup by SMS fingerprint on drain.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M16. The GATE-02 deadline cannot be met and the gate is unnecessary</h3>
+              <span class="finding-location">§20 M1, GATE-02, M2 start</span>
+            </header>
+            <div class="finding-note">Play's SMS-declaration eligibility answers take weeks; M2 needs an application ID on 8 November. Either the alpha slips or the gate is self-certified. The stated fallback never changes the <strong>main</strong> package ID anyway.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Fix the main application ID now as the no-SMS package. Reserve a second ID for a possible SMS edition. Move GATE-02 to "before the M3 SMS declaration".</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M17. The reference-set protocol distorts the UPI accuracy it is meant to measure</h3>
+              <span class="finding-location">§16.3, §3.3, GATE-08</span>
+            </header>
+            <div class="finding-note">Payee names and UPI IDs are exactly the fields UPI-002 extracts. Once redacted, the real-set measurement cannot score payee extraction, and the redaction boxes change the layout the parser depends on. GATE-08's review must also happen <em>before collection</em> (M3). How testers transfer files (email, WhatsApp) is not covered, and that is where third-party data actually leaks.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Measure on the device at collection time, before redaction, and store only results plus redacted copies. Specify an encrypted transfer channel (no chat apps). Schedule the GATE-08 review before M3.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M18. Identical CSV rows meet the fuzzy rule after the first commits</h3>
+              <span class="finding-location">FIN-027, IMP-004, IMP-005</span>
+            </header>
+            <div class="finding-note">Two Pret £3.50 lines on 20 October: row 1 commits in batch 1, then row 2 is checked against the ledger and becomes <code>possible_duplicate</code>. "Kept as distinct rows" does not say whether row 2 is confirmed or held. Overlapping exports can also shift occurrence indices when the file boundary cuts a day in half.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Rows from the same file are never fuzzy-matched against each other. The occurrence index is per (date, amount, description) group. Rows from a partial first or last day go to review.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">M19. The balance chain will flag ordinary days as suspicious</h3>
+              <span class="finding-location">SMS-012</span>
+            </header>
+            <div class="finding-note">NACH/ECS debits, card auto-pays, interest credits and bank charges often arrive with no SMS, and SMS can arrive out of order. The next SMS balance mismatches, the capture is flagged, and auto-approve is lost on the most routine day. "Allowing for intervening … transactions" has no tolerance and no ordering rule.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Compare in <code>occurred_at</code> order. A mismatch flags only when the difference equals neither this transaction's amount nor zero. A flagged chain resets silently once and flags only a second consecutive mismatch.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">L1. "Unallocated" is still used for Not itemised</h3>
+              <span class="finding-location">FIN-022, TXN-009</span>
+            </header>
+            <div class="finding-note">FIN-022 says missing OCR items are "explicit <em>unallocated amount</em>". TXN-009 says Not itemised "is not unallocated".</div>
+            <div class="finding-fix"><strong>Fix:</strong> Reword FIN-022 to refer to the Not itemised split row (TXN-009).</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">L2. The INS-001 presets still omit Yesterday</h3>
+              <span class="finding-location">INS-001</span>
+            </header>
+            <div class="finding-note">INS-001 says "as in §6.5" and then lists the presets without Yesterday.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Delete the inline list.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">L3. The "seven row states" are incomplete</h3>
+              <span class="finding-location">TXN-006</span>
+            </header>
+            <div class="finding-note">TXN-006 omits refund, reversed, "before tracking started" and foreign-currency waiting rows.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Add them, or call the list "primary states" and specify the rest.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">L4. The addendum contradicts the PRD</h3>
+              <span class="finding-location">addendum §2, §3</span>
+            </header>
+            <div class="finding-note"><ul><li>The widget is "● count"; the PRD says "N to check" text.</li><li>Own-account pairing is "within N minutes"; FIN-027 says ±1 day.</li><li>The vocabulary lacks "Recorded · needs a category".</li></ul></div>
+            <div class="finding-fix"><strong>Fix:</strong> Align the addendum with the PRD.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">L5. Data-model leftovers</h3>
+              <span class="finding-location">§11.1, FIN-024</span>
+            </header>
+            <div class="finding-note"><ul><li><code>profile.auto_approve_rule_effective_from</code> is redundant with the <code>auto_approve_rule</code> table.</li><li>FIN-024 lists <code>possible_duplicate</code> as a status flag, while §11.1 derives it from <code>review_candidate</code>.</li><li><code>goal.allocated_minor</code> is redundant with <code>goal_allocation</code>.</li></ul></div>
+            <div class="finding-fix"><strong>Fix:</strong> Drop the stored duplicates.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">L6. Deleted manual entries: backup copy vs purge, and an unreachable "Delete permanently"</h3>
+              <span class="finding-location">§7.3 status mapping, FIN-014</span>
+            </header>
+            <div class="finding-note">The status mapping says a Delete "keeps its audit row and backup copy"; FIN-014 says purges propagate to the next backup. Deleted entries are "hidden everywhere", so a deleted item's own detail screen cannot offer Delete permanently.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Say "kept in backups until purged (30 days)". Settings → Data → "Recently deleted" lists them.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">L7. DEC-21 still promises a single Approve/Reject for every capture</h3>
+              <span class="finding-location">DEC-21, CAP-012, CAP-004, OCR-010</span>
+            </header>
+            <div class="finding-note">CAP-012 (transfer choices), CAP-004 (credit types) and OCR-010 (Attach/Keep/Discard) all depart from it.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Amend DEC-21 to "Approve/Reject for categorised captures; typed choices for credits, transfer-like captures and receipt matches".</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">L8. §13.2 omits SMS-017</h3>
+              <span class="finding-location">§13.2</span>
+            </header>
+            <div class="finding-note">The no-SMS table marks SMS-001..016 absent. SMS-017 (the unknown-sender prompt) is not listed.</div>
+            <div class="finding-fix"><strong>Fix:</strong> SMS-001..017.</div>
+          </article>
+        </div>
+      </details>
+    </section>
+
+    <div class="mechanical">
+      <h3>Mechanical notes</h3>
+      <ul>
+        <li><strong>ID continuity:</strong> IDs are unique and the references checked resolve (including §16.3 and §16.4). Listing order is still out of sequence: FIN-016 before FIN-011 and FIN-026/027/028 before FIN-025; TXN-012/013 before TXN-009; CAP-012 between CAP-004 and CAP-005; REC-009/010 before REC-008; HOM-008 before HOM-007; INS-007 before INS-005 (INS-008/009 do not exist); SCR-27..31 before SCR-25/26; WMB-16..18 before WMB-13. Either reorder, or add under §0: "IDs are stable; new IDs are appended next to related items."</li>
+        <li><strong>Source legend:</strong> <code>[v1.3]</code> is now defined in §0. Resolved.</li>
+        <li><strong>DEC-23:</strong> the stale cross-reference is fixed ("now specified in LRN-001–009"). FIN-025 still points to LRN-001–006.</li>
+        <li><strong>§6.3 near-duplicate sentence:</strong> "Each card has a clear period label." is followed directly by "Each card supports tap-to-details … and a clear period label."</li>
+        <li><strong>Release labels:</strong> RB0/RB1 in §16.2 resolve the P0/P1 collision. DEC-22 correctly references "RB0".</li>
+        <li><strong>Glossary (§10) gaps:</strong> no entries for auto-approve or daily cutoff, Not classified, Not itemised, <code>needs_category</code>, savings account (ACC-009), Savings share, or Kept. "Mixed merchant" and "Left in budget" are stale.</li>
+        <li><strong>Change log:</strong> still no 1.0.0 baseline row, although the numbering note names one. The 1.3.1 "Decisions affected" column omits CAP-012's effect on FIN-024 and the status mapping.</li>
+        <li><strong>Assumptions Index:</strong> none. The one inline <code>[ASSUMPTION]</code> (SMS-016) round-trips to GATE-02 and §25, but its "before M3" deadline conflicts with GATE-02.</li>
+        <li><strong>UJ protagonists:</strong> all 18 flows name a protagonist with market and currency. There is still no non-India flow for a receipt match against an imported CSV row, which the receipt-first markets rely on.</li>
+        <li><strong>Required sections:</strong> all present for a chain-top consumer PRD.</li>
+      </ul>
+    </div>
+
+    <footer class="report-footer">
+      <div class="meta">
+        <span>Rubric: .claude/skills/bmad-prd/assets/prd-validation-checklist.md</span>
+        <span>Generated: 2026-11-01</span>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>
