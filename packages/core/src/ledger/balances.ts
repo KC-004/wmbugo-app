@@ -77,6 +77,60 @@ export function overviewTotals(rows: readonly AccountRow[]): OverviewTotals {
   };
 }
 
+/** How one account reads on the list: always unsigned, direction in words (Story 2.2). */
+export type AccountLineView =
+  | { readonly kind: 'not-set' }
+  | { readonly kind: 'have'; readonly minor: number }
+  | { readonly kind: 'below-zero'; readonly minor: number }
+  | { readonly kind: 'owe'; readonly minor: number }
+  | { readonly kind: 'in-credit'; readonly minor: number };
+
+export function accountLine(row: AccountRow): AccountLineView {
+  if (row.type === 'card') {
+    const c = cardPosition(row);
+    if (c.kind === 'not-set') return c;
+    return c.kind === 'owed' ? { kind: 'owe', minor: c.outstandingMinor } : { kind: 'in-credit', minor: c.inCreditMinor };
+  }
+  if (row.balanceNotSet) return { kind: 'not-set' };
+  return row.postingsMinor < 0 ? { kind: 'below-zero', minor: -row.postingsMinor } : { kind: 'have', minor: row.postingsMinor };
+}
+
+/** A group total: unsigned. "not-set-yet" when no counted account has a balance (never zero). */
+export type GroupTotalView = { readonly kind: 'not-set-yet' } | { readonly kind: 'amount'; readonly minor: number } | { readonly kind: 'below-zero'; readonly minor: number };
+
+export interface AccountGroup {
+  readonly rows: readonly AccountRow[];
+  readonly total: GroupTotalView;
+  readonly notSetCount: number;
+  readonly excludedCount: number;
+}
+
+export interface AccountGroups {
+  readonly have: AccountGroup;
+  readonly owe: AccountGroup;
+  /** Counted accounts only; null when nothing is known. */
+  readonly netWorth: { readonly kind: 'net'; readonly minor: number } | { readonly kind: 'owe-more'; readonly minor: number } | null;
+}
+
+/**
+ * The two groups of the accounts list, in the saved order. Totals come from the same read model as Home
+ * (overviewTotals), so the list and Home can never disagree. The two totals are never added together.
+ */
+export function accountGroups(rows: readonly AccountRow[]): AccountGroups {
+  const active = rows.filter((r) => r.status === 'active');
+  const assets = active.filter((r) => r.type !== 'card');
+  const cards = active.filter((r) => r.type === 'card');
+  const t = overviewTotals(active);
+  const haveTotal: GroupTotalView = t.inAccountsMinor === null ? { kind: 'not-set-yet' } : t.inAccountsMinor < 0 ? { kind: 'below-zero', minor: -t.inAccountsMinor } : { kind: 'amount', minor: t.inAccountsMinor };
+  const oweTotal: GroupTotalView = t.cardDuesMinor === null ? { kind: 'not-set-yet' } : { kind: 'amount', minor: t.cardDuesMinor };
+  const net = t.netWorthMinor;
+  return {
+    have: { rows: assets, total: haveTotal, notSetCount: t.notSetAssets, excludedCount: assets.filter((r) => r.includeInOverview === false).length },
+    owe: { rows: cards, total: oweTotal, notSetCount: t.notSetCards, excludedCount: 0 },
+    netWorth: net === null ? null : net < 0 ? { kind: 'owe-more', minor: -net } : { kind: 'net', minor: net },
+  };
+}
+
 export const BALANCE_NOT_SET = 'Balance not set';
 
 /** "+1 account not set", "+2 accounts not set", "+1 card not set", "+3 cards not set"; null when none. */

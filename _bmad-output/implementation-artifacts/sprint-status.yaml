@@ -56,7 +56,7 @@ development_status:
 
   epic-2: in-progress
   2-1-account-balance-read-model-and-finance-fixtures: review
-  2-2-accounts-list-with-money-you-have-and-money-you-owe: backlog
+  2-2-accounts-list-with-money-you-have-and-money-you-owe: review
   2-3-account-detail-and-its-timeline: backlog
   2-4-starting-balance-and-tracking-date: backlog
   2-5-adjust-balance-with-a-reason: backlog

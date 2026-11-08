@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bank, CreditCard, Money, PiggyBank, Wallet } from 'phosphor-react-native';
-import { balanceOf, cardDues, validateAccountName, type AccountRow, type CurrencyCode, type NewAccount } from '@wmbugo/core';
+import { accountGroups, accountLine, validateAccountName, type AccountGroup, type AccountLineView, type AccountRow, type CurrencyCode, type GroupTotalView, type NewAccount, notSetNote } from '@wmbugo/core';
 import { amountLabel } from '../../shared/a11y/labels';
 import { copy } from '../../shared/copy';
 import { EmptyState, ErrorBlock, Skeleton } from '../../shared/feedback/Feedback';
@@ -15,7 +15,7 @@ import { textStyle } from '../../shared/theme/typography';
 import { Amount } from '../../shared/ui/Amount';
 import { Button } from '../../shared/ui/Button';
 import { AccountForm, TYPE_LABEL } from './AccountForm';
-import { ACCOUNTS_QUERY_KEY, PROFILE_QUERY_KEY, realAccountsApi, type AccountsApi } from './accountsApi';
+import { ACCOUNTS_QUERY_KEY, NET_WORTH_QUERY_KEY, PROFILE_QUERY_KEY, realAccountsApi, type AccountsApi } from './accountsApi';
 
 const ICONS: Readonly<Record<string, IconComponent>> = { Money, Bank, Wallet, PiggyBank, CreditCard };
 
@@ -31,11 +31,13 @@ export function AccountsScreen({ api = realAccountsApi }: { api?: AccountsApi })
   const qc = useQueryClient();
   const accounts = useQuery({ queryKey: ACCOUNTS_QUERY_KEY, queryFn: () => api.list() });
   const profile = useQuery({ queryKey: PROFILE_QUERY_KEY, queryFn: () => api.profile() });
+  const netWorthOn = useQuery({ queryKey: NET_WORTH_QUERY_KEY, queryFn: () => api.showNetWorth() });
   const [mode, setMode] = useState<Mode>({ kind: 'list' });
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const refresh = () => qc.invalidateQueries({ queryKey: ['ledger'] });
   const active = (accounts.data ?? []).filter((a) => a.status === 'active');
+  const groups = accountGroups(active);
   const ink = { color: theme.color('text-primary') };
 
   const adding = useRef(false);
@@ -75,6 +77,18 @@ export function AccountsScreen({ api = realAccountsApi }: { api?: AccountsApi })
     });
   };
 
+  const setInclusion = async (a: AccountRow, include: boolean) => {
+    const r = await api.setInclusion(a.id, include);
+    if (!r.ok) toast.show({ message: copy.accounts.inclusionFailed });
+    await refresh();
+  };
+
+  const setNetWorth = async (on: boolean) => {
+    const r = await api.setShowNetWorth(on);
+    if (!r.ok) toast.show({ message: copy.accounts.inclusionFailed });
+    await qc.invalidateQueries({ queryKey: NET_WORTH_QUERY_KEY });
+  };
+
   const move = async (a: AccountRow, direction: 'up' | 'down') => {
     await api.move(a.id, direction);
     await refresh();
@@ -110,29 +124,42 @@ export function AccountsScreen({ api = realAccountsApi }: { api?: AccountsApi })
         <EmptyState sentence={copy.accounts.empty} actionLabel={copy.accounts.add} onAction={() => setMode({ kind: 'add' })} />
       ) : null}
 
-      {active.map((a, i) => (
-        <AccountRowView
-          key={a.id}
-          account={a}
-          currency={profile.data?.currency}
-          locale={profile.data?.locale}
-          isFirst={i === 0}
-          isLast={i === active.length - 1}
-          editing={mode.kind === 'rename' && mode.account.id === a.id}
-          onMove={(d) => void move(a, d)}
-          onArchive={() => void archive(a)}
-          onRename={() => setMode({ kind: 'rename', account: a })}
-          onRenameSubmit={async (name) => {
-            const r = await api.rename(a.id, name);
-            if (r.ok) {
-              setMode({ kind: 'list' });
-              await refresh();
-            } else toast.show({ message: copy.accounts.renameFailed });
-            return r.ok;
-          }}
-          onRenameCancel={() => setMode({ kind: 'list' })}
-        />
-      ))}
+      {active.length > 0 ? (
+        <>
+          {([['have', copy.accounts.haveGroup, groups.have], ['owe', copy.accounts.oweGroup, groups.owe]] as const).map(([key, title, g]) =>
+            g.rows.length === 0 ? null : (
+              <View key={key} testID={`group-${key}`} style={styles.group}>
+                <GroupHeader testID={`group-${key}-header`} title={title} group={g} currency={profile.data?.currency} locale={profile.data?.locale} kind={key === 'owe' ? 'card' : 'account'} />
+                {g.rows.map((a, i) => (
+                  <AccountRowView
+                    key={a.id}
+                    account={a}
+                    currency={profile.data?.currency}
+                    locale={profile.data?.locale}
+                    isFirst={i === 0}
+                    isLast={i === g.rows.length - 1}
+                    editing={mode.kind === 'rename' && mode.account.id === a.id}
+                    onMove={(d) => void move(a, d)}
+                    onArchive={() => void archive(a)}
+                    onRename={() => setMode({ kind: 'rename', account: a })}
+                    onInclusion={(v) => void setInclusion(a, v)}
+                    onRenameSubmit={async (name) => {
+                      const r = await api.rename(a.id, name);
+                      if (r.ok) {
+                        setMode({ kind: 'list' });
+                        await refresh();
+                      } else toast.show({ message: copy.accounts.renameFailed });
+                      return r.ok;
+                    }}
+                    onRenameCancel={() => setMode({ kind: 'list' })}
+                  />
+                ))}
+              </View>
+            ),
+          )}
+          <NetWorthFooter on={netWorthOn.data === true} onToggle={(v) => void setNetWorth(v)} net={groups.netWorth} currency={profile.data?.currency} locale={profile.data?.locale} />
+        </>
+      ) : null}
     </ScrollView>
   );
 }
@@ -147,6 +174,7 @@ function AccountRowView(props: {
   onMove: (d: 'up' | 'down') => void;
   onArchive: () => void;
   onRename: () => void;
+  onInclusion: (include: boolean) => void;
   onRenameSubmit: (name: string) => Promise<boolean>;
   onRenameCancel: () => void;
 }) {
@@ -155,14 +183,10 @@ function AccountRowView(props: {
   const [name, setName] = useState(a.name);
   const [error, setError] = useState(false);
 
-  const balance = balanceOf(a);
-  const dues = a.type === 'card' ? cardDues(a) : null;
-  const shown = dues ?? balance;
-  const spoken =
-    shown.kind === 'not-set' || !currency
-      ? copy.money.balanceNotSet
-      : `${amountLabel({ amountMinor: shown.minor, currency, locale })}${dues ? ` ${copy.accounts.cardOwed.toLowerCase()}` : ''}`;
-  const label = `${a.name}, ${TYPE_LABEL[a.type]}, ${spoken}`;
+  const line = accountLine(a);
+  const counted = a.type === 'card' || a.includeInOverview !== false;
+  const spoken = line.kind === 'not-set' || !currency ? copy.money.balanceNotSet : [lineWords(line), amountLabel({ amountMinor: line.minor, currency, locale })].filter(Boolean).join(' ');
+  const label = `${a.name}, ${TYPE_LABEL[a.type]}, ${spoken}${counted ? '' : `, ${copy.accounts.notCounted}`}`;
 
   const actions = [
     ...(isFirst ? [] : [{ name: 'moveUp', label: copy.accounts.moveUp }]),
@@ -215,12 +239,15 @@ function AccountRowView(props: {
           )}
         </View>
         {!editing ? (
-          shown.kind === 'not-set' || !currency ? (
+          line.kind === 'not-set' || !currency ? (
             <Text testID={`balance-${a.id}`} style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{copy.money.balanceNotSet}</Text>
           ) : (
             <View testID={`balance-${a.id}`} style={styles.balance}>
-              <Amount amountMinor={shown.minor} currency={currency} direction="neutral" locale={locale} />
-              {dues ? <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{copy.accounts.cardOwed}</Text> : null}
+              <View style={styles.inline}>
+                {lineWords(line) ? <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{lineWords(line)}</Text> : null}
+                <Amount amountMinor={line.minor} currency={currency} direction="neutral" locale={locale} />
+              </View>
+              {counted ? null : <Text testID={`not-counted-${a.id}`} style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{copy.accounts.notCounted}</Text>}
             </View>
           )
         ) : null}
@@ -229,6 +256,20 @@ function AccountRowView(props: {
       <View style={styles.actions}>
         {editing ? (
           <>
+            {a.type === 'card' ? null : (
+              <View style={styles.switchRow}>
+                <Text style={[textStyle('body'), { color: theme.color('text-primary'), flex: 1 }]}>{copy.accounts.countInTotals}</Text>
+                <Switch
+                  testID={`include-${a.id}`}
+                  accessibilityLabel={copy.accounts.countInTotals}
+                  accessibilityRole="switch"
+                  accessibilityState={{ checked: counted }}
+                  value={counted}
+                  onValueChange={props.onInclusion}
+                  trackColor={{ false: theme.color('border-control'), true: theme.color('accent-primary') }}
+                />
+              </View>
+            )}
             <Button
               label={copy.accounts.renameSave}
               testID="rename-save"
@@ -255,7 +296,79 @@ function AccountRowView(props: {
   );
 }
 
+function lineWords(l: Exclude<AccountLineView, { kind: 'not-set' }>): string {
+  return l.kind === 'owe' ? copy.accounts.youOwe : l.kind === 'below-zero' ? copy.accounts.belowZero : l.kind === 'in-credit' ? copy.accounts.inCredit : '';
+}
+
+function GroupHeader({ title, group, currency, locale, kind, testID }: { title: string; group: AccountGroup; currency?: CurrencyCode; locale?: string; kind: 'account' | 'card'; testID: string }) {
+  const theme = useTheme();
+  if (!currency) return null;
+  const notSetYet = group.total.kind === 'not-set-yet';
+  const note = notSetYet ? null : notSetNote(group.notSetCount, kind);
+  const excl = group.excludedCount > 0 ? (group.excludedCount === 1 ? copy.accounts.excludes : copy.accounts.excludesMany).replace('{n}', String(group.excludedCount)) : null;
+  const spoken = [title, group.total.kind === 'not-set-yet' ? copy.accounts.notSetYet : spokenTotal(group.total, currency, locale), note, excl].filter(Boolean).join(', ');
+  const muted = { color: theme.color('text-secondary') };
+  return (
+    <View testID={testID} accessible accessibilityRole="header" accessibilityLabel={spoken} style={styles.groupHeader}>
+      <Text style={[textStyle('title'), { color: theme.color('text-primary') }]}>{title}</Text>
+      <View testID={`${testID}-total`} style={styles.inline}>
+        {group.total.kind === 'not-set-yet' ? (
+          <Text style={[textStyle('body-medium'), { color: theme.color('text-primary') }]}>{copy.accounts.notSetYet}</Text>
+        ) : (
+          <>
+            {group.total.kind === 'below-zero' ? <Text style={[textStyle('body-medium'), { color: theme.color('text-primary') }]}>{copy.accounts.belowZero}</Text> : null}
+            <Amount amountMinor={group.total.minor} currency={currency} direction="neutral" locale={locale} />
+          </>
+        )}
+        {note ? <Text style={[textStyle('caption'), muted]}>{`· ${note}`}</Text> : null}
+      </View>
+      {excl ? <Text testID={`${testID}-excludes`} style={[textStyle('caption'), muted]}>{excl}</Text> : null}
+    </View>
+  );
+}
+
+function spokenTotal(t: Exclude<GroupTotalView, { kind: 'not-set-yet' }>, currency: CurrencyCode, locale?: string): string {
+  const a = amountLabel({ amountMinor: t.minor, currency, locale });
+  return t.kind === 'below-zero' ? `${copy.accounts.belowZero} ${a}` : a;
+}
+
+function NetWorthFooter({ on, onToggle, net, currency, locale }: { on: boolean; onToggle: (v: boolean) => void; net: ReturnType<typeof accountGroups>['netWorth']; currency?: CurrencyCode; locale?: string }) {
+  const theme = useTheme();
+  const ink = { color: theme.color('text-primary') };
+  const [before, after] = copy.accounts.netWorthOweMore.split('{amount}');
+  return (
+    <View style={styles.group}>
+      {on && net && currency ? (
+        <View testID="net-worth" accessible style={[styles.row, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
+          <View style={styles.inline}>
+            <Text style={[textStyle('body-medium'), ink]}>{net.kind === 'owe-more' ? before : copy.accounts.netWorth}</Text>
+            <Amount amountMinor={net.minor} currency={currency} direction="neutral" locale={locale} />
+            {net.kind === 'owe-more' ? <Text style={[textStyle('body-medium'), ink]}>{after}</Text> : null}
+          </View>
+          <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{copy.accounts.netWorthCaption}</Text>
+        </View>
+      ) : null}
+      <View style={styles.switchRow}>
+        <Text style={[textStyle('body'), { color: theme.color('text-primary'), flex: 1 }]}>{copy.accounts.showNetWorth}</Text>
+        <Switch
+          testID="switch-net-worth"
+          accessibilityLabel={copy.accounts.showNetWorth}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: on }}
+          value={on}
+          onValueChange={onToggle}
+          trackColor={{ false: theme.color('border-control'), true: theme.color('accent-primary') }}
+        />
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  group: { gap: 8 },
+  groupHeader: { gap: 2, paddingTop: 8 },
+  switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: layout.touchMin, width: '100%' },
+  inline: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 6 },
   pad: { padding: 16, gap: 12 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   row: { borderWidth: 1, borderRadius: radii.md, padding: 12, gap: 8 },

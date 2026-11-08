@@ -6,6 +6,11 @@ import {
   MoveAccount,
   RenameAccount,
   RestoreAccount,
+  SetAccountInclusion,
+  SETTING_SHOW_NET_WORTH,
+  ChangeSetting,
+  parseSettings,
+  SETTINGS_SQL,
   type AccountRow,
   type CurrencyCode,
   type NewAccount,
@@ -28,10 +33,14 @@ export interface AccountsApi {
   move(accountId: string, direction: 'up' | 'down'): Promise<{ ok: boolean }>;
   archive(accountId: string): Promise<{ ok: boolean }>;
   restore(accountId: string): Promise<{ ok: boolean }>;
+  setInclusion(accountId: string, include: boolean): Promise<{ ok: boolean }>;
+  showNetWorth(): Promise<boolean>;
+  setShowNetWorth(on: boolean): Promise<{ ok: boolean }>;
 }
 
 export const ACCOUNTS_QUERY_KEY = ['ledger', 'accounts'] as const;
 export const PROFILE_QUERY_KEY = ['ledger', 'profile'] as const;
+export const NET_WORTH_QUERY_KEY = ['ledger', 'settings', 'net-worth'] as const;
 
 export const realAccountsApi: AccountsApi = {
   async profile() {
@@ -46,4 +55,9 @@ export const realAccountsApi: AccountsApi = {
   move: (accountId, direction) => getServices().writer.run(MoveAccount, { accountId, direction }, 'user'),
   archive: (accountId) => getServices().writer.run(ArchiveAccount, { accountId }, 'user'),
   restore: (accountId) => getServices().writer.run(RestoreAccount, { accountId }, 'user'),
+  setInclusion: (accountId, include) => getServices().writer.run(SetAccountInclusion, { accountId, include }, 'user'),
+  async showNetWorth() {
+    return parseSettings(await getServices().db.query(SETTINGS_SQL)).showNetWorth;
+  },
+  setShowNetWorth: (on) => getServices().writer.run(ChangeSetting, { key: SETTING_SHOW_NET_WORTH, value: on }, 'user'),
 };

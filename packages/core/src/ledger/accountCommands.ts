@@ -98,15 +98,21 @@ export const RenameAccount: UseCase<{ accountId: string; name: string }, void, A
   },
 };
 
-/** Moves an active account one place up or down among the active accounts; the order stays dense and unique. */
+/**
+ * Moves an active account one place up or down among the accounts of its own group (cards, or everything else,
+ * as the list shows them), swapping with the nearest account of that group. The order stays dense and unique.
+ */
 export const MoveAccount: UseCase<{ accountId: string; direction: 'up' | 'down' }, void, 'ACCOUNT_NOT_FOUND' | 'AT_EDGE'> = {
   name: 'MoveAccount',
   async execute(ctx, input) {
-    const rows = await ctx.query("SELECT id, sort_order FROM account WHERE status = 'active' ORDER BY sort_order, id");
+    const rows = await ctx.query("SELECT id, type = 'card' FROM account WHERE status = 'active' ORDER BY sort_order, id");
     const ids = rows.map((r) => String(r[0]));
+    const isCard = rows.map((r) => Number(r[1]) === 1);
     const i = ids.indexOf(input.accountId);
     if (i < 0) return err('ACCOUNT_NOT_FOUND');
-    const j = input.direction === 'up' ? i - 1 : i + 1;
+    const step = input.direction === 'up' ? -1 : 1;
+    let j = i + step;
+    while (j >= 0 && j < ids.length && isCard[j] !== isCard[i]) j += step;
     if (j < 0 || j >= ids.length) return err('AT_EDGE');
     [ids[i], ids[j]] = [ids[j] as string, ids[i] as string];
     const at = ctx.nowMs();
@@ -139,6 +145,23 @@ export const RestoreAccount: UseCase<{ accountId: string }, void, 'ACCOUNT_NOT_F
     const order = Number((await ctx.query("SELECT COALESCE(MAX(sort_order), -1) + 1 FROM account WHERE status = 'active'"))[0]?.[0] ?? 0);
     await ctx.execute("UPDATE account SET status = 'active', sort_order = ?, updated_at = ? WHERE id = ?", [order, ctx.nowMs(), input.accountId]);
     ctx.touch('account', input.accountId, { status: 'active' });
+    ctx.emit('AccountsChanged', { accountIds: [input.accountId] });
+    return ok(undefined);
+  },
+};
+
+/**
+ * Counts an asset account in, or leaves it out of, the totals (ACC-006). Cards always count in Card dues, so
+ * they refuse. Nothing is deleted or hidden: the account and its balance stay as they were.
+ */
+export const SetAccountInclusion: UseCase<{ accountId: string; include: boolean }, void, 'ACCOUNT_NOT_FOUND' | 'CARD_ALWAYS_COUNTS'> = {
+  name: 'SetAccountInclusion',
+  async execute(ctx, input) {
+    const r = (await ctx.query('SELECT type FROM account WHERE id = ?', [input.accountId]))[0];
+    if (!r) return err('ACCOUNT_NOT_FOUND');
+    if (String(r[0]) === 'card') return err('CARD_ALWAYS_COUNTS');
+    await ctx.execute('UPDATE account SET include_in_overview = ?, updated_at = ? WHERE id = ?', [input.include ? 1 : 0, ctx.nowMs(), input.accountId]);
+    ctx.touch('account', input.accountId, { includeInTotals: input.include });
     ctx.emit('AccountsChanged', { accountIds: [input.accountId] });
     return ok(undefined);
   },

@@ -148,7 +148,7 @@ describe('AccountsScreen', () => {
   });
 
   function fakeApi(initial: AccountRow[]) {
-    const state = { rows: [...initial] };
+    const state = { rows: [...initial], netWorth: false };
     const api: AccountsApi & { calls: string[] } = {
       calls: [],
       profile: async () => ({ currency: 'SGD', exponent: 2, locale: 'en-SG' }),
@@ -166,7 +166,8 @@ describe('AccountsScreen', () => {
       },
       move: async (id, d) => {
         api.calls.push(`move:${id}:${d}`);
-        const active = state.rows.filter((r) => r.status === 'active').sort((a, b) => a.sortOrder - b.sortOrder);
+        const me = state.rows.find((r) => r.id === id)!;
+        const active = state.rows.filter((r) => r.status === 'active' && (r.type === 'card') === (me.type === 'card')).sort((a, b) => a.sortOrder - b.sortOrder);
         const i = active.findIndex((r) => r.id === id);
         const j = d === 'up' ? i - 1 : i + 1;
         const a = active[i]!;
@@ -181,6 +182,18 @@ describe('AccountsScreen', () => {
         api.calls.push(`archive:${id}`);
         const r = state.rows.find((x) => x.id === id)!;
         state.rows[state.rows.indexOf(r)] = { ...r, status: 'archived' };
+        return { ok: true };
+      },
+      setInclusion: async (id, include) => {
+        api.calls.push(`include:${id}:${include}`);
+        const r = state.rows.find((x) => x.id === id)!;
+        state.rows[state.rows.indexOf(r)] = { ...r, includeInOverview: include };
+        return { ok: true };
+      },
+      showNetWorth: async () => state.netWorth,
+      setShowNetWorth: async (on) => {
+        api.calls.push(`networth:${on}`);
+        state.netWorth = on;
         return { ok: true };
       },
       restore: async (id) => {
@@ -226,7 +239,7 @@ describe('AccountsScreen', () => {
   it('shows each active account with type and balance: a ledger balance, "Balance not set" (never zero), or card dues without a minus', async () => {
     const r = await mountScreen(fakeApi(three()));
     const balance = (id: string) => JSON.stringify(r.root.findAll((n) => typeof n.type === 'string' && n.props.testID === `balance-${id}`)[0]!.props.children ?? '') + texts(r).join('|');
-    expect(texts(r)).toEqual(expect.arrayContaining(['DBS', 'Bank account', 'Cash', 'Visa', 'Credit card', 'Balance not set', 'S$3,200.00', 'S$450.00', 'Owed']));
+    expect(texts(r)).toEqual(expect.arrayContaining(['DBS', 'Bank account', 'Cash', 'Visa', 'Credit card', 'Balance not set', 'S$3,200.00', 'You owe', 'S$450.00']));
     expect(texts(r).join('|')).not.toMatch(/[-−]/);
     expect(balance('b')).not.toMatch(/S\$0\.00/);
     expect(texts(r).filter((t) => t === 'Balance not set')).toHaveLength(1);
@@ -236,12 +249,12 @@ describe('AccountsScreen', () => {
     const r = await mountScreen(fakeApi(three()));
     const mid = r.root.findAll((n) => typeof n.type === 'string' && n.props.testID === 'account-row-b')[0]!;
     expect(mid.props.accessibilityLabel).toBe('Cash, Cash, Balance not set');
-    expect(mid.props.accessibilityActions.map((a: { label: string }) => a.label)).toEqual(['Move up', 'Move down', 'Rename', 'Archive']);
+    expect(mid.props.accessibilityActions.map((a: { label: string }) => a.label)).toEqual(['Move up', 'Rename', 'Archive']);
     const first = r.root.findAll((n) => typeof n.type === 'string' && n.props.testID === 'account-row-a')[0]!;
     expect(first.props.accessibilityLabel).toBe('DBS, Bank account, 3,200 Singapore dollars');
     expect(first.props.accessibilityActions.map((a: { label: string }) => a.label)).toEqual(['Move down', 'Rename', 'Archive']);
     const card = r.root.findAll((n) => typeof n.type === 'string' && n.props.testID === 'account-row-c')[0]!;
-    expect(card.props.accessibilityLabel).toBe('Visa, Credit card, 450 Singapore dollars owed');
+    expect(card.props.accessibilityLabel).toBe('Visa, Credit card, You owe 450 Singapore dollars');
   });
 
   it('Move up / Move down work from the buttons and from TalkBack custom actions; edges have no button', async () => {
@@ -251,12 +264,12 @@ describe('AccountsScreen', () => {
     expect(has(r, 'move-down-c')).toBe(false);
     await press(r, 'move-up-b');
     expect(api.calls).toContain('move:b:up');
-    const row = r.root.findAll((n) => typeof n.type === 'string' && n.props.testID === 'account-row-c')[0]!;
+    const row = r.root.findAll((n) => typeof n.type === 'string' && n.props.testID === 'account-row-a')[0]!;
     await act(async () => row.props.onAccessibilityAction({ nativeEvent: { actionName: 'moveUp' } }));
     await settle();
-    expect(api.calls).toContain('move:c:up');
+    expect(api.calls).toContain('move:a:up');
     const order = r.root.findAll((n) => typeof n.type === 'string' && /^account-row-/.test(String(n.props.testID))).map((n) => n.props.testID);
-    expect(order).toEqual(['account-row-b', 'account-row-c', 'account-row-a']);
+    expect(order).toEqual(['account-row-a', 'account-row-b', 'account-row-c']);
   });
 
   it('adds an account through the same form', async () => {
@@ -298,6 +311,102 @@ describe('AccountsScreen', () => {
     await settle();
     expect(api.calls).toContain('restore:b');
     expect(has(r, 'account-row-b')).toBe(true);
+  });
+
+  // The text of a group total: its Text children joined (the amount is its own Text).
+  const total = (r: ReactTestRenderer, id: string) =>
+    r.root
+      .findAll((n) => typeof n.type === 'string' && n.props.testID === id)[0]!
+      .findAll((n) => n.type === Text)
+      .map((n) => [n.props.children].flat().filter((c) => typeof c === 'string').join(''))
+      .join(' ');
+
+  it('splits into Money you have and Money you owe, each with its own total, never added together', async () => {
+    const r = await mountScreen(
+      fakeApi([
+        row({ id: 'a', name: 'Cash', type: 'cash', sortOrder: 0, postingsMinor: 230000 }),
+        row({ id: 'b', name: 'HDFC', sortOrder: 1, postingsMinor: 3120000 }),
+        row({ id: 'c', name: 'SBI', sortOrder: 2, postingsMinor: 1880000 }),
+        row({ id: 'd', name: 'HDFC Card', type: 'card', sortOrder: 3, postingsMinor: -410000 }),
+      ]),
+    );
+    expect(texts(r)).toEqual(expect.arrayContaining(['Money you have', 'Money you owe', 'You owe', 'S$4,100.00']));
+    expect(total(r, 'group-have-header-total')).toBe('S$52,300.00');
+    expect(total(r, 'group-owe-header-total')).toBe('S$4,100.00');
+    const order = r.root.findAll((n) => typeof n.type === 'string' && /^(group-|account-row-)/.test(String(n.props.testID)) && !String(n.props.testID).includes('header')).map((n) => n.props.testID);
+    expect(order).toEqual(['group-have', 'account-row-a', 'account-row-b', 'account-row-c', 'group-owe', 'account-row-d']);
+    expect(r.root.findAll((n) => typeof n.type === 'string' && n.props.testID === 'group-have-header')[0]!.props.accessibilityLabel).toBe('Money you have, 52,300 Singapore dollars');
+  });
+
+  it('a not-set account adds "+1 account not set" to the total; only not-set accounts read "Not set yet", never zero', async () => {
+    const mixed = await mountScreen(fakeApi(three()));
+    expect(total(mixed, 'group-have-header-total')).toBe('S$3,200.00 · +1 account not set');
+    const only = await mountScreen(fakeApi([row({ id: 'z', name: 'Cash', type: 'cash', balanceNotSet: true })]));
+    expect(texts(only)).toContain('Not set yet');
+    expect(texts(only).join('|')).not.toMatch(/S\$0\.00/);
+  });
+
+  it('a card with no balance reads "Balance not set" and the owe total reads "Not set yet"', async () => {
+    const r = await mountScreen(fakeApi([row({ id: 'k', name: 'Visa', type: 'card', balanceNotSet: true })]));
+    expect(total(r, 'group-owe-header-total')).toBe('Not set yet');
+    expect(texts(r)).toContain('Balance not set');
+  });
+
+  it('an account below zero reads "Below zero S$500.00" with no minus sign, and the total takes it as a reduction', async () => {
+    const r = await mountScreen(
+      fakeApi([row({ id: 'a', name: 'Cash', type: 'cash', sortOrder: 0, postingsMinor: -50000 }), row({ id: 'b', name: 'DBS', sortOrder: 1, postingsMinor: 120000 })]),
+    );
+    expect(texts(r)).toEqual(expect.arrayContaining(['Below zero', 'S$500.00']));
+    expect(total(r, 'group-have-header-total')).toBe('S$700.00');
+    expect(texts(r).join('|')).not.toMatch(/[-−]/);
+  });
+
+  it('a group total below zero reads "Below zero S$X"', async () => {
+    const r = await mountScreen(fakeApi([row({ id: 'a', name: 'Cash', type: 'cash', postingsMinor: -50000 })]));
+    expect(total(r, 'group-have-header-total')).toBe('Below zero S$500.00');
+  });
+
+  it('Count in my totals: off drops the balance from the total, labels the row and adds "Excludes 1 account"; cards have no toggle', async () => {
+    const api = fakeApi([
+      row({ id: 'a', name: 'Cash', type: 'cash', sortOrder: 0, postingsMinor: 230000 }),
+      row({ id: 'b', name: 'HDFC', sortOrder: 1, postingsMinor: 3120000 }),
+      row({ id: 'k', name: 'Visa', type: 'card', sortOrder: 2, postingsMinor: -45000 }),
+    ]);
+    const r = await mountScreen(api);
+    await press(r, 'rename-k');
+    expect(has(r, 'include-k')).toBe(false);
+    await press(r, 'rename-cancel');
+    await press(r, 'rename-a');
+    const sw = r.root.findAll((n) => n.props.testID === 'include-a' && typeof n.props.onValueChange === 'function')[0]!;
+    expect(sw.props.accessibilityLabel).toBe('Count in my totals');
+    expect(sw.props.accessibilityState).toEqual({ checked: true });
+    await act(async () => sw.props.onValueChange(false));
+    await settle();
+    expect(api.calls).toContain('include:a:false');
+    await press(r, 'rename-cancel');
+    expect(total(r, 'group-have-header-total')).toBe('S$31,200.00');
+    expect(texts(r)).toEqual(expect.arrayContaining(['Excludes 1 account', 'Not counted in totals']));
+    expect(has(r, 'not-counted-a')).toBe(true);
+  });
+
+  it('Show net worth is off by default; on, it shows one separate row from counted accounts, and off removes it', async () => {
+    const api = fakeApi([row({ id: 'a', name: 'DBS', postingsMinor: 5230000 }), row({ id: 'k', name: 'Visa', type: 'card', sortOrder: 1, postingsMinor: -410000 })]);
+    const r = await mountScreen(api);
+    expect(has(r, 'net-worth')).toBe(false);
+    await act(async () => r.root.findAll((n) => n.props.testID === 'switch-net-worth' && typeof n.props.onValueChange === 'function')[0]!.props.onValueChange(true));
+    await settle();
+    expect(api.calls).toContain('networth:true');
+    expect(texts(r)).toEqual(expect.arrayContaining(['Net worth', 'S$48,200.00', 'What you have minus what you owe']));
+    await act(async () => r.root.findAll((n) => n.props.testID === 'switch-net-worth' && typeof n.props.onValueChange === 'function')[0]!.props.onValueChange(false));
+    await settle();
+    expect(has(r, 'net-worth')).toBe(false);
+  });
+
+  it('net worth says you owe more when the cards outweigh the accounts', async () => {
+    const api = fakeApi([row({ id: 'a', name: 'DBS', postingsMinor: 100000 }), row({ id: 'k', name: 'Visa', type: 'card', sortOrder: 1, postingsMinor: -250000 })]);
+    await api.setShowNetWorth(true);
+    const r = await mountScreen(api);
+    expect(texts(r)).toEqual(expect.arrayContaining(['Net worth: you owe ', 'S$1,500.00', ' more than you have']));
   });
 
   it('archived accounts are not listed', async () => {
