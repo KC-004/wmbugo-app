@@ -26,7 +26,17 @@ type Mode = { kind: 'list' } | { kind: 'add' } | { kind: 'rename'; account: Acco
  * The accounts list: active accounts in Mei's order with a ledger-derived balance or "Balance not set"
  * (never zero), add, rename, Move up / Move down (also TalkBack custom actions) and archive with Undo.
  */
-export function AccountsScreen({ api = realAccountsApi, onOpen, onBack }: { api?: AccountsApi; onOpen?: (accountId: string) => void; onBack?: () => void }) {
+export function AccountsScreen({
+  api = realAccountsApi,
+  onOpen,
+  onBack,
+  onPayBill,
+}: {
+  api?: AccountsApi;
+  onOpen?: (accountId: string) => void;
+  onBack?: () => void;
+  onPayBill?: (cardId: string) => void;
+}) {
   const toast = useToast();
   const qc = useQueryClient();
   const accounts = useQuery({ queryKey: ACCOUNTS_QUERY_KEY, queryFn: () => api.list() });
@@ -148,6 +158,7 @@ export function AccountsScreen({ api = realAccountsApi, onOpen, onBack }: { api?
                     onRename={() => setMode({ kind: 'rename', account: a })}
                     onInclusion={(v) => void setInclusion(a, v)}
                     onOpen={() => onOpen?.(a.id)}
+                    onPayBill={onPayBill ? () => onPayBill(a.id) : undefined}
                     onRenameSubmit={async (name) => {
                       const r = await api.rename(a.id, name);
                       if (r.ok) {
@@ -182,6 +193,7 @@ function AccountRowView(props: {
   onRename: () => void;
   onInclusion: (include: boolean) => void;
   onOpen: () => void;
+  onPayBill?: () => void;
   onRenameSubmit: (name: string) => Promise<boolean>;
   onRenameCancel: () => void;
 }) {
@@ -198,6 +210,7 @@ function AccountRowView(props: {
   const actions = [
     ...(isFirst ? [] : [{ name: 'moveUp', label: copy.accounts.moveUp }]),
     ...(isLast ? [] : [{ name: 'moveDown', label: copy.accounts.moveDown }]),
+    ...(a.type === 'card' && props.onPayBill ? [{ name: 'payBill', label: copy.accountDetail.payBill }] : []),
     { name: 'rename', label: copy.accounts.rename },
     { name: 'archive', label: copy.accounts.archive },
   ];
@@ -214,6 +227,7 @@ function AccountRowView(props: {
         const n = e.nativeEvent.actionName;
         if (n === 'moveUp') props.onMove('up');
         else if (n === 'moveDown') props.onMove('down');
+        else if (n === 'payBill') props.onPayBill?.();
         else if (n === 'rename') props.onRename();
         else if (n === 'archive') props.onArchive();
       }}
@@ -296,6 +310,7 @@ function AccountRowView(props: {
           <>
             {isFirst ? null : <Button label={copy.accounts.moveUp} variant="text" onPress={() => props.onMove('up')} testID={`move-up-${a.id}`} />}
             {isLast ? null : <Button label={copy.accounts.moveDown} variant="text" onPress={() => props.onMove('down')} testID={`move-down-${a.id}`} />}
+            {a.type === 'card' && props.onPayBill ? <Button label={copy.accountDetail.payBill} variant="text" onPress={props.onPayBill} testID={`pay-bill-${a.id}`} /> : null}
             <Button label={copy.accounts.rename} variant="text" onPress={props.onRename} testID={`rename-${a.id}`} />
             <Button label={copy.accounts.archive} variant="text" onPress={props.onArchive} testID={`archive-${a.id}`} />
           </>

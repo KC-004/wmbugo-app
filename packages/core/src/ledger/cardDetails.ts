@@ -87,3 +87,26 @@ export function statementStatus(d: CardDetails & { paidSinceMinor: number }, tod
   if (d.dueDate !== null && today > d.dueDate) return { kind: 'overdue', amountMinor: d.statementDueMinor, dueDate: d.dueDate };
   return { kind: 'due', amountMinor: d.statementDueMinor, dueDate: d.dueDate };
 }
+
+/** The asset account that last paid this card: the From side of the newest transfer onto it. Param: card id. */
+export const LAST_PAYER_SQL =
+  "SELECT pf.account_id FROM posting pt JOIN \"transaction\" t ON t.id = pt.transaction_id JOIN posting pf ON pf.transaction_id = t.id AND pf.signed_amount_minor < 0 WHERE pt.account_id = ? AND pt.signed_amount_minor > 0 AND t.event_type = 'transfer' AND t.removed_at IS NULL AND t.status = 'confirmed' ORDER BY t.created_at DESC, t.id DESC LIMIT 1";
+
+/**
+ * Where a card bill is paid from: the asset account that last paid this card, else the default account from Settings,
+ * else the most recently used active asset account, else the first one. null when there is no asset account.
+ */
+export function pickPayerAccount(assetIds: readonly string[], lastPayer: string | null, settingDefault: string | null, lastUsed: string | null): string | null {
+  for (const c of [lastPayer, settingDefault, lastUsed]) if (c && assetIds.includes(c)) return c;
+  return assetIds[0] ?? null;
+}
+
+/**
+ * What a ready-filled Pay card bill starts with: the unpaid statement amount, else what is owed, else nothing
+ * (and the sheet says nothing is owed).
+ */
+export function payBillAmount(details: CardDetailsRead | null, today: string, outstandingMinor: number): { amountMinor: number | null; nothingOwed: boolean } {
+  const s = details ? statementStatus(details, today) : { kind: 'none' as const };
+  if ((s.kind === 'due' || s.kind === 'overdue') && s.amountMinor !== null) return { amountMinor: s.amountMinor, nothingOwed: false };
+  return outstandingMinor > 0 ? { amountMinor: outstandingMinor, nothingOwed: false } : { amountMinor: null, nothingOwed: true };
+}

@@ -14,6 +14,7 @@ import {
 import { announce } from '../../shared/a11y/announce';
 import { systemClock } from '../../adapters/startApp';
 import { typedAmountLabel } from '../../shared/a11y/labels';
+import { minorToInput } from '../../shared/minorInput';
 import { copy } from '../../shared/copy';
 import { invalidateForEvent } from '../../shared/queryClient';
 import { useToast } from '../../shared/feedback/ToastHost';
@@ -30,7 +31,21 @@ import { startSaveTiming } from './saveTiming';
 
 const QUICK_COUNT = 6;
 
-type FieldError = 'amount' | 'category' | 'date' | 'same' | 'fee' | null;
+type FieldError = 'amount' | 'category' | 'date' | 'same' | 'fee' | 'from' | null;
+
+/** Opened from an account: what the sheet starts with. From is `accountId`; Pay card bill also fixes To. */
+export interface AddPreset {
+  readonly kind: AddKind;
+  readonly accountId: string | null;
+  readonly toAccountId?: string;
+  readonly lockTo?: boolean;
+  /** Starts the amount at this (minor units). */
+  readonly amountMinor?: number | null;
+  /** What the card owes: a bigger payment gets a note about the extra credit. */
+  readonly owedMinor?: number | null;
+  /** Shown while the amount is empty. */
+  readonly hint?: string;
+}
 
 function wallParts(nowMs: number, tz: string): { date: string; time: string } {
   const d = toLocalDate(nowMs, tz);
@@ -60,7 +75,7 @@ export function AddSheet({
   /** Opens the add-account screen (the sheet closes first). */
   onNewAccount?: () => void;
   /** Opened from an account: the type and the account (the From side of a transfer) are chosen already, the amount is empty. */
-  preset?: { kind: AddKind; accountId: string };
+  preset?: AddPreset;
   now?: () => number;
 }) {
   const theme = useTheme();
@@ -76,7 +91,9 @@ export function AddSheet({
   const [text, setText] = useState(preset ? '' : draft.typedText);
   const [categoryId, setCategoryId] = useState<string | null>(preset ? null : draft.categoryId);
   const [accountId, setAccountId] = useState<string | null>(preset?.accountId ?? null);
-  const [toAccountId, setToAccountId] = useState<string | null>(null);
+  const [toAccountId, setToAccountId] = useState<string | null>(preset?.toAccountId ?? null);
+  const [owedWarned, setOwedWarned] = useState<string | null>(null);
+  const presetApplied = useRef(false);
   const [feeText, setFeeText] = useState('');
   const [feeCategoryId, setFeeCategoryId] = useState(OTHER_CATEGORY_ID);
   const [warned, setWarned] = useState<string | null>(null);
@@ -103,6 +120,10 @@ export function AddSheet({
       if (!live || !d) return;
       setData(d);
       if (!accountTouched.current) setAccountId(d.defaultAccountId);
+      if (preset?.amountMinor && !presetApplied.current) {
+        presetApplied.current = true;
+        setText(minorToInput(preset.amountMinor, d.exponent));
+      }
       if (!dateTouched.current) {
         const w = wallParts(now(), d.timezoneId);
         setDateText(w.date);
@@ -116,6 +137,7 @@ export function AddSheet({
 
   useEffect(() => {
     if (kind !== 'transfer' || !data) return;
+    if (preset?.lockTo) return;
     if (toAccountId === null || toAccountId === accountId) {
       setToAccountId(data.accounts.find((a) => a.id !== accountId)?.id ?? null);
     }
@@ -250,6 +272,10 @@ export function AddSheet({
 
   const saveTransfer = async (another: boolean) => {
     if (!data || !parsed.ok) return;
+    if (preset?.lockTo && !accountId) {
+      setError('from');
+      return;
+    }
     if (!accountId || !toAccountId || accountId === toAccountId) {
       setError('same');
       return;
@@ -271,6 +297,12 @@ export function AddSheet({
         return;
       }
       fee = { amountMinor: f.value, categoryId: feeCategoryId };
+    }
+    // Paying more than the card owes is allowed: the extra sits on the card as credit. Tell once, then go ahead.
+    const owedKey = `${accountId}:${parsed.value}`;
+    if (preset?.lockTo && preset.owedMinor !== undefined && preset.owedMinor !== null && parsed.value > preset.owedMinor && owedWarned !== owedKey) {
+      setOwedWarned(owedKey);
+      return;
     }
     // A non-blocking warning when the amount is above the balance on record: the next Save goes ahead.
     const from = data.accounts.find((a) => a.id === accountId);
@@ -346,7 +378,7 @@ export function AddSheet({
       <View style={styles.inline}>
       <Text style={[textStyle('label'), ink]}>{kind === 'transfer' ? copy.add.from : kind === 'income' ? copy.add.receivedIn : copy.add.paidFrom}</Text>
       <AccountChip
-        accounts={data?.accounts ?? []}
+        accounts={(data?.accounts ?? []).filter((a) => !preset?.lockTo || a.type !== 'card')}
         loaded={data !== null}
         selectedId={accountId}
         picking={pickingAccount}
@@ -365,6 +397,7 @@ export function AddSheet({
           fromId={accountId}
           toId={toAccountId}
           sameError={error === 'same'}
+          locked={preset?.lockTo === true}
           onNewAccount={onNewAccount}
           onPick={(id) => {
             setToAccountId(id);
@@ -437,6 +470,17 @@ export function AddSheet({
         />
       ) : null}
 
+      {error === 'from' ? (
+        <Text testID="from-error" accessibilityRole="alert" accessibilityLiveRegion="assertive" style={[textStyle('body-medium'), { color: theme.color('on-glass-accent') }]}>
+          {copy.add.payFromRequired}
+        </Text>
+      ) : null}
+      {preset?.hint && text === '' ? <Text testID="preset-hint" style={[textStyle('body'), secondary]}>{preset.hint}</Text> : null}
+      {owedWarned ? (
+        <Text testID="owed-warning" accessibilityRole="alert" accessibilityLiveRegion="polite" style={[textStyle('body'), secondary]}>
+          {copy.add.moreThanOwed}
+        </Text>
+      ) : null}
       {warned ? (
         <Text testID="transfer-warning" accessibilityRole="alert" accessibilityLiveRegion="polite" style={[textStyle('body'), secondary]}>
           {copy.add.warnAboveBalance}

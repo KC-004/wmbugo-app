@@ -16,6 +16,7 @@ import { HomeScreen } from '../home/HomeScreen';
 import { SettingsScreen } from '../settings/SettingsScreen';
 import { AccountDetailScreen } from '../accounts/AccountDetailScreen';
 import { AccountsScreen } from '../accounts/AccountsScreen';
+import { usePayBill } from '../accounts/payBill';
 import { ScreenHeader } from './ScreenHeader';
 import { TabBar, type TabRoute } from './TabBar';
 import { markTabFirstFrame } from './navTiming';
@@ -122,9 +123,10 @@ function AccountsRoute() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const nav = useNavigation<{ navigate: (s: 'AccountDetail', p: { accountId: string }) => void; goBack: () => void }>();
+  const payBill = usePayBill();
   return (
     <View style={[styles.fill, { backgroundColor: theme.color('bg-canvas'), paddingTop: insets.top }]}>
-      <AccountsScreen onBack={() => nav.goBack()} onOpen={(accountId) => nav.navigate('AccountDetail', { accountId })} />
+      <AccountsScreen onPayBill={payBill} onBack={() => nav.goBack()} onOpen={(accountId) => nav.navigate('AccountDetail', { accountId })} />
     </View>
   );
 }
@@ -137,9 +139,10 @@ function AccountDetailRoute() {
   const { accountId } = route.params;
   const moveMoney = useOpenAdd(undefined, { kind: 'transfer', accountId });
   const addExpense = useOpenAdd(undefined, { kind: 'expense', accountId });
+  const payBill = usePayBill();
   return (
     <View style={[styles.fill, { backgroundColor: theme.color('bg-canvas'), paddingTop: insets.top }]}>
-      <AccountDetailScreen accountId={accountId} onBack={() => nav.goBack()} onMoveMoney={moveMoney} onAddExpense={addExpense} />
+      <AccountDetailScreen accountId={accountId} onBack={() => nav.goBack()} onMoveMoney={moveMoney} onAddExpense={addExpense} onPayBill={() => payBill(accountId)} />
     </View>
   );
 }

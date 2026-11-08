@@ -124,6 +124,7 @@ export function TransferTo({
   fromId,
   toId,
   sameError,
+  locked = false,
   onPick,
   onNewAccount,
 }: {
@@ -131,6 +132,8 @@ export function TransferTo({
   fromId: string | null;
   toId: string | null;
   sameError: boolean;
+  /** The To account is fixed (paying a card bill). */
+  locked?: boolean;
   onPick: (id: string) => void;
   onNewAccount?: () => void;
 }) {
@@ -140,11 +143,11 @@ export function TransferTo({
       <Text style={[textStyle('label'), { color: theme.color('on-glass-primary') }]}>{copy.add.to}</Text>
       <View style={styles.wrap} testID="to-accounts">
         {accounts
-          .filter((a) => a.id !== fromId)
+          .filter((a) => (locked ? a.id === toId : a.id !== fromId))
           .map((a) => (
-            <Chip onGlass key={a.id} label={a.name} variant="account" testID={`to-option-${a.id}`} selected={a.id === toId} onPress={() => onPick(a.id)} />
+            <Chip onGlass key={a.id} label={a.name} variant="account" testID={locked ? 'to-locked' : `to-option-${a.id}`} selected={a.id === toId} onPress={() => (locked ? undefined : onPick(a.id))} />
           ))}
-        {accounts.length < 2 ? <Chip onGlass label={copy.add.newAccount} variant="account" testID="to-new-account" onPress={() => onNewAccount?.()} /> : null}
+        {!locked && accounts.length < 2 ? <Chip onGlass label={copy.add.newAccount} variant="account" testID="to-new-account" onPress={() => onNewAccount?.()} /> : null}
       </View>
       {sameError ? (
         <Text testID="same-error" accessibilityRole="alert" accessibilityLiveRegion="assertive" style={[textStyle('body-medium'), { color: theme.color('on-glass-accent') }]}>

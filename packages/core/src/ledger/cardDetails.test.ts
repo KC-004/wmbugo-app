@@ -8,7 +8,7 @@ import { LedgerWriter } from '../writer/ledgerWriter';
 import { AddAccount, openingBalanceShape } from './accountCommands';
 import { ACCOUNT_LIST_SQL, mapAccountRows, type AccountType } from './accounts';
 import { accountGroups } from './balances';
-import { CARD_DETAILS_SQL, mapCardDetails, statementStatus, UpdateCardDetails } from './cardDetails';
+import { CARD_DETAILS_SQL, LAST_PAYER_SQL, mapCardDetails, payBillAmount, pickPayerAccount, statementStatus, UpdateCardDetails } from './cardDetails';
 import { entryShape } from './entryCommands';
 import { homeAccounts } from './readModels';
 import { RecordTransfer } from './transferCommands';
@@ -94,5 +94,34 @@ describe('statementStatus', () => {
     expect(statementStatus(d(), '2026-11-16')).toEqual({ kind: 'overdue', amountMinor: 820000, dueDate: '2026-11-15' });
     expect(statementStatus(d({ paidSinceMinor: 820000 }), '2026-12-01')).toEqual({ kind: 'paid', amountMinor: 820000 });
     expect(statementStatus(d({ statementDueMinor: null }), '2026-11-08')).toEqual({ kind: 'due', amountMinor: null, dueDate: '2026-11-15' });
+  });
+});
+
+describe('Pay card bill helpers (Story 2.7)', () => {
+  const d = (over: object = {}) => ({ statementDueMinor: 820000, dueDate: '2026-11-15', limitMinor: null, paidSinceMinor: 0, ...over });
+  it('picks the payer: last payer, then the Settings default, then the latest used, then the first; none without assets', () => {
+    expect(pickPayerAccount(['a', 'b', 'c'], 'b', 'c', 'a')).toBe('b');
+    expect(pickPayerAccount(['a', 'b', 'c'], 'x', 'c', 'a')).toBe('c');
+    expect(pickPayerAccount(['a', 'b', 'c'], null, null, 'b')).toBe('b');
+    expect(pickPayerAccount(['a', 'b'], null, null, 'card-id')).toBe('a');
+    expect(pickPayerAccount([], 'a', 'a', 'a')).toBeNull();
+  });
+  it('starts with the unpaid statement, else what is owed, else empty with "nothing owed"', () => {
+    expect(payBillAmount(d(), '2026-11-08', 1245000)).toEqual({ amountMinor: 820000, nothingOwed: false });
+    expect(payBillAmount(d({ paidSinceMinor: 820000 }), '2026-11-08', 1245000)).toEqual({ amountMinor: 1245000, nothingOwed: false });
+    expect(payBillAmount(null, '2026-11-08', 1245000)).toEqual({ amountMinor: 1245000, nothingOwed: false });
+    expect(payBillAmount(null, '2026-11-08', 0)).toEqual({ amountMinor: null, nothingOwed: true });
+  });
+  it('paying writes one transfer: Card dues and the payer fall together, Spent and income do not move', async () => {
+    const { db, writer, add } = await setup();
+    const card = await add('HDFC Card', 'card', 1245000);
+    const bank = await add('HDFC', 'bank', 3120000);
+    expect((await db.query(LAST_PAYER_SQL, [card])).length).toBe(0);
+    await writer.run(RecordTransfer, { amountMinor: 820000, fromAccountId: bank, toAccountId: card }, 'user');
+    const rows = mapAccountRows(await db.query(ACCOUNT_LIST_SQL));
+    expect(homeAccounts(rows)).toMatchObject({ inAccountsMinor: 2300000, cardDuesMinor: 425000 });
+    expect(String((await db.query(LAST_PAYER_SQL, [card]))[0]![0])).toBe(bank);
+    expect(Number((await db.query("SELECT COUNT(*) FROM \"transaction\" WHERE event_type = 'transfer'"))[0]![0])).toBe(1);
+    expect(Number((await db.query("SELECT COALESCE(SUM(amount_minor),0) FROM \"transaction\" WHERE event_type IN ('expense','income')"))[0]![0])).toBe(0);
   });
 });

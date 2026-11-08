@@ -10,7 +10,7 @@ import { ToastHost } from '../../shared/feedback/ToastHost';
 import { createQueryClient } from '../../shared/queryClient';
 import { EMPTY_DRAFT, useUiStore } from '../../shared/state/uiStore';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
-import { AddSheet } from './AddSheet';
+import { AddSheet, type AddPreset } from './AddSheet';
 import type { AddApi, AddData, AddKind } from './addApi';
 
 const live: ReactTestRenderer[] = [];
@@ -76,7 +76,7 @@ export function fakeApi(over: Partial<AddData> = {}, counts = new Map<string, nu
   return { api, record, recordTransfer, remove, load, defaultAccountFor };
 }
 
-export function mount(api: AddApi, close = jest.fn(), onNewAccount?: () => void, preset?: { kind: AddKind; accountId: string }) {
+export function mount(api: AddApi, close = jest.fn(), onNewAccount?: () => void, preset?: AddPreset) {
   const qc = createQueryClient();
   clients.push(qc);
   let r!: ReactTestRenderer;
@@ -95,7 +95,7 @@ export function mount(api: AddApi, close = jest.fn(), onNewAccount?: () => void,
   return { r, close, qc };
 }
 
-export async function mountReady(over: Partial<AddData> = {}, counts?: Map<string, number>, onNewAccount?: () => void, preset?: { kind: AddKind; accountId: string }) {
+export async function mountReady(over: Partial<AddData> = {}, counts?: Map<string, number>, onNewAccount?: () => void, preset?: AddPreset) {
   const f = fakeApi(over, counts);
   const m = mount(f.api, jest.fn(), onNewAccount, preset);
   await settle();

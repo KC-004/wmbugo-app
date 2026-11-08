@@ -206,7 +206,7 @@ describe('AccountsScreen', () => {
     return api;
   }
 
-  async function mountScreen(api: AccountsApi, onOpen?: (id: string) => void) {
+  async function mountScreen(api: AccountsApi, onOpen?: (id: string) => void, onPayBill?: (id: string) => void) {
     const qc = createQueryClient();
     clients.push(qc);
     let r!: ReactTestRenderer;
@@ -215,7 +215,7 @@ describe('AccountsScreen', () => {
         <QueryClientProvider client={qc}>
           <ThemeProvider>
             <ToastHost>
-              <AccountsScreen api={api} onOpen={onOpen} />
+              <AccountsScreen api={api} onOpen={onOpen} onPayBill={onPayBill} />
             </ToastHost>
           </ThemeProvider>
         </QueryClientProvider>,
@@ -418,6 +418,16 @@ describe('AccountsScreen', () => {
     expect(onOpen).toHaveBeenCalledWith('a');
     await press(r, 'rename-a');
     expect(r.root.findAll((n) => n.props.testID === 'account-row-a' && typeof n.props.onPress === 'function')).toHaveLength(0);
+  });
+
+  it('a card row offers Pay card bill (button and TalkBack action); other accounts do not', async () => {
+    const onPayBill = jest.fn();
+    const r = await mountScreen(fakeApi(three()), undefined, onPayBill);
+    expect(has(r, 'pay-bill-a')).toBe(false);
+    await press(r, 'pay-bill-c');
+    expect(onPayBill).toHaveBeenCalledWith('c');
+    const card = r.root.findAll((n) => typeof n.type === 'string' && n.props.testID === 'account-row-c')[0]!;
+    expect(card.props.accessibilityActions.map((a: { label: string }) => a.label)).toContain('Pay card bill');
   });
 
   it('archived accounts are not listed', async () => {

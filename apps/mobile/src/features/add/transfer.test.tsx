@@ -187,3 +187,57 @@ describe('opened from an account (Story 2.3)', () => {
     expect(record).toHaveBeenCalledWith(expect.objectContaining({ kind: 'expense', accountId: 'a2' }));
   });
 });
+
+describe('Pay card bill (Story 2.7)', () => {
+  const dbs = account('a1', 'DBS', { balanceNotSet: false, postingsMinor: 3120000 });
+  const card = account('c1', 'HDFC Card', { type: 'card', icon: 'CreditCard', balanceNotSet: false, postingsMinor: -1245000 });
+  const pay = { kind: 'transfer' as const, accountId: 'a1', toAccountId: 'c1', lockTo: true, owedMinor: 1245000 };
+
+  it('opens as a transfer with To locked to the card and the amount ready; saving writes From DBS To the card', async () => {
+    const { r, recordTransfer } = await mountReady({ accounts: [dbs, card] }, undefined, undefined, { ...pay, amountMinor: 820000 });
+    expect(has(r, 'to-locked')).toBe(true);
+    expect(has(r, 'to-option-a1')).toBe(false);
+    expect(texts(r)).toEqual(expect.arrayContaining(['To', 'HDFC Card', 'S$8,200.00']));
+    await act(async () => fire(r, 'save'));
+    expect(recordTransfer).toHaveBeenCalledWith(expect.objectContaining({ amountMinor: 820000, fromAccountId: 'a1', toAccountId: 'c1' }));
+  });
+
+  it('From offers only asset accounts, never the card itself', async () => {
+    const { r } = await mountReady({ accounts: [dbs, card, account('a2', 'Cash wallet')] }, undefined, undefined, { ...pay, amountMinor: 820000 });
+    act(() => fire(r, 'account-chip'));
+    expect(has(r, 'account-option-a2')).toBe(true);
+    expect(has(r, 'account-option-c1')).toBe(false);
+  });
+
+  it('paying more than is owed says so once, then goes ahead on the next Save', async () => {
+    const { r, recordTransfer } = await mountReady({ accounts: [dbs, card] }, undefined, undefined, { ...pay, amountMinor: 1500000 });
+    await act(async () => fire(r, 'save'));
+    expect(recordTransfer).not.toHaveBeenCalled();
+    expect(host(r, 'owed-warning').props.children).toBe('This is more than you owe. The extra shows as credit on the card. Tap Save again to continue.');
+    await act(async () => fire(r, 'save'));
+    expect(recordTransfer).toHaveBeenCalledWith(expect.objectContaining({ amountMinor: 1500000 }));
+  });
+
+  it('with nothing owed the amount is empty and the hint says so', async () => {
+    const { r } = await mountReady({ accounts: [dbs, card] }, undefined, undefined, { ...pay, amountMinor: null, owedMinor: 0, hint: 'Nothing owed on this card right now' });
+    expect(texts(r)).toContain('Nothing owed on this card right now');
+    tap(r, '5');
+    expect(has(r, 'preset-hint')).toBe(false);
+  });
+
+  it('with no asset account nothing is saved until From is set: "Error: choose where the money came from"', async () => {
+    const { r, recordTransfer } = await mountReady({ accounts: [card], defaultAccountId: null }, undefined, undefined, { ...pay, accountId: null, amountMinor: 820000 });
+    await act(async () => fire(r, 'save'));
+    expect(texts(r)).toContain('Error: choose where the money came from');
+    expect(host(r, 'from-error').props.accessibilityRole).toBe('alert');
+    expect(recordTransfer).not.toHaveBeenCalled();
+  });
+
+  it('the over-balance warning from Story 1.15 still applies to the payer', async () => {
+    const poor = account('a1', 'DBS', { balanceNotSet: false, postingsMinor: 100000 });
+    const { r, recordTransfer } = await mountReady({ accounts: [poor, card] }, undefined, undefined, { ...pay, amountMinor: 820000 });
+    await act(async () => fire(r, 'save'));
+    expect(recordTransfer).not.toHaveBeenCalled();
+    expect(has(r, 'transfer-warning')).toBe(true);
+  });
+});

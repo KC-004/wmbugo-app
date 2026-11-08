@@ -57,13 +57,14 @@ async function mountDetail(d: AccountDetailData | 'missing', props: Partial<Para
   const onBack = jest.fn();
   const onMoveMoney = jest.fn();
   const onAddExpense = jest.fn();
+  const onPayBill = jest.fn();
   let r!: ReactTestRenderer;
   await act(async () => {
     r = create(
       <QueryClientProvider client={qc}>
         <ThemeProvider>
           <ToastHost bottomOffset={0}>
-            <AccountDetailScreen accountId="h" onBack={onBack} onMoveMoney={onMoveMoney} onAddExpense={onAddExpense} api={api} {...props} />
+            <AccountDetailScreen accountId="h" onBack={onBack} onMoveMoney={onMoveMoney} onAddExpense={onAddExpense} onPayBill={onPayBill} api={api} {...props} />
           </ToastHost>
         </ThemeProvider>
       </QueryClientProvider>,
@@ -71,7 +72,7 @@ async function mountDetail(d: AccountDetailData | 'missing', props: Partial<Para
   });
   live.push(r);
   await settle();
-  return { r, load, onBack, onMoveMoney, onAddExpense, setStartingBalance, changeTrackingDate, adjustBalance, remove, updateCardDetails };
+  return { r, load, onBack, onMoveMoney, onAddExpense, onPayBill, setStartingBalance, changeTrackingDate, adjustBalance, remove, updateCardDetails };
 }
 
 const typeIn = (r: ReactTestRenderer, id: string, value: string) =>
@@ -318,6 +319,14 @@ describe('AccountDetailScreen', () => {
       expect(texts(f.r)).toEqual(expect.arrayContaining(['You owe', '₹12,450.00', 'From your entries in wmbugo']));
       expect(host(f.r, 'account-card-details')).toHaveLength(1);
       expect(host(f.r, 'card-lines')).toHaveLength(0);
+    });
+
+    it('Pay card bill is on a card, not on other accounts', async () => {
+      const f = await mountCard(null);
+      act(() => press(f.r, 'account-pay-bill'));
+      expect(f.onPayBill).toHaveBeenCalled();
+      const bank = await mountDetail(data(rows, {}));
+      expect(host(bank.r, 'account-pay-bill')).toHaveLength(0);
     });
 
     it('shows Statement due with its date and the Limit as separate lines', async () => {

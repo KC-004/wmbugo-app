@@ -35,6 +35,7 @@ export function AccountDetailScreen({
   onBack,
   onMoveMoney,
   onAddExpense,
+  onPayBill,
   api = realAccountDetailApi,
 }: {
   accountId: string;
@@ -43,6 +44,8 @@ export function AccountDetailScreen({
   onMoveMoney: () => void;
   /** Opens the Add sheet as an expense on this account. */
   onAddExpense: () => void;
+  /** Opens the ready-filled transfer that pays this card. */
+  onPayBill?: () => void;
   api?: AccountDetailApi;
 }) {
   const theme = useTheme();
@@ -153,6 +156,7 @@ export function AccountDetailScreen({
                 <Header d={d} />
                 {d.card ? <CardLines card={d.card} today={d.today} currency={d.currency} locale={d.locale} formatDate={(x) => dayMonth(shortDate(x))} /> : null}
                 <View style={styles.actions}>
+                  {d.account.type === 'card' && onPayBill ? <Button label={copy.accountDetail.payBill} onPress={onPayBill} testID="account-pay-bill" /> : null}
                   {d.account.type === 'card' ? null : <Button label={copy.accountDetail.moveMoney} variant="secondary" onPress={onMoveMoney} testID="account-move-money" />}
                   {d.account.type === 'card' ? <Button label={copy.cardDetails.action} variant="secondary" onPress={() => setPanel('card')} testID="account-card-details" /> : null}
                   {d.account.balanceNotSet ? null : (
