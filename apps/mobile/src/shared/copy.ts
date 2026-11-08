@@ -31,6 +31,24 @@ export const copy = {
   sheet: {
     addTitle: 'Add entry',
   },
+  home: {
+    spentThisPeriod: 'Spent this period',
+    inAccounts: 'In accounts',
+    cardDues: 'Card dues',
+    setUpAccount: 'Set up an account to calculate your balance',
+    addAccount: 'Add an account',
+    notSetOne: '+1 account not set',
+    notSetMany: '+{n} accounts not set',
+    tip: "This is money in accounts you've added",
+    loadError: 'Could not load Home.',
+  },
+  activity: {
+    empty: 'Nothing here yet. Your first expense will show up in this list.',
+    addExpense: 'Add an expense',
+    spent: 'Spent',
+    transfer: 'Transfer',
+    loadError: 'Could not load your entries.',
+  },
   add: {
     expense: 'Expense',
     income: 'Income',

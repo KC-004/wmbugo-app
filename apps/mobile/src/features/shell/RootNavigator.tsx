@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { DefaultTheme, NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -6,12 +6,14 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { copy } from '../../shared/copy';
 import { navLayout } from '../../shared/feedback/layout';
-import { SheetHost, useSheet } from '../../shared/feedback/SheetHost';
+import { SheetHost } from '../../shared/feedback/SheetHost';
 import { ToastHost } from '../../shared/feedback/ToastHost';
 import { useTheme } from '../../shared/theme/ThemeProvider';
 import { textStyle } from '../../shared/theme/typography';
 import type { AddButtonRef } from './AddButton';
-import { AddSheet } from '../add/AddSheet';
+import { useOpenAdd } from '../add/useOpenAdd';
+import { ActivityScreen } from '../activity/ActivityScreen';
+import { HomeScreen } from '../home/HomeScreen';
 import { AccountsScreen } from '../accounts/AccountsScreen';
 import { ScreenHeader } from './ScreenHeader';
 import { TabBar, type TabRoute } from './TabBar';
@@ -22,10 +24,11 @@ const RootStack = createNativeStackNavigator<RootParams>();
 const Tabs = createBottomTabNavigator();
 const TabStack = createNativeStackNavigator();
 
-/** Header only: Insights and Plan show nothing else until their epics land. */
-function TabScreen({ title, tab }: { title: string; tab?: TabRoute }) {
+type Nav = { navigate: (s: keyof RootParams) => void };
+
+/** The frame every tab shares: safe area, a centred column, and the first-frame timing mark. */
+function TabFrame({ tab, children }: { tab?: TabRoute; children: ReactNode }) {
   const theme = useTheme();
-  const nav = useNavigation<{ navigate: (s: keyof RootParams) => void }>();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const column = navLayout(width).contentWidth;
@@ -34,42 +37,59 @@ function TabScreen({ title, tab }: { title: string; tab?: TabRoute }) {
   }, [tab]);
   return (
     <View style={[styles.screen, { backgroundColor: theme.color('bg-canvas'), paddingTop: insets.top }]}>
-      <View style={[styles.column, { maxWidth: column }]}>
-        <ScreenHeader title={title} onAccounts={() => nav.navigate('Accounts')} onProfile={() => nav.navigate('Settings')} />
-      </View>
+      <View style={[styles.column, { maxWidth: column, flex: 1 }]}>{children}</View>
     </View>
   );
 }
 
-const tabStack = (title: string, tab: TabRoute) =>
+/** Header only: Insights and Plan show nothing else until their epics land. */
+function HeaderOnly({ title, tab }: { title: string; tab: TabRoute }) {
+  const nav = useNavigation<Nav>();
+  return (
+    <TabFrame tab={tab}>
+      <ScreenHeader title={title} onAccounts={() => nav.navigate('Accounts')} onProfile={() => nav.navigate('Settings')} />
+    </TabFrame>
+  );
+}
+
+function HomeTab() {
+  const nav = useNavigation<Nav>();
+  return (
+    <TabFrame tab="Home">
+      <HomeScreen onAccounts={() => nav.navigate('Accounts')} onProfile={() => nav.navigate('Settings')} onAddAccount={() => nav.navigate('Accounts')} />
+    </TabFrame>
+  );
+}
+
+function ActivityTab() {
+  const nav = useNavigation<Nav>();
+  const openAdd = useOpenAdd();
+  return (
+    <TabFrame tab="Activity">
+      <ActivityScreen onAccounts={() => nav.navigate('Accounts')} onProfile={() => nav.navigate('Settings')} onAdd={openAdd} />
+    </TabFrame>
+  );
+}
+
+const stackOf = (name: string, Screen: () => ReactNode) =>
   function TabStackScreen() {
     return (
       <TabStack.Navigator screenOptions={{ headerShown: false }}>
-        <TabStack.Screen name={`${tab}Root`}>{() => <TabScreen title={title} tab={tab} />}</TabStack.Screen>
+        <TabStack.Screen name={name}>{() => <Screen />}</TabStack.Screen>
       </TabStack.Navigator>
     );
   };
 
-const HomeStack = tabStack(copy.nav.home, 'Home');
-const ActivityStack = tabStack(copy.nav.activity, 'Activity');
-const InsightsStack = tabStack(copy.nav.insights, 'Insights');
-const PlanStack = tabStack(copy.nav.plan, 'Plan');
+const HomeStack = stackOf('HomeRoot', HomeTab);
+const ActivityStack = stackOf('ActivityRoot', ActivityTab);
+const InsightsStack = stackOf('InsightsRoot', () => <HeaderOnly title={copy.nav.insights} tab="Insights" />);
+const PlanStack = stackOf('PlanRoot', () => <HeaderOnly title={copy.nav.plan} tab="Plan" />);
 
 function TabsWithAdd() {
-  const sheet = useSheet();
   const opener: AddButtonRef = useRef(null);
   const { width } = useWindowDimensions();
   const nav = navLayout(width);
-  const onAdd = useCallback(() => {
-    sheet.open(
-      {
-        id: 'add',
-        title: copy.sheet.addTitle,
-        body: (close) => <AddSheet close={close} />,
-      },
-      opener,
-    );
-  }, [sheet]);
+  const onAdd = useOpenAdd(opener);
 
   return (
     <View style={styles.fill}>

@@ -30,7 +30,7 @@ export function EmptyState({ sentence, actionLabel, onAction }: { sentence: stri
     <View testID="empty-state" style={styles.empty}>
       <PaperBoat />
       <Text style={[textStyle('body'), styles.center, { color: theme.color('text-secondary') }]}>{sentence}</Text>
-      <Button label={actionLabel} onPress={onAction} />
+      <Button label={actionLabel} onPress={onAction} testID="empty-state-action" />
     </View>
   );
 }
