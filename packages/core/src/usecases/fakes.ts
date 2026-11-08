@@ -1,5 +1,5 @@
 import type { KeyStore } from '../ports/keystore';
-import type { DatabaseOpener, SqlDatabase, SqlParam, SqlStatement } from '../ports/storage';
+import type { DatabaseOpener, SqlDatabase, SqlParam, SqlStatement, SqlTransaction } from '../ports/storage';
 import { createRedactingLogger, type LogEntry } from '../shared/logger';
 
 /**
@@ -55,6 +55,13 @@ export class FakeSqlDatabase implements SqlDatabase {
     this.migrationRows = rows;
     this.writes += 1;
     return Promise.resolve();
+  }
+
+  transaction<T>(fn: (tx: SqlTransaction) => Promise<T>): Promise<T> {
+    return fn({
+      query: (sql, params) => this.query(sql, params),
+      execute: () => Promise.reject(new Error('FakeSqlDatabase: transactions are not simulated here')),
+    });
   }
 
   safetyCopy(label: string): Promise<void> {

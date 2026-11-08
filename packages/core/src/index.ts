@@ -10,3 +10,4 @@ export * from './shared';
 export * from './schema-lint';
 export * from './ports';
 export * from './usecases';
+export * from './writer';

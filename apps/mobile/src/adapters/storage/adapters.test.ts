@@ -10,6 +10,7 @@ jest.mock('react-native-keychain', () => ({
 const calls: string[] = [];
 const mockExecuteRaw = jest.fn();
 const mockExecuteBatch = jest.fn();
+const mockTransaction = jest.fn();
 const mockOpen = jest.fn();
 jest.mock('@op-engineering/op-sqlite', () => ({ open: (...a: unknown[]) => mockOpen(...a), ANDROID_DATABASE_PATH: '/data/databases' }));
 jest.mock('../files/rnFileStore', () => ({
@@ -36,6 +37,7 @@ beforeEach(() => {
       return mockExecuteRaw(...a);
     },
     executeBatch: (...a: unknown[]) => mockExecuteBatch(...a),
+    transaction: (...a: unknown[]) => mockTransaction(...a),
     getDbPath: () => '/data/databases/wmbugo.db',
     close: jest.fn(),
   });
@@ -89,6 +91,24 @@ describe('opSqliteOpener', () => {
     const db = await opSqliteOpener.open('00'.repeat(32));
     await db.executeBatch([{ sql: 'A' }, { sql: 'B ?', params: [1] }]);
     expect(mockExecuteBatch).toHaveBeenCalledWith([['A', []], ['B ?', [1]]]);
+  });
+
+  it('transaction runs fn inside the op-sqlite transaction, returns its value and keeps column order', async () => {
+    const txExecute = jest.fn(async (sql: string) => (sql.startsWith('SELECT') ? { rows: [{ id: 'a', v: 1 }, { id: 'b', v: 2 }] } : { rows: [] }));
+    mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<void>) => fn({ execute: txExecute }));
+    const db = await opSqliteOpener.open('00'.repeat(32));
+    const out = await db.transaction(async (tx) => {
+      await tx.execute('INSERT INTO t (a) VALUES (?)', [5]);
+      return tx.query('SELECT id, v FROM t');
+    });
+    expect(out).toEqual([['a', 1], ['b', 2]]);
+    expect(txExecute).toHaveBeenCalledWith('INSERT INTO t (a) VALUES (?)', [5]);
+  });
+
+  it('transaction rethrows so op-sqlite rolls back', async () => {
+    mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<void>) => fn({ execute: jest.fn() }));
+    const db = await opSqliteOpener.open('00'.repeat(32));
+    await expect(db.transaction(async () => { throw new Error('boom'); })).rejects.toThrow('boom');
   });
 
   it('safety copy checkpoints the log first, then copies the encrypted file to private storage', async () => {

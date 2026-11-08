@@ -1,5 +1,5 @@
 import { ANDROID_DATABASE_PATH, open } from '@op-engineering/op-sqlite';
-import type { DatabaseOpener, SqlDatabase, SqlParam } from '@wmbugo/core';
+import type { DatabaseOpener, SqlDatabase, SqlParam, SqlTransaction } from '@wmbugo/core';
 import { copyFile, ensureDir, fileExists, PRIVATE_DIR } from '../files/rnFileStore';
 
 const DB_NAME = 'wmbugo.db';
@@ -27,6 +27,23 @@ export const opSqliteOpener: DatabaseOpener = {
       },
       async executeBatch(statements) {
         await db.executeBatch(statements.map((s) => [s.sql, [...(s.params ?? [])]] as [string, SqlParam[]]));
+      },
+      async transaction<T>(fn: (tx: SqlTransaction) => Promise<T>): Promise<T> {
+        // op-sqlite queues every other statement on this connection until the transaction ends,
+        // so readers never see a half-written state. Its rows are objects; keep column order.
+        let result!: T;
+        await db.transaction(async (tx) => {
+          result = await fn({
+            query: async (sql, params = []) => {
+              const r = await tx.execute(sql, [...params]);
+              return r.rows.map((row) => Object.values(row) as SqlParam[]);
+            },
+            execute: async (sql, params = []) => {
+              await tx.execute(sql, [...params]);
+            },
+          });
+        });
+        return result;
       },
       async safetyCopy(label) {
         // Fold the write-ahead log into the main file so the copy is complete.
