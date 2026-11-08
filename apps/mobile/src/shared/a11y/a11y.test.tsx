@@ -146,7 +146,7 @@ describe('copy catalogue', () => {
     // Sentence case: no word in ALL CAPS of 4+ letters (acronyms such as SMS are 3 letters).
     expect(text).not.toMatch(/\b[A-Z]{4,}\b/);
     // Starts like a sentence (capital letter or brand name), unless it is the lower-case brand.
-    expect(text).toMatch(/^([A-Z0-9+]|wmbugo)/);
+    expect(text).toMatch(/^([A-Z0-9+{]|wmbugo)/);
   });
 
   it('keys are unique and dotted', () => {

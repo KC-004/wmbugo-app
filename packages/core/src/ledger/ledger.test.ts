@@ -230,7 +230,7 @@ describe('rename, reorder, archive', () => {
     expect((await rows()).map((r) => r.sortOrder)).toEqual([0, 1, 2]);
   });
 
-  it('archiving hides the account from pickers but keeps its history; restore brings it back at the end', async () => {
+  it('archiving hides the account from pickers but keeps its history; restore brings it back in its place', async () => {
     const { db, writer, rows, count } = await setup();
     const a = await add(writer, 'DBS', 'bank', 320000);
     await add(writer, 'Cash', 'cash', 5000);
@@ -243,7 +243,7 @@ describe('rename, reorder, archive', () => {
     expect((await rows()).find((r) => r.name === 'DBS')).toMatchObject({ status: 'archived', postingsMinor: 320000 });
     expect(assetTotal(await rows()).minor).toBe(5000); // archived accounts are not in the total
     await writer.run(RestoreAccount, { accountId: id }, 'user');
-    expect((await db.query("SELECT name FROM account WHERE status = 'active' ORDER BY sort_order")).map((r) => r[0])).toEqual(['Cash', 'DBS']);
+    expect((await db.query("SELECT name FROM account WHERE status = 'active' ORDER BY sort_order")).map((r) => r[0])).toEqual(['DBS', 'Cash']);
     expect(await writer.run(ArchiveAccount, { accountId: 'nope' }, 'user')).toEqual({ ok: false, code: 'ACCOUNT_NOT_FOUND' });
     expect(await writer.run(RestoreAccount, { accountId: 'nope' }, 'user')).toEqual({ ok: false, code: 'ACCOUNT_NOT_FOUND' });
   });

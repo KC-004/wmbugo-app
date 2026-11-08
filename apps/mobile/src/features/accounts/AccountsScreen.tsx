@@ -16,6 +16,7 @@ import { Amount } from '../../shared/ui/Amount';
 import { Button } from '../../shared/ui/Button';
 import { Chip } from '../../shared/ui/Chip';
 import { ScreenHeader } from '../shell/ScreenHeader';
+import { ArchivedSection } from './ArchivedSection';
 import { AccountForm, TYPE_LABEL } from './AccountForm';
 import { ACCOUNTS_QUERY_KEY, NET_WORTH_QUERY_KEY, PROFILE_QUERY_KEY, realAccountsApi, type AccountsApi } from './accountsApi';
 
@@ -25,7 +26,7 @@ type Mode = { kind: 'list' } | { kind: 'add' } | { kind: 'rename'; account: Acco
 
 /**
  * The accounts list: active accounts in Mei's order with a ledger-derived balance or "Balance not set"
- * (never zero), add, rename, Move up / Move down (also TalkBack custom actions) and archive with Undo.
+ * (never zero), add, rename, Move up / Move down (also TalkBack custom actions) and delete for an account that never held anything. Archiving is on the account's own page, where it can warn first.
  */
 export function AccountsScreen({
   api = realAccountsApi,
@@ -50,6 +51,7 @@ export function AccountsScreen({
   const refresh = () => qc.invalidateQueries({ queryKey: ['ledger'] });
   const active = (accounts.data ?? []).filter((a) => a.status === 'active');
   const groups = accountGroups(active);
+  const archivedRows = (accounts.data ?? []).filter((a) => a.status === 'archived');
 
   const adding = useRef(false);
   const add = async (account: NewAccount) => {
@@ -66,26 +68,6 @@ export function AccountsScreen({
       setMode({ kind: 'list' });
       await refresh();
     } else setSaveError(copy.accounts.saveError);
-  };
-
-  const archive = async (a: AccountRow) => {
-    const r = await api.archive(a.id);
-    if (!r.ok) return;
-    await refresh();
-    toast.show({
-      message: `${copy.accounts.archived} ${a.name}`,
-      undo: {
-        label: copy.common.undo,
-        onUndo: () =>
-          void api
-            .restore(a.id)
-            .then(async (res) => {
-              await refresh();
-              if (!res.ok) toast.show({ message: copy.accounts.restoreFailed });
-            })
-            .catch(() => toast.show({ message: copy.accounts.restoreFailed })),
-      },
-    });
   };
 
   const setInclusion = async (a: AccountRow, include: boolean) => {
@@ -164,7 +146,12 @@ export function AccountsScreen({
                     }}
                     editing={mode.kind === 'rename' && mode.account.id === a.id}
                     onMove={(d) => void move(a, d)}
-                    onArchive={() => void archive(a)}
+                    onDelete={async () => {
+                      const r = await api.deleteAccount(a.id);
+                      if (!r.ok) toast.show({ message: copy.archive.failed });
+                      setMode({ kind: 'list' });
+                      await refresh();
+                    }}
                     onRename={() => setMode({ kind: 'rename', account: a })}
                     onInclusion={(v) => void setInclusion(a, v)}
                     onOpen={() => onOpen?.(a.id)}
@@ -187,6 +174,19 @@ export function AccountsScreen({
           <NetWorthFooter on={netWorthOn.data === true} onToggle={(v) => void setNetWorth(v)} net={groups.netWorth} currency={profile.data?.currency} locale={profile.data?.locale} />
         </>
       ) : null}
+      {archivedRows.length > 0 ? (
+        <ArchivedSection
+          rows={archivedRows}
+          currency={profile.data?.currency}
+          locale={profile.data?.locale}
+          onOpen={(id) => onOpen?.(id)}
+          onRestore={async (id) => {
+            const r = await api.restore(id);
+            if (!r.ok) toast.show({ message: copy.accounts.restoreFailed });
+            await refresh();
+          }}
+        />
+      ) : null}
       </ScrollView>
     </View>
   );
@@ -200,7 +200,7 @@ function AccountRowView(props: {
   isLast: boolean;
   editing: boolean;
   onMove: (d: 'up' | 'down') => void;
-  onArchive: () => void;
+  onDelete: () => void;
   onRename: () => void;
   onInclusion: (include: boolean) => void;
   onOpen: () => void;
@@ -213,6 +213,7 @@ function AccountRowView(props: {
   const theme = useTheme();
   const [name, setName] = useState(a.name);
   const [error, setError] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   const line = accountLine(a);
   const counted = a.type === 'card' || a.includeInOverview !== false;
@@ -232,7 +233,6 @@ function AccountRowView(props: {
     ...(isLast ? [] : [{ name: 'moveDown', label: copy.accounts.moveDown }]),
     ...(a.type === 'card' && props.onPayBill ? [{ name: 'payBill', label: copy.accountDetail.payBill }] : []),
     { name: 'rename', label: copy.accounts.rename },
-    { name: 'archive', label: copy.accounts.archive },
   ];
 
   return (
@@ -249,7 +249,6 @@ function AccountRowView(props: {
         else if (n === 'moveDown') props.onMove('down');
         else if (n === 'payBill') props.onPayBill?.();
         else if (n === 'rename') props.onRename();
-        else if (n === 'archive') props.onArchive();
       }}
       style={[styles.row, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
       <View style={styles.rowMain}>
@@ -323,6 +322,21 @@ function AccountRowView(props: {
                 />
               </View>
             )}
+            {a.postingCount === 0 ? (
+              confirming ? (
+                <View testID="delete-confirm" style={styles.group}>
+                  <Text style={[textStyle('body-medium'), { color: theme.color('text-primary') }]}>{copy.archive.deleteConfirm.replace('{name}', a.name)}</Text>
+                  <View style={styles.typeChips}>
+                    <Button label={copy.archive.deleteYes} onPress={props.onDelete} testID={`delete-yes-${a.id}`} />
+                    <Button label={copy.common.cancel} variant="text" onPress={() => setConfirming(false)} testID={`delete-no-${a.id}`} />
+                  </View>
+                </View>
+              ) : (
+                <Button label={copy.archive.deleteAccount} variant="text" onPress={() => setConfirming(true)} testID={`delete-${a.id}`} />
+              )
+            ) : (
+              <Text testID={`delete-hint-${a.id}`} style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{copy.archive.deleteHint}</Text>
+            )}
             <Button
               label={copy.accounts.renameSave}
               testID="rename-save"
@@ -342,7 +356,6 @@ function AccountRowView(props: {
             {isLast ? null : <Button label={copy.accounts.moveDown} variant="text" onPress={() => props.onMove('down')} testID={`move-down-${a.id}`} />}
             {a.type === 'card' && props.onPayBill ? <Button label={copy.accountDetail.payBill} variant="text" onPress={props.onPayBill} testID={`pay-bill-${a.id}`} /> : null}
             <Button label={copy.accounts.rename} variant="text" onPress={props.onRename} testID={`rename-${a.id}`} />
-            <Button label={copy.accounts.archive} variant="text" onPress={props.onArchive} testID={`archive-${a.id}`} />
           </>
         )}
       </View>

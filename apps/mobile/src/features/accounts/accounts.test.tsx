@@ -178,10 +178,9 @@ describe('AccountsScreen', () => {
         state.rows[bi] = { ...b, sortOrder: a.sortOrder };
         return { ok: true };
       },
-      archive: async (id) => {
-        api.calls.push(`archive:${id}`);
-        const r = state.rows.find((x) => x.id === id)!;
-        state.rows[state.rows.indexOf(r)] = { ...r, status: 'archived' };
+      deleteAccount: async (id) => {
+        api.calls.push(`delete:${id}`);
+        state.rows = state.rows.filter((x) => x.id !== id);
         return { ok: true };
       },
       changeType: async (id, type) => {
@@ -256,10 +255,10 @@ describe('AccountsScreen', () => {
     const r = await mountScreen(fakeApi(three()));
     const mid = r.root.findAll((n) => typeof n.type === 'string' && n.props.testID === 'account-row-b')[0]!;
     expect(mid.props.accessibilityLabel).toBe('Cash, Cash, Balance not set');
-    expect(mid.props.accessibilityActions.map((a: { label: string }) => a.label)).toEqual(['Move up', 'Rename', 'Archive']);
+    expect(mid.props.accessibilityActions.map((a: { label: string }) => a.label)).toEqual(['Move up', 'Rename']);
     const first = r.root.findAll((n) => typeof n.type === 'string' && n.props.testID === 'account-row-a')[0]!;
     expect(first.props.accessibilityLabel).toBe('DBS, Bank account, 3,200 Singapore dollars');
-    expect(first.props.accessibilityActions.map((a: { label: string }) => a.label)).toEqual(['Move down', 'Rename', 'Archive']);
+    expect(first.props.accessibilityActions.map((a: { label: string }) => a.label)).toEqual(['Move down', 'Rename']);
     const card = r.root.findAll((n) => typeof n.type === 'string' && n.props.testID === 'account-row-c')[0]!;
     expect(card.props.accessibilityLabel).toBe('Visa, Credit card, You owe 450 Singapore dollars');
   });
@@ -308,17 +307,40 @@ describe('AccountsScreen', () => {
     expect(texts(r)).toContain('DBS Savings');
   });
 
-  it('archive hides the account and offers Undo in a toast; Undo restores it', async () => {
-    const api = fakeApi(three());
+  it('archived accounts sit under a collapsed "Archived (n)" row; opened, each shows its final balance, Open and Restore', async () => {
+    const onOpen = jest.fn();
+    const api = fakeApi([...three(), row({ id: 'z', name: 'Old SBI', status: 'archived', sortOrder: 9, postingsMinor: 120000 })]);
+    const r = await mountScreen(api, onOpen);
+    expect(texts(r)).toContain('Archived (1)');
+    expect(has(r, 'archived-row-z')).toBe(false);
+    await press(r, 'archived-toggle');
+    expect(has(r, 'archived-row-z')).toBe(true);
+    expect(texts(r)).toEqual(expect.arrayContaining(['Old SBI', 'S$1,200.00']));
+    await press(r, 'archived-open-z');
+    expect(onOpen).toHaveBeenCalledWith('z');
+    await press(r, 'archived-restore-z');
+    expect(api.calls).toContain('restore:z');
+    expect(has(r, 'account-row-z')).toBe(true);
+    expect(has(r, 'archived-section')).toBe(false);
+  });
+
+  it('Delete account is offered only for an account that never held anything, behind "Delete X? This can\'t be undone."', async () => {
+    const api = fakeApi([row({ id: 'e', name: 'Mistake', type: 'cash', sortOrder: 0, balanceNotSet: true, postingCount: 0 }), row({ id: 'u', name: 'Used', sortOrder: 1, postingsMinor: 100, postingCount: 2 })]);
     const r = await mountScreen(api);
-    await press(r, 'archive-b');
-    expect(api.calls).toContain('archive:b');
-    expect(has(r, 'account-row-b')).toBe(false);
-    expect(texts(r)).toContain('Archived Cash');
-    await act(async () => fire(r, 'toast-undo'));
-    await settle();
-    expect(api.calls).toContain('restore:b');
-    expect(has(r, 'account-row-b')).toBe(true);
+    await press(r, 'rename-u');
+    expect(has(r, 'delete-u')).toBe(false);
+    expect(texts(r)).toContain("Accounts with entries can't be deleted. Archive keeps their history.");
+    await press(r, 'rename-cancel');
+    await press(r, 'rename-e');
+    await press(r, 'delete-e');
+    expect(texts(r)).toContain("Delete Mistake? This can't be undone.");
+    expect(api.calls.some((c) => c.startsWith('delete'))).toBe(false);
+    await press(r, 'delete-no-e');
+    expect(has(r, 'delete-e')).toBe(true);
+    await press(r, 'delete-e');
+    await press(r, 'delete-yes-e');
+    expect(api.calls).toContain('delete:e');
+    expect(has(r, 'account-row-e')).toBe(false);
   });
 
   // The text of a group total: its Text children joined (the amount is its own Text).

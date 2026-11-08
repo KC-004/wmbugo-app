@@ -1,7 +1,7 @@
 import {
   ACCOUNT_LIST_SQL,
   AddAccount,
-  ArchiveAccount,
+  DeleteAccount,
   mapAccountRows,
   MoveAccount,
   RenameAccount,
@@ -33,7 +33,7 @@ export interface AccountsApi {
   add(account: NewAccount): Promise<{ ok: boolean }>;
   rename(accountId: string, name: string): Promise<{ ok: boolean; code?: string }>;
   move(accountId: string, direction: 'up' | 'down'): Promise<{ ok: boolean }>;
-  archive(accountId: string): Promise<{ ok: boolean }>;
+  deleteAccount(accountId: string): Promise<{ ok: boolean; code?: string }>;
   restore(accountId: string): Promise<{ ok: boolean }>;
   setInclusion(accountId: string, include: boolean): Promise<{ ok: boolean }>;
   changeType(accountId: string, type: AccountType): Promise<{ ok: boolean; code?: string }>;
@@ -56,7 +56,7 @@ export const realAccountsApi: AccountsApi = {
   add: (account) => getServices().writer.run(AddAccount, account, 'user'),
   rename: (accountId, name) => getServices().writer.run(RenameAccount, { accountId, name }, 'user'),
   move: (accountId, direction) => getServices().writer.run(MoveAccount, { accountId, direction }, 'user'),
-  archive: (accountId) => getServices().writer.run(ArchiveAccount, { accountId }, 'user'),
+  deleteAccount: (accountId) => getServices().writer.run(DeleteAccount, { accountId }, 'user'),
   restore: (accountId) => getServices().writer.run(RestoreAccount, { accountId }, 'user'),
   changeType: (accountId, type) => getServices().writer.run(ChangeAccountType, { accountId, type }, 'user'),
   setInclusion: (accountId, include) => getServices().writer.run(SetAccountInclusion, { accountId, include }, 'user'),

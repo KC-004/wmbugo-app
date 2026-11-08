@@ -6,6 +6,9 @@ import {
   groupByDay,
   mapAccountRows,
   AdjustBalance,
+  ArchiveAccount,
+  RestoreAccount,
+  NEEDS_REVIEW_COUNT_SQL,
   CARD_DETAILS_SQL,
   mapCardDetails,
   UpdateCardDetails,
@@ -37,6 +40,8 @@ export interface AccountDetailData {
   /** Signed effect on this account, by entry id (a transfer reads "To X" or "From X" from it). */
   readonly signed: Readonly<Record<string, number>>;
   readonly hasMore: boolean;
+  /** Entries on this account that wait for the user (status needs_review). */
+  readonly needsReviewCount: number;
   /** A card's statement details and the payments since they were entered; null for other accounts. */
   readonly card: CardDetailsRead | null;
   /** The opening balance and the day tracking began; null when the balance was never set. */
@@ -52,6 +57,8 @@ export interface AccountDetailApi {
   adjustBalance(input: { accountId: string; actualMinor: number; reason: AdjustReason; note?: string }): Promise<{ ok: boolean; code?: string; transactionId?: string }>;
   /** Stores what the user copied from the card statement. */
   updateCardDetails(accountId: string, details: CardDetails): Promise<{ ok: boolean; code?: string }>;
+  archive(accountId: string): Promise<{ ok: boolean }>;
+  restore(accountId: string): Promise<{ ok: boolean }>;
   /** Undo for an adjustment. */
   remove(transactionId: string): Promise<{ ok: boolean }>;
   /** Moves the day tracking starts to the start of this local day (yyyy-mm-dd). */
@@ -84,6 +91,7 @@ export const realAccountDetailApi: AccountDetailApi = {
       days: groupByDay(page.rows),
       signed,
       hasMore: page.hasMore,
+      needsReviewCount: Number((await db.query(NEEDS_REVIEW_COUNT_SQL, [accountId]))[0]?.[0] ?? 0),
       card: account.type === 'card' ? mapCardDetails(await db.query(CARD_DETAILS_SQL, [accountId])) : null,
       starting: start && startDate?.ok ? { minor: Number(start[0]), localDate: startDate.value } : null,
     };
@@ -94,6 +102,8 @@ export const realAccountDetailApi: AccountDetailApi = {
     return r.ok ? { ok: true, transactionId: r.value.transactionId } : { ok: false, code: r.code };
   },
   updateCardDetails: (accountId, d) => getServices().writer.run(UpdateCardDetails, { accountId, ...d }, 'user'),
+  archive: (accountId) => getServices().writer.run(ArchiveAccount, { accountId }, 'user'),
+  restore: (accountId) => getServices().writer.run(RestoreAccount, { accountId }, 'user'),
   remove: (transactionId) => getServices().writer.run(RemoveEntry, { transactionId }, 'user'),
   changeTrackingDate: (accountId, localDate) => getServices().writer.run(ChangeTrackingDate, { accountId, localDate }, 'user'),
 };

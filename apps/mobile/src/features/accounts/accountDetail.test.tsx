@@ -41,17 +41,19 @@ const row = (id: string, kind: ActivityRow['kind'], amountMinor: number, localDa
   id, kind, amountMinor, localDate, merchant: null, categoryName: 'Food & Drinks', categoryIcon: 'ForkKnife', categoryColor: 'cat-rose', accountName: null, ...over,
 });
 const data = (rows: ActivityRow[], signed: Record<string, number> = {}, over: Partial<AccountDetailData> = {}): AccountDetailData => ({
-  currency: 'INR', exponent: 2, locale: 'en-IN', today: '2026-11-08', account: account(), days: groupByDay(rows), signed, hasMore: false, card: null, starting: { minor: 3000000, localDate: '2026-11-01' }, ...over,
+  currency: 'INR', exponent: 2, locale: 'en-IN', today: '2026-11-08', account: account(), days: groupByDay(rows), signed, hasMore: false, needsReviewCount: 0, card: null, starting: { minor: 3000000, localDate: '2026-11-01' }, ...over,
 });
 
 async function mountDetail(d: AccountDetailData | 'missing', props: Partial<Parameters<typeof AccountDetailScreen>[0]> = {}) {
   const load = jest.fn<Promise<AccountDetailData | 'missing'>, [string, number?]>(async () => d);
+  const archive = jest.fn<Promise<{ ok: boolean }>, [string]>(async () => ({ ok: true }));
+  const restore = jest.fn<Promise<{ ok: boolean }>, [string]>(async () => ({ ok: true }));
   const setStartingBalance = jest.fn<Promise<{ ok: boolean; code?: string }>, [string, number]>(async () => ({ ok: true }));
   const changeTrackingDate = jest.fn<Promise<{ ok: boolean; code?: string }>, [string, string]>(async () => ({ ok: true }));
   const adjustBalance = jest.fn<Promise<{ ok: boolean; code?: string; transactionId?: string }>, [{ accountId: string; actualMinor: number; reason: string; note?: string }]>(async () => ({ ok: true, transactionId: 'adj1' }));
   const remove = jest.fn<Promise<{ ok: boolean }>, [string]>(async () => ({ ok: true }));
   const updateCardDetails = jest.fn<Promise<{ ok: boolean; code?: string }>, [string, CardDetails]>(async () => ({ ok: true }));
-  const api: AccountDetailApi = { load, setStartingBalance, changeTrackingDate, adjustBalance, updateCardDetails, remove: remove as AccountDetailApi['remove'] };
+  const api: AccountDetailApi = { load, setStartingBalance, changeTrackingDate, adjustBalance, updateCardDetails, archive, restore, remove: remove as AccountDetailApi['remove'] };
   const qc = createQueryClient();
   clients.push(qc);
   const onBack = jest.fn();
@@ -72,7 +74,7 @@ async function mountDetail(d: AccountDetailData | 'missing', props: Partial<Para
   });
   live.push(r);
   await settle();
-  return { r, load, onBack, onMoveMoney, onAddExpense, onPayBill, setStartingBalance, changeTrackingDate, adjustBalance, remove, updateCardDetails };
+  return { r, load, onBack, onMoveMoney, onAddExpense, onPayBill, setStartingBalance, changeTrackingDate, adjustBalance, remove, updateCardDetails, archive, restore };
 }
 
 const typeIn = (r: ReactTestRenderer, id: string, value: string) =>
@@ -385,6 +387,74 @@ describe('AccountDetailScreen', () => {
       await act(async () => press(f.r, 'card-save'));
       expect(texts(f.r)).toContain('Error: check the date');
       expect(host(f.r, 'card-date')[0]!.props.value).toBe('soon');
+    });
+  });
+
+  describe('Archive and Restore (Story 2.9)', () => {
+    const body = (r: ReactTestRenderer, id: string) => host(r, id)[0]!.findAll((n) => n.type === Text).map((n) => [n.props.children].flat().filter((c) => typeof c === 'string').join('')).join('');
+    const openArchive = async (over: Partial<AccountDetailData> = {}) => {
+      const f = await mountDetail(data(rows, {}, { account: account({ name: 'SBI', postingsMinor: 120000 }), ...over }));
+      act(() => press(f.r, 'account-archive'));
+      return f;
+    };
+
+    it('an account with money warns what is still in it, and offers Adjust balance first or Archive anyway', async () => {
+      const f = await openArchive();
+      expect(body(f.r, 'archive-message')).toBe('SBI still has ₹1,200.00. Archiving keeps its history but stops counting it in your totals.');
+      expect(host(f.r, 'archive-adjust')).toHaveLength(1);
+      act(() => press(f.r, 'archive-adjust'));
+      expect(host(f.r, 'adjust-panel')).toHaveLength(1);
+      expect(host(f.r, 'archive-panel')).toHaveLength(0);
+    });
+
+    it('a card says what is still owed', async () => {
+      const f = await openArchive({ account: account({ name: 'HDFC Card', type: 'card', icon: 'CreditCard', postingsMinor: -410000 }) });
+      expect(body(f.r, 'archive-message')).toBe('You still owe ₹4,100.00 on HDFC Card. Archiving keeps its history but stops counting it in your totals.');
+    });
+
+    it('an account at zero or with no balance gets a plain confirmation with no Adjust first', async () => {
+      const f = await openArchive({ account: account({ name: 'SBI', postingsMinor: 0 }) });
+      expect(body(f.r, 'archive-message')).toBe('Archive SBI?');
+      expect(host(f.r, 'archive-adjust')).toHaveLength(0);
+      const g = await openArchive({ account: account({ name: 'Cash', balanceNotSet: true, postingsMinor: 0 }) });
+      expect(body(g.r, 'archive-message')).toBe('Archive Cash?');
+    });
+
+    it('mentions entries waiting for review', async () => {
+      const one = await openArchive({ needsReviewCount: 1 });
+      expect(texts(one.r)).toContain('1 entry on this account is waiting for you.');
+      const many = await openArchive({ needsReviewCount: 3 });
+      expect(texts(many.r)).toContain('3 entries on this account are waiting for you.');
+    });
+
+    it('Archive anyway archives, goes back and offers Undo that restores', async () => {
+      const f = await openArchive();
+      await act(async () => press(f.r, 'archive-confirm'));
+      await settle();
+      expect(f.archive).toHaveBeenCalledWith('h');
+      expect(f.onBack).toHaveBeenCalled();
+      expect(texts(f.r)).toContain('Archived SBI');
+      await act(async () => press(f.r, 'toast-undo'));
+      expect(f.restore).toHaveBeenCalledWith('h');
+    });
+
+    it('Cancel writes nothing', async () => {
+      const f = await openArchive();
+      act(() => press(f.r, 'archive-cancel'));
+      expect(host(f.r, 'archive-panel')).toHaveLength(0);
+      expect(f.archive).not.toHaveBeenCalled();
+    });
+
+    it('an archived account is read-only: its timeline and Restore, no actions', async () => {
+      const f = await mountDetail(data(rows, {}, { account: account({ status: 'archived', name: 'Old SBI' }) }));
+      expect(texts(f.r)).toContain('This account is archived. Its history is kept.');
+      expect(host(f.r, 'account-move-money')).toHaveLength(0);
+      expect(host(f.r, 'account-adjust')).toHaveLength(0);
+      expect(host(f.r, 'account-archive')).toHaveLength(0);
+      expect(host(f.r, 'tracking-since')).toHaveLength(0);
+      expect(host(f.r, 'activity-row-t')).toHaveLength(1);
+      await act(async () => press(f.r, 'account-restore'));
+      expect(f.restore).toHaveBeenCalledWith('h');
     });
   });
 });

@@ -18,6 +18,7 @@ import { Button } from '../../shared/ui/Button';
 import { ActivityRowView } from '../activity/ActivityRowView';
 import { ScreenHeader } from '../shell/ScreenHeader';
 import { AdjustBalancePanel } from './AdjustBalancePanel';
+import { ArchivePanel } from './ArchivePanel';
 import { CardDetailsPanel } from './CardDetailsPanel';
 import { CardLines, dayMonth } from './CardLines';
 import { TYPE_LABEL } from './AccountForm';
@@ -55,7 +56,7 @@ export function AccountDetailScreen({
   const d = q.data && q.data !== 'missing' ? q.data : null;
   const ink = { color: theme.color('text-primary') };
   const toast = useToast();
-  const [panel, setPanel] = useState<'balance' | 'date' | 'adjust' | 'card' | null>(null);
+  const [panel, setPanel] = useState<'balance' | 'date' | 'adjust' | 'card' | 'archive' | null>(null);
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const busy = useRef(false);
@@ -79,6 +80,30 @@ export function AccountDetailScreen({
       });
     }
     return r;
+  };
+
+  const archive = async () => {
+    if (!d) return;
+    const r = await api.archive(accountId);
+    if (!r.ok) return toast.show({ message: copy.archive.failed });
+    await invalidateForEvent(qc, 'AccountsChanged');
+    toast.show({
+      message: `${copy.accounts.archived} ${d.account.name}`,
+      undo: {
+        label: copy.common.undo,
+        onUndo: () =>
+          void api
+            .restore(accountId)
+            .then(() => invalidateForEvent(qc, 'AccountsChanged'))
+            .catch(() => toast.show({ message: copy.accounts.restoreFailed })),
+      },
+    });
+    onBack();
+  };
+  const restore = async () => {
+    const r = await api.restore(accountId);
+    if (!r.ok) return toast.show({ message: copy.accounts.restoreFailed });
+    await invalidateForEvent(qc, 'AccountsChanged');
   };
 
   const saveCard = async (details: CardDetails) => {
@@ -155,6 +180,12 @@ export function AccountDetailScreen({
               <View style={styles.headerBlock}>
                 <Header d={d} />
                 {d.card ? <CardLines card={d.card} today={d.today} currency={d.currency} locale={d.locale} formatDate={(x) => dayMonth(shortDate(x))} /> : null}
+                {d.account.status === 'archived' ? (
+                  <View style={styles.block}>
+                    <Text testID="archived-note" style={[textStyle('body'), ink]}>{copy.archive.archivedNote}</Text>
+                    <Button label={copy.archive.restore} variant="secondary" onPress={() => void restore()} testID="account-restore" />
+                  </View>
+                ) : (
                 <View style={styles.actions}>
                   {d.account.type === 'card' && onPayBill ? <Button label={copy.accountDetail.payBill} onPress={onPayBill} testID="account-pay-bill" /> : null}
                   {d.account.type === 'card' ? null : <Button label={copy.accountDetail.moveMoney} variant="secondary" onPress={onMoveMoney} testID="account-move-money" />}
@@ -162,17 +193,30 @@ export function AccountDetailScreen({
                   {d.account.balanceNotSet ? null : (
                     <Button label={copy.adjust.action} variant="secondary" onPress={() => setPanel('adjust')} testID="account-adjust" />
                   )}
+                  <Button label={copy.archive.action} variant="text" onPress={() => setPanel('archive')} testID="account-archive" />
                   {d.account.balanceNotSet ? (
                     <Button label={d.account.type === 'card' ? copy.accountDetail.setAmountOwed : copy.accountDetail.setBalance} variant="secondary" onPress={() => open('balance')} testID="account-set-balance" />
                   ) : null}
                 </View>
-                {d.starting && !d.account.balanceNotSet ? (
+                )}
+                {d.starting && !d.account.balanceNotSet && d.account.status === 'active' ? (
                   <View style={styles.inline}>
                     <Text testID="tracking-since" style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{`${copy.accountDetail.trackingSince} ${dayMonth(shortDate(d.starting.localDate))}`}</Text>
                     <Button label={copy.accountDetail.changeDate} variant="text" onPress={() => open('date')} testID="account-change-date" />
                   </View>
                 ) : null}
                 {panel === 'card' && d.account.type === 'card' ? <CardDetailsPanel initial={d.card ?? { statementDueMinor: null, dueDate: null, limitMinor: null }} exponent={d.exponent} onSave={saveCard} onCancel={() => setPanel(null)} /> : null}
+                {panel === 'archive' ? (
+                  <ArchivePanel
+                    account={d.account}
+                    currency={d.currency}
+                    locale={d.locale}
+                    reviewCount={d.needsReviewCount}
+                    onAdjust={() => setPanel('adjust')}
+                    onConfirm={() => void archive()}
+                    onCancel={() => setPanel(null)}
+                  />
+                ) : null}
                 {panel === 'adjust' ? (
                   <AdjustBalancePanel type={d.account.type} currentMinor={d.account.postingsMinor} exponent={d.exponent} currency={d.currency} locale={d.locale} onSave={adjust} onCancel={() => setPanel(null)} />
                 ) : null}
@@ -319,6 +363,7 @@ const styles = StyleSheet.create({
   pad: { paddingHorizontal: 16, paddingTop: 8, gap: 8 },
   list: { paddingHorizontal: 16, paddingBottom: 120, gap: 8 },
   headerBlock: { gap: 12, paddingBottom: 4 },
+  block: { gap: 8 },
   card: { borderWidth: 1, borderRadius: radii.md, padding: 16, gap: 12 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   inline: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 6 },

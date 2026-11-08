@@ -2,6 +2,7 @@ import type { SqlParam } from '../ports/storage';
 import { toLocalDate } from '../shared/clock';
 import { err, ok } from '../shared/result';
 import type { Invariant, UseCase, WriterContext } from '../writer/ledgerWriter';
+import { SETTING_DEFAULT_ACCOUNT } from '../profile/settings';
 import { ACCOUNT_DEFAULTS, ACCOUNT_TYPES, openingPostingMinor, validateAccountName, type AccountNameError, type AccountType } from './accounts';
 
 export interface NewAccount {
@@ -126,24 +127,55 @@ export const MoveAccount: UseCase<{ accountId: string; direction: 'up' | 'down' 
   },
 };
 
+/** If the account is the default in Settings, the default goes back to None (the Add sheet then defaults as usual). */
+async function clearDefaultIf(ctx: WriterContext, accountId: string): Promise<void> {
+  const row = (await ctx.query('SELECT value_json FROM settings WHERE key = ?', [SETTING_DEFAULT_ACCOUNT]))[0];
+  if (!row) return;
+  let current: unknown;
+  try {
+    current = JSON.parse(String(row[0]));
+  } catch {
+    return;
+  }
+  if (current !== accountId) return;
+  await ctx.execute('UPDATE settings SET value_json = ?, version = version + 1, updated_at = ? WHERE key = ?', ['null', ctx.nowMs(), SETTING_DEFAULT_ACCOUNT]);
+  ctx.touch('settings', SETTING_DEFAULT_ACCOUNT, { changed: true });
+}
+
+/** Entries on an account that wait for the user (status needs_review). Param: account id. */
+export const NEEDS_REVIEW_COUNT_SQL =
+  "SELECT COUNT(DISTINCT t.id) FROM posting p JOIN \"transaction\" t ON t.id = p.transaction_id WHERE p.account_id = ? AND t.status = 'needs_review' AND t.removed_at IS NULL";
+
+/**
+ * Archives an account: it leaves pickers, both groups and the totals, its history stays exactly as it was, and an entry
+ * waiting for review is left untouched. If it was the Settings default, the default falls back to None.
+ */
 export const ArchiveAccount: UseCase<{ accountId: string }, void, 'ACCOUNT_NOT_FOUND'> = {
   name: 'ArchiveAccount',
   async execute(ctx, input) {
     if ((await accountStatus(ctx, input.accountId)) === null) return err('ACCOUNT_NOT_FOUND');
     await ctx.execute("UPDATE account SET status = 'archived', updated_at = ? WHERE id = ?", [ctx.nowMs(), input.accountId]);
+    await clearDefaultIf(ctx, input.accountId);
     ctx.touch('account', input.accountId, { status: 'archived' });
     ctx.emit('AccountsChanged', { accountIds: [input.accountId] });
     return ok(undefined);
   },
 };
 
-/** Undo for Archive: the account returns at the end of the active list. History was never touched. */
+/** Brings an archived account back in its previous place among the active ones (its group follows its type). History was never touched. */
 export const RestoreAccount: UseCase<{ accountId: string }, void, 'ACCOUNT_NOT_FOUND'> = {
   name: 'RestoreAccount',
   async execute(ctx, input) {
     if ((await accountStatus(ctx, input.accountId)) === null) return err('ACCOUNT_NOT_FOUND');
-    const order = Number((await ctx.query("SELECT COALESCE(MAX(sort_order), -1) + 1 FROM account WHERE status = 'active'"))[0]?.[0] ?? 0);
-    await ctx.execute("UPDATE account SET status = 'active', sort_order = ?, updated_at = ? WHERE id = ?", [order, ctx.nowMs(), input.accountId]);
+    const old = Number((await ctx.query('SELECT sort_order FROM account WHERE id = ?', [input.accountId]))[0]![0]);
+    const active = (await ctx.query("SELECT id, sort_order FROM account WHERE status = 'active' AND id <> ? ORDER BY sort_order, id", [input.accountId])).map((r) => ({ id: String(r[0]), order: Number(r[1]) }));
+    // Back where it was: before the first active account that sat after it, then the order is made dense again.
+    const at = active.findIndex((a) => a.order > old);
+    const ids = active.map((a) => a.id);
+    ids.splice(at < 0 ? ids.length : at, 0, input.accountId);
+    const now = ctx.nowMs();
+    await ctx.execute("UPDATE account SET status = 'active', updated_at = ? WHERE id = ?", [now, input.accountId]);
+    for (const [k, id] of ids.entries()) await ctx.execute('UPDATE account SET sort_order = ? WHERE id = ?', [k, id] as SqlParam[]);
     ctx.touch('account', input.accountId, { status: 'active' });
     ctx.emit('AccountsChanged', { accountIds: [input.accountId] });
     return ok(undefined);
@@ -162,6 +194,26 @@ export const SetAccountInclusion: UseCase<{ accountId: string; include: boolean 
     if (String(r[0]) === 'card') return err('CARD_ALWAYS_COUNTS');
     await ctx.execute('UPDATE account SET include_in_overview = ?, updated_at = ? WHERE id = ?', [input.include ? 1 : 0, ctx.nowMs(), input.accountId]);
     ctx.touch('account', input.accountId, { includeInTotals: input.include });
+    ctx.emit('AccountsChanged', { accountIds: [input.accountId] });
+    return ok(undefined);
+  },
+};
+
+export type DeleteAccountError = 'ACCOUNT_NOT_FOUND' | 'ACCOUNT_HAS_POSTINGS';
+
+/**
+ * Deletes an account that never held anything (created by mistake): no posting at all, an opening balance included.
+ * Anything with entries is archived instead. The audit row stays.
+ */
+export const DeleteAccount: UseCase<{ accountId: string }, void, DeleteAccountError> = {
+  name: 'DeleteAccount',
+  async execute(ctx, input) {
+    if ((await accountStatus(ctx, input.accountId)) === null) return err('ACCOUNT_NOT_FOUND');
+    const postings = Number((await ctx.query('SELECT COUNT(*) FROM posting WHERE account_id = ?', [input.accountId]))[0]![0]);
+    if (postings > 0) return err('ACCOUNT_HAS_POSTINGS');
+    await clearDefaultIf(ctx, input.accountId);
+    await ctx.execute('DELETE FROM account WHERE id = ?', [input.accountId]);
+    ctx.touch('account', input.accountId, { deleted: true });
     ctx.emit('AccountsChanged', { accountIds: [input.accountId] });
     return ok(undefined);
   },
