@@ -7,3 +7,4 @@
  */
 export const CORE_PACKAGE = '@wmbugo/core';
 export * from './shared';
+export * from './schema-lint';

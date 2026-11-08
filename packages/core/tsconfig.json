@@ -5,7 +5,7 @@
     "lib": ["ES2022"],
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "types": ["jest"],
+    "types": ["jest", "node"],
     "paths": {
       "react-native": ["./__forbidden__/react-native"],
       "react-native/*": ["./__forbidden__/react-native"],
