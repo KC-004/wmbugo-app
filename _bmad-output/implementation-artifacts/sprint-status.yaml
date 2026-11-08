@@ -44,7 +44,7 @@ development_status:
   1-6-encrypted-database-opens-on-first-launch: review
   1-7-atomic-writer-with-audit-trail-outbox-and-query-cache: review
   1-8-design-tokens-theming-and-brand-assets: review
-  1-9-shared-controls-and-accessibility-primitives: backlog
+  1-9-shared-controls-and-accessibility-primitives: review
   1-10-app-shell-navigation-and-feedback-patterns: backlog
   1-11-onboarding-privacy-welcome-region-and-currency-payday: backlog
   1-12-first-account-and-the-accounts-list: backlog

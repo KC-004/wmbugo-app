@@ -16,16 +16,19 @@ export function Icon({
   size = 24,
   selected = false,
   color = 'text-primary',
+  tint,
 }: {
   icon: IconComponent;
   size?: number;
   selected?: boolean;
   color?: ColorName;
+  /** A resolved colour value (for ink that must not change with the scheme). Wins over `color`. */
+  tint?: string;
 }) {
   const theme = useTheme();
   return (
     <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      <Glyph size={size} weight={selected ? 'fill' : 'regular'} color={theme.color(color)} />
+      <Glyph size={size} weight={selected ? 'fill' : 'regular'} color={tint ?? theme.color(color)} />
     </View>
   );
 }

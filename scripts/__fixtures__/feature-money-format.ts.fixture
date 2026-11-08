@@ -1,0 +1,6 @@
+import { formatAmount } from '../../shared/formatAmount';
+
+export const a = formatAmount({ amountMinor: 1, currency: 'INR', direction: 'expense' });
+export const b = new Intl.NumberFormat('en-IN').format(5);
+export const c = (12.5).toFixed(2);
+export const d = (5).toLocaleString();

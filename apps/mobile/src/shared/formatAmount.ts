@@ -80,3 +80,31 @@ export function formatAmount(input: FormatAmountInput): Result<string, 'AMOUNT_I
   out = out.replace(SIGN_CHARS, '');
   return ok(input.direction === 'income' ? `+${out}` : out);
 }
+
+const plainFormatters = new Map<string, Intl.NumberFormat>();
+
+/** Grouped number with the currency's exact minor digits and no symbol (for spoken labels). */
+export function formatPlainNumber(amountMinor: number, currency: string, locale?: string): Result<string, 'AMOUNT_INVALID' | 'CURRENCY_UNSUPPORTED'> {
+  const cur = getCurrency(currency);
+  if (!cur.ok) return cur;
+  if (!Number.isSafeInteger(amountMinor)) return err('AMOUNT_INVALID');
+  const exponent = cur.value.exponent;
+  const magnitude = Math.abs(amountMinor);
+  const scale = 10 ** exponent;
+  const whole = Math.floor(magnitude / scale);
+  const fraction = String(magnitude - whole * scale).padStart(exponent, '0');
+  const loc = locale ?? cur.value.defaultLocale;
+  const key = `${loc}|${exponent}`;
+  let f = plainFormatters.get(key);
+  if (!f) {
+    try {
+      f = new Intl.NumberFormat(loc, { minimumFractionDigits: exponent, maximumFractionDigits: exponent, useGrouping: true });
+    } catch {
+      f = new Intl.NumberFormat('en-US', { minimumFractionDigits: exponent, maximumFractionDigits: exponent, useGrouping: true });
+    }
+    plainFormatters.set(key, f);
+  }
+  let out = '';
+  for (const part of f.formatToParts(whole)) out += part.type === 'fraction' ? fraction : part.value;
+  return ok(out.replace(SIGN_CHARS, ''));
+}
