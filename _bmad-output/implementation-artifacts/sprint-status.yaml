@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 11-08-2026 09:43
-last_updated: 11-08-2026 17:56
+last_updated: 11-08-2026 21:19
 project: wmbugo-app
 project_key: NOKEY
 tracking_system: file-system
@@ -64,7 +64,7 @@ development_status:
   2-7-pay-card-bill: review
   2-8-savings-pots: review
   2-9-archive-restore-and-delete-accounts-safely: review
-  epic-2-retrospective: optional
+  epic-2-retrospective: done
 
   epic-3: backlog
   3-1-duplicate-matching-rules-in-core: backlog
@@ -311,3 +311,69 @@ action_items:
     owner: "dev"
     status: done
     ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-11-08.md"
+  - id: "epic-2-retro-item-14-sign-the-gate-07-finance-worked-examples"
+    epic: 2
+    action: "Sign the GATE-07 finance worked-examples table (fixtures F1 to F6) and
+      GATE-03"
+    owner: "product owner / finance reviewer"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-11-08.md"
+  - id: "epic-2-retro-item-15-talkback-and-large-font-fontscale-1-3-32"
+    epic: 2
+    action: "TalkBack and large-font (fontScale 1.3, 320dp) pass on the Epic 2 screens"
+    owner: "product owner with dev agent"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-11-08.md"
+  - id: "epic-2-retro-item-16-reconcile-the-epic-2-spec-record-edit-sp"
+    epic: 2
+    action: "Reconcile the Epic 2 spec: record Edit split, Archive placement, include_in_overview,
+      typed dates, Balance not set as accepted deviations"
+    owner: "dev agent proposes, product owner applies"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-11-08.md"
+  - id: "epic-2-retro-item-17-decide-should-paid-statement-count-only"
+    epic: 2
+    action: "Decide: should paid statement count only transfers from asset accounts,
+      and should card credit count in net worth"
+    owner: "product owner"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-11-08.md"
+  - id: "epic-2-retro-item-18-add-missing-tests-paybillpreset-against"
+    epic: 2
+    action: "Add missing tests: payBillPreset against a database, loading/error/Retry
+      states, fontScale 1.3 stacking"
+    owner: "dev agent"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-11-08.md"
+  - id: "epic-2-retro-item-19-single-account-edit-screen-rename-type-i"
+    epic: 2
+    action: "Single account Edit screen (rename, type, inclusion, tracking date, card
+      details, delete) with account screen file split"
+    owner: "dev agent"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-11-08.md"
+  - id: "epic-2-retro-item-20-keep-archived-accounts-order-exact-on-re"
+    epic: 2
+    action: "Keep archived accounts order exact on restore"
+    owner: "dev agent"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-11-08.md"
+  - id: "epic-2-retro-item-21-process-run-the-independent-review-per-e"
+    epic: 2
+    action: "Process: run the independent review per epic and for any story that writes
+      money"
+    owner: "dev agent"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-11-08.md"
+  - id: "epic-2-retro-item-22-mark-epic-1-and-epic-2-stories-done-afte"
+    epic: 2
+    action: "Mark Epic 1 and Epic 2 stories done after human review"
+    owner: "product owner"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-11-08.md"
+  - id: "epic-2-retro-item-23-first-ci-run-on-github-needs-a-push"
+    epic: 2
+    action: "First CI run on GitHub (needs a push)"
+    owner: "product owner"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-11-08.md"
