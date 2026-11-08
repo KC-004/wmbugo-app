@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bank, CreditCard, Money, PiggyBank, Wallet } from 'phosphor-react-native';
-import { accountGroups, accountLine, validateAccountName, type AccountGroup, type AccountLineView, type AccountRow, type CurrencyCode, type GroupTotalView, type NewAccount, notSetNote } from '@wmbugo/core';
+import { ACCOUNT_TYPES, accountGroups, accountLine, validateAccountName, type AccountType, type AccountGroup, type AccountLineView, type AccountRow, type CurrencyCode, type GroupTotalView, type NewAccount, notSetNote } from '@wmbugo/core';
 import { amountLabel } from '../../shared/a11y/labels';
 import { copy } from '../../shared/copy';
 import { EmptyState, ErrorBlock, Skeleton } from '../../shared/feedback/Feedback';
@@ -14,6 +14,7 @@ import { layout, radii } from '../../shared/theme/tokens';
 import { textStyle } from '../../shared/theme/typography';
 import { Amount } from '../../shared/ui/Amount';
 import { Button } from '../../shared/ui/Button';
+import { Chip } from '../../shared/ui/Chip';
 import { ScreenHeader } from '../shell/ScreenHeader';
 import { AccountForm, TYPE_LABEL } from './AccountForm';
 import { ACCOUNTS_QUERY_KEY, NET_WORTH_QUERY_KEY, PROFILE_QUERY_KEY, realAccountsApi, type AccountsApi } from './accountsApi';
@@ -37,6 +38,7 @@ export function AccountsScreen({
   onBack?: () => void;
   onPayBill?: (cardId: string) => void;
 }) {
+  const theme = useTheme();
   const toast = useToast();
   const qc = useQueryClient();
   const accounts = useQuery({ queryKey: ACCOUNTS_QUERY_KEY, queryFn: () => api.list() });
@@ -141,17 +143,25 @@ export function AccountsScreen({
       {active.length > 0 ? (
         <>
           {([['have', copy.accounts.haveGroup, groups.have], ['owe', copy.accounts.oweGroup, groups.owe]] as const).map(([key, title, g]) =>
-            g.rows.length === 0 ? null : (
+            g.rows.length === 0 && g.savedRows.length === 0 ? null : (
               <View key={key} testID={`group-${key}`} style={styles.group}>
                 <GroupHeader testID={`group-${key}-header`} title={title} group={g} currency={profile.data?.currency} locale={profile.data?.locale} kind={key === 'owe' ? 'card' : 'account'} />
-                {g.rows.map((a, i) => (
+                {[...g.rows.map((a) => ({ a, saved: false })), ...g.savedRows.map((a) => ({ a, saved: true }))].map(({ a, saved }, i) => (
+                  <View key={a.id} style={styles.group}>
+                  {saved && i === g.rows.length ? (
+                    <Text testID="saved-heading" accessibilityRole="header" style={[textStyle('label'), { color: theme.color('text-secondary') }]}>{copy.accounts.savedHeading}</Text>
+                  ) : null}
                   <AccountRowView
-                    key={a.id}
                     account={a}
                     currency={profile.data?.currency}
                     locale={profile.data?.locale}
-                    isFirst={i === 0}
-                    isLast={i === g.rows.length - 1}
+                    isFirst={saved || i === 0}
+                    isLast={saved || i === g.rows.length - 1}
+                    onChangeType={async (t) => {
+                      const r = await api.changeType(a.id, t);
+                      if (!r.ok) toast.show({ message: r.code === 'HAS_ENTRIES' ? copy.accounts.typeBlocked : copy.accounts.inclusionFailed });
+                      await refresh();
+                    }}
                     editing={mode.kind === 'rename' && mode.account.id === a.id}
                     onMove={(d) => void move(a, d)}
                     onArchive={() => void archive(a)}
@@ -169,6 +179,7 @@ export function AccountsScreen({
                     }}
                     onRenameCancel={() => setMode({ kind: 'list' })}
                   />
+                  </View>
                 ))}
               </View>
             ),
@@ -193,6 +204,7 @@ function AccountRowView(props: {
   onRename: () => void;
   onInclusion: (include: boolean) => void;
   onOpen: () => void;
+  onChangeType: (type: AccountType) => void;
   onPayBill?: () => void;
   onRenameSubmit: (name: string) => Promise<boolean>;
   onRenameCancel: () => void;
@@ -204,8 +216,16 @@ function AccountRowView(props: {
 
   const line = accountLine(a);
   const counted = a.type === 'card' || a.includeInOverview !== false;
-  const spoken = line.kind === 'not-set' || !currency ? copy.money.balanceNotSet : [lineWords(line), amountLabel({ amountMinor: line.minor, currency, locale })].filter(Boolean).join(' ');
-  const label = `${a.name}, ${TYPE_LABEL[a.type]}, ${spoken}${counted ? '' : `, ${copy.accounts.notCounted}`}`;
+  const movedIn = line.kind === 'moved-in';
+  const spoken =
+    line.kind === 'not-set' || !currency
+      ? copy.money.balanceNotSet
+      : movedIn
+        ? line.minor === 0
+          ? copy.accounts.nothingMovedIn
+          : `${amountLabel({ amountMinor: line.minor, currency, locale })} ${copy.accounts.movedIn.toLowerCase()}`
+        : [lineWords(line), amountLabel({ amountMinor: line.minor, currency, locale })].filter(Boolean).join(' ');
+  const label = `${a.name}, ${TYPE_LABEL[a.type]}, ${spoken}${counted ? '' : `, ${copy.accounts.notCounted}`}${movedIn ? `, ${copy.accounts.notInYourTotals.toLowerCase()}` : ''}`;
 
   const actions = [
     ...(isFirst ? [] : [{ name: 'moveUp', label: copy.accounts.moveUp }]),
@@ -268,7 +288,12 @@ function AccountRowView(props: {
             <View testID={`balance-${a.id}`} style={styles.balance}>
               <View style={styles.inline}>
                 {lineWords(line) ? <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{lineWords(line)}</Text> : null}
-                <Amount amountMinor={line.minor} currency={currency} direction="neutral" locale={locale} />
+                {line.kind === 'moved-in' && line.minor === 0 ? (
+                  <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{copy.accounts.nothingMovedIn}</Text>
+                ) : (
+                  <Amount amountMinor={line.minor} currency={currency} direction="neutral" locale={locale} />
+                )}
+                {line.kind === 'moved-in' && line.minor > 0 ? <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{copy.accounts.movedIn.toLowerCase()}</Text> : null}
               </View>
               {counted ? null : <Text testID={`not-counted-${a.id}`} style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{copy.accounts.notCounted}</Text>}
             </View>
@@ -279,6 +304,11 @@ function AccountRowView(props: {
       <View style={styles.actions}>
         {editing ? (
           <>
+            <View accessibilityRole="radiogroup" accessibilityLabel={copy.accounts.typeLabel} style={styles.typeChips}>
+              {ACCOUNT_TYPES.map((t) => (
+                <Chip key={t} label={TYPE_LABEL[t]} variant="account" testID={`type-${a.id}-${t}`} selected={a.type === t} onPress={() => (a.type === t ? undefined : props.onChangeType(t))} />
+              ))}
+            </View>
             {a.type === 'card' ? null : (
               <View style={styles.switchRow}>
                 <Text style={[textStyle('body'), { color: theme.color('text-primary'), flex: 1 }]}>{copy.accounts.countInTotals}</Text>
@@ -390,6 +420,7 @@ function NetWorthFooter({ on, onToggle, net, currency, locale }: { on: boolean; 
 
 const styles = StyleSheet.create({
   group: { gap: 8 },
+  typeChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   groupHeader: { gap: 2, paddingTop: 8 },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: layout.touchMin, width: '100%' },
   inline: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 6 },

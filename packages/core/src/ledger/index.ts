@@ -10,3 +10,4 @@ export * from './timeline';
 export * from './accountBalanceCommands';
 export * from './adjustBalance';
 export * from './cardDetails';
+export * from './savings';

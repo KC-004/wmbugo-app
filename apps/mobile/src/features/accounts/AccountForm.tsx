@@ -73,6 +73,10 @@ export function AccountForm({ exponent, submitLabel, onSubmit, onSkip, saveError
         ))}
       </View>
 
+      {type === 'savings_pot' ? (
+        <Text testID="pot-hint" style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{copy.accounts.potHint}</Text>
+      ) : null}
+
       <Text style={[textStyle('label'), ink]}>{copy.accounts.nameLabel}</Text>
       <TextInput
         ref={nameRef}
@@ -108,7 +112,7 @@ export function AccountForm({ exponent, submitLabel, onSubmit, onSkip, saveError
           {ERROR_COPY[error as BuildAccountError]}
         </Text>
       ) : (
-        <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{copy.accounts.roughIsFine}</Text>
+        <Text testID="balance-hint" style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{type === 'savings_pot' ? copy.accounts.potBalanceHint : copy.accounts.roughIsFine}</Text>
       )}
 
       {saveError ? (

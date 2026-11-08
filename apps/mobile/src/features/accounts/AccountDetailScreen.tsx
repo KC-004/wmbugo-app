@@ -247,7 +247,11 @@ function Header({ d }: { d: AccountDetailData }) {
   const spoken =
     line.kind === 'not-set'
       ? copy.money.balanceNotSet
-      : [words, amountLabel({ amountMinor: line.minor, currency: d.currency, locale: d.locale })].filter(Boolean).join(' ');
+      : line.kind === 'moved-in'
+        ? line.minor === 0
+          ? copy.accounts.nothingMovedIn
+          : `${amountLabel({ amountMinor: line.minor, currency: d.currency, locale: d.locale })} ${copy.accounts.movedIn.toLowerCase()}`
+        : [words, amountLabel({ amountMinor: line.minor, currency: d.currency, locale: d.locale })].filter(Boolean).join(' ');
   return (
     <View
       testID="account-detail-header"
@@ -266,7 +270,12 @@ function Header({ d }: { d: AccountDetailData }) {
       ) : (
         <View testID="account-detail-balance" style={styles.inline}>
           {words ? <Text style={[textStyle('body-medium'), { color: theme.color('text-secondary') }]}>{words}</Text> : null}
-          <Amount amountMinor={line.minor} currency={d.currency} direction="neutral" role="headline" locale={d.locale} />
+          {line.kind === 'moved-in' && line.minor === 0 ? (
+            <Text style={[textStyle('body-medium'), { color: theme.color('text-secondary') }]}>{copy.accounts.nothingMovedIn}</Text>
+          ) : (
+            <Amount amountMinor={line.minor} currency={d.currency} direction="neutral" role="headline" locale={d.locale} />
+          )}
+          {line.kind === 'moved-in' && line.minor > 0 ? <Text style={[textStyle('body-medium'), { color: theme.color('text-secondary') }]}>{copy.accounts.movedIn.toLowerCase()}</Text> : null}
         </View>
       )}
       {a.type === 'card' && line.kind !== 'not-set' ? <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{copy.cardDetails.fromEntries}</Text> : null}

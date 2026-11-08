@@ -7,6 +7,8 @@ import {
   RenameAccount,
   RestoreAccount,
   SetAccountInclusion,
+  ChangeAccountType,
+  type AccountType,
   SETTING_SHOW_NET_WORTH,
   ChangeSetting,
   parseSettings,
@@ -34,6 +36,7 @@ export interface AccountsApi {
   archive(accountId: string): Promise<{ ok: boolean }>;
   restore(accountId: string): Promise<{ ok: boolean }>;
   setInclusion(accountId: string, include: boolean): Promise<{ ok: boolean }>;
+  changeType(accountId: string, type: AccountType): Promise<{ ok: boolean; code?: string }>;
   showNetWorth(): Promise<boolean>;
   setShowNetWorth(on: boolean): Promise<{ ok: boolean }>;
 }
@@ -55,6 +58,7 @@ export const realAccountsApi: AccountsApi = {
   move: (accountId, direction) => getServices().writer.run(MoveAccount, { accountId, direction }, 'user'),
   archive: (accountId) => getServices().writer.run(ArchiveAccount, { accountId }, 'user'),
   restore: (accountId) => getServices().writer.run(RestoreAccount, { accountId }, 'user'),
+  changeType: (accountId, type) => getServices().writer.run(ChangeAccountType, { accountId, type }, 'user'),
   setInclusion: (accountId, include) => getServices().writer.run(SetAccountInclusion, { accountId, include }, 'user'),
   async showNetWorth() {
     return parseSettings(await getServices().db.query(SETTINGS_SQL)).showNetWorth;

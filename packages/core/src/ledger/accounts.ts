@@ -49,6 +49,8 @@ export interface AccountRow {
   readonly postingsMinor: number;
   /** Included in the Home totals (default true; the account settings screen arrives later). */
   readonly includeInOverview?: boolean;
+  /** Savings pots only: money transferred in from ordinary accounts minus money taken out to them (can be below zero). */
+  readonly movedInMinor?: number;
 }
 
 export function balanceOf(row: Pick<AccountRow, 'balanceNotSet' | 'postingsMinor'>): BalanceView {
@@ -72,7 +74,9 @@ export function assetTotal(rows: readonly AccountRow[]): { minor: number; accoun
   for (const r of rows) {
     if (r.status !== 'active' || r.type === 'card' || r.includeInOverview === false) continue;
     const b = balanceOf(r);
-    if (b.kind === 'not-set') notSet += 1;
+    if (b.kind === 'not-set') {
+      if (r.type !== 'savings_pot') notSet += 1;
+    }
     else {
       minor += b.minor;
       counted += 1;
@@ -83,7 +87,7 @@ export function assetTotal(rows: readonly AccountRow[]): { minor: number; accoun
 
 /** SQL for the accounts list: postings summed per account, in the user's order. Archived rows are included; callers filter. */
 export const ACCOUNT_LIST_SQL =
-  `SELECT a.id, a.name, a.type, a.icon, a.color_token, a.sort_order, a.status, a.balance_not_set, COALESCE(SUM(CASE WHEN t.removed_at IS NULL AND t.status = 'confirmed' AND (p.posting_kind <> 'normal' OR a.opening_effective_at IS NULL OR t.occurred_at_utc >= a.opening_effective_at) THEN p.signed_amount_minor END), 0) AS postings_minor, a.include_in_overview FROM account a LEFT JOIN posting p ON p.account_id = a.id LEFT JOIN "transaction" t ON t.id = p.transaction_id GROUP BY a.id ORDER BY a.sort_order, a.id`;
+  `SELECT a.id, a.name, a.type, a.icon, a.color_token, a.sort_order, a.status, a.balance_not_set, COALESCE(SUM(CASE WHEN t.removed_at IS NULL AND t.status = 'confirmed' AND (p.posting_kind <> 'normal' OR a.opening_effective_at IS NULL OR t.occurred_at_utc >= a.opening_effective_at) THEN p.signed_amount_minor END), 0) AS postings_minor, a.include_in_overview, CASE WHEN a.type = 'savings_pot' THEN COALESCE((SELECT SUM(p1.signed_amount_minor) FROM posting p1 JOIN "transaction" t1 ON t1.id = p1.transaction_id AND t1.event_type = 'transfer' AND t1.removed_at IS NULL AND t1.status = 'confirmed' WHERE p1.account_id = a.id AND EXISTS (SELECT 1 FROM posting p2 JOIN account a2 ON a2.id = p2.account_id WHERE p2.transaction_id = t1.id AND p2.id <> p1.id AND a2.type <> 'savings_pot')), 0) ELSE 0 END AS moved_in_minor FROM account a LEFT JOIN posting p ON p.account_id = a.id LEFT JOIN "transaction" t ON t.id = p.transaction_id GROUP BY a.id ORDER BY a.sort_order, a.id`;
 
 export function mapAccountRows(rows: readonly (readonly unknown[])[]): AccountRow[] {
   return rows.map((r) => ({
@@ -97,6 +101,7 @@ export function mapAccountRows(rows: readonly (readonly unknown[])[]): AccountRo
     balanceNotSet: Number(r[7]) === 1,
     postingsMinor: Number(r[8]),
     includeInOverview: Number(r[9] ?? 1) === 1,
+    movedInMinor: Number(r[10] ?? 0),
   }));
 }
 

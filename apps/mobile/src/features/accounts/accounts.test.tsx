@@ -184,6 +184,13 @@ describe('AccountsScreen', () => {
         state.rows[state.rows.indexOf(r)] = { ...r, status: 'archived' };
         return { ok: true };
       },
+      changeType: async (id, type) => {
+        api.calls.push(`type:${id}:${type}`);
+        if (type === 'card' && state.rows.find((x) => x.id === id)?.type !== 'card' && id === 'blocked') return { ok: false, code: 'HAS_ENTRIES' };
+        const r = state.rows.find((x) => x.id === id)!;
+        state.rows[state.rows.indexOf(r)] = { ...r, type };
+        return { ok: true };
+      },
       setInclusion: async (id, include) => {
         api.calls.push(`include:${id}:${include}`);
         const r = state.rows.find((x) => x.id === id)!;
@@ -283,7 +290,8 @@ describe('AccountsScreen', () => {
     expect(api.calls).toContain('add:Savings');
     expect(has(r, 'account-form')).toBe(false);
     expect(texts(r)).toContain('Savings');
-    expect(texts(r).filter((t) => t === 'Balance not set').length).toBe(2);
+    expect(texts(r).filter((t) => t === 'Balance not set').length).toBe(1);
+    expect(texts(r)).toContain('Nothing moved in yet');
   });
 
   it('renames; an empty name shows the inline error and writes nothing', async () => {
@@ -428,6 +436,71 @@ describe('AccountsScreen', () => {
     expect(onPayBill).toHaveBeenCalledWith('c');
     const card = r.root.findAll((n) => typeof n.type === 'string' && n.props.testID === 'account-row-c')[0]!;
     expect(card.props.accessibilityActions.map((a: { label: string }) => a.label)).toContain('Pay card bill');
+  });
+
+  it('the pot form explains what a pot is and says to leave the balance empty for market-valued money', async () => {
+    let f!: ReactTestRenderer;
+    act(() => {
+      f = create(
+        <ThemeProvider>
+          <AccountForm exponent={2} submitLabel="Save account" onSubmit={jest.fn()} />
+        </ThemeProvider>,
+      );
+    });
+    live.push(f);
+    expect(has(f, 'pot-hint')).toBe(false);
+    act(() => fire(f, 'account-type-savings_pot'));
+    expect(texts(f)).toEqual(
+      expect.arrayContaining(['For SIPs, RDs, PPF or an emergency fund. Not your everyday bank account, even if the bank calls it a savings account.', 'Leave empty if the value changes with the market']),
+    );
+  });
+
+  describe('savings pots', () => {
+    const pots = () => [
+      row({ id: 'h', name: 'HDFC', sortOrder: 0, postingsMinor: 3000000 }),
+      row({ id: 'e', name: 'Emergency fund', type: 'savings_pot', icon: 'PiggyBank', colorToken: 'cat-emerald', sortOrder: 1, postingsMinor: 4000000 }),
+      row({ id: 's', name: 'SIP – Axis MF', type: 'savings_pot', icon: 'PiggyBank', colorToken: 'cat-emerald', sortOrder: 2, balanceNotSet: true, movedInMinor: 500000 }),
+    ];
+
+    it('a pot with a balance counts; one without sits under Saved & invested as "moved in", out of the total and not "not set"', async () => {
+      const r = await mountScreen(fakeApi(pots()));
+      expect(total(r, 'group-have-header-total')).toBe('S$70,000.00');
+      expect(texts(r)).toEqual(expect.arrayContaining(['Saved & invested', 'S$5,000.00', 'moved in']));
+      expect(texts(r).join('|')).not.toContain('not set');
+      const order = r.root.findAll((n) => typeof n.type === 'string' && (n.props.testID === 'saved-heading' || /^account-row-/.test(String(n.props.testID)))).map((n) => n.props.testID);
+      expect(order).toEqual(['account-row-h', 'account-row-e', 'saved-heading', 'account-row-s']);
+    });
+
+    it('TalkBack reads the no-balance pot as moved in and not counted in your totals', async () => {
+      const r = await mountScreen(fakeApi(pots()));
+      const node = r.root.findAll((n) => typeof n.type === 'string' && n.props.testID === 'account-row-s')[0]!;
+      expect(node.props.accessibilityLabel).toBe('SIP – Axis MF, Savings pot, 5,000 Singapore dollars moved in, not counted in your totals');
+    });
+
+    it('a pot whose net is zero or below reads "Nothing moved in yet", never a minus', async () => {
+      const r = await mountScreen(fakeApi([row({ id: 's', name: 'SIP', type: 'savings_pot', balanceNotSet: true, movedInMinor: -200000 })]));
+      expect(texts(r)).toContain('Nothing moved in yet');
+      expect(texts(r).join('|')).not.toMatch(/[-−]\s?S\$/);
+    });
+  });
+
+  describe('changing the account type', () => {
+    it('editing shows the five types; choosing one saves it', async () => {
+      const api = fakeApi(three());
+      const r = await mountScreen(api);
+      await press(r, 'rename-a');
+      expect(r.root.findAll((n) => typeof n.type === 'string' && /^type-a-/.test(String(n.props.testID)))).toHaveLength(5);
+      await press(r, 'type-a-savings_pot');
+      expect(api.calls).toContain('type:a:savings_pot');
+    });
+
+    it('a blocked change says so calmly', async () => {
+      const api = fakeApi([row({ id: 'blocked', name: 'HDFC', sortOrder: 0, postingsMinor: 100 })]);
+      const r = await mountScreen(api);
+      await press(r, 'rename-blocked');
+      await press(r, 'type-blocked-card');
+      expect(texts(r)).toContain('This account has entries. Add a new card instead.');
+    });
   });
 
   it('archived accounts are not listed', async () => {

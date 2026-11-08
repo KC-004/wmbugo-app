@@ -59,7 +59,8 @@ export function overviewTotals(rows: readonly AccountRow[]): OverviewTotals {
         else credit += c.inCreditMinor;
       }
     } else if (r.balanceNotSet) {
-      notSetAssets += 1;
+      // A savings pot with no balance (a SIP whose value moves with the market) is not an account missing a balance.
+      if (r.type !== 'savings_pot') notSetAssets += 1;
     } else {
       assetsKnown += 1;
       assets += r.postingsMinor;
@@ -83,7 +84,9 @@ export type AccountLineView =
   | { readonly kind: 'have'; readonly minor: number }
   | { readonly kind: 'below-zero'; readonly minor: number }
   | { readonly kind: 'owe'; readonly minor: number }
-  | { readonly kind: 'in-credit'; readonly minor: number };
+  | { readonly kind: 'in-credit'; readonly minor: number }
+  /** A savings pot with no balance: only what was moved in (floored at zero for display). */
+  | { readonly kind: 'moved-in'; readonly minor: number };
 
 export function accountLine(row: AccountRow): AccountLineView {
   if (row.type === 'card') {
@@ -91,7 +94,7 @@ export function accountLine(row: AccountRow): AccountLineView {
     if (c.kind === 'not-set') return c;
     return c.kind === 'owed' ? { kind: 'owe', minor: c.outstandingMinor } : { kind: 'in-credit', minor: c.inCreditMinor };
   }
-  if (row.balanceNotSet) return { kind: 'not-set' };
+  if (row.balanceNotSet) return row.type === 'savings_pot' ? { kind: 'moved-in', minor: Math.max(0, row.movedInMinor ?? 0) } : { kind: 'not-set' };
   return row.postingsMinor < 0 ? { kind: 'below-zero', minor: -row.postingsMinor } : { kind: 'have', minor: row.postingsMinor };
 }
 
@@ -100,6 +103,8 @@ export type GroupTotalView = { readonly kind: 'not-set-yet' } | { readonly kind:
 
 export interface AccountGroup {
   readonly rows: readonly AccountRow[];
+  /** Savings pots with no balance, shown under "Saved & invested"; they are not in the total. */
+  readonly savedRows: readonly AccountRow[];
   readonly total: GroupTotalView;
   readonly notSetCount: number;
   readonly excludedCount: number;
@@ -118,15 +123,16 @@ export interface AccountGroups {
  */
 export function accountGroups(rows: readonly AccountRow[]): AccountGroups {
   const active = rows.filter((r) => r.status === 'active');
-  const assets = active.filter((r) => r.type !== 'card');
+  const savedRows = active.filter((r) => r.type === 'savings_pot' && r.balanceNotSet);
+  const assets = active.filter((r) => r.type !== 'card' && !(r.type === 'savings_pot' && r.balanceNotSet));
   const cards = active.filter((r) => r.type === 'card');
   const t = overviewTotals(active);
   const haveTotal: GroupTotalView = t.inAccountsMinor === null ? { kind: 'not-set-yet' } : t.inAccountsMinor < 0 ? { kind: 'below-zero', minor: -t.inAccountsMinor } : { kind: 'amount', minor: t.inAccountsMinor };
   const oweTotal: GroupTotalView = t.cardDuesMinor === null ? { kind: 'not-set-yet' } : { kind: 'amount', minor: t.cardDuesMinor };
   const net = t.netWorthMinor;
   return {
-    have: { rows: assets, total: haveTotal, notSetCount: t.notSetAssets, excludedCount: assets.filter((r) => r.includeInOverview === false).length },
-    owe: { rows: cards, total: oweTotal, notSetCount: t.notSetCards, excludedCount: 0 },
+    have: { rows: assets, savedRows, total: haveTotal, notSetCount: t.notSetAssets, excludedCount: assets.filter((r) => r.includeInOverview === false).length },
+    owe: { rows: cards, savedRows: [], total: oweTotal, notSetCount: t.notSetCards, excludedCount: 0 },
     netWorth: net === null ? null : net < 0 ? { kind: 'owe-more', minor: -net } : { kind: 'net', minor: net },
   };
 }
