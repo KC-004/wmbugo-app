@@ -12,7 +12,8 @@
     "test:core": "pnpm --filter @wmbugo/core test",
     "check:lockfiles": "node scripts/check-lockfiles.mjs",
     "check:permissions": "node scripts/check-permissions.mjs",
-    "test:gates": "node scripts/test-gates.mjs"
+    "test:gates": "node scripts/test-gates.mjs",
+    "check:encrypted-db": "node scripts/check-encrypted-db.mjs"
   },
   "simple-git-hooks": {
     "pre-push": "pnpm test:core"
