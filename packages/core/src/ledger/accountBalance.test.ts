@@ -162,3 +162,14 @@ describe('only a user action moves an opening instant', () => {
     expect(hits.map((h) => h.split(':')[0])).toEqual(['accountBalanceCommands.ts', 'accountBalanceCommands.ts']);
   });
 });
+
+describe('review fixes (Epic 2)', () => {
+  it('moving the tracking date announces the moved opening transaction', async () => {
+    const { db, writer, add } = await setup();
+    const cash = await add('Cash', 'cash', 200000);
+    await writer.run(ChangeTrackingDate, { accountId: cash, localDate: '2026-11-01' }, 'user');
+    const events = (await db.query('SELECT event FROM outbox ORDER BY created_at DESC, rowid DESC LIMIT 2')).map((x) => String(x[0])).sort();
+    expect(events).toEqual(['AccountsChanged', 'TransactionsChanged']);
+    expect(Number((await db.query("SELECT COUNT(*) FROM audit_event WHERE entity_kind = 'transaction'"))[0]![0])).toBeGreaterThanOrEqual(2);
+  });
+});

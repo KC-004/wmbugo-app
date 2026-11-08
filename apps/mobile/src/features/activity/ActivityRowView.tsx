@@ -44,7 +44,7 @@ export function ActivityRowView({
   const sub = [kindWord, account, row.beforeTracking ? copy.activity.beforeTracking : null].filter(Boolean).join(' · ');
   const spoken = [
     title,
-    adjustment ? `${up ? 'up' : 'down'} ${amountLabel({ amountMinor: row.amountMinor, currency, locale, inline: true })}` : amountLabel({ amountMinor: row.amountMinor, currency, locale, kind: KIND[row.kind], inline: true }),
+    adjustment ? `${(up ? copy.activity.up : copy.activity.down).toLowerCase()} ${amountLabel({ amountMinor: row.amountMinor, currency, locale, inline: true })}` : amountLabel({ amountMinor: row.amountMinor, currency, locale, kind: KIND[row.kind], inline: true }),
     row.kind === 'transfer' || adjustment ? null : row.categoryName,
     account,
     row.beforeTracking ? copy.activity.beforeTracking.toLowerCase() : null,

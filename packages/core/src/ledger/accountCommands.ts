@@ -166,7 +166,9 @@ export const ArchiveAccount: UseCase<{ accountId: string }, void, 'ACCOUNT_NOT_F
 export const RestoreAccount: UseCase<{ accountId: string }, void, 'ACCOUNT_NOT_FOUND'> = {
   name: 'RestoreAccount',
   async execute(ctx, input) {
-    if ((await accountStatus(ctx, input.accountId)) === null) return err('ACCOUNT_NOT_FOUND');
+    const status = await accountStatus(ctx, input.accountId);
+    if (status === null) return err('ACCOUNT_NOT_FOUND');
+    if (status === 'active') return ok(undefined);
     const old = Number((await ctx.query('SELECT sort_order FROM account WHERE id = ?', [input.accountId]))[0]![0]);
     const active = (await ctx.query("SELECT id, sort_order FROM account WHERE status = 'active' AND id <> ? ORDER BY sort_order, id", [input.accountId])).map((r) => ({ id: String(r[0]), order: Number(r[1]) }));
     // Back where it was: before the first active account that sat after it, then the order is made dense again.

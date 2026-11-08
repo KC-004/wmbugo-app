@@ -142,3 +142,19 @@ describe('ChangeAccountType (Story 2.8)', () => {
     expect(await writer.run(ChangeAccountType, { accountId: 'x', type: 'cash' }, 'user')).toEqual({ ok: false, code: 'ACCOUNT_NOT_FOUND' });
   });
 });
+
+describe('review fixes (Epic 2)', () => {
+  it('an account left out of totals counts again when it becomes a card, and a card losing its type drops its statement', async () => {
+    const { db, writer, add, rows } = await setup();
+    const a = await add('Visa', 'bank', 450000);
+    const { SetAccountInclusion } = await import('./accountCommands');
+    const { UpdateCardDetails } = await import('./cardDetails');
+    await writer.run(SetAccountInclusion, { accountId: a, include: false }, 'user');
+    await writer.run(ChangeAccountType, { accountId: a, type: 'card' }, 'user');
+    expect(homeAccounts(await rows()).cardDuesMinor).toBe(450000);
+    await writer.run(UpdateCardDetails, { accountId: a, statementDueMinor: 1000, dueDate: '2026-11-15', limitMinor: 5000 }, 'user');
+    await writer.run(ChangeAccountType, { accountId: a, type: 'bank' }, 'user');
+    const r = (await db.query('SELECT statement_due_minor, statement_due_date, credit_limit_minor, statement_set_at FROM account WHERE id = ?', [a]))[0]!;
+    expect(r).toEqual([null, null, null, null]);
+  });
+});

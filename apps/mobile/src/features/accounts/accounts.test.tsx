@@ -307,7 +307,21 @@ describe('AccountsScreen', () => {
     expect(texts(r)).toContain('DBS Savings');
   });
 
-  it('archived accounts sit under a collapsed "Archived (n)" row; opened, each shows its final balance, Open and Restore', async () => {
+  it('an overpaid card reads In credit in Money you owe and adds nothing to the owe total', async () => {
+    const r = await mountScreen(fakeApi([row({ id: 'h', name: 'HDFC', postingsMinor: 100000 }), row({ id: 'k', name: 'Visa', type: 'card', sortOrder: 1, postingsMinor: 50000 })]));
+    expect(texts(r)).toEqual(expect.arrayContaining(['In credit', 'S$500.00']));
+    expect(total(r, 'group-owe-header-total')).toBe('S$0.00');
+    expect(total(r, 'group-have-header-total')).toBe('S$1,000.00');
+  });
+
+  it('group headers read their total and what is not set or left out for TalkBack', async () => {
+    const r = await mountScreen(fakeApi([...three(), row({ id: 'x', name: 'Old', sortOrder: 3, postingsMinor: 5000, includeInOverview: false })]));
+    const header = r.root.findAll((n) => typeof n.type === 'string' && n.props.testID === 'group-have-header')[0]!;
+    expect(header.props.accessibilityRole).toBe('header');
+    expect(header.props.accessibilityLabel).toBe('Money you have, 3,200 Singapore dollars, +1 account not set, Excludes 1 account');
+  });
+
+    it('archived accounts sit under a collapsed "Archived (n)" row; opened, each shows its final balance, Open and Restore', async () => {
     const onOpen = jest.fn();
     const api = fakeApi([...three(), row({ id: 'z', name: 'Old SBI', status: 'archived', sortOrder: 9, postingsMinor: 120000 })]);
     const r = await mountScreen(api, onOpen);

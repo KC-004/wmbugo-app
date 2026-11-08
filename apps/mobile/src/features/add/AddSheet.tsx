@@ -476,7 +476,7 @@ export function AddSheet({
         </Text>
       ) : null}
       {preset?.hint && text === '' ? <Text testID="preset-hint" style={[textStyle('body'), secondary]}>{preset.hint}</Text> : null}
-      {owedWarned ? (
+      {kind === 'transfer' && owedWarned !== null && owedWarned === `${accountId}:${parsed.ok ? parsed.value : ''}` ? (
         <Text testID="owed-warning" accessibilityRole="alert" accessibilityLiveRegion="polite" style={[textStyle('body'), secondary]}>
           {copy.add.moreThanOwed}
         </Text>

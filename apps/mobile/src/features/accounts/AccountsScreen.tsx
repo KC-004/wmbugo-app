@@ -54,6 +54,8 @@ export function AccountsScreen({
   const archivedRows = (accounts.data ?? []).filter((a) => a.status === 'archived');
 
   const adding = useRef(false);
+  const deleting = useRef(false);
+  const restoring = useRef(false);
   const add = async (account: NewAccount) => {
     if (adding.current) return;
     adding.current = true;
@@ -107,7 +109,7 @@ export function AccountsScreen({
         backTestID="accounts-back"
         actions={<Button label={copy.accounts.add} variant="secondary" onPress={() => setMode({ kind: 'add' })} testID="accounts-add" />}
       />
-      <ScrollView contentContainerStyle={styles.pad}>
+      <ScrollView contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
 
       {accounts.isError ? (
         <ErrorBlock cause={copy.accounts.loadError} onRetry={() => void accounts.refetch()} />
@@ -147,8 +149,11 @@ export function AccountsScreen({
                     editing={mode.kind === 'rename' && mode.account.id === a.id}
                     onMove={(d) => void move(a, d)}
                     onDelete={async () => {
-                      const r = await api.deleteAccount(a.id);
-                      if (!r.ok) toast.show({ message: copy.archive.failed });
+                      if (deleting.current) return;
+                      deleting.current = true;
+                      const r = await api.deleteAccount(a.id).catch(() => ({ ok: false }));
+                      deleting.current = false;
+                      if (!r.ok) toast.show({ message: copy.accounts.deleteFailed });
                       setMode({ kind: 'list' });
                       await refresh();
                     }}
@@ -181,7 +186,10 @@ export function AccountsScreen({
           locale={profile.data?.locale}
           onOpen={(id) => onOpen?.(id)}
           onRestore={async (id) => {
-            const r = await api.restore(id);
+            if (restoring.current) return;
+            restoring.current = true;
+            const r = await api.restore(id).catch(() => ({ ok: false }));
+            restoring.current = false;
             if (!r.ok) toast.show({ message: copy.accounts.restoreFailed });
             await refresh();
           }}

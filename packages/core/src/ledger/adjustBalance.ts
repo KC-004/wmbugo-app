@@ -26,6 +26,7 @@ export function adjustmentDelta(type: AccountType, currentPostingMinor: number, 
 export type AdjustBalanceError =
   | 'ACCOUNT_NOT_FOUND'
   | 'BALANCE_NOT_SET'
+  | 'ACCOUNT_ARCHIVED'
   | 'AMOUNT_INVALID'
   | 'AMOUNT_NEGATIVE'
   | 'REASON_INVALID'
@@ -53,6 +54,7 @@ export const AdjustBalance: UseCase<
     if ([...note].length > MAX_ADJUST_NOTE) return err('NOTE_TOO_LONG');
     const row = mapAccountRows(await ctx.query(ACCOUNT_LIST_SQL)).find((r) => r.id === input.accountId);
     if (!row) return err('ACCOUNT_NOT_FOUND');
+    if (row.status === 'archived') return err('ACCOUNT_ARCHIVED');
     if (row.balanceNotSet) return err('BALANCE_NOT_SET');
     const tz = await profileTimezone(ctx);
     if (tz === null) return err('NO_PROFILE');
@@ -66,7 +68,7 @@ export const AdjustBalance: UseCase<
     const transactionId = ctx.newId();
     await ctx.execute(
       "INSERT INTO \"transaction\" (id, event_type, status, amount_minor, occurred_at_utc, local_date, timezone_id, note, tags_json, needs_category, created_at, updated_at) VALUES (?, 'adjustment', 'confirmed', ?, ?, ?, ?, ?, '[]', 0, ?, ?)",
-      [transactionId, Math.abs(delta), at, date.ok ? date.value : '1970-01-01', tz, reason.id === 'other' && note !== '' ? note : reason.label, at, at],
+      [transactionId, Math.abs(delta), at, date.ok ? date.value : '1970-01-01', tz, reason.id === 'other' ? (note !== '' ? note : reason.label) : note !== '' ? `${reason.label} · ${note}` : reason.label, at, at],
     );
     await ctx.execute("INSERT INTO posting (id, transaction_id, account_id, direction, signed_amount_minor, posting_kind) VALUES (?, ?, ?, ?, ?, 'adjustment')", [
       ctx.newId(),

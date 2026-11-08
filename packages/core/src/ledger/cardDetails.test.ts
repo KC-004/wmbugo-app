@@ -125,3 +125,21 @@ describe('Pay card bill helpers (Story 2.7)', () => {
     expect(Number((await db.query("SELECT COALESCE(SUM(amount_minor),0) FROM \"transaction\" WHERE event_type IN ('expense','income')"))[0]![0])).toBe(0);
   });
 });
+
+describe('review fixes (Epic 2)', () => {
+  it('editing only the limit does not restart "paid" on the statement', async () => {
+    const { writer, clock, add, details } = await setup();
+    const card = await add('HDFC Card', 'card', 1245000);
+    const bank = await add('HDFC', 'bank', 3000000);
+    await writer.run(UpdateCardDetails, { accountId: card, statementDueMinor: 500000, dueDate: '2026-11-15', limitMinor: null }, 'user');
+    clock.advance(1000);
+    await writer.run(RecordTransfer, { amountMinor: 500000, fromAccountId: bank, toAccountId: card }, 'user');
+    expect(statementStatus(await details(card), '2026-11-10')).toEqual({ kind: 'paid', amountMinor: 500000 });
+    clock.advance(1000);
+    await writer.run(UpdateCardDetails, { accountId: card, statementDueMinor: 500000, dueDate: '2026-11-15', limitMinor: 9000000 }, 'user');
+    expect(statementStatus(await details(card), '2026-11-10')).toEqual({ kind: 'paid', amountMinor: 500000 });
+    clock.advance(1000);
+    await writer.run(UpdateCardDetails, { accountId: card, statementDueMinor: 600000, dueDate: '2026-12-15', limitMinor: 9000000 }, 'user');
+    expect((await details(card)).paidSinceMinor).toBe(0);
+  });
+});

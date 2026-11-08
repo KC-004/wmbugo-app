@@ -48,6 +48,11 @@ export function ArchivedSection({
                 testID={`archived-row-${a.id}`}
                 accessible
                 accessibilityLabel={`${a.name}, ${TYPE_LABEL[a.type]}, ${copy.accounts.archived.toLowerCase()}, ${spoken}`}
+                accessibilityActions={[
+                  { name: 'open', label: copy.accountDetail.open },
+                  { name: 'restore', label: copy.archive.restore },
+                ]}
+                onAccessibilityAction={(e) => (e.nativeEvent.actionName === 'open' ? onOpen(a.id) : void onRestore(a.id))}
                 style={[styles.row, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
                 <View style={styles.main}>
                   <View style={styles.text}>

@@ -36,11 +36,15 @@ export const UpdateCardDetails: UseCase<{ accountId: string } & CardDetails, voi
 
     const at = ctx.nowMs();
     const hasStatement = input.statementDueMinor !== null || input.dueDate !== null;
+    // "Paid" counts payments since the statement was entered, so editing only the limit must not restart that.
+    const old = (await ctx.query('SELECT statement_due_minor, statement_due_date, statement_set_at FROM account WHERE id = ?', [input.accountId]))[0]!;
+    const same = (old[0] === null ? null : Number(old[0])) === input.statementDueMinor && (old[1] === null ? null : String(old[1])) === input.dueDate;
+    const setAt = !hasStatement ? null : same && old[2] !== null ? Number(old[2]) : at;
     await ctx.execute('UPDATE account SET statement_due_minor = ?, statement_due_date = ?, credit_limit_minor = ?, statement_set_at = ?, updated_at = ? WHERE id = ?', [
       input.statementDueMinor,
       input.dueDate,
       input.limitMinor,
-      hasStatement ? at : null,
+      setAt,
       at,
       input.accountId,
     ]);

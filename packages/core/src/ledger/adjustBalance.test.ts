@@ -123,3 +123,15 @@ describe('AdjustBalance (Story 2.5)', () => {
     expect(ADJUST_REASONS.map((r) => r.label)).toEqual(['Starting balance was rough', 'Missed some entries', 'Bank charges or interest', 'Other']);
   });
 });
+
+describe('review fixes (Epic 2)', () => {
+  it('an archived account cannot be adjusted, and a note is kept with any reason', async () => {
+    const { db, writer, add } = await setup();
+    const a = await add('HDFC', 'bank', 100000);
+    await writer.run(AdjustBalance, { accountId: a, actualMinor: 90000, reason: 'missed', note: 'cafe' }, 'user');
+    expect(String((await db.query("SELECT note FROM \"transaction\" WHERE event_type = 'adjustment'"))[0]![0])).toBe('Missed some entries · cafe');
+    const { ArchiveAccount } = await import('./accountCommands');
+    await writer.run(ArchiveAccount, { accountId: a }, 'user');
+    expect(await writer.run(AdjustBalance, { accountId: a, actualMinor: 1, reason: 'rough' }, 'user')).toEqual({ ok: false, code: 'ACCOUNT_ARCHIVED' });
+  });
+});

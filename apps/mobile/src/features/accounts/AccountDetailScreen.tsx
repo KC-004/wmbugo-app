@@ -74,17 +74,24 @@ export function AccountDetailScreen({
           onUndo: () =>
             void api
               .remove(id ?? '')
-              .then(() => invalidateForEvent(qc, 'AccountsChanged'))
-              .catch(() => toast.show({ message: copy.accountDetail.saveError })),
+              .then(async (u) => {
+                await invalidateForEvent(qc, 'AccountsChanged');
+                if (!u.ok) toast.show({ message: copy.add.removeFailed });
+              })
+              .catch(() => toast.show({ message: copy.add.removeFailed })),
         },
       });
     }
     return r;
   };
 
+  const archiving = useRef(false);
   const archive = async () => {
-    if (!d) return;
-    const r = await api.archive(accountId);
+    if (!d || archiving.current) return;
+    archiving.current = true;
+    setPanel(null);
+    const r = await api.archive(accountId).catch(() => ({ ok: false }));
+    archiving.current = false;
     if (!r.ok) return toast.show({ message: copy.archive.failed });
     await invalidateForEvent(qc, 'AccountsChanged');
     toast.show({
@@ -94,14 +101,21 @@ export function AccountDetailScreen({
         onUndo: () =>
           void api
             .restore(accountId)
-            .then(() => invalidateForEvent(qc, 'AccountsChanged'))
+            .then(async (u) => {
+              await invalidateForEvent(qc, 'AccountsChanged');
+              if (!u.ok) toast.show({ message: copy.accounts.restoreFailed });
+            })
             .catch(() => toast.show({ message: copy.accounts.restoreFailed })),
       },
     });
     onBack();
   };
+  const restoring = useRef(false);
   const restore = async () => {
-    const r = await api.restore(accountId);
+    if (restoring.current) return;
+    restoring.current = true;
+    const r = await api.restore(accountId).catch(() => ({ ok: false }));
+    restoring.current = false;
     if (!r.ok) return toast.show({ message: copy.accounts.restoreFailed });
     await invalidateForEvent(qc, 'AccountsChanged');
   };
@@ -172,6 +186,7 @@ export function AccountDetailScreen({
         {d ? (
           <SectionList
             testID="account-timeline"
+            keyboardShouldPersistTaps="handled"
             sections={d.days.map((day) => ({ day, data: day.rows as ActivityRow[] }))}
             keyExtractor={(r) => r.id}
             stickySectionHeadersEnabled={false}
@@ -273,7 +288,7 @@ export function AccountDetailScreen({
               return <ActivityRowView row={item} date={section.day.localDate} currency={d.currency} locale={d.locale} title={title} showAccount={false} />;
             }}
           />
-        ) : q.isError ? (
+        ) : q.isError || q.data === null ? (
           <View style={styles.pad}>
             <ErrorBlock cause={copy.accountDetail.loadError} onRetry={() => void q.refetch()} />
           </View>

@@ -62,6 +62,10 @@ export const ChangeAccountType: UseCase<{ accountId: string; type: AccountType }
       ctx.nowMs(),
       input.accountId,
     ]);
+    // A card always counts in Card dues, so a switch to card clears any "leave out of totals".
+    if (input.type === 'card') await ctx.execute('UPDATE account SET include_in_overview = 1 WHERE id = ?', [input.accountId]);
+    // Statement details belong to a card only; they do not come back if it is a card again later.
+    if (from === 'card') await ctx.execute('UPDATE account SET statement_due_minor = NULL, statement_due_date = NULL, credit_limit_minor = NULL, statement_set_at = NULL WHERE id = ?', [input.accountId]);
     ctx.touch('account', input.accountId, { typeFrom: from, typeTo: input.type });
     ctx.emit('AccountsChanged', { accountIds: [input.accountId] });
     return ok(undefined);

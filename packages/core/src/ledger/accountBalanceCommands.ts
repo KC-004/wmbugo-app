@@ -92,12 +92,15 @@ export const ChangeTrackingDate: UseCase<{ accountId: string; localDate: string 
     if (at === before) return ok(undefined);
     await ctx.execute('UPDATE account SET opening_effective_at = ?, updated_at = ? WHERE id = ?', [at, ctx.nowMs(), input.accountId]);
     // The opening transaction sits at the opening instant, so it moves with it.
+    const openingTx = (await ctx.query("SELECT transaction_id FROM posting WHERE account_id = ? AND posting_kind = 'opening_balance'", [input.accountId])).map((r) => String(r[0]));
     await ctx.execute(
-      "UPDATE \"transaction\" SET occurred_at_utc = ?, local_date = ?, updated_at = ? WHERE id IN (SELECT transaction_id FROM posting WHERE account_id = ? AND posting_kind = 'opening_balance')",
-      [at, input.localDate, ctx.nowMs(), input.accountId],
+      "UPDATE \"transaction\" SET occurred_at_utc = ?, local_date = ?, timezone_id = ?, updated_at = ? WHERE id IN (SELECT transaction_id FROM posting WHERE account_id = ? AND posting_kind = 'opening_balance')",
+      [at, input.localDate, tz, ctx.nowMs(), input.accountId],
     );
+    for (const id of openingTx) ctx.touch('transaction', id, { movedWithTrackingDate: true });
     ctx.touch('account', input.accountId, { trackingFrom: before, trackingTo: at });
     ctx.emit('AccountsChanged', { accountIds: [input.accountId] });
+    if (openingTx.length > 0) ctx.emit('TransactionsChanged', { transactionIds: openingTx });
     return ok(undefined);
   },
 };

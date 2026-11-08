@@ -134,3 +134,27 @@ describe('archive, restore and delete (Story 2.9)', () => {
     expect(parseSettings(await db.query(SETTINGS_SQL)).defaultAccountId).toBeNull();
   });
 });
+
+describe('review fixes (Epic 2)', () => {
+  it('archiving leaves an entry waiting for review untouched', async () => {
+    const { db, writer, add, clock } = await setup();
+    const a = await add('SBI', 'bank', 100000);
+    clock.advance(1000);
+    const r = await writer.run(RecordManualEntry, { kind: 'expense', amountMinor: 500, categoryId: 'cat_food', accountId: a }, 'user');
+    if (!r.ok) throw new Error('entry');
+    db.raw.prepare('UPDATE "transaction" SET status = ? WHERE id = ?').run('needs_review', r.value.transactionId);
+    expect(Number((await db.query(NEEDS_REVIEW_COUNT_SQL, [a]))[0]![0])).toBe(1);
+    await writer.run(ArchiveAccount, { accountId: a }, 'user');
+    expect(Number((await db.query(NEEDS_REVIEW_COUNT_SQL, [a]))[0]![0])).toBe(1);
+    expect(String((await db.query('SELECT status FROM "transaction" WHERE id = ?', [r.value.transactionId]))[0]![0])).toBe('needs_review');
+  });
+
+  it('restoring an account that is already active changes nothing', async () => {
+    const { writer, add, rows } = await setup();
+    const a = await add('A', 'bank', 1);
+    await add('B', 'bank', 1);
+    const before = (await rows()).map((r) => [r.name, r.sortOrder]);
+    expect(await writer.run(RestoreAccount, { accountId: a }, 'user')).toEqual({ ok: true, value: undefined });
+    expect((await rows()).map((r) => [r.name, r.sortOrder])).toEqual(before);
+  });
+});

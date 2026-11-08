@@ -92,6 +92,8 @@ export const copy = {
     balanceAdjustment: 'Balance adjustment',
     adjustedUp: 'Adjusted up',
     adjustedDown: 'Adjusted down',
+    up: 'Up',
+    down: 'Down',
     loadError: 'Could not load your entries.',
   },
   add: {
@@ -192,6 +194,7 @@ export const copy = {
     potBalanceHint: 'Leave empty if the value changes with the market',
     typeLabel: 'Account type',
     typeBlocked: 'This account has entries. Add a new card instead.',
+    deleteFailed: 'Could not delete the account.',
     countInTotals: 'Count in my totals',
     excludes: 'Excludes {n} account',
     excludesMany: 'Excludes {n} accounts',
