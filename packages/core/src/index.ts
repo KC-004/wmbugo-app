@@ -13,3 +13,4 @@ export * from './usecases';
 export * from './writer';
 export * from './profile';
 export * from './ledger';
+export * from './capture';

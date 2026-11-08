@@ -66,8 +66,8 @@ development_status:
   2-9-archive-restore-and-delete-accounts-safely: review
   epic-2-retrospective: done
 
-  epic-3: backlog
-  3-1-duplicate-matching-rules-in-core: backlog
+  epic-3: in-progress
+  3-1-duplicate-matching-rules-in-core: review
   3-2-shared-capture-pipeline-with-manual-entry-as-its-first-sourc: backlog
   3-3-possible-duplicate-on-save-keep-both-or-merge: backlog
   3-4-transaction-detail-edit-duplicate-delete-or-reject: backlog
