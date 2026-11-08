@@ -53,6 +53,8 @@ export interface ActivityRow {
   readonly categoryIcon: string | null;
   readonly categoryColor: string | null;
   readonly accountName: string | null;
+  /** Dated before its account's tracking start: it never changed that balance (FIN-016). Derived on read. */
+  readonly beforeTracking?: boolean;
 }
 
 /** How many entries Activity loads at a time. */
@@ -66,7 +68,7 @@ const ACTIVITY_FILTER = "t2.removed_at IS NULL AND t2.status = 'confirmed' AND t
  * the first and joins the two account names.
  */
 export const ACTIVITY_SQL =
-  'SELECT t.id, t.event_type, t.amount_minor, t.local_date, t.original_description, c.name, c.icon, c.color_token, a.name FROM "transaction" t LEFT JOIN split s ON s.transaction_id = t.id LEFT JOIN category c ON c.id = s.category_id LEFT JOIN posting p ON p.transaction_id = t.id LEFT JOIN account a ON a.id = p.account_id WHERE t.id IN (SELECT t2.id FROM "transaction" t2 WHERE ' +
+  'SELECT t.id, t.event_type, t.amount_minor, t.local_date, t.original_description, c.name, c.icon, c.color_token, a.name, (p.posting_kind = \'normal\' AND a.opening_effective_at IS NOT NULL AND t.occurred_at_utc < a.opening_effective_at) FROM "transaction" t LEFT JOIN split s ON s.transaction_id = t.id LEFT JOIN category c ON c.id = s.category_id LEFT JOIN posting p ON p.transaction_id = t.id LEFT JOIN account a ON a.id = p.account_id WHERE t.id IN (SELECT t2.id FROM "transaction" t2 WHERE ' +
   ACTIVITY_FILTER +
   ' ORDER BY t2.local_date DESC, t2.occurred_at_utc DESC, t2.id DESC LIMIT ?) ORDER BY t.local_date DESC, t.occurred_at_utc DESC, t.id DESC, p.signed_amount_minor ASC';
 
@@ -107,6 +109,7 @@ export function mapActivityRows(rows: readonly (readonly unknown[])[]): Activity
       categoryIcon: s(r[6]),
       categoryColor: s(r[7]),
       accountName: s(r[8]),
+      beforeTracking: String(r[1]) !== 'transfer' && Number(r[9]) === 1,
     });
   }
   return out;

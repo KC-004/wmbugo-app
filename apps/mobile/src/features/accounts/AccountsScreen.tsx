@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bank, CreditCard, Money, PiggyBank, Wallet } from 'phosphor-react-native';
 import { accountGroups, accountLine, validateAccountName, type AccountGroup, type AccountLineView, type AccountRow, type CurrencyCode, type GroupTotalView, type NewAccount, notSetNote } from '@wmbugo/core';
@@ -25,7 +25,7 @@ type Mode = { kind: 'list' } | { kind: 'add' } | { kind: 'rename'; account: Acco
  * The accounts list: active accounts in Mei's order with a ledger-derived balance or "Balance not set"
  * (never zero), add, rename, Move up / Move down (also TalkBack custom actions) and archive with Undo.
  */
-export function AccountsScreen({ api = realAccountsApi }: { api?: AccountsApi }) {
+export function AccountsScreen({ api = realAccountsApi, onOpen }: { api?: AccountsApi; onOpen?: (accountId: string) => void }) {
   const theme = useTheme();
   const toast = useToast();
   const qc = useQueryClient();
@@ -143,6 +143,7 @@ export function AccountsScreen({ api = realAccountsApi }: { api?: AccountsApi })
                     onArchive={() => void archive(a)}
                     onRename={() => setMode({ kind: 'rename', account: a })}
                     onInclusion={(v) => void setInclusion(a, v)}
+                    onOpen={() => onOpen?.(a.id)}
                     onRenameSubmit={async (name) => {
                       const r = await api.rename(a.id, name);
                       if (r.ok) {
@@ -175,6 +176,7 @@ function AccountRowView(props: {
   onArchive: () => void;
   onRename: () => void;
   onInclusion: (include: boolean) => void;
+  onOpen: () => void;
   onRenameSubmit: (name: string) => Promise<boolean>;
   onRenameCancel: () => void;
 }) {
@@ -196,9 +198,11 @@ function AccountRowView(props: {
   ];
 
   return (
-    <View
+    <Pressable
       testID={`account-row-${a.id}`}
       accessible={!editing}
+      accessibilityRole={editing ? undefined : 'button'}
+      onPress={editing ? undefined : props.onOpen}
       accessibilityLabel={label}
       accessibilityActions={actions}
       onAccessibilityAction={(e) => {
@@ -292,7 +296,7 @@ function AccountRowView(props: {
           </>
         )}
       </View>
-    </View>
+    </Pressable>
   );
 }
 

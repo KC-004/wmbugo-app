@@ -206,7 +206,7 @@ describe('AccountsScreen', () => {
     return api;
   }
 
-  async function mountScreen(api: AccountsApi) {
+  async function mountScreen(api: AccountsApi, onOpen?: (id: string) => void) {
     const qc = createQueryClient();
     clients.push(qc);
     let r!: ReactTestRenderer;
@@ -215,7 +215,7 @@ describe('AccountsScreen', () => {
         <QueryClientProvider client={qc}>
           <ThemeProvider>
             <ToastHost>
-              <AccountsScreen api={api} />
+              <AccountsScreen api={api} onOpen={onOpen} />
             </ToastHost>
           </ThemeProvider>
         </QueryClientProvider>,
@@ -407,6 +407,17 @@ describe('AccountsScreen', () => {
     await api.setShowNetWorth(true);
     const r = await mountScreen(api);
     expect(texts(r)).toEqual(expect.arrayContaining(['Net worth: you owe ', 'S$1,500.00', ' more than you have']));
+  });
+
+  it('tapping a row opens that account; while renaming it does not', async () => {
+    const onOpen = jest.fn();
+    const r = await mountScreen(fakeApi(three()), onOpen);
+    const rowOf = (id: string) => r.root.findAll((n) => typeof n.type === 'string' && n.props.testID === `account-row-${id}`)[0]!;
+    expect(rowOf('a').props.accessibilityRole).toBe('button');
+    await act(async () => fire(r, 'account-row-a'));
+    expect(onOpen).toHaveBeenCalledWith('a');
+    await press(r, 'rename-a');
+    expect(r.root.findAll((n) => n.props.testID === 'account-row-a' && typeof n.props.onPress === 'function')).toHaveLength(0);
   });
 
   it('archived accounts are not listed', async () => {

@@ -6,3 +6,4 @@ export * from './keypad';
 export * from './readModels';
 export * from './transferCommands';
 export * from './balances';
+export * from './timeline';

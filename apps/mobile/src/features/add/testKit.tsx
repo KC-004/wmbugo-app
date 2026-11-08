@@ -76,7 +76,7 @@ export function fakeApi(over: Partial<AddData> = {}, counts = new Map<string, nu
   return { api, record, recordTransfer, remove, load, defaultAccountFor };
 }
 
-export function mount(api: AddApi, close = jest.fn(), onNewAccount?: () => void) {
+export function mount(api: AddApi, close = jest.fn(), onNewAccount?: () => void, preset?: { kind: AddKind; accountId: string }) {
   const qc = createQueryClient();
   clients.push(qc);
   let r!: ReactTestRenderer;
@@ -85,7 +85,7 @@ export function mount(api: AddApi, close = jest.fn(), onNewAccount?: () => void)
       <QueryClientProvider client={qc}>
         <ThemeProvider>
           <ToastHost bottomOffset={0}>
-            <AddSheet api={api} close={close} onNewAccount={onNewAccount} now={() => Date.UTC(2026, 10, 8, 10, 0, 0)} />
+            <AddSheet api={api} close={close} onNewAccount={onNewAccount} preset={preset} now={() => Date.UTC(2026, 10, 8, 10, 0, 0)} />
           </ToastHost>
         </ThemeProvider>
       </QueryClientProvider>,
@@ -95,9 +95,9 @@ export function mount(api: AddApi, close = jest.fn(), onNewAccount?: () => void)
   return { r, close, qc };
 }
 
-export async function mountReady(over: Partial<AddData> = {}, counts?: Map<string, number>, onNewAccount?: () => void) {
+export async function mountReady(over: Partial<AddData> = {}, counts?: Map<string, number>, onNewAccount?: () => void, preset?: { kind: AddKind; accountId: string }) {
   const f = fakeApi(over, counts);
-  const m = mount(f.api, jest.fn(), onNewAccount);
+  const m = mount(f.api, jest.fn(), onNewAccount, preset);
   await settle();
   return { ...f, ...m };
 }

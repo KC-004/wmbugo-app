@@ -88,6 +88,7 @@ export const copy = {
     showEarlier: 'Show earlier entries',
     spent: 'Spent',
     transfer: 'Transfer',
+    beforeTracking: 'Before tracking started',
     loadError: 'Could not load your entries.',
   },
   add: {
@@ -191,6 +192,18 @@ export const copy = {
     typeSavings: 'Savings pot',
     typeCard: 'Credit card',
     saveError: 'Could not save the account.',
+  },
+  accountDetail: {
+    moveMoney: 'Move money',
+    startingBalance: 'Starting balance',
+    toAccount: 'To {name}',
+    fromAccount: 'From {name}',
+    empty: 'Nothing recorded on this account yet',
+    addExpense: 'Add an expense',
+    showEarlier: 'Show earlier entries',
+    loadError: 'Could not load this account.',
+    notFound: 'This account is not here any more.',
+    back: 'Back to accounts',
   },
   startup: {
     storageError: "wmbugo couldn't open its secure storage. Nothing was changed.",

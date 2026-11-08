@@ -197,6 +197,12 @@ describe('Activity', () => {
     expect(header.accessibilityLabel).toBe('Saturday 7 November, spent 12.50 Singapore dollars');
   });
 
+  it('an entry dated before its account was tracked says so, and TalkBack hears it after the account', async () => {
+    const { r } = await mountActivity(activity([row('x', 'expense', 30000, '2026-11-05', { beforeTracking: true, accountName: 'Cash' })]));
+    expect(texts(r)).toContain('Food & Drinks · Cash · Before tracking started');
+    expect(host(r, 'activity-row-x')[0]!.props.accessibilityLabel).toContain('Cash, before tracking started, Thursday 5 November');
+  });
+
   it('stacks the day header and amounts at fontScale 1.3', async () => {
     mockFontScale = 1.3;
     const { r } = await mountActivity(activity(rows));

@@ -1,5 +1,6 @@
 import { AccessibilityInfo } from 'react-native';
 import { act, type ReactTestRenderer } from 'react-test-renderer';
+import { useUiStore } from '../../shared/state/uiStore';
 import { account, cleanup, fire, has, host, mountReady, quietAccessibility, settle, tap, texts } from './testKit';
 
 jest.mock('../../adapters/startApp', () => ({ getServices: jest.fn(), systemClock: { nowMs: () => 0, timezoneId: () => 'Asia/Singapore' } }));
@@ -163,5 +164,26 @@ describe('Transfer', () => {
     await settle();
     expect(m.remove).toHaveBeenCalledWith('tr1');
     expect(m.remove).toHaveBeenCalledWith('fee1');
+  });
+});
+
+describe('opened from an account (Story 2.3)', () => {
+  it('Move money opens as a transfer with From set to that account and the amount empty, even over an old draft', async () => {
+    useUiStore.setState({ addDraft: { kind: 'expense', typedText: '99', categoryId: 'cat_food' } });
+    const { r, recordTransfer } = await mountReady({}, undefined, undefined, { kind: 'transfer', accountId: 'a2' });
+    expect(texts(r)).toEqual(expect.arrayContaining(['From', 'To']));
+    expect(has(r, 'category-cat_food')).toBe(false);
+    expect(texts(r).join('|')).not.toContain('S$99');
+    tap(r, '20');
+    await act(async () => fire(r, 'save'));
+    expect(recordTransfer).toHaveBeenCalledWith(expect.objectContaining({ amountMinor: 2000, fromAccountId: 'a2', toAccountId: 'a1' }));
+  });
+
+  it('Add an expense opens as an expense paid from that account', async () => {
+    const { r, record } = await mountReady({}, undefined, undefined, { kind: 'expense', accountId: 'a2' });
+    tap(r, '5');
+    act(() => fire(r, 'category-cat_food'));
+    await act(async () => fire(r, 'save'));
+    expect(record).toHaveBeenCalledWith(expect.objectContaining({ kind: 'expense', accountId: 'a2' }));
   });
 });

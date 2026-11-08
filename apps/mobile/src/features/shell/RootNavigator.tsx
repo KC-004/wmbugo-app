@@ -1,6 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
-import { DefaultTheme, NavigationContainer, useNavigation } from '@react-navigation/native';
+import { DefaultTheme, NavigationContainer, useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,12 +14,13 @@ import { useOpenAdd } from '../add/useOpenAdd';
 import { ActivityScreen } from '../activity/ActivityScreen';
 import { HomeScreen } from '../home/HomeScreen';
 import { SettingsScreen } from '../settings/SettingsScreen';
+import { AccountDetailScreen } from '../accounts/AccountDetailScreen';
 import { AccountsScreen } from '../accounts/AccountsScreen';
 import { ScreenHeader } from './ScreenHeader';
 import { TabBar, type TabRoute } from './TabBar';
 import { markTabFirstFrame } from './navTiming';
 
-type RootParams = { Tabs: undefined; Accounts: undefined; Settings: undefined };
+type RootParams = { Tabs: undefined; Accounts: undefined; AccountDetail: { accountId: string }; Settings: undefined };
 const RootStack = createNativeStackNavigator<RootParams>();
 const Tabs = createBottomTabNavigator();
 const TabStack = createNativeStackNavigator();
@@ -120,9 +121,25 @@ function SettingsRoute() {
 function AccountsRoute() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const nav = useNavigation<{ navigate: (s: 'AccountDetail', p: { accountId: string }) => void }>();
   return (
     <View style={[styles.fill, { backgroundColor: theme.color('bg-canvas'), paddingTop: insets.top }]}>
-      <AccountsScreen />
+      <AccountsScreen onOpen={(accountId) => nav.navigate('AccountDetail', { accountId })} />
+    </View>
+  );
+}
+
+function AccountDetailRoute() {
+  const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  const nav = useNavigation<{ goBack: () => void }>();
+  const route = useRoute<RouteProp<RootParams, 'AccountDetail'>>();
+  const { accountId } = route.params;
+  const moveMoney = useOpenAdd(undefined, { kind: 'transfer', accountId });
+  const addExpense = useOpenAdd(undefined, { kind: 'expense', accountId });
+  return (
+    <View style={[styles.fill, { backgroundColor: theme.color('bg-canvas'), paddingTop: insets.top }]}>
+      <AccountDetailScreen accountId={accountId} onBack={() => nav.goBack()} onMoveMoney={moveMoney} onAddExpense={addExpense} />
     </View>
   );
 }
@@ -146,6 +163,7 @@ export function RootNavigator() {
           <RootStack.Navigator screenOptions={{ headerShown: false }}>
             <RootStack.Screen name="Tabs" component={TabsWithAdd} />
             <RootStack.Screen name="Accounts" component={AccountsRoute} />
+            <RootStack.Screen name="AccountDetail" component={AccountDetailRoute} />
             <RootStack.Screen name="Settings" component={SettingsRoute} />
           </RootStack.Navigator>
         </SheetHost>

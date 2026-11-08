@@ -52,12 +52,15 @@ export function AddSheet({
   api = realAddApi,
   close,
   onNewAccount,
+  preset,
   now = systemClock.nowMs,
 }: {
   api?: AddApi;
   close: () => void;
   /** Opens the add-account screen (the sheet closes first). */
   onNewAccount?: () => void;
+  /** Opened from an account: the type and the account (the From side of a transfer) are chosen already, the amount is empty. */
+  preset?: { kind: AddKind; accountId: string };
   now?: () => number;
 }) {
   const theme = useTheme();
@@ -69,10 +72,10 @@ export function AddSheet({
   const insets = useSafeAreaInsets();
 
   const [data, setData] = useState<AddData | null>(null);
-  const [kind, setKind] = useState<AddKind>(draft.kind);
-  const [text, setText] = useState(draft.typedText);
-  const [categoryId, setCategoryId] = useState<string | null>(draft.categoryId);
-  const [accountId, setAccountId] = useState<string | null>(null);
+  const [kind, setKind] = useState<AddKind>(preset?.kind ?? draft.kind);
+  const [text, setText] = useState(preset ? '' : draft.typedText);
+  const [categoryId, setCategoryId] = useState<string | null>(preset ? null : draft.categoryId);
+  const [accountId, setAccountId] = useState<string | null>(preset?.accountId ?? null);
   const [toAccountId, setToAccountId] = useState<string | null>(null);
   const [feeText, setFeeText] = useState('');
   const [feeCategoryId, setFeeCategoryId] = useState(OTHER_CATEGORY_ID);
@@ -88,7 +91,7 @@ export function AddSheet({
   const [dateText, setDateText] = useState('');
   const [timeText, setTimeText] = useState('');
 
-  const accountTouched = useRef(false);
+  const accountTouched = useRef(preset !== undefined);
   const dateTouched = useRef(false);
   const saving = useRef(false);
   const amountRef = useRef<ComponentRef<typeof TextInput>>(null);
