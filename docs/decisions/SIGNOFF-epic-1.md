@@ -71,3 +71,20 @@ Limits: one device; the interim budget device is an emulator and cannot give val
 ### Standard release builds
 
 `assembleNosmsRelease`, `assembleSmsRelease`, `pnpm check:permissions` and `pnpm check:not-debuggable` pass (the last also fails correctly on a debuggable APK).
+
+## GATE-07 worked examples (Story 2.1), for the finance reviewer
+
+Amounts are shown as the person sees them. "Period" is November 2026. Source: `packages/core/test/fixtures/finance/fixtures.ts`, run by `finance-fixtures.test.ts` against the real ledger.
+
+| # | What was recorded | Balances | In accounts | Card dues | Spent | Income |
+|---|-------------------|----------|-------------|-----------|-------|--------|
+| F1 | HDFC bank opens at ₹30,000.00, then is adjusted to ₹31,200.00 | HDFC ₹31,200.00 | ₹31,200.00 | none | ₹0.00 | ₹0.00 |
+| F2 | HDFC ₹50,000.00; Visa card dues ₹8,200.00; ₹8,200.00 paid from HDFC to Visa | HDFC ₹41,800.00; Visa owes ₹0.00 | ₹41,800.00 | ₹0.00 | ₹0.00 | ₹0.00 |
+| F3 | DBS S$1,000.00; Cash S$0.00; S$200.00 DBS to Cash with a S$2.00 fee | DBS S$798.00; Cash S$200.00 | S$998.00 | none | S$2.00 (the fee only) | S$0.00 |
+| F4 | HDFC ₹10,000.00; savings pot Holiday ₹0.00; ₹5,000.00 into the pot | HDFC ₹5,000.00; Holiday ₹5,000.00 | ₹10,000.00 | none | ₹0.00 | ₹0.00 |
+| F5 | HDFC opens at ₹10,000.00; an expense of ₹300.00 dated two days before it opened | HDFC ₹10,000.00 (the expense is before tracking) | ₹10,000.00 | none | ₹300.00 | ₹0.00 |
+| F6 | HDFC ₹20,000.00; Visa dues ₹4,500.00 plus a ₹2,000.00 charge; Amex with no balance set; ₹50,000.00 income to HDFC | HDFC ₹70,000.00; Visa owes ₹6,500.00; Amex not set | ₹70,000.00 | ₹6,500.00 (+1 card not set) | ₹2,000.00 | ₹50,000.00 |
+
+Rules the fixtures encode: a card's ledger balance is negative while owed and "Card dues" shows its negation; a card payment and a savings-pot deposit are transfers, so they are neither spending nor income; In accounts and Card dues are never added together except into net worth; a balance that is not set is never shown as zero; an entry dated before an account's opening instant does not change its balance but still counts as spending.
+
+Reviewer sign-off on these six: `Signed: ____________ / ____________`

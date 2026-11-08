@@ -67,7 +67,7 @@ const data = (over: Partial<HomeData> = {}, accounts: Partial<HomeData['accounts
   hour: 9,
   scope: 'This month',
   spentMinor: 1250,
-  accounts: { hasAccounts: true, inAccountsMinor: 320000, notSetCount: 0, cardDuesMinor: null, ...accounts },
+  accounts: { hasAccounts: true, inAccountsMinor: 320000, notSetCount: 0, cardDuesMinor: null, notSetCards: 0, ...accounts },
   ...over,
 });
 const homeApi = (d: HomeData | null, seen = new MemorySeenStore()): HomeApi & { load: jest.Mock } => ({ load: jest.fn(async () => d), seen });
@@ -124,6 +124,13 @@ describe('Home', () => {
     expect(texts(r).join(' ')).not.toContain('S$0.00 ');
     const b = await mountHome(homeApi(data({}, { inAccountsMinor: 1000, notSetCount: 2 })));
     expect(texts(b.r)).toContain('+2 accounts not set');
+  });
+
+  it('a card with no balance reads Not set and +1 card not set, never zero', async () => {
+    const { r } = await mountHome(homeApi(data({}, { cardDuesMinor: null, notSetCards: 1 })));
+    const t = texts(r);
+    expect(t).toEqual(expect.arrayContaining(['Card dues', 'Not set', '+1 card not set']));
+    expect(host(r, 'accounts-line')).toHaveLength(1);
   });
 
   it('shows the In accounts tip once, and "Got it" records it so it never returns', async () => {

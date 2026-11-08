@@ -251,7 +251,7 @@ describe('SettingsBridge', () => {
 describe('time zone prompt on Home', () => {
   const home: HomeData = {
     currency: 'SGD', locale: 'en-SG', timezoneId: 'Asia/Singapore', today: '2026-11-07', hour: 9, scope: 'This month', spentMinor: 0,
-    accounts: { hasAccounts: false, inAccountsMinor: null, notSetCount: 0, cardDuesMinor: null },
+    accounts: { hasAccounts: false, inAccountsMinor: null, notSetCount: 0, cardDuesMinor: null, notSetCards: 0 },
   };
   const homeApi: HomeApi = { load: async () => home, seen: new MemorySeenStore() };
 

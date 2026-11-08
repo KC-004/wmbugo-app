@@ -68,7 +68,7 @@ export const RecordTransfer: UseCase<TransferInput, { transactionId: string; fee
     if (await blockTransfersAboveBalance(ctx)) {
       const f = (
         await ctx.query(
-          'SELECT a.balance_not_set, a.type, COALESCE(SUM(CASE WHEN t.removed_at IS NULL THEN p.signed_amount_minor END), 0) FROM account a LEFT JOIN posting p ON p.account_id = a.id LEFT JOIN "transaction" t ON t.id = p.transaction_id WHERE a.id = ? GROUP BY a.id',
+          `SELECT a.balance_not_set, a.type, COALESCE(SUM(CASE WHEN t.removed_at IS NULL AND t.status = 'confirmed' AND (p.posting_kind <> 'normal' OR a.opening_effective_at IS NULL OR t.occurred_at_utc >= a.opening_effective_at) THEN p.signed_amount_minor END), 0) FROM account a LEFT JOIN posting p ON p.account_id = a.id LEFT JOIN "transaction" t ON t.id = p.transaction_id WHERE a.id = ? GROUP BY a.id`,
           [input.fromAccountId],
         )
       )[0];

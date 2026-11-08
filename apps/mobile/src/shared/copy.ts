@@ -79,8 +79,6 @@ export const copy = {
     cardDues: 'Card dues',
     setUpAccount: 'Set up an account to calculate your balance',
     addAccount: 'Add an account',
-    notSetOne: '+1 account not set',
-    notSetMany: '+{n} accounts not set',
     tip: "This is money in accounts you've added",
     loadError: 'Could not load Home.',
   },

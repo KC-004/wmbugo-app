@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { greetingFor, shortDate } from '@wmbugo/core';
+import { greetingFor, notSetNote, shortDate } from '@wmbugo/core';
 import { amountLabel } from '../../shared/a11y/labels';
 import { copy } from '../../shared/copy';
 import { ErrorBlock, Reveal, Skeleton, Tooltip } from '../../shared/feedback/Feedback';
@@ -101,16 +101,28 @@ export function HomeScreen({
                     ) : (
                       <Amount amountMinor={d.accounts.inAccountsMinor} currency={d.currency} direction="neutral" locale={d.locale} />
                     )}
-                    {d.accounts.notSetCount > 0 ? (
+                    {notSetNote(d.accounts.notSetCount, 'account') ? (
                       <Text testID="not-set-note" style={[textStyle('caption'), muted]}>
-                        {d.accounts.notSetCount === 1 ? copy.home.notSetOne : copy.home.notSetMany.replace("{n}", String(d.accounts.notSetCount))}
+                        {notSetNote(d.accounts.notSetCount, 'account')}
                       </Text>
                     ) : null}
                   </View>
-                  {d.accounts.cardDuesMinor !== null ? (
-                    <View style={styles.cell} accessible accessibilityLabel={`${copy.home.cardDues}, ${amountLabel({ amountMinor: d.accounts.cardDuesMinor, currency: d.currency, locale: d.locale, inline: true })}`}>
+                  {d.accounts.cardDuesMinor !== null || d.accounts.notSetCards > 0 ? (
+                    <View
+                      style={styles.cell}
+                      accessible
+                      accessibilityLabel={`${copy.home.cardDues}, ${d.accounts.cardDuesMinor === null ? copy.money.notSet : amountLabel({ amountMinor: d.accounts.cardDuesMinor, currency: d.currency, locale: d.locale, inline: true })}${notSetNote(d.accounts.notSetCards, 'card') ? `, ${notSetNote(d.accounts.notSetCards, 'card')}` : ''}`}>
                       <Text style={[textStyle('label'), muted]}>{copy.home.cardDues}</Text>
-                      <Amount amountMinor={d.accounts.cardDuesMinor} currency={d.currency} direction="neutral" locale={d.locale} />
+                      {d.accounts.cardDuesMinor === null ? (
+                        <Text style={[textStyle('body-medium'), ink]}>{copy.money.notSet}</Text>
+                      ) : (
+                        <Amount amountMinor={d.accounts.cardDuesMinor} currency={d.currency} direction="neutral" locale={d.locale} />
+                      )}
+                      {notSetNote(d.accounts.notSetCards, 'card') ? (
+                        <Text testID="not-set-cards-note" style={[textStyle('caption'), muted]}>
+                          {notSetNote(d.accounts.notSetCards, 'card')}
+                        </Text>
+                      ) : null}
                     </View>
                   ) : null}
                 </>
@@ -144,8 +156,8 @@ export function HomeScreen({
 function inAccountsLabel(d: HomeData): string {
   const a = d.accounts;
   const base = a.inAccountsMinor === null ? `${copy.home.inAccounts}, ${copy.money.notSet}` : `${copy.home.inAccounts}, ${amountLabel({ amountMinor: a.inAccountsMinor, currency: d.currency, locale: d.locale, inline: true })}`;
-  if (a.notSetCount === 0) return base;
-  return `${base}, ${a.notSetCount === 1 ? copy.home.notSetOne : copy.home.notSetMany.replace("{n}", String(a.notSetCount))}`;
+  if (notSetNote(a.notSetCount, 'account') === null) return base;
+  return `${base}, ${notSetNote(a.notSetCount, 'account')}`;
 }
 
 const styles = StyleSheet.create({

@@ -140,9 +140,9 @@ describe('spent this period', () => {
 describe('home accounts', () => {
   it('shows no total for no accounts, and never zero for an unknown balance', async () => {
     const { writer, accounts } = await setup();
-    expect(homeAccounts(await accounts())).toEqual({ hasAccounts: false, inAccountsMinor: null, notSetCount: 0, cardDuesMinor: null });
+    expect(homeAccounts(await accounts())).toEqual({ hasAccounts: false, inAccountsMinor: null, notSetCount: 0, cardDuesMinor: null, notSetCards: 0 });
     await writer.run(AddAccount, { name: 'Cash', type: 'cash', openingMinor: null }, 'user');
-    expect(homeAccounts(await accounts())).toEqual({ hasAccounts: true, inAccountsMinor: null, notSetCount: 1, cardDuesMinor: null });
+    expect(homeAccounts(await accounts())).toEqual({ hasAccounts: true, inAccountsMinor: null, notSetCount: 1, cardDuesMinor: null, notSetCards: 0 });
   });
 
   it('adds asset accounts, counts the unset ones, and keeps card dues separate and positive', async () => {
@@ -150,7 +150,7 @@ describe('home accounts', () => {
     await writer.run(AddAccount, { name: 'DBS', type: 'bank', openingMinor: 320000 }, 'user');
     await writer.run(AddAccount, { name: 'Wallet', type: 'wallet', openingMinor: null }, 'user');
     await writer.run(AddAccount, { name: 'Visa', type: 'card', openingMinor: 25000 }, 'user');
-    expect(homeAccounts(await accounts())).toEqual({ hasAccounts: true, inAccountsMinor: 320000, notSetCount: 1, cardDuesMinor: 25000 });
+    expect(homeAccounts(await accounts())).toEqual({ hasAccounts: true, inAccountsMinor: 320000, notSetCount: 1, cardDuesMinor: 25000, notSetCards: 0 });
   });
 
   it('an archived account is left out', async () => {

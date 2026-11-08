@@ -5,3 +5,4 @@ export * from './entryCommands';
 export * from './keypad';
 export * from './readModels';
 export * from './transferCommands';
+export * from './balances';

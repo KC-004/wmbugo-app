@@ -1,4 +1,5 @@
-import { assetTotal, type AccountRow } from './accounts';
+import type { AccountRow } from './accounts';
+import { overviewTotals } from './balances';
 
 /** Confirmed expenses in a local-date range (inclusive), not removed. Params: start, end. */
 export const SPENT_EXPENSES_SQL =
@@ -6,6 +7,10 @@ export const SPENT_EXPENSES_SQL =
 /** Confirmed refunds in the range (they reduce spending). Params: start, end. */
 export const SPENT_REFUNDS_SQL =
   "SELECT COALESCE(SUM(amount_minor), 0) FROM \"transaction\" WHERE event_type = 'refund' AND status = 'confirmed' AND removed_at IS NULL AND local_date BETWEEN ? AND ?";
+
+/** Confirmed income in a local-date range (inclusive), not removed. Transfers are never income. Params: start, end. */
+export const INCOME_SQL =
+  "SELECT COALESCE(SUM(amount_minor), 0) FROM \"transaction\" WHERE event_type = 'income' AND status = 'confirmed' AND removed_at IS NULL AND local_date BETWEEN ? AND ?";
 
 /** Spent = confirmed expenses minus refunds, never below zero. */
 export function spentMinor(expensesMinor: number, refundsMinor: number): number {
@@ -16,21 +21,23 @@ export interface HomeAccounts {
   readonly hasAccounts: boolean;
   /** Sum of included asset accounts with a balance; null when none has one. */
   readonly inAccountsMinor: number | null;
+  /** Asset accounts with no balance set. */
   readonly notSetCount: number;
-  /** What is owed on cards with a known balance; null when there is no card with a balance. */
+  /** What is owed on cards with a known balance; null when no card has one. */
   readonly cardDuesMinor: number | null;
+  /** Cards with no balance set. */
+  readonly notSetCards: number;
 }
 
-/** "In accounts" and "Card dues" side by side, never summed; an unknown balance is never shown as zero. */
+/** "In accounts" and "Card dues" side by side, from the one overview query (never summed here). */
 export function homeAccounts(accounts: readonly AccountRow[]): HomeAccounts {
-  const active = accounts.filter((a) => a.status === 'active');
-  const assets = assetTotal(active);
-  const cards = active.filter((a) => a.type === 'card' && !a.balanceNotSet);
+  const t = overviewTotals(accounts);
   return {
-    hasAccounts: active.length > 0,
-    inAccountsMinor: assets.accountsCounted > 0 ? assets.minor : null,
-    notSetCount: assets.accountsNotSet,
-    cardDuesMinor: cards.length > 0 ? cards.reduce((n, c) => n - c.postingsMinor, 0) : null,
+    hasAccounts: accounts.some((a) => a.status === 'active'),
+    inAccountsMinor: t.inAccountsMinor,
+    notSetCount: t.notSetAssets,
+    cardDuesMinor: t.cardDuesMinor,
+    notSetCards: t.notSetCards,
   };
 }
 

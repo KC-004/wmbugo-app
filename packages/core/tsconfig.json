@@ -15,5 +15,5 @@
       "@op-engineering/op-sqlite/*": ["./__forbidden__/op-sqlite"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts"]
 }

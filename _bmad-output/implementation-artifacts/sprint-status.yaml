@@ -54,8 +54,8 @@ development_status:
   1-16-settings-hub-with-appearance-and-finance-settings: review
   epic-1-retrospective: done
 
-  epic-2: backlog
-  2-1-account-balance-read-model-and-finance-fixtures: backlog
+  epic-2: in-progress
+  2-1-account-balance-read-model-and-finance-fixtures: review
   2-2-accounts-list-with-money-you-have-and-money-you-owe: backlog
   2-3-account-detail-and-its-timeline: backlog
   2-4-starting-balance-and-tracking-date: backlog
