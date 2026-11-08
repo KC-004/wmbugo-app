@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["jest"],
+    "paths": {
+      "react-native": ["./__forbidden__/react-native"],
+      "react-native/*": ["./__forbidden__/react-native"],
+      "drizzle-orm": ["./__forbidden__/drizzle-orm"],
+      "drizzle-orm/*": ["./__forbidden__/drizzle-orm"],
+      "@op-engineering/op-sqlite": ["./__forbidden__/op-sqlite"],
+      "@op-engineering/op-sqlite/*": ["./__forbidden__/op-sqlite"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
+}

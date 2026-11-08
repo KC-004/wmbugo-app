@@ -1,0 +1,28 @@
+{
+  "name": "wmbugo",
+  "private": true,
+  "packageManager": "pnpm@12.18.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "postinstall": "simple-git-hooks",
+    "lint": "eslint --max-warnings 0 .",
+    "typecheck": "pnpm -r --workspace-concurrency=1 run typecheck",
+    "test:core": "pnpm --filter @wmbugo/core test",
+    "check:lockfiles": "node scripts/check-lockfiles.mjs",
+    "check:permissions": "node scripts/check-permissions.mjs",
+    "test:gates": "node scripts/test-gates.mjs"
+  },
+  "simple-git-hooks": {
+    "pre-push": "pnpm test:core"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.14.0",
+    "globals": "^17.14.0",
+    "simple-git-hooks": "^2.14.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.72.1"
+  }
+}

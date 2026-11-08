@@ -1,0 +1,12 @@
+packages:
+  - apps/*
+  - packages/*
+
+# pnpm 11+ reads settings from this file, not .npmrc. .npmrc keeps
+# node-linker=hoisted as well so older tooling sees the same intent.
+nodeLinker: hoisted
+
+allowBuilds:
+  # The root postinstall script installs the git hooks; the package's own
+  # install script is not needed.
+  simple-git-hooks: false

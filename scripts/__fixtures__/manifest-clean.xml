@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="app.wmbugo">
+    <permission android:name="app.wmbugo.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" android:protectionLevel="signature" />
+    <uses-permission android:name="app.wmbugo.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+    <application android:allowBackup="false" />
+</manifest>

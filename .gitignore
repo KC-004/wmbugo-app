@@ -1,2 +1,28 @@
 # BMad generated render cache
 _bmad/render/
+
+# Dependencies
+node_modules/
+
+# Temp files left by scripts/test-gates.mjs if interrupted
+__gate_*
+
+# Build output
+build/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Android / IDE
+.gradle/
+.idea/
+.kotlin/
+.cxx/
+local.properties
+*.iml
+*.hprof
+
+# OS / logs
+.DS_Store
+npm-debug.log*
+pnpm-debug.log*
