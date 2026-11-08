@@ -1,12 +1,16 @@
 import { AccessibilityInfo, Text, useWindowDimensions } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { createQueryClient } from '../../shared/queryClient';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
 import { colorTokens } from '../../shared/theme/colors';
 import { setNavTimingSink, markTabFirstFrame, markTabPress } from './navTiming';
 import { RootNavigator } from './RootNavigator';
 import { ScreenHeader } from './ScreenHeader';
 
+// The Add sheet reads through the ledger; the shell tests only care that it opens and closes.
+jest.mock('../add/addApi', () => ({ realAddApi: { load: async () => null, defaultAccountFor: async () => null, record: async () => ({ ok: false, code: 'x' }), remove: async () => ({ ok: true }) } }));
 jest.mock('react-native-safe-area-context', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.mock factories cannot use import
   require('react-native-safe-area-context/jest/mock').default,
@@ -32,15 +36,24 @@ beforeEach(() => {
   jest.spyOn(AccessibilityInfo, 'addEventListener').mockReturnValue({ remove: () => undefined } as never);
 });
 
+const queryClients: ReturnType<typeof createQueryClient>[] = [];
+afterEach(() => {
+  for (const c of queryClients.splice(0)) c.clear();
+});
+
 async function mountShell(): Promise<ReactTestRenderer> {
+  const qc = createQueryClient();
+  queryClients.push(qc);
   let r!: ReactTestRenderer;
   await act(async () => {
     r = create(
-      <ThemeProvider initialMode="light">
-        <SafeAreaProvider>
-          <RootNavigator />
-        </SafeAreaProvider>
-      </ThemeProvider>,
+      <QueryClientProvider client={qc}>
+        <ThemeProvider initialMode="light">
+          <SafeAreaProvider>
+            <RootNavigator />
+          </SafeAreaProvider>
+        </ThemeProvider>
+      </QueryClientProvider>,
     );
   });
   live.push(r);
@@ -132,15 +145,14 @@ describe('root navigator', () => {
     expect(shadowed.length).toBe(1);
   });
 
-  it('tapping the add button opens the sheet host with a glass body and Cancel; Cancel closes it and nothing stacks', async () => {
+  it('tapping the add button opens the sheet host with a glass body; the scrim closes it and nothing stacks', async () => {
     const r = await mountShell();
     await act(async () => fire(r, 'add-button'));
     expect(host(r, 'sheet-scrim').length).toBe(1);
     expect(labels(r)).toContain('Add entry');
     await act(async () => fire(r, 'add-button')); // again: replaces, not stacks
     expect(host(r, 'sheet-scrim').length).toBe(1);
-    const cancel = r.root.findAll((n) => n.props.accessibilityLabel === 'Cancel' && typeof n.props.onPress === 'function')[0]!;
-    await act(async () => cancel.props.onPress());
+    await act(async () => fire(r, 'sheet-scrim'));
     expect(host(r, 'sheet-scrim')).toHaveLength(0);
   });
 

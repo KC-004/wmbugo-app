@@ -10,8 +10,8 @@ import { SheetHost, useSheet } from '../../shared/feedback/SheetHost';
 import { ToastHost } from '../../shared/feedback/ToastHost';
 import { useTheme } from '../../shared/theme/ThemeProvider';
 import { textStyle } from '../../shared/theme/typography';
-import { Button } from '../../shared/ui/Button';
 import type { AddButtonRef } from './AddButton';
+import { AddSheet } from '../add/AddSheet';
 import { AccountsScreen } from '../accounts/AccountsScreen';
 import { ScreenHeader } from './ScreenHeader';
 import { TabBar, type TabRoute } from './TabBar';
@@ -55,12 +55,6 @@ const ActivityStack = tabStack(copy.nav.activity, 'Activity');
 const InsightsStack = tabStack(copy.nav.insights, 'Insights');
 const PlanStack = tabStack(copy.nav.plan, 'Plan');
 
-function AddSheetContent() {
-  const theme = useTheme();
-  // The Add sheet content arrives in Story 1.13; the host and the opening path are what this story ships.
-  return <Text style={[textStyle('body'), { color: theme.color('on-glass-primary') }]}>{copy.sheet.addTitle}</Text>;
-}
-
 function TabsWithAdd() {
   const sheet = useSheet();
   const opener: AddButtonRef = useRef(null);
@@ -71,8 +65,7 @@ function TabsWithAdd() {
       {
         id: 'add',
         title: copy.sheet.addTitle,
-        body: () => <AddSheetContent />,
-        footer: (close) => <Button label={copy.common.cancel} variant="secondary-on-footer" onPress={close} />,
+        body: (close) => <AddSheet close={close} />,
       },
       opener,
     );

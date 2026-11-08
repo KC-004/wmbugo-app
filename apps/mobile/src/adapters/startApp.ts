@@ -4,6 +4,7 @@ import {
   createRedactingLogger,
   LedgerWriter,
   OutboxDispatcher,
+  entryShape,
   openingBalanceShape,
   SetUpProfile,
   startStorage,
@@ -93,7 +94,7 @@ export async function startApp(): Promise<Result<StartupOk, StartupErrorCode>> {
     clock: systemClock,
     newId: createIdGenerator(systemClock, secureRandom),
     logger: log,
-    invariants: [singleProfile, openingBalanceShape],
+    invariants: [singleProfile, openingBalanceShape, entryShape],
     // Deliver after every commit; a failure stays pending and is retried on the next commit or launch.
     onCommitted: () => void dispatcher.deliverPending().catch(() => undefined),
   });

@@ -81,7 +81,7 @@ export function assetTotal(rows: readonly AccountRow[]): { minor: number; accoun
 
 /** SQL for the accounts list: postings summed per account, in the user's order. Archived rows are included; callers filter. */
 export const ACCOUNT_LIST_SQL =
-  'SELECT a.id, a.name, a.type, a.icon, a.color_token, a.sort_order, a.status, a.balance_not_set, COALESCE(SUM(p.signed_amount_minor), 0) AS postings_minor FROM account a LEFT JOIN posting p ON p.account_id = a.id GROUP BY a.id ORDER BY a.sort_order, a.id';
+  'SELECT a.id, a.name, a.type, a.icon, a.color_token, a.sort_order, a.status, a.balance_not_set, COALESCE(SUM(CASE WHEN t.removed_at IS NULL THEN p.signed_amount_minor END), 0) AS postings_minor FROM account a LEFT JOIN posting p ON p.account_id = a.id LEFT JOIN "transaction" t ON t.id = p.transaction_id GROUP BY a.id ORDER BY a.sort_order, a.id';
 
 export function mapAccountRows(rows: readonly (readonly unknown[])[]): AccountRow[] {
   return rows.map((r) => ({

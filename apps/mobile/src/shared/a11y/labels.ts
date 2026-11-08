@@ -99,3 +99,13 @@ export function controlA11y(input: {
     ...(input.hint ? { accessibilityHint: aboutText(input.hint) } : {}),
   };
 }
+
+/**
+ * What TalkBack says while an amount is being typed: "12 point 50 Singapore dollars". A trailing decimal
+ * point reads "12 point"; nothing typed reads "0".
+ */
+export function typedAmountLabel(typedText: string, currency: CurrencyCode): string {
+  const [whole = '', frac] = typedText.split('.');
+  const said = `${whole === '' ? '0' : whole}${frac === undefined ? '' : frac === '' ? ' point' : ` point ${frac}`}`;
+  return `${said} ${UNIT[currency]}`;
+}

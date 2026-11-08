@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { check, index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { check, index, integer, sqliteTable, text, type AnySQLiteColumn } from 'drizzle-orm/sqlite-core';
 
 /**
  * Owned by the ledger module (AD-3). Created by migration 0004 (Story 1.12). The `transaction` table is
@@ -113,5 +113,47 @@ export const posting = sqliteTable(
       'posting_sign_check',
       sql`(${t.direction} = 'in' AND ${t.signed_amount_minor} >= 0) OR (${t.direction} = 'out' AND ${t.signed_amount_minor} <= 0)`,
     ),
+  ],
+);
+
+/** Created by migration 0004 (journal index 4, Story 1.13) with the seeded categories (CAT-001, CAT-006). */
+export const category = sqliteTable(
+  'category',
+  {
+    id: text('id').primaryKey(),
+    parent_id: text('parent_id').references((): AnySQLiteColumn => category.id),
+    name: text('name').notNull(),
+    kind: text('kind').notNull(),
+    budget_type: text('budget_type'),
+    icon: text('icon').notNull(),
+    color_token: text('color_token').notNull(),
+    sort_order: integer('sort_order').notNull(),
+    archived: integer('archived').notNull().default(0),
+  },
+  (t) => [
+    index('category_parent_order_idx').on(t.parent_id, t.sort_order),
+    check('category_kind_check', sql`${t.kind} IN ('expense','income')`),
+    check('category_budget_type_check', sql`${t.budget_type} IS NULL OR ${t.budget_type} IN ('need','want')`),
+    check('category_archived_check', sql`${t.archived} IN (0,1)`),
+  ],
+);
+
+export const split = sqliteTable(
+  'split',
+  {
+    id: text('id').primaryKey(),
+    transaction_id: text('transaction_id')
+      .notNull()
+      .references(() => transaction.id),
+    category_id: text('category_id')
+      .notNull()
+      .references(() => category.id),
+    amount_minor: integer('amount_minor').notNull(),
+    memo: text('memo'),
+  },
+  (t) => [
+    index('split_category_tx_idx').on(t.category_id, t.transaction_id),
+    index('split_tx_idx').on(t.transaction_id),
+    check('split_amount_check', sql`${t.amount_minor} >= 0`),
   ],
 );
