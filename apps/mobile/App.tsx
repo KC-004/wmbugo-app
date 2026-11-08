@@ -1,22 +1,31 @@
 /**
  * Placeholder root. Navigation, theming and features arrive in later stories.
+ * The only logic here is the startup gate: the first screen waits for the
+ * encrypted database to be ready.
  */
 import { StatusBar, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { startApp } from './src/adapters/startApp';
+import { StartupGate, type StartFn } from './src/features/startup/StartupGate';
+import { copy } from './src/shared/copy';
 
-function App() {
+function App({ start = startApp }: { start?: StartFn }) {
   const isDarkMode = useColorScheme() === 'dark';
 
   return (
     <SafeAreaProvider>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <View style={styles.container}>
-        <Text
-          accessibilityRole="header"
-          style={[styles.title, isDarkMode ? styles.titleDark : styles.titleLight]}>
-          wmbugo
-        </Text>
-      </View>
+      <StartupGate start={start}>
+        {(route) => (
+          <View style={styles.container}>
+            <Text
+              accessibilityRole="header"
+              style={[styles.title, isDarkMode ? styles.titleDark : styles.titleLight]}>
+              {route === 'onboarding' ? copy.onboarding.placeholder : copy.app.name}
+            </Text>
+          </View>
+        )}
+      </StartupGate>
     </SafeAreaProvider>
   );
 }

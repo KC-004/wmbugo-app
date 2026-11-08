@@ -41,7 +41,7 @@ development_status:
   1-3-spike-s8-reference-devices-and-benchmark-method: review
   1-4-exact-money-and-time-primitives-with-a-property-suite: review
   1-5-spike-s2-initial-schema-and-migration-plan: review
-  1-6-encrypted-database-opens-on-first-launch: backlog
+  1-6-encrypted-database-opens-on-first-launch: review
   1-7-atomic-writer-with-audit-trail-outbox-and-query-cache: backlog
   1-8-design-tokens-theming-and-brand-assets: backlog
   1-9-shared-controls-and-accessibility-primitives: backlog

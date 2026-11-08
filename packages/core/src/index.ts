@@ -8,3 +8,5 @@
 export const CORE_PACKAGE = '@wmbugo/core';
 export * from './shared';
 export * from './schema-lint';
+export * from './ports';
+export * from './usecases';

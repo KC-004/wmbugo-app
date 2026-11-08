@@ -133,6 +133,9 @@ android {
             // see https://reactnative.dev/docs/signed-apk-android.
             signingConfig signingConfigs.debug
             minifyEnabled enableProguardInReleaseBuilds
+            // Opt-in only (-PwmbugoDebuggableRelease): lets CI and developers `run-as` into the
+            // app to inspect the database header. Never set for a build that ships.
+            debuggable project.hasProperty('wmbugoDebuggableRelease')
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }
     }

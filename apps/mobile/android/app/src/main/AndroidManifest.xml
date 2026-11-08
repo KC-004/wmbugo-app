@@ -1,10 +1,18 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!--
       No permissions here. INTERNET is declared only in src/debug (Metro dev server).
       Release builds must pass scripts/check-permissions.mjs against
       scripts/android-permission-allowlist.json.
     -->
+
+    <!-- Libraries add permissions we do not use or want. Removing them by name keeps
+         the allowlist check honest without masking an INTERNET added to main. -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" tools:node="remove" />
+    <uses-permission android:name="android.permission.USE_FINGERPRINT" tools:node="remove" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" tools:node="remove" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" tools:node="remove" />
 
     <application
       android:name=".MainApplication"

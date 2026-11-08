@@ -63,3 +63,36 @@ jobs:
 
       - name: Permission allowlist check (both flavors)
         run: pnpm check:permissions
+
+  encrypted-db:
+    name: Encrypted database header check (emulator)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Build release APK (debuggable so the database can be pulled)
+        working-directory: apps/mobile/android
+        run: ./gradlew --no-daemon assembleNosmsRelease -PwmbugoDebuggableRelease
+      - name: First launch on an emulator, pull the database, check its header
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          script: bash scripts/ci-check-encrypted-db.sh
