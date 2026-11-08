@@ -121,10 +121,10 @@ function SettingsRoute() {
 function AccountsRoute() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const nav = useNavigation<{ navigate: (s: 'AccountDetail', p: { accountId: string }) => void }>();
+  const nav = useNavigation<{ navigate: (s: 'AccountDetail', p: { accountId: string }) => void; goBack: () => void }>();
   return (
     <View style={[styles.fill, { backgroundColor: theme.color('bg-canvas'), paddingTop: insets.top }]}>
-      <AccountsScreen onOpen={(accountId) => nav.navigate('AccountDetail', { accountId })} />
+      <AccountsScreen onBack={() => nav.goBack()} onOpen={(accountId) => nav.navigate('AccountDetail', { accountId })} />
     </View>
   );
 }

@@ -29,6 +29,8 @@ const settle = async () => {
 };
 const texts = (r: ReactTestRenderer) => r.root.findAll((n) => n.type === Text).map((n) => [n.props.children].flat().filter((c) => typeof c === 'string').join(''));
 const host = (r: ReactTestRenderer, id: string) => r.root.findAll((n) => typeof n.type === 'string' && n.props.testID === id);
+const type = (r: ReactTestRenderer, value: string) =>
+  act(() => r.root.findAll((n) => n.props.testID === 'account-panel-input' && typeof n.props.onChangeText === 'function')[0]!.props.onChangeText(value));
 const press = (r: ReactTestRenderer, id: string) => r.root.findAll((n) => n.props.testID === id && typeof n.props.onPress === 'function')[0]!.props.onPress();
 
 const account = (over: Partial<AccountRow> = {}): AccountRow => ({
@@ -38,12 +40,14 @@ const row = (id: string, kind: ActivityRow['kind'], amountMinor: number, localDa
   id, kind, amountMinor, localDate, merchant: null, categoryName: 'Food & Drinks', categoryIcon: 'ForkKnife', categoryColor: 'cat-rose', accountName: null, ...over,
 });
 const data = (rows: ActivityRow[], signed: Record<string, number> = {}, over: Partial<AccountDetailData> = {}): AccountDetailData => ({
-  currency: 'INR', locale: 'en-IN', today: '2026-11-08', account: account(), days: groupByDay(rows), signed, hasMore: false, starting: { minor: 3000000, localDate: '2026-11-01' }, ...over,
+  currency: 'INR', exponent: 2, locale: 'en-IN', today: '2026-11-08', account: account(), days: groupByDay(rows), signed, hasMore: false, starting: { minor: 3000000, localDate: '2026-11-01' }, ...over,
 });
 
 async function mountDetail(d: AccountDetailData | 'missing', props: Partial<Parameters<typeof AccountDetailScreen>[0]> = {}) {
   const load = jest.fn<Promise<AccountDetailData | 'missing'>, [string, number?]>(async () => d);
-  const api: AccountDetailApi = { load };
+  const setStartingBalance = jest.fn<Promise<{ ok: boolean; code?: string }>, [string, number]>(async () => ({ ok: true }));
+  const changeTrackingDate = jest.fn<Promise<{ ok: boolean; code?: string }>, [string, string]>(async () => ({ ok: true }));
+  const api: AccountDetailApi = { load, setStartingBalance, changeTrackingDate };
   const qc = createQueryClient();
   clients.push(qc);
   const onBack = jest.fn();
@@ -61,8 +65,10 @@ async function mountDetail(d: AccountDetailData | 'missing', props: Partial<Para
   });
   live.push(r);
   await settle();
-  return { r, load, onBack, onMoveMoney, onAddExpense };
+  return { r, load, onBack, onMoveMoney, onAddExpense, setStartingBalance, changeTrackingDate };
 }
+
+const r2 = (r: ReactTestRenderer) => String(host(r, 'account-panel-input')[0]!.props.value);
 
 describe('AccountDetailScreen', () => {
   const rows = [
@@ -92,7 +98,7 @@ describe('AccountDetailScreen', () => {
     const { r } = await mountDetail(data(rows, { t: -20000, e: -45000, i: 500000 }));
     const start = host(r, 'starting-balance')[0]!;
     const t = start.findAll((n) => n.type === Text).map((n) => [n.props.children].flat().filter((c) => typeof c === 'string').join(''));
-    expect(t).toEqual(['Starting balance', '₹30,000.00', '· 1 Nov']);
+    expect(t).toEqual(['Starting balance', '₹30,000.00', '· 1 Nov', 'To correct it, use Adjust balance']);
     expect(t.join('')).not.toContain('+');
   });
 
@@ -141,5 +147,72 @@ describe('AccountDetailScreen', () => {
     expect(texts(f.r)).toContain('This account is not here any more.');
     act(() => press(f.r, 'account-detail-back'));
     expect(f.onBack).toHaveBeenCalled();
+  });
+
+  describe('Set balance and Tracking since (Story 2.4)', () => {
+    const notSet = (over: Partial<AccountRow> = {}) => account({ balanceNotSet: true, postingsMinor: 0, type: 'cash', icon: 'Money', name: 'Cash', ...over });
+
+    it('a not-set account offers Set balance, not a starting row; a set account does not offer it', async () => {
+      const a = await mountDetail(data([], {}, { starting: null, account: notSet() }));
+      expect(host(a.r, 'account-set-balance')).toHaveLength(1);
+      expect(host(a.r, 'tracking-since')).toHaveLength(0);
+      const b = await mountDetail(data(rows, {}));
+      expect(host(b.r, 'account-set-balance')).toHaveLength(0);
+      expect(host(b.r, 'tracking-since')).toHaveLength(1);
+      expect(texts(b.r)).toContain('Tracking since 1 Nov');
+    });
+
+    it("asks \"What's in it today?\", saves the exact minor units, closes and refreshes", async () => {
+      const f = await mountDetail(data([], {}, { starting: null, account: notSet() }));
+      act(() => press(f.r, 'account-set-balance'));
+      expect(texts(f.r)).toContain("What's in it today?");
+      type(f.r, '1550');
+      await act(async () => press(f.r, 'account-panel-save'));
+      await settle();
+      expect(f.setStartingBalance).toHaveBeenCalledWith('h', 155000);
+      expect(host(f.r, 'account-panel')).toHaveLength(0);
+      expect(f.load.mock.calls.length).toBeGreaterThan(1);
+    });
+
+    it('a card asks how much you owe, labelled Set amount owed', async () => {
+      const f = await mountDetail(data([], {}, { starting: null, account: notSet({ type: 'card', icon: 'CreditCard', name: 'Visa' }) }));
+      expect(texts(f.r)).toContain('Set amount owed');
+      act(() => press(f.r, 'account-set-balance'));
+      expect(texts(f.r)).toContain('How much do you owe today?');
+      type(f.r, '4100');
+      await act(async () => press(f.r, 'account-panel-save'));
+      expect(f.setStartingBalance).toHaveBeenCalledWith('h', 410000);
+    });
+
+    it('an empty amount shows "Error: amount required", keeps the panel and writes nothing; zero is saved', async () => {
+      const f = await mountDetail(data([], {}, { starting: null, account: notSet() }));
+      act(() => press(f.r, 'account-set-balance'));
+      await act(async () => press(f.r, 'account-panel-save'));
+      expect(texts(f.r)).toContain('Error: amount required');
+      expect(host(f.r, 'account-panel-error')[0]!.props.accessibilityRole).toBe('alert');
+      expect(f.setStartingBalance).not.toHaveBeenCalled();
+      type(f.r, 'abc');
+      await act(async () => press(f.r, 'account-panel-save'));
+      expect(texts(f.r)).toContain('Enter a number, like 3200 or 3200.50.');
+      type(f.r, '0');
+      await act(async () => press(f.r, 'account-panel-save'));
+      expect(f.setStartingBalance).toHaveBeenCalledWith('h', 0);
+    });
+
+    it('Tracking since: Change opens the date, saves it, and a future date shows the calm error and keeps the input', async () => {
+      const f = await mountDetail(data(rows, {}));
+      act(() => press(f.r, 'account-change-date'));
+      expect(r2(f.r)).toBe('2026-11-01');
+      f.changeTrackingDate.mockResolvedValueOnce({ ok: false, code: 'DATE_IN_FUTURE' });
+      type(f.r, '2026-12-01');
+      await act(async () => press(f.r, 'account-panel-save'));
+      expect(texts(f.r)).toContain('Error: choose today or an earlier date');
+      expect(r2(f.r)).toBe('2026-12-01');
+      type(f.r, '2026-10-30');
+      await act(async () => press(f.r, 'account-panel-save'));
+      await settle();
+      expect(f.changeTrackingDate).toHaveBeenLastCalledWith('h', '2026-10-30');
+      expect(host(f.r, 'account-panel')).toHaveLength(0);
+    });
   });
 });

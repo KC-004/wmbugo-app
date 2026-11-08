@@ -5,8 +5,10 @@ import {
   ACTIVITY_PAGE_SIZE,
   groupByDay,
   mapAccountRows,
+  ChangeTrackingDate,
   mapTimelineRows,
   pageActivity,
+  SetStartingBalance,
   toLocalDate,
   type AccountRow,
   type ActivityDay,
@@ -18,6 +20,7 @@ import { readProfile } from '../../adapters/readProfile';
 
 export interface AccountDetailData {
   readonly currency: CurrencyCode;
+  readonly exponent: number;
   readonly locale: string;
   readonly today: string;
   readonly account: AccountRow;
@@ -33,6 +36,10 @@ export interface AccountDetailData {
 export interface AccountDetailApi {
   /** null: no profile yet. 'missing': no such account. */
   load(accountId: string, limit?: number): Promise<AccountDetailData | 'missing' | null>;
+  /** Gives a not-set account its balance as of today (a card takes the amount owed). */
+  setStartingBalance(accountId: string, amountMinor: number): Promise<{ ok: boolean; code?: string }>;
+  /** Moves the day tracking starts to the start of this local day (yyyy-mm-dd). */
+  changeTrackingDate(accountId: string, localDate: string): Promise<{ ok: boolean; code?: string }>;
 }
 
 export const accountDetailKey = (accountId: string, limit: number) => ['ledger', 'account', accountId, limit] as const;
@@ -54,6 +61,7 @@ export const realAccountDetailApi: AccountDetailApi = {
     const startDate = start ? toLocalDate(Number(start[1]), p.timezoneId) : null;
     return {
       currency: p.currency,
+      exponent: p.exponent,
       locale: p.locale,
       today: today.value,
       account,
@@ -63,4 +71,6 @@ export const realAccountDetailApi: AccountDetailApi = {
       starting: start && startDate?.ok ? { minor: Number(start[0]), localDate: startDate.value } : null,
     };
   },
+  setStartingBalance: (accountId, amountMinor) => getServices().writer.run(SetStartingBalance, { accountId, amountMinor }, 'user'),
+  changeTrackingDate: (accountId, localDate) => getServices().writer.run(ChangeTrackingDate, { accountId, localDate }, 'user'),
 };

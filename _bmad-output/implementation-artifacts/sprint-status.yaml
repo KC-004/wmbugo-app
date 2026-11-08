@@ -58,7 +58,7 @@ development_status:
   2-1-account-balance-read-model-and-finance-fixtures: review
   2-2-accounts-list-with-money-you-have-and-money-you-owe: review
   2-3-account-detail-and-its-timeline: review
-  2-4-starting-balance-and-tracking-date: backlog
+  2-4-starting-balance-and-tracking-date: review
   2-5-adjust-balance-with-a-reason: backlog
   2-6-credit-card-details-outstanding-statement-due-and-limit: backlog
   2-7-pay-card-bill: backlog

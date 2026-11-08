@@ -14,6 +14,7 @@ import { layout, radii } from '../../shared/theme/tokens';
 import { textStyle } from '../../shared/theme/typography';
 import { Amount } from '../../shared/ui/Amount';
 import { Button } from '../../shared/ui/Button';
+import { ScreenHeader } from '../shell/ScreenHeader';
 import { AccountForm, TYPE_LABEL } from './AccountForm';
 import { ACCOUNTS_QUERY_KEY, NET_WORTH_QUERY_KEY, PROFILE_QUERY_KEY, realAccountsApi, type AccountsApi } from './accountsApi';
 
@@ -25,8 +26,7 @@ type Mode = { kind: 'list' } | { kind: 'add' } | { kind: 'rename'; account: Acco
  * The accounts list: active accounts in Mei's order with a ledger-derived balance or "Balance not set"
  * (never zero), add, rename, Move up / Move down (also TalkBack custom actions) and archive with Undo.
  */
-export function AccountsScreen({ api = realAccountsApi, onOpen }: { api?: AccountsApi; onOpen?: (accountId: string) => void }) {
-  const theme = useTheme();
+export function AccountsScreen({ api = realAccountsApi, onOpen, onBack }: { api?: AccountsApi; onOpen?: (accountId: string) => void; onBack?: () => void }) {
   const toast = useToast();
   const qc = useQueryClient();
   const accounts = useQuery({ queryKey: ACCOUNTS_QUERY_KEY, queryFn: () => api.list() });
@@ -38,7 +38,6 @@ export function AccountsScreen({ api = realAccountsApi, onOpen }: { api?: Accoun
   const refresh = () => qc.invalidateQueries({ queryKey: ['ledger'] });
   const active = (accounts.data ?? []).filter((a) => a.status === 'active');
   const groups = accountGroups(active);
-  const ink = { color: theme.color('text-primary') };
 
   const adding = useRef(false);
   const add = async (account: NewAccount) => {
@@ -96,20 +95,25 @@ export function AccountsScreen({ api = realAccountsApi, onOpen }: { api?: Accoun
 
   if (mode.kind === 'add' && profile.data) {
     return (
-      <ScrollView contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
-        <Text accessibilityRole="header" style={[textStyle('title'), ink]}>{copy.accounts.add}</Text>
-        <AccountForm exponent={profile.data.exponent} submitLabel={copy.accounts.save} onSubmit={add} saveError={saveError} />
-        <Button label={copy.common.cancel} variant="text" onPress={() => setMode({ kind: 'list' })} testID="account-cancel" />
-      </ScrollView>
+      <View style={styles.fill}>
+        <ScreenHeader title={copy.accounts.add} onBack={() => setMode({ kind: 'list' })} backTestID="account-back" />
+        <ScrollView contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
+          <AccountForm exponent={profile.data.exponent} submitLabel={copy.accounts.save} onSubmit={add} saveError={saveError} />
+          <Button label={copy.common.cancel} variant="text" onPress={() => setMode({ kind: 'list' })} testID="account-cancel" />
+        </ScrollView>
+      </View>
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.pad}>
-      <View style={styles.header}>
-        <Text accessibilityRole="header" style={[textStyle('title'), ink]}>{copy.accounts.title}</Text>
-        <Button label={copy.accounts.add} variant="secondary" onPress={() => setMode({ kind: 'add' })} testID="accounts-add" />
-      </View>
+    <View style={styles.fill}>
+      <ScreenHeader
+        title={copy.accounts.title}
+        onBack={onBack}
+        backTestID="accounts-back"
+        actions={<Button label={copy.accounts.add} variant="secondary" onPress={() => setMode({ kind: 'add' })} testID="accounts-add" />}
+      />
+      <ScrollView contentContainerStyle={styles.pad}>
 
       {accounts.isError ? (
         <ErrorBlock cause={copy.accounts.loadError} onRetry={() => void accounts.refetch()} />
@@ -161,7 +165,8 @@ export function AccountsScreen({ api = realAccountsApi, onOpen }: { api?: Accoun
           <NetWorthFooter on={netWorthOn.data === true} onToggle={(v) => void setNetWorth(v)} net={groups.netWorth} currency={profile.data?.currency} locale={profile.data?.locale} />
         </>
       ) : null}
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -373,6 +378,7 @@ const styles = StyleSheet.create({
   groupHeader: { gap: 2, paddingTop: 8 },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: layout.touchMin, width: '100%' },
   inline: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 6 },
+  fill: { flex: 1 },
   pad: { padding: 16, gap: 12 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   row: { borderWidth: 1, borderRadius: radii.md, padding: 12, gap: 8 },

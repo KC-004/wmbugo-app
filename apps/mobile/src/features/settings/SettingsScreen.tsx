@@ -24,6 +24,7 @@ import { layout, radii } from '../../shared/theme/tokens';
 import { textStyle } from '../../shared/theme/typography';
 import { Amount } from '../../shared/ui/Amount';
 import { Button } from '../../shared/ui/Button';
+import { ScreenHeader } from '../shell/ScreenHeader';
 import { Chip } from '../../shared/ui/Chip';
 import { useFocusRing } from '../../shared/ui/FocusRing';
 import { RegionPicker } from '../onboarding/OnboardingFlow';
@@ -94,13 +95,9 @@ export function SettingsScreen({ api = realSettingsApi, onBack }: { api?: Settin
   const back = () => (page === 'hub' ? onBack() : setPage(page === 'you' ? 'hub' : 'you'));
 
   return (
-    <ScrollView contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
-      <View style={styles.header}>
-        <Button label={copy.nav.back} variant="text" onPress={back} testID="settings-back" />
-        <Text accessibilityRole="header" style={[textStyle('title'), { color: theme.color('text-primary') }]}>
-          {title}
-        </Text>
-      </View>
+    <View style={styles.fill}>
+      <ScreenHeader title={title} onBack={back} backTestID="settings-back" />
+      <ScrollView contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
       {!d ? null : page === 'hub' ? (
         <Row testID="group-you" label={copy.settings.you} summary={youSummary(d.profile.payday, d.settings.theme)} onPress={() => setPage('you')} />
       ) : page === 'you' ? (
@@ -130,7 +127,8 @@ export function SettingsScreen({ api = realSettingsApi, onBack }: { api?: Settin
           {`${note} ${copy.errors.nothingSaved}`}
         </Text>
       ) : null}
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -380,7 +378,7 @@ function SwitchRow({ label, hint, value, onChange, testID }: { label: string; hi
 
 const styles = StyleSheet.create({
   pad: { padding: 16, gap: 12 },
-  header: { gap: 4, alignItems: 'flex-start' },
+  fill: { flex: 1 },
   gap: { gap: 8 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: radii.md, padding: 12, minHeight: layout.touchMin },

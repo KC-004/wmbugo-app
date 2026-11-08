@@ -1,11 +1,12 @@
-import { useState } from 'react';
-import { Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
-import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Bank, CreditCard, Money, PiggyBank, Wallet } from 'phosphor-react-native';
-import { accountLine, ACTIVITY_PAGE_SIZE, dayHeading, longDate, shortDate, type ActivityRow, type CurrencyCode } from '@wmbugo/core';
+import { useRef, useState } from 'react';
+import { SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Bank, CreditCard, Money, PiggyBank, Wallet } from 'phosphor-react-native';
+import { accountLine, ACTIVITY_PAGE_SIZE, dayHeading, longDate, parseAmountInput, shortDate, type ActivityRow, type CurrencyCode } from '@wmbugo/core';
 import { amountLabel } from '../../shared/a11y/labels';
 import { copy } from '../../shared/copy';
 import { EmptyState, ErrorBlock, Reveal, Skeleton } from '../../shared/feedback/Feedback';
+import { invalidateForEvent } from '../../shared/queryClient';
 import { Icon, type IconComponent } from '../../shared/theme/Icon';
 import type { ColorName } from '../../shared/theme/colors';
 import { useTheme } from '../../shared/theme/ThemeProvider';
@@ -14,6 +15,7 @@ import { textStyle } from '../../shared/theme/typography';
 import { Amount } from '../../shared/ui/Amount';
 import { Button } from '../../shared/ui/Button';
 import { ActivityRowView } from '../activity/ActivityRowView';
+import { ScreenHeader } from '../shell/ScreenHeader';
 import { TYPE_LABEL } from './AccountForm';
 import { accountDetailKey, realAccountDetailApi, type AccountDetailApi, type AccountDetailData } from './accountDetailApi';
 
@@ -42,19 +44,51 @@ export function AccountDetailScreen({
   const theme = useTheme();
   const [limit, setLimit] = useState(ACTIVITY_PAGE_SIZE);
   const q = useQuery({ queryKey: accountDetailKey(accountId, limit), queryFn: () => api.load(accountId, limit), placeholderData: (prev) => prev });
+  const qc = useQueryClient();
   const d = q.data && q.data !== 'missing' ? q.data : null;
   const ink = { color: theme.color('text-primary') };
+  const [panel, setPanel] = useState<'balance' | 'date' | null>(null);
+  const [text, setText] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const busy = useRef(false);
 
-  const back = (
-    <Pressable testID="account-detail-back" accessibilityRole="button" accessibilityLabel={copy.nav.back} onPress={onBack} style={styles.back} hitSlop={8}>
-      <Icon icon={ArrowLeft} />
-    </Pressable>
-  );
+  const open = (kind: 'balance' | 'date') => {
+    setPanel(kind);
+    setError(null);
+    setText(kind === 'date' ? (d?.starting?.localDate ?? '') : '');
+  };
+  const submit = async () => {
+    if (!d || busy.current) return;
+    let write: () => Promise<{ ok: boolean; code?: string }>;
+    if (panel === 'balance') {
+      if (text.trim() === '') return setError(copy.accountDetail.amountRequired);
+      const amount = parseAmountInput(text, d.exponent);
+      if (!amount.ok) return setError(amount.code === 'EXCESS_DECIMALS' ? copy.accounts.balanceExcess : amount.code === 'AMOUNT_TOO_LARGE' ? copy.accounts.balanceTooLarge : copy.accounts.balanceInvalid);
+      write = () => api.setStartingBalance(accountId, amount.value);
+    } else {
+      write = () => api.changeTrackingDate(accountId, text.trim());
+    }
+    busy.current = true;
+    try {
+      const r = await write();
+      if (r.ok) {
+        setPanel(null);
+        setError(null);
+        await invalidateForEvent(qc, 'AccountsChanged');
+      } else setError(r.code === 'DATE_IN_FUTURE' ? copy.accountDetail.dateFuture : r.code === 'DATE_INVALID' ? copy.accountDetail.dateInvalid : copy.accountDetail.saveError);
+    } catch {
+      setError(copy.accountDetail.saveError);
+    } finally {
+      busy.current = false;
+    }
+  };
+
+  const back = <ScreenHeader title={copy.nav.accounts} onBack={onBack} backTestID="account-detail-back" />;
 
   if (q.data === 'missing') {
     return (
       <View style={styles.fill}>
-        <View style={styles.pad}>{back}</View>
+        {back}
         <EmptyState sentence={copy.accountDetail.notFound} actionLabel={copy.accountDetail.back} onAction={onBack} />
       </View>
     );
@@ -62,7 +96,7 @@ export function AccountDetailScreen({
 
   return (
     <View style={styles.fill}>
-      <View style={styles.pad}>{back}</View>
+      {back}
       <Reveal
         loading={q.isLoading}
         skeleton={
@@ -82,11 +116,47 @@ export function AccountDetailScreen({
             ListHeaderComponent={
               <View style={styles.headerBlock}>
                 <Header d={d} />
-                {d.account.type === 'card' ? null : (
-                  <View style={styles.actions}>
-                    <Button label={copy.accountDetail.moveMoney} variant="secondary" onPress={onMoveMoney} testID="account-move-money" />
+                <View style={styles.actions}>
+                  {d.account.type === 'card' ? null : <Button label={copy.accountDetail.moveMoney} variant="secondary" onPress={onMoveMoney} testID="account-move-money" />}
+                  {d.account.balanceNotSet ? (
+                    <Button label={d.account.type === 'card' ? copy.accountDetail.setAmountOwed : copy.accountDetail.setBalance} variant="secondary" onPress={() => open('balance')} testID="account-set-balance" />
+                  ) : null}
+                </View>
+                {d.starting && !d.account.balanceNotSet ? (
+                  <View style={styles.inline}>
+                    <Text testID="tracking-since" style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{`${copy.accountDetail.trackingSince} ${shortDate(d.starting.localDate).split(' ').slice(1).join(' ')}`}</Text>
+                    <Button label={copy.accountDetail.changeDate} variant="text" onPress={() => open('date')} testID="account-change-date" />
                   </View>
-                )}
+                ) : null}
+                {panel ? (
+                  <View testID="account-panel" style={[styles.card, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
+                    <Text style={[textStyle('body-medium'), ink]}>
+                      {panel === 'date' ? copy.accountDetail.dateLabel : d.account.type === 'card' ? copy.accountDetail.owedQuestion : copy.accountDetail.todayQuestion}
+                    </Text>
+                    <TextInput
+                      testID="account-panel-input"
+                      accessibilityLabel={panel === 'date' ? copy.accountDetail.dateLabel : d.account.type === 'card' ? copy.accountDetail.owedQuestion : copy.accountDetail.todayQuestion}
+                      accessibilityHint={panel === 'balance' ? copy.accounts.roughIsFine : undefined}
+                      value={text}
+                      onChangeText={(t) => {
+                        setText(t);
+                        setError(null);
+                      }}
+                      keyboardType={panel === 'date' ? 'numbers-and-punctuation' : 'decimal-pad'}
+                      autoFocus
+                      style={[styles.input, textStyle('body'), { color: theme.color('text-primary'), borderColor: theme.color(error ? 'semantic-expense' : 'border-control') }]}
+                    />
+                    {error ? (
+                      <Text testID="account-panel-error" accessibilityRole="alert" accessibilityLiveRegion="assertive" style={[textStyle('caption'), { color: theme.color('semantic-expense') }]}>
+                        {error}
+                      </Text>
+                    ) : null}
+                    <View style={styles.actions}>
+                      <Button label={panel === 'date' ? copy.accountDetail.saveDate : copy.accountDetail.saveBalance} onPress={() => void submit()} testID="account-panel-save" />
+                      <Button label={copy.common.cancel} variant="text" onPress={() => setPanel(null)} testID="account-panel-cancel" />
+                    </View>
+                  </View>
+                ) : null}
                 {d.days.length === 0 ? (
                   <Text testID="account-timeline-empty" style={[textStyle('body'), ink]}>
                     {copy.accountDetail.empty}
@@ -180,6 +250,7 @@ function StartingRow({ minor, localDate, currency, locale }: { minor: number; lo
         <Amount amountMinor={amount} currency={currency} direction="neutral" locale={locale} />
         <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{`· ${when}`}</Text>
       </View>
+      <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{copy.accountDetail.correctHint}</Text>
     </View>
   );
 }
@@ -188,7 +259,6 @@ const styles = StyleSheet.create({
   fill: { flex: 1 },
   flex: { flex: 1 },
   pad: { paddingHorizontal: 16, paddingTop: 8, gap: 8 },
-  back: { minWidth: layout.touchMin, minHeight: layout.touchMin, justifyContent: 'center' },
   list: { paddingHorizontal: 16, paddingBottom: 120, gap: 8 },
   headerBlock: { gap: 12, paddingBottom: 4 },
   card: { borderWidth: 1, borderRadius: radii.md, padding: 16, gap: 12 },
@@ -198,4 +268,5 @@ const styles = StyleSheet.create({
   day: { paddingTop: 12, paddingBottom: 4 },
   footer: { gap: 8, paddingTop: 8 },
   starting: { borderWidth: 1, borderRadius: radii.md, padding: 12, gap: 2 },
+  input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, minHeight: layout.touchMin },
 });

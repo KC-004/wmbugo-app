@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { UserCircle, Wallet } from 'phosphor-react-native';
+import { ArrowLeft, UserCircle, Wallet } from 'phosphor-react-native';
 import { controlA11y } from '../../shared/a11y/labels';
 import { copy } from '../../shared/copy';
 import { headerSplits } from '../../shared/feedback/layout';
@@ -19,29 +19,45 @@ export function ScreenHeader({
   actions,
   onAccounts,
   onProfile,
+  onBack,
+  backTestID = 'header-back',
 }: {
   title: string;
   actions?: ReactNode;
-  onAccounts: () => void;
-  onProfile: () => void;
+  /** Tab screens show the Accounts icon and the avatar; pages opened from them show a Back arrow instead. */
+  onAccounts?: () => void;
+  onProfile?: () => void;
+  onBack?: () => void;
+  backTestID?: string;
 }) {
   const theme = useTheme();
   const { fontScale } = useWindowDimensions();
   const split = headerSplits(fontScale);
   const titleNode = (
-    <Text accessibilityRole="header" style={[textStyle('title'), styles.title, { color: theme.color('text-primary') }]}>
-      {title}
-    </Text>
+    <View style={styles.titleWrap}>
+      {onBack ? (
+        <IconButton label={copy.nav.back} onPress={onBack} testID={backTestID}>
+          <Icon icon={ArrowLeft} />
+        </IconButton>
+      ) : null}
+      <Text accessibilityRole="header" style={[textStyle('title'), styles.title, { color: theme.color('text-primary') }]}>
+        {title}
+      </Text>
+    </View>
   );
   const actionRow = (
     <View style={styles.actions}>
       {actions}
-      <IconButton label={copy.nav.accounts} onPress={onAccounts} testID="header-accounts">
-        <Icon icon={Wallet} />
-      </IconButton>
-      <IconButton label={copy.nav.profile} onPress={onProfile} testID="header-avatar">
-        <Icon icon={UserCircle} />
-      </IconButton>
+      {onAccounts ? (
+        <IconButton label={copy.nav.accounts} onPress={onAccounts} testID="header-accounts">
+          <Icon icon={Wallet} />
+        </IconButton>
+      ) : null}
+      {onProfile ? (
+        <IconButton label={copy.nav.profile} onPress={onProfile} testID="header-avatar">
+          <Icon icon={UserCircle} />
+        </IconButton>
+      ) : null}
     </View>
   );
   return split ? (
@@ -71,6 +87,7 @@ export function IconButton({ label, onPress, children, testID }: { label: string
 const styles = StyleSheet.create({
   row: { minHeight: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16 },
   column: { minHeight: 64, paddingHorizontal: 16, paddingVertical: 8, gap: 4 },
+  titleWrap: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 },
   title: { flexShrink: 1 },
   actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' },
   icon: { minWidth: layout.touchMin, minHeight: layout.touchMin, alignItems: 'center', justifyContent: 'center' },
