@@ -71,12 +71,17 @@ export interface ActivityRow {
   readonly guessed?: boolean;
   /** A foreign amount (waiting for its currency to be settled): "USD 12.99". */
   readonly foreign?: { readonly currency: string; readonly amountMinor: number };
+  /** A rejected capture shown by "Show rejected": counts nowhere. */
+  readonly rejected?: boolean;
+  /** With a category filter: the sum of the matching splits only (what a day's Spent counts). */
+  readonly matchedMinor?: number;
 }
 
 /** The states of an Activity row (UX-DR29), most important first. */
-export type RowState = 'reversed' | 'check' | 'currency' | 'waiting' | 'needs-category' | 'guessed' | 'refund' | 'transfer' | 'income' | 'expense' | 'adjustment';
+export type RowState = 'rejected' | 'reversed' | 'check' | 'currency' | 'waiting' | 'needs-category' | 'guessed' | 'refund' | 'transfer' | 'income' | 'expense' | 'adjustment';
 
 export function rowState(r: ActivityRow): RowState {
+  if (r.rejected) return 'rejected';
   if (r.reversed) return 'reversed';
   if (r.held) return 'check';
   if (r.waiting && r.foreign) return 'currency';
@@ -165,6 +170,8 @@ export function mapActivityRows(rows: readonly (readonly unknown[])[]): Activity
       ...(Number(r[13]) === 1 ? { needsCategory: true } : {}),
       ...(String(r[14]) === 'auto_approved' && Number(r[13]) !== 1 ? { guessed: true } : {}),
       ...(r[15] !== null && r[15] !== undefined ? { foreign: { currency: String(r[15]), amountMinor: Number(r[16]) } } : {}),
+      ...(String(r[11]) === 'excluded' && String(r[14]) === 'rejected' ? { rejected: true } : {}),
+      ...(r[18] !== null && r[18] !== undefined ? { matchedMinor: Number(r[18]) } : {}),
     });
   }
   return out;
@@ -187,9 +194,11 @@ export function groupByDay(rows: readonly ActivityRow[]): ActivityDay[] {
       days.push(day);
     }
     day.rows.push(r);
-    if (r.held || r.waiting || r.reversed) continue;
-    if (r.kind === 'expense') day.expenses += r.amountMinor;
-    else if (r.kind === 'refund') day.refunds += r.amountMinor;
+    if (r.held || r.waiting || r.reversed || r.rejected) continue;
+    // With a category filter only the matching splits count.
+    const counted = r.matchedMinor ?? r.amountMinor;
+    if (r.kind === 'expense') day.expenses += counted;
+    else if (r.kind === 'refund') day.refunds += counted;
   }
   return days.map((d) => ({ localDate: d.localDate, spentMinor: spentMinor(d.expenses, d.refunds), rows: d.rows }));
 }

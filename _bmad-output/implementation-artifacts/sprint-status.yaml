@@ -72,7 +72,7 @@ development_status:
   3-3-possible-duplicate-on-save-keep-both-or-merge: review
   3-4-transaction-detail-edit-duplicate-delete-or-reject: review
   3-5-activity-rows-in-every-state-and-the-refund-net-day-header: review
-  3-6-search-filters-and-sort-in-activity: backlog
+  3-6-search-filters-and-sort-in-activity: review
   3-7-split-one-entry-across-categories: backlog
   3-8-refunds-reimbursements-and-failed-payments: backlog
   3-9-select-many-entries-and-move-them-to-another-category: backlog

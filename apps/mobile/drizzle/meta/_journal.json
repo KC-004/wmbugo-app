@@ -57,6 +57,13 @@
       "when": 1794154647330,
       "tag": "0007_tan_toro",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1794157800911,
+      "tag": "0008_activity_search",
+      "breakpoints": true
     }
   ]
 }

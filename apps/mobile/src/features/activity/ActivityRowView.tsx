@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { ArrowsLeftRight, ArrowUUpLeft, DotsThree, Scales, Warning } from 'phosphor-react-native';
-import { longDate, rowState, type ActivityRow, type CurrencyCode } from '@wmbugo/core';
+import { longDate, rowState, shortDate, type ActivityRow, type CurrencyCode } from '@wmbugo/core';
 import { amountLabel, type AmountKind } from '../../shared/a11y/labels';
 import { copy } from '../../shared/copy';
 import { minorToInput } from '../../shared/minorInput';
@@ -25,6 +25,7 @@ function tagsOf(row: ActivityRow): { text: string; spoken: string; tone?: 'warni
   if (state === 'currency') out.push({ text: copy.activity.tagCurrency.toLowerCase(), spoken: copy.activity.waitingForCurrency.toLowerCase() });
   if (state === 'check') out.push({ text: copy.activity.tagCheck, spoken: copy.activity.checkSpoken.toLowerCase(), tone: 'warning' });
   if (state === 'reversed') out.push({ text: copy.activity.tagReversed.toLowerCase(), spoken: copy.activity.tagReversed.toLowerCase() });
+  if (state === 'rejected') out.push({ text: copy.activity.tagRejected.toLowerCase(), spoken: copy.activity.tagRejected.toLowerCase() });
   if (row.beforeTracking) out.push({ text: copy.activity.tagBeforeTracking.toLowerCase(), spoken: copy.activity.beforeTracking.toLowerCase() });
   return out;
 }
@@ -42,6 +43,7 @@ export function ActivityRowView({
   locale,
   title: titleOverride,
   showAccount = true,
+  showDate = false,
   footer,
   onPress,
   actions,
@@ -55,6 +57,8 @@ export function ActivityRowView({
   title?: string;
   /** False on an account's timeline, where the account is the page itself. */
   showAccount?: boolean;
+  /** In a flat list (sorted by amount or merchant) there are no day headers, so the date goes in the subtitle. */
+  showDate?: boolean;
   /** Under the row's text: the Keep both / Merge buttons of a possible duplicate. */
   footer?: ReactNode;
   /** Opens the entry. */
@@ -71,7 +75,7 @@ export function ActivityRowView({
   const title = adjustment ? copy.activity.balanceAdjustment : (titleOverride ?? row.merchant ?? row.categoryName ?? copy.activity.transfer);
   const account = showAccount ? row.accountName : null;
   const kindWord = adjustment ? (up ? copy.activity.adjustedUp : copy.activity.adjustedDown) : row.kind === 'transfer' ? copy.activity.transfer : row.categoryName;
-  const sub = [kindWord, account].filter(Boolean).join(' · ');
+  const sub = [kindWord, account, showDate ? shortDate(row.localDate) : null].filter(Boolean).join(' · ');
   const tags = tagsOf(row);
   const foreignCurrency = row.foreign?.currency as CurrencyCode | undefined;
   const amountSpoken =
@@ -95,7 +99,7 @@ export function ActivityRowView({
 
   const glyph = adjustment ? Scales : row.kind === 'transfer' ? ArrowsLeftRight : row.categoryIcon ? categoryIcon(row.categoryIcon) : DotsThree;
   const direction = row.kind === 'income' || row.kind === 'refund' ? 'income' : row.kind === 'expense' ? 'expense' : 'neutral';
-  const reversed = state === 'reversed';
+  const reversed = state === 'reversed' || state === 'rejected';
   const waiting = state === 'waiting' || state === 'currency';
   const amountColor: ColorName = reversed ? 'text-secondary' : direction === 'income' ? 'semantic-income' : 'text-primary';
   const strike = reversed ? styles.strike : undefined;

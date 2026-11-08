@@ -1,21 +1,92 @@
-import { SectionList, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { useState } from 'react';
+import { FlatList, Pressable, SectionList, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ACTIVITY_PAGE_SIZE, dayHeading, longDate, type ActivityDay, type ActivityRow, type CurrencyCode } from '@wmbugo/core';
+import { ArrowLeft, FunnelSimple, MagnifyingGlass, X } from 'phosphor-react-native';
+import {
+  ACTIVITY_PAGE_SIZE,
+  activeFilterCount,
+  dayHeading,
+  isFiltered,
+  isFlatSort,
+  longDate,
+  type ActivityDay,
+  type ActivityQuery,
+  type ActivityRow,
+  type CurrencyCode,
+} from '@wmbugo/core';
 import { amountLabel } from '../../shared/a11y/labels';
+import { announce } from '../../shared/a11y/announce';
 import { copy } from '../../shared/copy';
 import { EmptyState, ErrorBlock, Reveal, Skeleton } from '../../shared/feedback/Feedback';
+import { useSheet } from '../../shared/feedback/SheetHost';
+import { EMPTY_ACTIVITY_FILTER, useUiStore, type DatePreset } from '../../shared/state/uiStore';
+import { Icon } from '../../shared/theme/Icon';
 import { useTheme } from '../../shared/theme/ThemeProvider';
+import { layout, radii } from '../../shared/theme/tokens';
 import { textStyle } from '../../shared/theme/typography';
 import { Amount } from '../../shared/ui/Amount';
 import { Button } from '../../shared/ui/Button';
-import { ScreenHeader } from '../shell/ScreenHeader';
+import { ScreenHeader, IconButton } from '../shell/ScreenHeader';
 import { realAddApi, type AddApi } from '../add/addApi';
+import { ActivityFilterSheet } from './ActivityFilterSheet';
 import { ActivityRowView } from './ActivityRowView';
 import { HeldRowActions } from './HeldRowActions';
-import { ACTIVITY_QUERY_KEY, realActivityApi, type ActivityApi } from './activityApi';
+import { ACTIVITY_QUERY_KEY, realActivityApi, type ActivityApi, type ActivityOptions } from './activityApi';
 
-/** Activity: saved entries grouped under day headers with that day's "Spent" total. */
+const SEARCH_DEBOUNCE_MS = 300;
+
+type ChipSpec = { key: string; label: string; remove: (q: ActivityQuery) => ActivityQuery; clearsPreset?: boolean };
+
+/** Labels of the active filters, one removable chip each. */
+function activeChips(q: ActivityQuery, preset: DatePreset, o: ActivityOptions | null): ChipSpec[] {
+  const out: ChipSpec[] = [];
+  if (q.fromDate || q.toDate) {
+    const label = preset === 'period' ? copy.activity.thisPeriod : preset === '7d' ? copy.activity.lastWeek : preset === '30d' ? copy.activity.lastMonth : `${q.fromDate ?? ''} – ${q.toDate ?? ''}`;
+    out.push({
+      key: 'date',
+      label,
+      clearsPreset: true,
+      remove: (x) => {
+        const { fromDate: _a, toDate: _b, ...rest } = x;
+        void _a;
+        void _b;
+        return rest;
+      },
+    });
+  }
+  for (const id of q.accountIds ?? []) out.push({ key: `account-${id}`, label: o?.accounts.find((a) => a.id === id)?.name ?? id, remove: (x) => ({ ...x, accountIds: (x.accountIds ?? []).filter((v) => v !== id) }) });
+  for (const id of q.categoryIds ?? []) out.push({ key: `category-${id}`, label: o?.categories.find((c) => c.id === id)?.name ?? id, remove: (x) => ({ ...x, categoryIds: (x.categoryIds ?? []).filter((v) => v !== id) }) });
+  const typeLabel = { expense: copy.activity.typeExpense, income: copy.activity.typeIncome, transfer: copy.activity.typeTransfer, refund: copy.activity.typeRefund } as const;
+  for (const t of q.types ?? []) out.push({ key: `type-${t}`, label: typeLabel[t], remove: (x) => ({ ...x, types: (x.types ?? []).filter((v) => v !== t) }) });
+  const statusLabel = { waiting: copy.activity.statusWaiting, check: copy.activity.statusCheck, 'needs-category': copy.activity.statusNeedsCategory, guessed: copy.activity.statusGuessed, reversed: copy.activity.statusReversed } as const;
+  for (const s of q.statuses ?? []) out.push({ key: `status-${s}`, label: statusLabel[s], remove: (x) => ({ ...x, statuses: (x.statuses ?? []).filter((v) => v !== s) }) });
+  if (q.minMinor !== undefined || q.maxMinor !== undefined) {
+    out.push({
+      key: 'amount',
+      label: copy.activity.filterAmount,
+      remove: (x) => {
+        const { minMinor: _a, maxMinor: _b, ...rest } = x;
+        void _a;
+        void _b;
+        return rest;
+      },
+    });
+  }
+  if (q.showRejected) {
+    out.push({
+      key: 'rejected',
+      label: copy.activity.showRejected,
+      remove: (x) => {
+        const { showRejected: _a, ...rest } = x;
+        void _a;
+        return rest;
+      },
+    });
+  }
+  return out;
+}
+
+/** Activity: saved entries grouped under day headers with that day's "Spent" total; search, filters and sort. */
 export function ActivityScreen({
   api = realActivityApi,
   onAccounts,
@@ -38,10 +109,130 @@ export function ActivityScreen({
   onDeleteRow?: (row: ActivityRow) => void;
   onRecategorise?: (row: ActivityRow) => void;
 }) {
+  const theme = useTheme();
+  const sheet = useSheet();
+  const filter = useUiStore((s) => s.activityFilter);
+  const setFilter = useUiStore((s) => s.setActivityFilter);
+  const query = filter.query;
   const [limit, setLimit] = useState(ACTIVITY_PAGE_SIZE);
-  const q = useQuery({ queryKey: [...ACTIVITY_QUERY_KEY, limit], queryFn: () => api.load(limit), placeholderData: (prev) => prev });
+  const [searching, setSearching] = useState((query.search ?? '') !== '');
+  const [text, setText] = useState(query.search ?? '');
+
+  // Results follow typing after a short pause.
+  useEffect(() => {
+    if (text === (query.search ?? '')) return;
+    const h = setTimeout(() => {
+      const { search: _s, ...rest } = query;
+      void _s;
+      setFilter({ ...filter, query: text.trim() === '' ? rest : { ...rest, search: text } });
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(h);
+  }, [text]);
+
+  const key = useMemo(() => JSON.stringify(query), [query]);
+  const q = useQuery({ queryKey: [...ACTIVITY_QUERY_KEY, limit, key], queryFn: () => api.load(limit, query), placeholderData: (prev) => prev });
+  const options = useQuery({ queryKey: [...ACTIVITY_QUERY_KEY, 'options'], queryFn: async () => (api.options ? api.options() : null) });
   const d = q.data ?? null;
-  const header = <ScreenHeader title={copy.nav.activity} onAccounts={onAccounts} onProfile={onProfile} />;
+  const filtered = isFiltered(query);
+  const flat = isFlatSort(query);
+  const n = activeFilterCount(query);
+  const resultCount = d?.days.reduce((c, day) => c + day.rows.length, 0) ?? 0;
+
+  const clearAll = () => {
+    setText('');
+    setFilter(EMPTY_ACTIVITY_FILTER);
+  };
+  const closeSearch = () => {
+    setSearching(false);
+    setText('');
+    const { search: _s, ...rest } = query;
+    void _s;
+    if (query.search) setFilter({ ...filter, query: rest });
+  };
+
+  const openFilters = () => {
+    const o = options.data;
+    if (!o) return;
+    const search = query.search ? { search: query.search } : {};
+    sheet.open({
+      id: 'activity-filters',
+      title: copy.activity.filters,
+      body: (close) => (
+        <ActivityFilterSheet
+          initial={query}
+          datePreset={filter.datePreset}
+          options={o}
+          exponent={2}
+          count={(x) => (api.count ? api.count({ ...x, ...search }) : Promise.resolve(0))}
+          onApply={(next, preset) => {
+            close();
+            setFilter({ query: { ...next, ...search }, datePreset: preset });
+          }}
+        />
+      ),
+    });
+  };
+
+  const removeChip = (c: ChipSpec) => {
+    const next = c.remove(query);
+    setFilter({ query: next, datePreset: c.clearsPreset ? null : filter.datePreset });
+    void (api.count ? api.count(next) : Promise.resolve(0)).then((count) => announce(`${copy.activity.filterRemoved}. ${count} ${(count === 1 ? copy.activity.result : copy.activity.results).toLowerCase()}`));
+  };
+
+  const header = searching ? (
+    <View style={styles.searchRow}>
+      <IconButton label={copy.nav.back} onPress={closeSearch} testID="search-back">
+        <Icon icon={ArrowLeft} />
+      </IconButton>
+      <TextInput
+        testID="search-input"
+        accessibilityLabel={copy.activity.searchLabel}
+        placeholder={copy.activity.searchPlaceholder}
+        placeholderTextColor={theme.color('text-secondary')}
+        value={text}
+        onChangeText={setText}
+        autoFocus
+        returnKeyType="search"
+        style={[styles.searchInput, textStyle('body'), { color: theme.color('text-primary'), borderColor: theme.color('border-control') }]}
+      />
+      {text !== '' ? <Button label={copy.activity.clear} variant="text" onPress={() => setText('')} testID="search-clear" /> : null}
+    </View>
+  ) : (
+    <ScreenHeader
+      title={copy.nav.activity}
+      onAccounts={onAccounts}
+      onProfile={onProfile}
+      actions={
+        <IconButton label={copy.activity.searchLabel} onPress={() => setSearching(true)} testID="header-search">
+          <Icon icon={MagnifyingGlass} />
+        </IconButton>
+      }
+    />
+  );
+
+  const onAccent = theme.scheme === 'dark' ? theme.color('bg-canvas') : theme.color('bg-surface');
+  const chipsRow = (
+    <View testID="filter-row" style={styles.chipsRow}>
+      <Pressable testID="filters-button" accessibilityRole="button" accessibilityLabel={`${copy.activity.filters}, ${n}`} onPress={openFilters} style={styles.filtersBtn}>
+        <Icon icon={FunnelSimple} size={18} />
+        <Text style={[textStyle('label'), { color: theme.color('text-primary') }]}>{`${copy.activity.filters} · ${n}`}</Text>
+      </Pressable>
+      {activeChips(query, filter.datePreset, options.data ?? null).map((c) => (
+        <Pressable
+          key={c.key}
+          testID={`chip-${c.key}`}
+          accessibilityRole="button"
+          accessibilityLabel={`${copy.activity.removeFilter}: ${c.label}`}
+          onPress={() => removeChip(c)}
+          style={[styles.activeChip, { backgroundColor: theme.color('accent-primary') }]}>
+          <Text style={[textStyle('label'), { color: onAccent }]}>{c.label}</Text>
+          <Icon icon={X} size={14} tint={onAccent} />
+        </Pressable>
+      ))}
+      {n >= 2 ? <Button label={copy.activity.clearAll} variant="text" onPress={clearAll} testID="chips-clear-all" /> : null}
+    </View>
+  );
+
   const skeleton = (
     <View style={styles.pad} testID="activity-skeleton">
       <Skeleton height={56} />
@@ -50,7 +241,21 @@ export function ActivityScreen({
     </View>
   );
 
-  if (d && d.days.length === 0) {
+  const rowFor = (item: ActivityRow, date: string, data: NonNullable<typeof d>, showDate = false) => (
+    <ActivityRowView
+      row={item}
+      date={date}
+      currency={data.currency}
+      locale={data.locale}
+      showDate={showDate}
+      footer={item.held ? <HeldRowActions transactionId={item.id} api={duplicateApi} /> : undefined}
+      onPress={onOpen ? () => onOpen(item.id) : undefined}
+      actions={onDeleteRow && onRecategorise && item.kind !== 'adjustment' ? [{ name: 'recategorise', label: copy.detail.recategorise }, { name: 'delete', label: item.captured ? copy.detail.reject : copy.detail.delete }] : undefined}
+      onAction={(name) => (name === 'delete' ? onDeleteRow?.(item) : onRecategorise?.(item))}
+    />
+  );
+
+  if (d && resultCount === 0 && !filtered) {
     return (
       <View style={styles.fill}>
         <View style={styles.pad}>{header}</View>
@@ -59,35 +264,37 @@ export function ActivityScreen({
     );
   }
 
+  const footer = d?.hasMore ? <Button label={copy.activity.showEarlier} variant="secondary" testID="activity-show-earlier" onPress={() => setLimit((x) => x + ACTIVITY_PAGE_SIZE)} /> : undefined;
+
   return (
     <View style={styles.fill}>
       <View style={styles.pad}>{header}</View>
+      {chipsRow}
       <Reveal loading={q.isLoading} skeleton={skeleton} fill>
-        {d ? (
+        {d && resultCount === 0 ? (
+          <View testID="no-matches" style={styles.noMatches}>
+            <Text style={[textStyle('body-medium'), { color: theme.color('text-primary') }]}>{`${copy.activity.noMatches} · ${copy.activity.clearAll}`}</Text>
+            <Button label={copy.activity.clearAll} variant="secondary" onPress={clearAll} testID="no-matches-clear" />
+          </View>
+        ) : d && flat ? (
+          <FlatList
+            testID="activity-list"
+            data={d.days.flatMap((day) => day.rows)}
+            keyExtractor={(r) => r.id}
+            contentContainerStyle={styles.list}
+            ListFooterComponent={footer}
+            renderItem={({ item }) => rowFor(item, item.localDate, d, true)}
+          />
+        ) : d ? (
           <SectionList
             testID="activity-list"
             sections={d.days.map((day) => ({ day, data: day.rows as ActivityRow[] }))}
             keyExtractor={(r) => r.id}
             stickySectionHeadersEnabled={false}
             contentContainerStyle={styles.list}
-            ListFooterComponent={
-              d.hasMore ? (
-                <Button label={copy.activity.showEarlier} variant="secondary" testID="activity-show-earlier" onPress={() => setLimit((n) => n + ACTIVITY_PAGE_SIZE)} />
-              ) : undefined
-            }
+            ListFooterComponent={footer}
             renderSectionHeader={({ section }) => <DayHeader day={section.day} today={d.today} currency={d.currency} locale={d.locale} />}
-            renderItem={({ item, section }) => (
-              <ActivityRowView
-                row={item}
-                date={section.day.localDate}
-                currency={d.currency}
-                locale={d.locale}
-                footer={item.held ? <HeldRowActions transactionId={item.id} api={duplicateApi} /> : undefined}
-                onPress={onOpen ? () => onOpen(item.id) : undefined}
-                actions={onDeleteRow && onRecategorise && item.kind !== 'adjustment' ? [{ name: 'recategorise', label: copy.detail.recategorise }, { name: 'delete', label: item.captured ? copy.detail.reject : copy.detail.delete }] : undefined}
-                onAction={(name) => (name === 'delete' ? onDeleteRow?.(item) : onRecategorise?.(item))}
-              />
-            )}
+            renderItem={({ item, section }) => rowFor(item, section.day.localDate, d)}
           />
         ) : q.isError ? (
           <View style={styles.pad}>
@@ -127,4 +334,10 @@ const styles = StyleSheet.create({
   between: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   column: { flexDirection: 'column', alignItems: 'flex-start' },
   spent: { flexDirection: 'row', gap: 6, alignItems: 'center' },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 64 },
+  searchInput: { flex: 1, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, minHeight: layout.touchMin },
+  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, paddingHorizontal: 16, minHeight: 48 },
+  filtersBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 48, paddingRight: 4 },
+  activeChip: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 48, paddingHorizontal: 12, borderRadius: radii.full },
+  noMatches: { padding: 16, gap: 12, alignItems: 'flex-start' },
 });

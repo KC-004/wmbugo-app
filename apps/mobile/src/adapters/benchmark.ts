@@ -8,6 +8,7 @@ import {
   LedgerWriter,
   openingBalanceShape,
   SubmitCapture,
+  searchIndexer,
   SetUpProfile,
   startStorage,
   type KeyStore,
@@ -70,7 +71,7 @@ export async function runSaveBenchmark(log: Logger, clock: { nowMs(): number; ti
   const db = started.value.db;
   try {
     const newId = createIdGenerator(clock, secureRandom);
-    const writer = new LedgerWriter({ uow: db, clock, newId, logger: quiet, invariants: [openingBalanceShape, entryShape] });
+    const writer = new LedgerWriter({ uow: db, clock, newId, logger: quiet, invariants: [openingBalanceShape, entryShape], indexer: searchIndexer });
     const region = findRegion('IN');
     if (!region) throw new Error('region');
     await writer.run(SetUpProfile, { region, payday: { kind: 'first' }, budgetOffer: { answer: 'skipped' }, timezoneId: clock.timezoneId() }, 'user');

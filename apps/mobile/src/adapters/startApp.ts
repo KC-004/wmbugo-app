@@ -1,6 +1,7 @@
 import {
   createFileLogSink,
   createIdGenerator,
+  searchIndexer,
   createRedactingLogger,
   LedgerWriter,
   OutboxDispatcher,
@@ -121,6 +122,7 @@ async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
     newId,
     logger: log,
     invariants: [singleProfile, openingBalanceShape, entryShape],
+    indexer: searchIndexer,
     // Deliver after every commit; a failure stays pending and is retried on the next commit or launch.
     onCommitted: () => void dispatcher.deliverPending().catch(() => undefined),
   });

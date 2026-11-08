@@ -213,12 +213,12 @@ describe('Activity', () => {
     const load = jest.fn(async (limit?: number) => ({ ...activity(rows), hasMore: (limit ?? 100) < 200 }));
     mount(<ActivityScreen api={{ load }} onAccounts={noop} onProfile={noop} onAdd={noop} />);
     await settle();
-    expect(load).toHaveBeenLastCalledWith(100);
+    expect(load).toHaveBeenLastCalledWith(100, {});
     const r = live[live.length - 1]!;
     expect(host(r, 'activity-show-earlier')).toHaveLength(1);
     await act(async () => fire(r, 'activity-show-earlier'));
     await settle();
-    expect(load).toHaveBeenLastCalledWith(200);
+    expect(load).toHaveBeenLastCalledWith(200, {});
     expect(host(r, 'activity-show-earlier')).toHaveLength(0);
   });
 

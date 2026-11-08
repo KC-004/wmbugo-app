@@ -59,6 +59,11 @@ export interface LedgerWriterDeps {
   readonly invariants?: readonly Invariant[];
   /** Called after every successful commit (the app kicks outbox delivery here). */
   readonly onCommitted?: () => void;
+  /**
+   * Runs inside the same transaction, after the use case and the invariants, with everything the use case touched. The
+   * Activity search index is kept up to date here, so a change and its index entry commit or roll back together.
+   */
+  readonly indexer?: (ctx: Pick<WriterContext, 'query' | 'execute'>, touched: readonly TouchedEntity[]) => Promise<void>;
 }
 
 class Abort extends Error {
@@ -132,6 +137,12 @@ export class LedgerWriter {
           }
         }
 
+        if (this.deps.indexer) {
+          await this.deps.indexer(
+            { query: (q, p) => tx.query(q, p), execute: (q, p = []) => { checkParams(p); return tx.execute(q, p); } },
+            touched,
+          );
+        }
         const at = clock.nowMs();
         const audited = touched.length > 0 ? touched : [{ entityKind: 'none', entityId: '', change: {} }];
         for (const t of audited) {
