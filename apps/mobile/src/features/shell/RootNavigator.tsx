@@ -12,6 +12,7 @@ import { useTheme } from '../../shared/theme/ThemeProvider';
 import { textStyle } from '../../shared/theme/typography';
 import { Button } from '../../shared/ui/Button';
 import type { AddButtonRef } from './AddButton';
+import { AccountsScreen } from '../accounts/AccountsScreen';
 import { ScreenHeader } from './ScreenHeader';
 import { TabBar, type TabRoute } from './TabBar';
 import { markTabFirstFrame } from './navTiming';
@@ -104,6 +105,16 @@ function Placeholder({ title }: { title: string }) {
   );
 }
 
+function AccountsRoute() {
+  const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={[styles.fill, { backgroundColor: theme.color('bg-canvas'), paddingTop: insets.top }]}>
+      <AccountsScreen />
+    </View>
+  );
+}
+
 /**
  * Root navigator: bottom tabs Home, Activity, Insights, Plan (the ＋ sits in the bar) with a
  * stack per tab, no drawer, state kept across switches. Accounts and Settings open above the tabs.
@@ -122,7 +133,7 @@ export function RootNavigator() {
         <SheetHost>
           <RootStack.Navigator screenOptions={{ headerShown: false }}>
             <RootStack.Screen name="Tabs" component={TabsWithAdd} />
-            <RootStack.Screen name="Accounts">{() => <Placeholder title={copy.nav.accounts} />}</RootStack.Screen>
+            <RootStack.Screen name="Accounts" component={AccountsRoute} />
             <RootStack.Screen name="Settings">{() => <Placeholder title={copy.nav.settings} />}</RootStack.Screen>
           </RootStack.Navigator>
         </SheetHost>

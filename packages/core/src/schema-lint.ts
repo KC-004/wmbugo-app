@@ -22,6 +22,7 @@ export const NON_MONEY_INTEGERS: ReadonlySet<string> = new Set([
   'confidence_pct',
   'qty',
   'currency_exponent',
+  'balance_not_set',
   'foreign_currency_exponent',
 ]);
 

@@ -4,10 +4,12 @@ import {
   createRedactingLogger,
   LedgerWriter,
   OutboxDispatcher,
+  openingBalanceShape,
   SetUpProfile,
   startStorage,
   type Invariant,
   type SetUpProfileInput,
+  type SqlDatabase,
 } from '@wmbugo/core';
 import type { Clock, Logger, Result, StartupErrorCode, StartupOk } from '@wmbugo/core';
 import migrations from '../../drizzle/migrations';
@@ -54,6 +56,7 @@ export async function getLogger(): Promise<Logger> {
 }
 
 export interface AppServices {
+  readonly db: SqlDatabase;
   readonly writer: LedgerWriter;
   readonly dispatcher: OutboxDispatcher;
 }
@@ -90,11 +93,11 @@ export async function startApp(): Promise<Result<StartupOk, StartupErrorCode>> {
     clock: systemClock,
     newId: createIdGenerator(systemClock, secureRandom),
     logger: log,
-    invariants: [singleProfile],
+    invariants: [singleProfile, openingBalanceShape],
     // Deliver after every commit; a failure stays pending and is retried on the next commit or launch.
     onCommitted: () => void dispatcher.deliverPending().catch(() => undefined),
   });
-  services = { writer, dispatcher };
+  services = { db: started.value.db, writer, dispatcher };
   // Tab navigation timings (NFR-03) go to the redacting log; durations and tab names only.
   setNavTimingSink((e) => log.debug('nav.tab', { tab: e.tab, durationMs: e.durationMs }));
   // Events committed before the app was last killed are delivered now, without holding up the first screen.

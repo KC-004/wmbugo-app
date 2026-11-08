@@ -1,9 +1,11 @@
 import { getCurrency } from '../shared/currency';
 import { err, ok } from '../shared/result';
+import { insertAccount, type NewAccount } from '../ledger/accountCommands';
+import { validateAccountName, type AccountNameError } from '../ledger/accounts';
 import type { UseCase } from '../writer/ledgerWriter';
-import type { BudgetOffer } from './onboarding';
-import type { PaydayRule } from './payday';
-import type { Region } from './regions';
+import type { BudgetOffer } from '../profile/onboarding';
+import type { PaydayRule } from '../profile/payday';
+import type { Region } from '../profile/regions';
 
 export interface SetUpProfileInput {
   readonly region: Region;
@@ -11,9 +13,11 @@ export interface SetUpProfileInput {
   readonly budgetOffer: BudgetOffer;
   /** The device's IANA timezone at setup. */
   readonly timezoneId: string;
+  /** The one optional first account ("Where's most of your money?"); null when skipped. */
+  readonly account?: NewAccount | null;
 }
 
-export type SetUpProfileError = 'PROFILE_EXISTS' | 'CURRENCY_UNSUPPORTED';
+export type SetUpProfileError = 'PROFILE_EXISTS' | 'CURRENCY_UNSUPPORTED' | AccountNameError | 'AMOUNT_INVALID';
 
 /** prompt_state keys written by onboarding for the budgets epic. */
 export const PROMPT_BUDGET_YES = 'budget_503020_yes';
@@ -36,6 +40,13 @@ export const SetUpProfile: UseCase<SetUpProfileInput, { profileId: string }, Set
     const currency = getCurrency(input.region.currency);
     if (!currency.ok) return err('CURRENCY_UNSUPPORTED');
 
+    if (input.account) {
+      const name = validateAccountName(input.account.name);
+      if (!name.ok) return err(name.code);
+      const typed = input.account.openingMinor;
+      if (typed !== null && (!Number.isSafeInteger(typed) || typed < 0)) return err('AMOUNT_INVALID');
+    }
+
     const profileId = ctx.newId();
     const at = ctx.nowMs();
     const rule = input.payday;
@@ -51,6 +62,12 @@ export const SetUpProfile: UseCase<SetUpProfileInput, { profileId: string }, Set
       await ctx.execute('INSERT INTO settings (key, value_json, version, updated_at) VALUES (?, ?, 1, ?)', [SETTING_ROUGH_INCOME, JSON.stringify(offer.roughMonthlyIncomeMinor), at]);
     } else if (offer.answer === 'not-now') {
       await ctx.execute('INSERT INTO prompt_state (key, count, last_shown_at) VALUES (?, 1, ?)', [PROMPT_BUDGET_NOT_NOW, at]);
+    }
+
+    if (input.account) {
+      const { accountId, transactionId } = await insertAccount(ctx, input.account, input.timezoneId);
+      ctx.emit('AccountsChanged', { accountIds: [accountId] });
+      if (transactionId) ctx.emit('TransactionsChanged', { transactionIds: [transactionId] });
     }
 
     ctx.touch('profile', profileId, { region: input.region.code, currency: currency.value.code, payday: rule.kind });

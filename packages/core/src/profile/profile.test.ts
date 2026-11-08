@@ -15,7 +15,7 @@ import {
 } from './onboarding';
 import { paydayFromChoice, periodModeFor } from './payday';
 import { detectRegion, findRegion, REGIONS, searchRegions } from './regions';
-import { PROMPT_BUDGET_NOT_NOW, PROMPT_BUDGET_YES, SETTING_ROUGH_INCOME, SETTING_THEME, SetUpProfile } from './setUpProfile';
+import { PROMPT_BUDGET_NOT_NOW, PROMPT_BUDGET_YES, SETTING_ROUGH_INCOME, SETTING_THEME, SetUpProfile } from '../usecases/setUpProfile';
 
 describe('regions', () => {
   it('every region maps to a supported currency, and every currency has a region', () => {
@@ -85,6 +85,10 @@ describe('onboarding state machine', () => {
     expect(continueHint(s)).toBe('choose-region');
     expect(run(s, { type: 'continue' }).step).toBe('region'); // disabled Continue does nothing
     s = run(s, { type: 'choose-region', region: sg }, { type: 'continue' });
+    expect(s.step).toBe('account');
+    expect(canContinue(s)).toBe(false);
+    expect(continueHint(s)).toBe('answer-account');
+    s = run(s, { type: 'answer-account', answer: { kind: 'skipped' } }, { type: 'continue' });
     expect(s.step).toBe('payday');
     expect(continueHint(s)).toBe('choose-payday');
     s = run(s, { type: 'choose-payday', choice: 'last_day' }, { type: 'continue' });
@@ -93,22 +97,25 @@ describe('onboarding state machine', () => {
     expect(isComplete(s)).toBe(false);
     s = run(s, { type: 'answer-budget', offer: { answer: 'not-now' } });
     expect(isComplete(s)).toBe(true);
+    expect(isComplete(run(s, { type: 'clear-account' }))).toBe(false);
     expect(continueHint(s)).toBeNull();
   });
 
   it('Back keeps earlier answers and never goes before Welcome', () => {
-    let s = run(initialOnboarding(sg), { type: 'continue' }, { type: 'continue' }, { type: 'choose-payday', choice: 'first' }, { type: 'continue' });
+    const acct = { kind: 'account' as const, account: { name: 'DBS', type: 'bank' as const, openingMinor: 320000 } };
+    let s = run(initialOnboarding(sg), { type: 'continue' }, { type: 'continue' }, { type: 'answer-account', answer: acct }, { type: 'continue' }, { type: 'choose-payday', choice: 'first' }, { type: 'continue' });
     expect(s.step).toBe('budget-offer');
-    s = run(s, { type: 'back' }, { type: 'back' });
+    s = run(s, { type: 'back' }, { type: 'back' }, { type: 'back' });
     expect(s.step).toBe('region');
     expect(s.region).toEqual(sg);
+    expect(s.accountAnswer).toEqual(acct);
     expect(s.payday).toEqual({ kind: 'first' });
     s = run(s, { type: 'back' }, { type: 'back' }, { type: 'back' });
     expect(s.step).toBe('welcome');
   });
 
   it('an invalid Other day clears the payday so Continue stays disabled', () => {
-    const s = run(initialOnboarding(sg), { type: 'continue' }, { type: 'continue' }, { type: 'choose-payday', choice: 'other', day: 40 });
+    const s = run(initialOnboarding(sg), { type: 'continue' }, { type: 'continue' }, { type: 'answer-account', answer: { kind: 'skipped' } }, { type: 'continue' }, { type: 'choose-payday', choice: 'other', day: 40 });
     expect(s.payday).toBeNull();
     expect(canContinue(s)).toBe(false);
     expect(run(s, { type: 'choose-payday', choice: 'other', day: 25 }).payday).toEqual({ kind: 'day', day: 25 });

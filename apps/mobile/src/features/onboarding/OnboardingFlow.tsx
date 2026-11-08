@@ -24,12 +24,18 @@ import { textStyle } from '../../shared/theme/typography';
 import { Amount } from '../../shared/ui/Amount';
 import { Button } from '../../shared/ui/Button';
 import { Chip } from '../../shared/ui/Chip';
+import { AccountForm } from '../accounts/AccountForm';
 
 /** A sample amount, 1,234.50 in the region's currency, shown through the shared <Amount> (never formatted here). */
 export function sampleMinor(region: Region): number {
-  const cur = getCurrency(region.currency);
-  const exponent = cur.ok ? cur.value.exponent : 2;
+  const exponent = exponentFor(region);
   return exponent === 0 ? 1234 : Number(`1234${'5'.padEnd(exponent, '0')}`);
+}
+
+/** The stored minor-unit exponent of the region's currency. */
+function exponentFor(region: Region): number {
+  const cur = getCurrency(region.currency);
+  return cur.ok ? cur.value.exponent : 2;
 }
 
 const PAYDAY_CHIPS: readonly { choice: PaydayChoice; label: string }[] = [
@@ -74,7 +80,8 @@ export function OnboardingFlow({ detected, timezoneId, onFinish }: OnboardingFlo
     if (!isComplete(state) || saving.current || state.region === null || state.payday === null || state.budgetOffer === null) return;
     saving.current = true;
     setFailed(false);
-    const ok = await onFinish({ region: state.region, payday: state.payday, budgetOffer: state.budgetOffer, timezoneId });
+    const account = state.accountAnswer?.kind === 'account' ? state.accountAnswer.account : null;
+    const ok = await onFinish({ region: state.region, payday: state.payday, budgetOffer: state.budgetOffer, timezoneId, account });
     if (!ok) {
       setFailed(true);
       saving.current = false;
@@ -121,6 +128,24 @@ export function OnboardingFlow({ detected, timezoneId, onFinish }: OnboardingFlo
             ) : null}
             <Button label={copy.onboarding.regionChange} variant="secondary" onPress={() => setPicking(true)} testID="region-change" />
             <Text style={[textStyle('caption'), secondary]}>{copy.onboarding.regionNote}</Text>
+          </View>
+        ) : null}
+
+        {state.step === 'account' && state.region ? (
+          <View style={styles.gap}>
+            <Text accessibilityRole="header" style={[textStyle('title'), ink]}>{copy.accounts.question}</Text>
+            <AccountForm
+              exponent={exponentFor(state.region)}
+              submitLabel={copy.accounts.save}
+              onSubmit={(account) => {
+                dispatch({ type: 'answer-account', answer: { kind: 'account', account } });
+                dispatch({ type: 'continue' });
+              }}
+              onSkip={() => {
+                dispatch({ type: 'answer-account', answer: { kind: 'skipped' } });
+                dispatch({ type: 'continue' });
+              }}
+            />
           </View>
         ) : null}
 
@@ -223,19 +248,19 @@ export function OnboardingFlow({ detected, timezoneId, onFinish }: OnboardingFlo
             {`${copy.onboarding.saveError} ${copy.errors.nothingSaved}`}
           </Text>
         ) : null}
-        {hint ? (
+        {hint && state.step !== 'account' ? (
           <Text style={[textStyle('caption'), secondary]}>
-            {hint === 'choose-region' ? copy.onboarding.regionHint : hint === 'choose-payday' ? copy.onboarding.paydayHint : copy.onboarding.budgetHint}
+            {hint === 'choose-region' ? copy.onboarding.regionHint : hint === 'answer-account' ? copy.onboarding.accountHint : hint === 'choose-payday' ? copy.onboarding.paydayHint : copy.onboarding.budgetHint}
           </Text>
         ) : null}
         <View style={styles.row}>
           {state.step !== 'welcome' ? <Button label={copy.onboarding.back} variant="text" onPress={() => dispatch({ type: 'back' })} testID="onboarding-back" /> : <View />}
-          <Button
+          {state.step === 'account' ? null : <Button
             label={last ? copy.onboarding.finish : copy.onboarding.continue}
             testID="onboarding-continue"
             onPress={last ? () => void finish() : () => dispatch({ type: 'continue' })}
-            disabledReason={canContinue(state) ? undefined : (hint === 'choose-region' ? copy.onboarding.regionHint : hint === 'choose-payday' ? copy.onboarding.paydayHint : copy.onboarding.budgetHint)}
-          />
+            disabledReason={canContinue(state) ? undefined : (hint === 'choose-region' ? copy.onboarding.regionHint : hint === 'answer-account' ? copy.onboarding.accountHint : hint === 'choose-payday' ? copy.onboarding.paydayHint : copy.onboarding.budgetHint)}
+          />}
         </View>
       </View>
     </View>

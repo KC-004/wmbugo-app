@@ -54,6 +54,7 @@ test('routes to onboarding when no profile exists, and finishing it opens Home',
   });
   await press('region-SG');
   await press('onboarding-continue'); // region
+  await press('account-skip'); // SCR-03
   await press('payday-last_day');
   await press('onboarding-continue'); // payday
   await press('budget-not-now');

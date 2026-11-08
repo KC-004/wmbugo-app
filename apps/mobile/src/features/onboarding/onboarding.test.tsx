@@ -33,6 +33,7 @@ const has = (r: ReactTestRenderer, testID: string) => r.root.findAll((n) => type
 const texts = (r: ReactTestRenderer) => r.root.findAll((n) => n.type === Text).map((n) => [n.props.children].flat().filter((c) => typeof c === 'string').join(''));
 const disabled = (r: ReactTestRenderer) => r.root.findAll((n) => typeof n.type === 'string' && n.props.testID === 'onboarding-continue')[0]!.props.accessibilityState?.disabled === true;
 const next = (r: ReactTestRenderer) => act(() => fire(r, 'onboarding-continue'));
+const skipAccount = (r: ReactTestRenderer) => act(() => fire(r, 'account-skip'));
 
 describe('Welcome (SCR-01)', () => {
   it('shows the three facts in one line and one Continue button, with no tutorial', () => {
@@ -53,6 +54,8 @@ describe('Region and currency (SCR-02)', () => {
     expect(texts(r)).toContain('S$1,234.50');
     expect(disabled(r)).toBe(false);
     next(r);
+    expect(texts(r)).toContain("Where's most of your money?");
+    skipAccount(r);
     expect(texts(r)).toContain('When are you paid?');
   });
 
@@ -126,6 +129,7 @@ describe('Payday', () => {
     const r = mount(code);
     next(r);
     next(r);
+    skipAccount(r);
     return r;
   };
 
@@ -162,6 +166,7 @@ describe('50/30/20 and Finish', () => {
     const r = mount(code, onFinish);
     next(r);
     next(r);
+    skipAccount(r);
     act(() => fire(r, 'payday-last_day'));
     next(r);
     return r;
@@ -184,7 +189,7 @@ describe('50/30/20 and Finish', () => {
     expect(onFinish).not.toHaveBeenCalled();
     await act(async () => fire(r, 'onboarding-continue'));
     expect(onFinish).toHaveBeenCalledTimes(1);
-    expect(onFinish).toHaveBeenCalledWith({ region: findRegion('SG'), payday: { kind: 'last_day' }, budgetOffer: { answer: 'not-now' }, timezoneId: 'Asia/Singapore' });
+    expect(onFinish).toHaveBeenCalledWith({ region: findRegion('SG'), payday: { kind: 'last_day' }, budgetOffer: { answer: 'not-now' }, timezoneId: 'Asia/Singapore', account: null });
   });
 
   it('Yes needs a rough monthly income in the profile currency', async () => {
@@ -238,11 +243,14 @@ describe('50/30/20 and Finish', () => {
     act(() => fire(r, 'onboarding-back'));
     expect(texts(r)).toContain('When are you paid?');
     act(() => fire(r, 'onboarding-back'));
+    expect(texts(r)).toContain("Where's most of your money?");
+    act(() => fire(r, 'onboarding-back'));
     expect(texts(r)).toContain('Singapore · S$ SGD');
     act(() => fire(r, 'onboarding-back'));
     expect(texts(r)).toContain('Welcome to wmbugo');
     next(r);
     next(r);
+    skipAccount(r);
     expect(disabled(r)).toBe(false); // the payday chosen earlier is still there
   });
 });
@@ -258,6 +266,7 @@ describe('permissions and offline', () => {
     act(() => fire(r, 'region-change'));
     act(() => fire(r, 'region-cancel'));
     next(r);
+    skipAccount(r);
     act(() => fire(r, 'payday-first'));
     next(r);
     act(() => fire(r, 'budget-yes'));
@@ -277,6 +286,7 @@ describe('permissions and offline', () => {
     const r = mount('SG', async () => true);
     next(r);
     next(r);
+    skipAccount(r);
     act(() => fire(r, 'payday-none'));
     next(r);
     act(() => fire(r, 'budget-skip'));

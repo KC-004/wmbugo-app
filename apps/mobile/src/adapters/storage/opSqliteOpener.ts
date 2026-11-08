@@ -15,6 +15,8 @@ export const opSqliteOpener: DatabaseOpener = {
 
   async open(keyHex: string): Promise<SqlDatabase> {
     const db = open({ name: DB_NAME, encryptionKey: keyHex });
+    // Foreign keys are off by default in SQLite and are per connection: the ledger relies on them.
+    db.executeSync('PRAGMA foreign_keys = ON');
     return {
       async cipherVersion() {
         const r = await db.executeRaw('PRAGMA cipher_version');

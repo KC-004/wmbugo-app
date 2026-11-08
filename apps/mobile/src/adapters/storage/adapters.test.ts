@@ -36,6 +36,9 @@ beforeEach(() => {
       calls.push(`raw ${String(a[0])}`);
       return mockExecuteRaw(...a);
     },
+    executeSync: (...a: unknown[]) => {
+      calls.push(`sync ${String(a[0])}`);
+    },
     executeBatch: (...a: unknown[]) => mockExecuteBatch(...a),
     transaction: (...a: unknown[]) => mockTransaction(...a),
     getDbPath: () => '/data/databases/wmbugo.db',
@@ -73,6 +76,11 @@ describe('keychainKeyStore', () => {
 describe('opSqliteOpener', () => {
   it('looks for the database file in the Android databases directory', async () => {
     expect(await opSqliteOpener.exists()).toBe(true);
+  });
+
+  it('turns foreign keys on for the connection', async () => {
+    await opSqliteOpener.open('00'.repeat(32));
+    expect(calls).toContain('sync PRAGMA foreign_keys = ON');
   });
 
   it('opens the database with the key', async () => {
