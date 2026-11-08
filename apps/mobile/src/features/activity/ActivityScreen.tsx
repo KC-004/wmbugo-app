@@ -22,6 +22,9 @@ export function ActivityScreen({
   onProfile,
   onAdd,
   duplicateApi = realAddApi,
+  onOpen,
+  onDeleteRow,
+  onRecategorise,
 }: {
   api?: ActivityApi;
   onAccounts: () => void;
@@ -29,6 +32,11 @@ export function ActivityScreen({
   onAdd: () => void;
   /** Keep both / Merge for a flagged entry. */
   duplicateApi?: Pick<AddApi, 'duplicateInfo' | 'keepBoth' | 'merge' | 'undoResolution'>;
+  /** Opens an entry's detail. */
+  onOpen?: (transactionId: string) => void;
+  /** TalkBack custom actions on a row: Delete (Reject for a captured entry) and Recategorise. */
+  onDeleteRow?: (row: ActivityRow) => void;
+  onRecategorise?: (row: ActivityRow) => void;
 }) {
   const [limit, setLimit] = useState(ACTIVITY_PAGE_SIZE);
   const q = useQuery({ queryKey: [...ACTIVITY_QUERY_KEY, limit], queryFn: () => api.load(limit), placeholderData: (prev) => prev });
@@ -69,7 +77,16 @@ export function ActivityScreen({
             }
             renderSectionHeader={({ section }) => <DayHeader day={section.day} today={d.today} currency={d.currency} locale={d.locale} />}
             renderItem={({ item, section }) => (
-              <ActivityRowView row={item} date={section.day.localDate} currency={d.currency} locale={d.locale} footer={item.held ? <HeldRowActions transactionId={item.id} api={duplicateApi} /> : undefined} />
+              <ActivityRowView
+                row={item}
+                date={section.day.localDate}
+                currency={d.currency}
+                locale={d.locale}
+                footer={item.held ? <HeldRowActions transactionId={item.id} api={duplicateApi} /> : undefined}
+                onPress={onOpen ? () => onOpen(item.id) : undefined}
+                actions={onDeleteRow && onRecategorise && item.kind !== 'adjustment' ? [{ name: 'recategorise', label: copy.detail.recategorise }, { name: 'delete', label: item.captured ? copy.detail.reject : copy.detail.delete }] : undefined}
+                onAction={(name) => (name === 'delete' ? onDeleteRow?.(item) : onRecategorise?.(item))}
+              />
             )}
           />
         ) : q.isError ? (

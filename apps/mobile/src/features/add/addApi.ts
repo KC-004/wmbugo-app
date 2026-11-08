@@ -7,6 +7,11 @@ import {
   mapAccountRows,
   mapCategoryRows,
   DUPLICATE_INFO_SQL,
+  EditTransaction,
+  RestoreTransaction,
+  type EntryEdit,
+  type TransferEdit,
+  type TxSnapshot,
   KeepBoth,
   mapDuplicateInfo,
   MergeDuplicate,
@@ -48,7 +53,7 @@ export interface AddData {
 }
 
 /** A save carries its submission id: saving again with the same id (a retry) returns the first save instead of writing twice. */
-export type EntryRequest = ManualEntry & { readonly submissionId: string };
+export type EntryRequest = ManualEntry & { readonly submissionId: string; /** Made by Duplicate: never held against the entry it was copied from. */ readonly copiedFrom?: string };
 export type TransferRequest = TransferInput & { readonly submissionId: string };
 
 export type RecordResult = { ok: true; value: { transactionId: string; accountId: string; result?: SubmitResult } } | { ok: false; code: string };
@@ -64,6 +69,9 @@ export interface AddApi {
   record(entry: EntryRequest): Promise<RecordResult>;
   recordTransfer(input: TransferRequest): Promise<TransferResult>;
   remove(transactionId: string): Promise<{ ok: boolean }>;
+  /** Saves changes to an existing entry; the snapshot it returns is what Undo restores. */
+  edit(transactionId: string, change: { entry?: EntryEdit; transfer?: TransferEdit }): Promise<{ ok: true; value: { snapshot: TxSnapshot } } | { ok: false; code: string }>;
+  restoreTransaction(snapshot: TxSnapshot): Promise<{ ok: boolean }>;
   /** The two entries' categories for a possible duplicate (so Merge can ask which one), or null when it is not (or no longer) held. */
   duplicateInfo(transactionId: string): Promise<DuplicateInfo | null>;
   keepBoth(transactionId: string): Promise<{ ok: boolean }>;
@@ -124,8 +132,8 @@ export const realAddApi: AddApi = {
     return pickDefaultAccount(ids, forCat, lastAny, prof?.settings.defaultAccountId ?? null);
   },
   newSubmissionId: () => getServices().newId(),
-  async record({ submissionId, ...entry }) {
-    const r = await getServices().writer.run(SubmitCapture, { submissionId, sourceKind: 'manual', entry }, 'user');
+  async record({ submissionId, copiedFrom, ...entry }) {
+    const r = await getServices().writer.run(SubmitCapture, { submissionId, sourceKind: 'manual', entry, ...(copiedFrom ? { copiedFrom } : {}) }, 'user');
     return r.ok ? { ok: true, value: { transactionId: r.value.transactionId, accountId: r.value.accountId ?? '', result: r.value.result } } : r;
   },
   async recordTransfer({ submissionId, ...transfer }) {
@@ -133,6 +141,11 @@ export const realAddApi: AddApi = {
     return r.ok ? { ok: true, value: { transactionId: r.value.transactionId, feeTransactionId: r.value.feeTransactionId, result: r.value.result } } : r;
   },
   remove: (transactionId) => getServices().writer.run(RemoveEntry, { transactionId }, 'user'),
+  async edit(transactionId, change) {
+    const r = await getServices().writer.run(EditTransaction, { transactionId, ...change }, 'user');
+    return r.ok ? { ok: true, value: { snapshot: r.value.snapshot } } : r;
+  },
+  restoreTransaction: (snapshot) => getServices().writer.run(RestoreTransaction, { snapshot }, 'user'),
   async duplicateInfo(transactionId) {
     return mapDuplicateInfo(await getServices().db.query(DUPLICATE_INFO_SQL, [transactionId]));
   },

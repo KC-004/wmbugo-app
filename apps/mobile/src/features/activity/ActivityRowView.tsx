@@ -1,6 +1,7 @@
 import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { ArrowsLeftRight, DotsThree, Scales } from 'phosphor-react-native';
 import type { ReactNode } from 'react';
+import { Pressable } from 'react-native';
 import { longDate, type ActivityRow, type CurrencyCode } from '@wmbugo/core';
 import { amountLabel, type AmountKind } from '../../shared/a11y/labels';
 import { copy } from '../../shared/copy';
@@ -26,6 +27,9 @@ export function ActivityRowView({
   title: titleOverride,
   showAccount = true,
   footer,
+  onPress,
+  actions,
+  onAction,
 }: {
   row: ActivityRow;
   date: string;
@@ -37,6 +41,11 @@ export function ActivityRowView({
   showAccount?: boolean;
   /** Under the row's text: the Keep both / Merge buttons of a possible duplicate. */
   footer?: ReactNode;
+  /** Opens the entry. */
+  onPress?: () => void;
+  /** TalkBack custom actions (Recategorise, Delete). */
+  actions?: readonly { name: string; label: string }[];
+  onAction?: (name: string) => void;
 }) {
   const theme = useTheme();
   const { fontScale } = useWindowDimensions();
@@ -61,10 +70,14 @@ export function ActivityRowView({
   const direction = row.kind === 'income' || row.kind === 'refund' ? 'income' : row.kind === 'expense' ? 'expense' : 'neutral';
   const stack = fontScale >= 1.3;
   return (
-    <View
+    <Pressable
       testID={`activity-row-${row.id}`}
       accessible
+      accessibilityRole={onPress ? 'button' : undefined}
       accessibilityLabel={spoken}
+      accessibilityActions={actions ? [...actions] : undefined}
+      onAccessibilityAction={onAction ? (e) => onAction(e.nativeEvent.actionName) : undefined}
+      onPress={onPress}
       style={[styles.row, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
       <View style={[styles.chip, { backgroundColor: theme.color('bg-muted') }]}>
         <Icon icon={glyph} size={22} color={(row.categoryColor as ColorName | null) ?? 'text-secondary'} />
@@ -84,7 +97,7 @@ export function ActivityRowView({
           color={direction === 'income' ? 'semantic-income' : 'text-primary'}
         />
       </View>
-    </View>
+    </Pressable>
   );
 }
 

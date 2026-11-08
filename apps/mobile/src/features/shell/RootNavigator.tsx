@@ -10,8 +10,10 @@ import { SheetHost } from '../../shared/feedback/SheetHost';
 import { ToastHost } from '../../shared/feedback/ToastHost';
 import { useTheme } from '../../shared/theme/ThemeProvider';
 import type { AddButtonRef } from './AddButton';
-import { useOpenAdd } from '../add/useOpenAdd';
+import { useOpenAdd, useOpenAddWith } from '../add/useOpenAdd';
 import { ActivityScreen } from '../activity/ActivityScreen';
+import { TransactionDetailScreen } from '../activity/TransactionDetailScreen';
+import { useEntryActions } from '../activity/useEntryActions';
 import { HomeScreen } from '../home/HomeScreen';
 import { SettingsScreen } from '../settings/SettingsScreen';
 import { AccountDetailScreen } from '../accounts/AccountDetailScreen';
@@ -21,7 +23,7 @@ import { ScreenHeader } from './ScreenHeader';
 import { TabBar, type TabRoute } from './TabBar';
 import { markTabFirstFrame } from './navTiming';
 
-type RootParams = { Tabs: undefined; Accounts: undefined; AccountDetail: { accountId: string }; Settings: undefined };
+type RootParams = { Tabs: undefined; Accounts: undefined; AccountDetail: { accountId: string }; TransactionDetail: { transactionId: string }; Settings: undefined };
 const RootStack = createNativeStackNavigator<RootParams>();
 const Tabs = createBottomTabNavigator();
 const TabStack = createNativeStackNavigator();
@@ -66,9 +68,10 @@ function HomeTab() {
 function ActivityTab() {
   const nav = useNavigation<Nav>();
   const openAdd = useOpenAdd();
+  const entry = useEntryActions();
   return (
     <TabFrame tab="Activity">
-      <ActivityScreen onAccounts={() => nav.navigate('Accounts')} onProfile={() => nav.navigate('Settings')} onAdd={openAdd} />
+      <ActivityScreen onAccounts={() => nav.navigate('Accounts')} onProfile={() => nav.navigate('Settings')} onAdd={openAdd} onOpen={entry.open} onDeleteRow={(r) => void entry.remove(r)} onRecategorise={(r) => void entry.recategorise(r)} />
     </TabFrame>
   );
 }
@@ -134,7 +137,7 @@ function AccountsRoute() {
 function AccountDetailRoute() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const nav = useNavigation<{ goBack: () => void }>();
+  const nav = useNavigation<{ goBack: () => void; navigate: (s: 'TransactionDetail', p: { transactionId: string }) => void }>();
   const route = useRoute<RouteProp<RootParams, 'AccountDetail'>>();
   const { accountId } = route.params;
   const moveMoney = useOpenAdd(undefined, { kind: 'transfer', accountId });
@@ -142,7 +145,25 @@ function AccountDetailRoute() {
   const payBill = usePayBill();
   return (
     <View style={[styles.fill, { backgroundColor: theme.color('bg-canvas'), paddingTop: insets.top }]}>
-      <AccountDetailScreen accountId={accountId} onBack={() => nav.goBack()} onMoveMoney={moveMoney} onAddExpense={addExpense} onPayBill={() => payBill(accountId)} />
+      <AccountDetailScreen accountId={accountId} onBack={() => nav.goBack()} onMoveMoney={moveMoney} onAddExpense={addExpense} onPayBill={() => payBill(accountId)} onOpenTransaction={(transactionId) => nav.navigate('TransactionDetail', { transactionId })} />
+    </View>
+  );
+}
+
+function TransactionDetailRoute() {
+  const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  const nav = useNavigation<{ goBack: () => void }>();
+  const route = useRoute<RouteProp<RootParams, 'TransactionDetail'>>();
+  const openAdd = useOpenAddWith();
+  return (
+    <View style={[styles.fill, { backgroundColor: theme.color('bg-canvas'), paddingTop: insets.top }]}>
+      <TransactionDetailScreen
+        transactionId={route.params.transactionId}
+        onBack={() => nav.goBack()}
+        onEdit={(spec) => openAdd(undefined, spec)}
+        onDuplicate={(preset) => openAdd(preset)}
+      />
     </View>
   );
 }
@@ -167,6 +188,7 @@ export function RootNavigator() {
             <RootStack.Screen name="Tabs" component={TabsWithAdd} />
             <RootStack.Screen name="Accounts" component={AccountsRoute} />
             <RootStack.Screen name="AccountDetail" component={AccountDetailRoute} />
+            <RootStack.Screen name="TransactionDetail" component={TransactionDetailRoute} />
             <RootStack.Screen name="Settings" component={SettingsRoute} />
           </RootStack.Navigator>
         </SheetHost>

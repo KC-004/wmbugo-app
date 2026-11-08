@@ -21,10 +21,10 @@ const PAYMENT_LABEL: Readonly<Record<PaymentMethod, string>> = {
 };
 
 /** Expense / Income / Transfer as a radio group "Entry type", each read "Option n of 3"; vertical at large text. */
-export function KindSegments({ kind, vertical, onChoose }: { kind: AddKind; vertical: boolean; onChoose: (k: AddKind) => void }) {
+export function KindSegments({ kind, vertical, onChoose, locked = false }: { kind: AddKind; vertical: boolean; onChoose: (k: AddKind) => void; /** Editing an entry: its type is fixed, so only that type shows. */ locked?: boolean }) {
   return (
     <View style={vertical ? styles.column : styles.row} accessibilityRole="radiogroup" accessibilityLabel={copy.add.typeLabel}>
-      {KINDS.map((k, i) => (
+      {KINDS.filter((k) => !locked || k === kind).map((k, i) => (
         <Chip
           onGlass
           key={k}

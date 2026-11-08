@@ -11,3 +11,4 @@ export * from './accountBalanceCommands';
 export * from './adjustBalance';
 export * from './cardDetails';
 export * from './savings';
+export * from './editCommands';

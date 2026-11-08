@@ -46,6 +46,12 @@ export interface AddPreset {
   readonly owedMinor?: number | null;
   /** Shown while the amount is empty. */
   readonly hint?: string;
+  /** Duplicate: what is copied from the entry (the date and time are now). */
+  readonly categoryId?: string | null;
+  readonly merchant?: string | null;
+  readonly note?: string | null;
+  readonly paymentMethod?: PaymentMethod | null;
+  readonly copiedFrom?: string;
 }
 
 function wallParts(nowMs: number, tz: string): { date: string; time: string } {
@@ -59,6 +65,20 @@ function wallParts(nowMs: number, tz: string): { date: string; time: string } {
   return { date: d.ok ? d.value : '1970-01-01', time };
 }
 
+/** An existing entry opened for editing: the type is fixed and Save changes it instead of adding one. */
+export interface EditSpec {
+  readonly transactionId: string;
+  readonly kind: AddKind;
+  readonly amountMinor: number;
+  readonly categoryId: string | null;
+  readonly accountId: string | null;
+  readonly toAccountId: string | null;
+  readonly merchant: string | null;
+  readonly note: string | null;
+  readonly paymentMethod: PaymentMethod | null;
+  readonly occurredAtMs: number;
+}
+
 /**
  * The Add sheet: segmented Expense/Income, quick-category chips (most used first, fixed while open), the
  * account chip, the typed amount and the keypad. Save writes through `SubmitCapture`; the toast offers
@@ -69,6 +89,7 @@ export function AddSheet({
   close,
   onNewAccount,
   preset,
+  edit,
   now = systemClock.nowMs,
 }: {
   api?: AddApi;
@@ -77,6 +98,8 @@ export function AddSheet({
   onNewAccount?: () => void;
   /** Opened from an account: the type and the account (the From side of a transfer) are chosen already, the amount is empty. */
   preset?: AddPreset;
+  /** Editing an existing entry. */
+  edit?: EditSpec;
   now?: () => number;
 }) {
   const theme = useTheme();
@@ -89,11 +112,11 @@ export function AddSheet({
   const insets = useSafeAreaInsets();
 
   const [data, setData] = useState<AddData | null>(null);
-  const [kind, setKind] = useState<AddKind>(preset?.kind ?? draft.kind);
-  const [text, setText] = useState(preset ? '' : draft.typedText);
-  const [categoryId, setCategoryId] = useState<string | null>(preset ? null : draft.categoryId);
-  const [accountId, setAccountId] = useState<string | null>(preset?.accountId ?? null);
-  const [toAccountId, setToAccountId] = useState<string | null>(preset?.toAccountId ?? null);
+  const [kind, setKind] = useState<AddKind>(edit?.kind ?? preset?.kind ?? draft.kind);
+  const [text, setText] = useState(preset || edit ? '' : draft.typedText);
+  const [categoryId, setCategoryId] = useState<string | null>(edit ? edit.categoryId : preset ? (preset.categoryId ?? null) : draft.categoryId);
+  const [accountId, setAccountId] = useState<string | null>(edit?.accountId ?? preset?.accountId ?? null);
+  const [toAccountId, setToAccountId] = useState<string | null>(edit?.toAccountId ?? preset?.toAccountId ?? null);
   const [owedWarned, setOwedWarned] = useState<string | null>(null);
   const presetApplied = useRef(false);
   const [feeText, setFeeText] = useState('');
@@ -103,14 +126,15 @@ export function AddSheet({
   const [showAllCategories, setShowAllCategories] = useState(false);
   const [error, setError] = useState<FieldError>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [details, setDetails] = useState(false);
-  const [merchant, setMerchant] = useState('');
-  const [note, setNote] = useState('');
-  const [payment, setPayment] = useState<PaymentMethod | null>(null);
+  const [details, setDetails] = useState(edit !== undefined);
+  const [merchant, setMerchant] = useState(edit?.merchant ?? preset?.merchant ?? '');
+  const [note, setNote] = useState(edit?.note ?? preset?.note ?? '');
+  const [payment, setPayment] = useState<PaymentMethod | null>(edit?.paymentMethod ?? preset?.paymentMethod ?? null);
+  const [editError, setEditError] = useState<string | null>(null);
   const [dateText, setDateText] = useState('');
   const [timeText, setTimeText] = useState('');
 
-  const accountTouched = useRef(preset !== undefined);
+  const accountTouched = useRef(preset !== undefined || edit !== undefined);
   const dateTouched = useRef(false);
   const saving = useRef(false);
   /** One id per save: kept across a failed attempt so a retry cannot write twice, dropped once a save succeeds. */
@@ -124,12 +148,13 @@ export function AddSheet({
       if (!live || !d) return;
       setData(d);
       if (!accountTouched.current) setAccountId(d.defaultAccountId);
-      if (preset?.amountMinor && !presetApplied.current) {
+      const startAmount = edit?.amountMinor ?? preset?.amountMinor;
+      if (startAmount && !presetApplied.current) {
         presetApplied.current = true;
-        setText(minorToInput(preset.amountMinor, d.exponent));
+        setText(minorToInput(startAmount, d.exponent));
       }
       if (!dateTouched.current) {
-        const w = wallParts(now(), d.timezoneId);
+        const w = wallParts(edit ? edit.occurredAtMs : now(), d.timezoneId);
         setDateText(w.date);
         setTimeText(w.time);
       }
@@ -199,11 +224,60 @@ export function AddSheet({
     }
   };
 
+  /** Editing: validate like a new entry, then change the existing one. Undo restores the snapshot it returned. */
+  const saveEdit = async () => {
+    if (!edit || !data || !parsed.ok) return;
+    const at = instantFromLocal(dateText, timeText, data.timezoneId);
+    if (at === null) return setError('date');
+    if (kind === 'transfer' && (!accountId || !toAccountId || accountId === toAccountId)) return setError('same');
+    if (kind !== 'transfer' && (!categoryId || !data.categories.some((c) => c.id === categoryId))) return setError('category');
+    saving.current = true;
+    setEditError(null);
+    try {
+      const r = await api.edit(
+        edit.transactionId,
+        kind === 'transfer'
+          ? { transfer: { amountMinor: parsed.value, fromAccountId: accountId!, toAccountId: toAccountId!, occurredAtMs: at, note: note.trim() === '' ? null : note } }
+          : { entry: { amountMinor: parsed.value, categoryId: categoryId!, accountId: accountId!, occurredAtMs: at, merchant: merchant.trim() === '' ? null : merchant, note: note.trim() === '' ? null : note, paymentMethod: payment } },
+      );
+      if (!r.ok) {
+        if (r.code === 'ENTRY_REMOVED') setEditError(copy.detail.removedError);
+        else if (r.code === 'SAME_ACCOUNT') setError('same');
+        else if (r.code === 'AMOUNT_REQUIRED') setError('amount');
+        else setEditError(`${copy.add.saveError} ${copy.errors.nothingSaved}`);
+        return;
+      }
+      const snapshot = r.value.snapshot;
+      await refresh();
+      toast.show({
+        message: copy.add.saved,
+        undo: {
+          label: copy.common.undo,
+          onUndo: () =>
+            void api
+              .restoreTransaction(snapshot)
+              .then(async (u) => {
+                await refresh();
+                if (!u.ok) toast.show({ message: copy.add.removeFailed });
+              })
+              .catch(() => toast.show({ message: copy.add.removeFailed })),
+        },
+      });
+      close();
+    } finally {
+      saving.current = false;
+    }
+  };
+
   const save = async (another: boolean) => {
     if (saving.current || !data) return;
     if (!parsed.ok || parsed.value <= 0) {
       setError('amount');
       amountRef.current?.focus();
+      return;
+    }
+    if (edit) {
+      await saveEdit();
       return;
     }
     if (kind === 'transfer') {
@@ -230,6 +304,7 @@ export function AddSheet({
       submission.current ??= api.newSubmissionId();
       const r = await api.record({
         submissionId: submission.current,
+        ...(preset?.copiedFrom ? { copiedFrom: preset.copiedFrom } : {}),
         kind,
         amountMinor: parsed.value,
         categoryId,
@@ -373,7 +448,7 @@ export function AddSheet({
   return (
     <View>
     <ScrollView style={{ maxHeight: Math.max(280, height - insets.top - 190) }} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
-      <KindSegments kind={kind} vertical={fontScale >= 1.3} onChoose={chooseKind} />
+      <KindSegments kind={kind} vertical={fontScale >= 1.3} onChoose={chooseKind} locked={edit !== undefined} />
 
       {kind === 'transfer' ? null : (
         <CategoryChips
@@ -503,10 +578,15 @@ export function AddSheet({
           {`${saveError} ${copy.errors.nothingSaved}`}
         </Text>
       ) : null}
+      {editError ? (
+        <Text testID="edit-error" accessibilityRole="alert" accessibilityLiveRegion="assertive" style={[textStyle('body'), secondary]}>
+          {editError}
+        </Text>
+      ) : null}
 
     </ScrollView>
     <View style={[styles.footer, { backgroundColor: theme.color('glass-fallback') }]} testID="add-footer">
-      <Button label={copy.add.saveAnother} variant="secondary-on-footer" onPress={() => void save(true)} testID="save-another" />
+      {edit ? null : <Button label={copy.add.saveAnother} variant="secondary-on-footer" onPress={() => void save(true)} testID="save-another" />}
       <Button label={copy.add.save} onPress={() => void save(false)} testID="save" />
     </View>
     </View>

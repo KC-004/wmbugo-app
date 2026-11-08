@@ -5,13 +5,13 @@
 import { AccessibilityInfo, Text } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { mapCategoryRows, rankCategories, SEED_CATEGORIES, type AccountRow, type DuplicateInfo } from '@wmbugo/core';
+import { mapCategoryRows, rankCategories, SEED_CATEGORIES, type AccountRow, type DuplicateInfo, type EntryEdit, type TransferEdit, type TxSnapshot } from '@wmbugo/core';
 import { SheetHost } from '../../shared/feedback/SheetHost';
 import { ToastHost } from '../../shared/feedback/ToastHost';
 import { createQueryClient } from '../../shared/queryClient';
 import { EMPTY_DRAFT, useUiStore } from '../../shared/state/uiStore';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
-import { AddSheet, type AddPreset } from './AddSheet';
+import { AddSheet, type AddPreset, type EditSpec } from './AddSheet';
 import type { AddApi, AddData, AddKind, EntryRequest, RecordResult, TransferRequest, TransferResult } from './addApi';
 
 const live: ReactTestRenderer[] = [];
@@ -78,11 +78,13 @@ export function fakeApi(over: Partial<AddData> = {}, counts = new Map<string, nu
   const keepBoth = jest.fn<Promise<{ ok: boolean }>, [string]>(async () => ({ ok: true }));
   const merge = jest.fn<Promise<{ ok: boolean; code?: string }>, [string, string?]>(async () => ({ ok: true }));
   const undoResolution = jest.fn<Promise<{ ok: boolean }>, [string]>(async () => ({ ok: true }));
-  const api: AddApi = { load, defaultAccountFor, record, recordTransfer, remove, newSubmissionId: () => `sub-${++n}`, duplicateInfo, keepBoth, merge, undoResolution };
-  return { api, record, recordTransfer, remove, load, defaultAccountFor, duplicateInfo, keepBoth, merge, undoResolution };
+  const editTx = jest.fn<Promise<{ ok: true; value: { snapshot: TxSnapshot } } | { ok: false; code: string }>, [string, { entry?: EntryEdit; transfer?: TransferEdit }]>(async () => ({ ok: true, value: { snapshot: { id: 'e1' } as TxSnapshot } }));
+  const restoreTransaction = jest.fn<Promise<{ ok: boolean }>, [TxSnapshot]>(async () => ({ ok: true }));
+  const api: AddApi = { load, defaultAccountFor, record, recordTransfer, remove, newSubmissionId: () => `sub-${++n}`, duplicateInfo, keepBoth, merge, undoResolution, edit: editTx, restoreTransaction };
+  return { api, record, recordTransfer, remove, load, defaultAccountFor, duplicateInfo, keepBoth, merge, undoResolution, editTx, restoreTransaction };
 }
 
-export function mount(api: AddApi, close = jest.fn(), onNewAccount?: () => void, preset?: AddPreset) {
+export function mount(api: AddApi, close = jest.fn(), onNewAccount?: () => void, preset?: AddPreset, editSpec?: EditSpec) {
   const qc = createQueryClient();
   clients.push(qc);
   let r!: ReactTestRenderer;
@@ -92,7 +94,7 @@ export function mount(api: AddApi, close = jest.fn(), onNewAccount?: () => void,
         <ThemeProvider>
           <ToastHost bottomOffset={0}>
             <SheetHost>
-            <AddSheet api={api} close={close} onNewAccount={onNewAccount} preset={preset} now={() => Date.UTC(2026, 10, 8, 10, 0, 0)} />
+            <AddSheet api={api} close={close} onNewAccount={onNewAccount} preset={preset} edit={editSpec} now={() => Date.UTC(2026, 10, 8, 10, 0, 0)} />
             </SheetHost>
           </ToastHost>
         </ThemeProvider>
@@ -103,9 +105,9 @@ export function mount(api: AddApi, close = jest.fn(), onNewAccount?: () => void,
   return { r, close, qc };
 }
 
-export async function mountReady(over: Partial<AddData> = {}, counts?: Map<string, number>, onNewAccount?: () => void, preset?: AddPreset) {
+export async function mountReady(over: Partial<AddData> = {}, counts?: Map<string, number>, onNewAccount?: () => void, preset?: AddPreset, editSpec?: EditSpec) {
   const f = fakeApi(over, counts);
-  const m = mount(f.api, jest.fn(), onNewAccount, preset);
+  const m = mount(f.api, jest.fn(), onNewAccount, preset, editSpec);
   await settle();
   return { ...f, ...m };
 }

@@ -59,6 +59,8 @@ export interface ActivityRow {
   readonly signedMinor?: number;
   /** Held back as a possible duplicate: shown to be resolved, never counted in Spent or any total. */
   readonly held?: boolean;
+  /** Came from a capture source, not typed by the user: it is rejected (Reject · Not mine), never deleted. */
+  readonly captured?: boolean;
 }
 
 /** How many entries Activity loads at a time. */
@@ -74,7 +76,7 @@ const ACTIVITY_FILTER =
  * the first and joins the two account names.
  */
 export const ACTIVITY_SQL =
-  'SELECT t.id, t.event_type, t.amount_minor, t.local_date, t.original_description, c.name, c.icon, c.color_token, a.name, (p.posting_kind = \'normal\' AND a.opening_effective_at IS NOT NULL AND t.occurred_at_utc < a.opening_effective_at), p.signed_amount_minor, t.status FROM "transaction" t LEFT JOIN split s ON s.transaction_id = t.id LEFT JOIN category c ON c.id = s.category_id LEFT JOIN posting p ON p.transaction_id = t.id LEFT JOIN account a ON a.id = p.account_id WHERE t.id IN (SELECT t2.id FROM "transaction" t2 WHERE ' +
+  'SELECT t.id, t.event_type, t.amount_minor, t.local_date, t.original_description, c.name, c.icon, c.color_token, a.name, (p.posting_kind = \'normal\' AND a.opening_effective_at IS NOT NULL AND t.occurred_at_utc < a.opening_effective_at), p.signed_amount_minor, t.status, (SELECT 1 FROM source_record sr WHERE sr.transaction_id = t.id AND sr.source_kind <> \'manual\' LIMIT 1) FROM "transaction" t LEFT JOIN split s ON s.transaction_id = t.id LEFT JOIN category c ON c.id = s.category_id LEFT JOIN posting p ON p.transaction_id = t.id LEFT JOIN account a ON a.id = p.account_id WHERE t.id IN (SELECT t2.id FROM "transaction" t2 WHERE ' +
   ACTIVITY_FILTER +
   ' ORDER BY t2.local_date DESC, t2.occurred_at_utc DESC, t2.id DESC LIMIT ?) ORDER BY t.local_date DESC, t.occurred_at_utc DESC, t.id DESC, p.signed_amount_minor ASC';
 
@@ -118,6 +120,7 @@ export function mapActivityRows(rows: readonly (readonly unknown[])[]): Activity
       beforeTracking: String(r[1]) !== 'transfer' && String(r[1]) !== 'adjustment' && Number(r[9]) === 1,
       ...(String(r[1]) === 'adjustment' ? { signedMinor: Number(r[10]) } : {}),
       ...(String(r[11]) === 'needs_review' ? { held: true } : {}),
+      ...(Number(r[12]) === 1 ? { captured: true } : {}),
     });
   }
   return out;

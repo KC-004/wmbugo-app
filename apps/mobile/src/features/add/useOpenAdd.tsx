@@ -2,22 +2,23 @@ import { useCallback, type RefObject } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { copy } from '../../shared/copy';
 import { useSheet } from '../../shared/feedback/SheetHost';
-import { AddSheet, type AddPreset } from './AddSheet';
+import { AddSheet, type AddPreset, type EditSpec } from './AddSheet';
 
 /** Opens the Add sheet with a preset chosen at the moment of the tap (one at a time). */
-export function useOpenAddWith(opener?: RefObject<unknown>): (preset?: AddPreset) => void {
+export function useOpenAddWith(opener?: RefObject<unknown>): (preset?: AddPreset, edit?: EditSpec) => void {
   const sheet = useSheet();
   const nav = useNavigation<{ navigate: (s: 'Accounts') => void }>();
   return useCallback(
-    (preset?: AddPreset) => {
+    (preset?: AddPreset, edit?: EditSpec) => {
       sheet.open(
         {
           id: 'add',
-          title: copy.sheet.addTitle,
+          title: edit ? copy.sheet.editTitle : copy.sheet.addTitle,
           body: (close) => (
             <AddSheet
               close={close}
               preset={preset}
+              edit={edit}
               onNewAccount={() => {
                 close();
                 nav.navigate('Accounts');

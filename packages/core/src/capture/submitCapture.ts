@@ -10,7 +10,7 @@ import { matchItem, type CaptureItem } from './match';
  * rules. Manual entry from the Add sheet is the first source.
  */
 
-export type SubmitInput = { readonly submissionId: string; readonly sourceKind: 'manual' } & ({ readonly entry: ManualEntry } | { readonly transfer: TransferInput });
+export type SubmitInput = { readonly submissionId: string; readonly sourceKind: 'manual' } & ({ readonly entry: ManualEntry; readonly copiedFrom?: string } | { readonly transfer: TransferInput });
 
 export type SubmitResult = 'RECORDED' | 'ALREADY_SUBMITTED' | 'POSSIBLE_DUPLICATE';
 export type SubmitError = RecordEntryError | TransferError | 'SUBMISSION_INVALID';
@@ -97,7 +97,9 @@ export const SubmitCapture: UseCase<SubmitInput, Submitted, SubmitError> = {
         accountId: facts.accountId,
         source: 'manual',
       };
-      const outcome = matchItem(item, await candidates(ctx, e.amountMinor, facts.localDate), { ownedAccountIds: new Set([facts.accountId]) });
+      // An entry made by Duplicate is never held against the entry it was copied from.
+      const near = (await candidates(ctx, e.amountMinor, facts.localDate)).filter((c) => c.id !== input.copiedFrom);
+      const outcome = matchItem(item, near, { ownedAccountIds: new Set([facts.accountId]) });
       // Saved, never blocked: a possible duplicate waits for review and counts in nothing until it is confirmed.
       return outcome.kind === 'possible_duplicate_of' || outcome.kind === 'duplicate_of' ? { status: 'needs_review', duplicateOf: outcome.id } : { status: 'confirmed' };
     });

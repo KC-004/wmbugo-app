@@ -3,3 +3,4 @@ export * from './match';
 export * from './submitCapture';
 export * from './statusLabel';
 export * from './resolveDuplicate';
+export * from './snapshot';

@@ -37,6 +37,7 @@ export function AccountDetailScreen({
   onMoveMoney,
   onAddExpense,
   onPayBill,
+  onOpenTransaction,
   api = realAccountDetailApi,
 }: {
   accountId: string;
@@ -47,6 +48,8 @@ export function AccountDetailScreen({
   onAddExpense: () => void;
   /** Opens the ready-filled transfer that pays this card. */
   onPayBill?: () => void;
+  /** Opens an entry from the timeline. */
+  onOpenTransaction?: (transactionId: string) => void;
   api?: AccountDetailApi;
 }) {
   const theme = useTheme();
@@ -285,7 +288,7 @@ export function AccountDetailScreen({
                 item.kind === 'transfer' && item.accountName
                   ? (signed < 0 ? copy.accountDetail.toAccount : copy.accountDetail.fromAccount).replace('{name}', item.accountName)
                   : undefined;
-              return <ActivityRowView row={item} date={section.day.localDate} currency={d.currency} locale={d.locale} title={title} showAccount={false} />;
+              return <ActivityRowView row={item} date={section.day.localDate} currency={d.currency} locale={d.locale} title={title} showAccount={false} onPress={onOpenTransaction ? () => onOpenTransaction(item.id) : undefined} />;
             }}
           />
         ) : q.isError || q.data === null ? (

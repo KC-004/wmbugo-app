@@ -1,5 +1,6 @@
 import { err, ok } from '../shared/result';
 import type { UseCase, WriterContext } from '../writer/ledgerWriter';
+import { restoreTx, snapshotTx, type TxSnapshot } from './snapshot';
 
 /**
  * Resolving a possible duplicate (Story 3.3, FIN-027 Merge): Keep both, Merge and Undo. Every resolution stores what it
@@ -18,57 +19,11 @@ export const TIP_CATEGORY_NAME = 'Tip / adjustment';
 
 export type ResolveError = 'NOT_A_DUPLICATE' | 'ALREADY_RESOLVED' | 'CATEGORY_REQUIRED' | 'CATEGORY_NOT_FOUND' | 'NOTHING_TO_UNDO';
 
-interface Snap {
-  id: string;
-  status: string;
-  resolution: string | null;
-  removedAt: number | null;
-  removalKind: string | null;
-  amount: number;
-  occurredAt: number;
-  localDate: string;
-  timezoneId: string;
-  postings: { id: string; account: string; direction: string; signed: number; kind: string }[];
-  splits: { id: string; category: string; amount: number; memo: string | null }[];
-  sources: string[];
-}
 interface Undo {
   kind: 'keep_both' | 'merge';
-  txs: Snap[];
+  txs: TxSnapshot[];
   /** Splits created by the merge (the tip split), removed again on Undo. */
   addedSplitIds?: string[];
-}
-
-async function snap(ctx: WriterContext, id: string): Promise<Snap> {
-  const t = (await ctx.query('SELECT status, capture_resolution, removed_at, removal_kind, amount_minor, occurred_at_utc, local_date, timezone_id FROM "transaction" WHERE id = ?', [id]))[0]!;
-  const postings = await ctx.query('SELECT id, account_id, direction, signed_amount_minor, posting_kind FROM posting WHERE transaction_id = ? ORDER BY id', [id]);
-  const splits = await ctx.query('SELECT id, category_id, amount_minor, memo FROM split WHERE transaction_id = ? ORDER BY id', [id]);
-  const sources = await ctx.query('SELECT id FROM source_record WHERE transaction_id = ? ORDER BY id', [id]);
-  return {
-    id,
-    status: String(t[0]),
-    resolution: t[1] === null ? null : String(t[1]),
-    removedAt: t[2] === null ? null : Number(t[2]),
-    removalKind: t[3] === null ? null : String(t[3]),
-    amount: Number(t[4]),
-    occurredAt: Number(t[5]),
-    localDate: String(t[6]),
-    timezoneId: String(t[7]),
-    postings: postings.map((p) => ({ id: String(p[0]), account: String(p[1]), direction: String(p[2]), signed: Number(p[3]), kind: String(p[4]) })),
-    splits: splits.map((s) => ({ id: String(s[0]), category: String(s[1]), amount: Number(s[2]), memo: s[3] === null ? null : String(s[3]) })),
-    sources: sources.map((s) => String(s[0])),
-  };
-}
-
-async function restore(ctx: WriterContext, s: Snap): Promise<void> {
-  await ctx.execute('UPDATE "transaction" SET status = ?, capture_resolution = ?, removed_at = ?, removal_kind = ?, amount_minor = ?, occurred_at_utc = ?, local_date = ?, timezone_id = ?, updated_at = ? WHERE id = ?', [
-    s.status, s.resolution, s.removedAt, s.removalKind, s.amount, s.occurredAt, s.localDate, s.timezoneId, ctx.nowMs(), s.id,
-  ]);
-  await ctx.execute('DELETE FROM posting WHERE transaction_id = ?', [s.id]);
-  for (const p of s.postings) await ctx.execute('INSERT INTO posting (id, transaction_id, account_id, direction, signed_amount_minor, posting_kind) VALUES (?, ?, ?, ?, ?, ?)', [p.id, s.id, p.account, p.direction, p.signed, p.kind]);
-  await ctx.execute('DELETE FROM split WHERE transaction_id = ?', [s.id]);
-  for (const sp of s.splits) await ctx.execute('INSERT INTO split (id, transaction_id, category_id, amount_minor, memo) VALUES (?, ?, ?, ?, ?)', [sp.id, s.id, sp.category, sp.amount, sp.memo]);
-  for (const src of s.sources) await ctx.execute('UPDATE source_record SET transaction_id = ? WHERE id = ?', [s.id, src]);
 }
 
 async function openCandidate(ctx: WriterContext, transactionId: string): Promise<{ id: string; matched: string } | 'resolved' | null> {
@@ -85,7 +40,7 @@ export const KeepBoth: UseCase<{ transactionId: string }, { candidateId: string 
     const c = await openCandidate(ctx, input.transactionId);
     if (c === null) return err('NOT_A_DUPLICATE');
     if (c === 'resolved') return err('ALREADY_RESOLVED');
-    const before = await snap(ctx, input.transactionId);
+    const before = (await snapshotTx(ctx, input.transactionId))!;
     const undo: Undo = { kind: 'keep_both', txs: [before] };
     await ctx.execute("UPDATE \"transaction\" SET status = 'confirmed', capture_resolution = 'user_approved', updated_at = ? WHERE id = ?", [ctx.nowMs(), input.transactionId]);
     await ctx.execute("UPDATE review_candidate SET status = 'resolved', resolved_at = ?, undo_json = ? WHERE id = ?", [ctx.nowMs(), JSON.stringify(undo), c.id]);
@@ -125,7 +80,7 @@ export const MergeDuplicate: UseCase<{ transactionId: string; categoryId?: strin
     const survivorId = heldAuth > confirmedAuth ? heldId : confirmedId;
     const otherId = survivorId === heldId ? confirmedId : heldId;
 
-    const before = [await snap(ctx, heldId), await snap(ctx, confirmedId)];
+    const before = [(await snapshotTx(ctx, heldId))!, (await snapshotTx(ctx, confirmedId))!];
     const survivor = before.find((s) => s.id === survivorId)!;
     const other = before.find((s) => s.id === otherId)!;
     const undo: Undo = { kind: 'merge', txs: before, addedSplitIds: [] };
@@ -189,7 +144,7 @@ export const UndoDuplicateResolution: UseCase<{ transactionId: string }, void, R
     for (const id of undo.addedSplitIds ?? []) await ctx.execute('DELETE FROM split WHERE id = ?', [id]);
     // Clear every split first: a split the merge moved from one record to the other must not collide when it goes back.
     for (const s of undo.txs) await ctx.execute('DELETE FROM split WHERE transaction_id = ?', [s.id]);
-    for (const s of undo.txs) await restore(ctx, s);
+    for (const s of undo.txs) await restoreTx(ctx, s);
     await ctx.execute("UPDATE review_candidate SET status = 'open', resolved_at = NULL, undo_json = NULL WHERE id = ?", [String(r[0])]);
     for (const s of undo.txs) ctx.touch('transaction', s.id, { resolution: 'undone' });
     ctx.emit('TransactionsChanged', { transactionIds: undo.txs.map((s) => s.id) });
