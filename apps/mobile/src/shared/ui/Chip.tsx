@@ -25,6 +25,10 @@ export interface ChipProps {
   /** Outline icon shown before the label; it turns filled when selected. */
   icon?: ComponentType<IconProps>;
   testID?: string;
+  /** Defaults to button; segmented choices pass radio. */
+  role?: 'button' | 'radio';
+  /** Spoken after the label, e.g. "2 of 3". */
+  hint?: string;
 }
 
 /**
@@ -32,10 +36,10 @@ export interface ChipProps {
  * Selected: accent fill with a filled icon (never colour alone: the icon and the
  * "selected" state change too). Paid with / Paid from chips speak their prefix.
  */
-export function Chip({ label, variant = 'quick-category', selected = false, onPress, icon, testID }: ChipProps) {
+export function Chip({ label, variant = 'quick-category', selected = false, onPress, icon, testID, role = 'button', hint }: ChipProps) {
   const theme = useTheme();
   const { focused, onFocus, onBlur } = useFocusRing();
-  const a11y = controlA11y({ label: `${SPOKEN_PREFIX[variant] ?? ''}${label}`, role: 'button', selected });
+  const a11y = controlA11y({ label: `${SPOKEN_PREFIX[variant] ?? ''}${label}`, role, selected, hint });
 
   // chip-selected (DESIGN.md): white on the light accent fill, dark canvas ink on the light-teal dark fill.
   const ink = selected ? (theme.scheme === 'dark' ? colorTokens['bg-canvas-dark'] : colorTokens['bg-surface']) : theme.color('text-primary');

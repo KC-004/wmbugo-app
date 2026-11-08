@@ -140,6 +140,12 @@ export const entryShape: Invariant = {
     const ids = ctx.touched.filter((t) => t.entityKind === 'transaction').map((t) => t.entityId);
     for (const id of ids) {
       const t = (await ctx.query('SELECT event_type, amount_minor FROM "transaction" WHERE id = ?', [id]))[0];
+      if (t && String(t[0]) === 'transfer') {
+        const p = await ctx.query('SELECT signed_amount_minor FROM posting WHERE transaction_id = ? ORDER BY signed_amount_minor', [id]);
+        const amount = Number(t[1]);
+        if (p.length !== 2 || Number(p[0]![0]) !== -amount || Number(p[1]![0]) !== amount) return 'a transfer must be two postings that sum to zero';
+        continue;
+      }
       if (!t || (String(t[0]) !== 'expense' && String(t[0]) !== 'income')) continue;
       const p = await ctx.query('SELECT signed_amount_minor FROM posting WHERE transaction_id = ?', [id]);
       const want = String(t[0]) === 'expense' ? -Number(t[1]) : Number(t[1]);

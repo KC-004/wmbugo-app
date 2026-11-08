@@ -57,7 +57,16 @@ export function mapActivityRows(rows: readonly (readonly unknown[])[]): Activity
   const out: ActivityRow[] = [];
   for (const r of rows) {
     const id = String(r[0]);
-    if (seen.has(id)) continue;
+    if (seen.has(id)) {
+      // A transfer has two postings (From first): show "From → To".
+      const at = out.findIndex((o) => o.id === id);
+      const prev = out[at];
+      const name = r[8] === null || r[8] === undefined ? null : String(r[8]);
+      if (prev && prev.kind === 'transfer' && name && prev.accountName && prev.accountName !== name && !prev.accountName.includes('→')) {
+        out[at] = { ...prev, accountName: `${prev.accountName} → ${name}` };
+      }
+      continue;
+    }
     seen.add(id);
     const s = (v: unknown) => (v === null || v === undefined ? null : String(v));
     out.push({

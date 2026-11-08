@@ -1,14 +1,14 @@
 import { AccessibilityInfo, Text, TextInput } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { mapCategoryRows, rankCategories, SEED_CATEGORIES, type AccountRow, type ManualEntry } from '@wmbugo/core';
+import { mapCategoryRows, rankCategories, SEED_CATEGORIES, type AccountRow, type ManualEntry, type TransferInput } from '@wmbugo/core';
 import { ToastHost } from '../../shared/feedback/ToastHost';
 import { createQueryClient } from '../../shared/queryClient';
 import { EMPTY_DRAFT, useUiStore } from '../../shared/state/uiStore';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
 import { typedAmountLabel } from '../../shared/a11y/labels';
 import { AddSheet } from './AddSheet';
-import type { AddApi, AddData } from './addApi';
+import type { AddApi, AddData, AddKind } from './addApi';
 import { KEY_SIZE } from './Keypad';
 
 jest.mock('../../adapters/startApp', () => ({ getServices: jest.fn(), systemClock: { nowMs: () => 0, timezoneId: () => 'Asia/Singapore' } }));
@@ -45,16 +45,17 @@ const tap = (r: ReactTestRenderer, keys: string) => {
 const amountText = (r: ReactTestRenderer) => r.root.findAll((n) => n.props.testID === 'typed-amount')[0]!;
 
 const account = (id: string, name: string): AccountRow => ({ id, name, type: 'bank', icon: 'Bank', colorToken: 'cat-indigo', sortOrder: 0, status: 'active', balanceNotSet: true, postingsMinor: 0 });
-const cats = (kind: 'expense' | 'income') => mapCategoryRows(SEED_CATEGORIES.filter((c) => c.kind === kind).map((c, i) => [c.id, c.name, c.kind, c.budgetType, c.icon, c.color, i]));
+const cats = (kind: AddKind) => mapCategoryRows(SEED_CATEGORIES.filter((c) => c.kind === (kind === 'income' ? 'income' : 'expense')).map((c, i) => [c.id, c.name, c.kind, c.budgetType, c.icon, c.color, i]));
 
 function fakeApi(over: Partial<AddData> = {}, counts = new Map<string, number>()) {
   const record = jest.fn<Promise<{ ok: true; value: { transactionId: string; accountId: string } } | { ok: false; code: string }>, [ManualEntry]>(async () => ({
     ok: true,
     value: { transactionId: 'tx1', accountId: 'a1' },
   }));
-  const remove = jest.fn(async () => ({ ok: true }));
+  const remove = jest.fn(async (...ids: string[]) => ({ ok: ids.length >= 0 }));
+  const recordTransfer = jest.fn<Promise<{ ok: true; value: { transactionId: string; feeTransactionId: string | null } } | { ok: false; code: string }>, [TransferInput]>(async () => ({ ok: true, value: { transactionId: 'tr1', feeTransactionId: null } }));
   const defaultAccountFor = jest.fn(async (c: string) => (c === 'cat_transport' ? 'a2' : 'a1'));
-  const load = jest.fn(async (kind: 'expense' | 'income'): Promise<AddData> => {
+  const load = jest.fn(async (kind: AddKind): Promise<AddData> => {
     const categories = cats(kind);
     return {
       currency: 'SGD',
@@ -65,11 +66,12 @@ function fakeApi(over: Partial<AddData> = {}, counts = new Map<string, number>()
       quick: rankCategories(categories, counts),
       accounts: [account('a1', 'DBS'), account('a2', 'Cash wallet')],
       defaultAccountId: 'a1',
+      blockTransfers: false,
       ...over,
     };
   });
-  const api: AddApi = { load, defaultAccountFor, record, remove };
-  return { api, record, remove, load, defaultAccountFor };
+  const api: AddApi = { load, defaultAccountFor, record, recordTransfer, remove };
+  return { api, record, recordTransfer, remove, load, defaultAccountFor };
 }
 
 function mount(api: AddApi, close = jest.fn()) {

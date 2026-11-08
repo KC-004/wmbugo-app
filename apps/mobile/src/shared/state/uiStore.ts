@@ -2,7 +2,7 @@ import { create } from 'zustand';
 
 /** The Add sheet's draft: what was typed, kept in memory only (never persisted, gone after process death). */
 export interface AddDraft {
-  readonly kind: 'expense' | 'income';
+  readonly kind: 'expense' | 'income' | 'transfer';
   /** Keypad text, '.' as the only separator. */
   readonly typedText: string;
   readonly categoryId: string | null;

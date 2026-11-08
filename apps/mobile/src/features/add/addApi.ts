@@ -7,6 +7,9 @@ import {
   LAST_ACCOUNT_SQL,
   mapAccountRows,
   mapCategoryRows,
+  RecordTransfer,
+  blockTransfersAboveBalance,
+  type TransferInput,
   pickDefaultAccount,
   rankCategories,
   rankIsStale,
@@ -20,6 +23,9 @@ import {
 } from '@wmbugo/core';
 import { getServices, systemClock } from '../../adapters/startApp';
 
+/** The sheet's three segments. */
+export type AddKind = EntryKind | 'transfer';
+
 export interface AddData {
   readonly currency: CurrencyCode;
   readonly exponent: number;
@@ -32,20 +38,25 @@ export interface AddData {
   readonly accounts: AccountRow[];
   /** The account to pick before any category is chosen; null when there is no account yet. */
   readonly defaultAccountId: string | null;
+  /** Settings > You > Block transfers above the balance. */
+  readonly blockTransfers: boolean;
 }
 
 export type RecordResult = { ok: true; value: { transactionId: string; accountId: string } } | { ok: false; code: string };
 
+export type TransferResult = { ok: true; value: { transactionId: string; feeTransactionId: string | null } } | { ok: false; code: string };
+
 /** What the Add sheet needs. The real one reads and writes through the ledger; tests pass a fake. */
 export interface AddApi {
-  load(kind: EntryKind): Promise<AddData | null>;
+  load(kind: AddKind): Promise<AddData | null>;
   defaultAccountFor(categoryId: string): Promise<string | null>;
   record(entry: ManualEntry): Promise<RecordResult>;
+  recordTransfer(input: TransferInput): Promise<TransferResult>;
   remove(transactionId: string): Promise<{ ok: boolean }>;
 }
 
 /** The quick-chip order is recalculated at most once a day, and only when a sheet opens. */
-const rankCache = new Map<EntryKind, { computedAt: number; ids: string[] }>();
+const rankCache = new Map<AddKind, { computedAt: number; ids: string[] }>();
 
 export function resetRankCache(): void {
   rankCache.clear();
@@ -64,7 +75,7 @@ export const realAddApi: AddApi = {
     const cur = getCurrency(String(prof[0]));
     if (!cur.ok) return null;
 
-    const categories = mapCategoryRows(await db.query(CATEGORY_LIST_SQL)).filter((c) => c.kind === kind);
+    const categories = mapCategoryRows(await db.query(CATEGORY_LIST_SQL)).filter((c) => c.kind === (kind === 'income' ? 'income' : 'expense'));
     const now = systemClock.nowMs();
     let cached = rankCache.get(kind);
     if (!cached || rankIsStale(cached.computedAt, now)) {
@@ -86,6 +97,7 @@ export const realAddApi: AddApi = {
       quick,
       accounts,
       defaultAccountId: pickDefaultAccount(accounts.map((a) => a.id), null, lastAny),
+      blockTransfers: await blockTransfersAboveBalance({ query: (q, params) => db.query(q, params) }),
     };
   },
   async defaultAccountFor(categoryId) {
@@ -96,5 +108,6 @@ export const realAddApi: AddApi = {
     return pickDefaultAccount(ids, forCat, lastAny);
   },
   record: (entry) => getServices().writer.run(RecordManualEntry, entry, 'user'),
+  recordTransfer: (input) => getServices().writer.run(RecordTransfer, input, 'user'),
   remove: (transactionId) => getServices().writer.run(RemoveEntry, { transactionId }, 'user'),
 };
