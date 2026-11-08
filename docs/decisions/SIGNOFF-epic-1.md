@@ -47,4 +47,27 @@ Sign here: `Signed: ____________ / ____________`
 
 ## Measured results
 
-(Filled in below by the benchmark and emulator runs.)
+### NFR-04 manual-entry save, main reference device (S8 method, section 3)
+
+| Device | Redmi Note 11 Pro+ 5G, Android 13 |
+|---|---|
+| Build | release, `nosms`, debuggable opt-in (so the log can be read), Hermes, bundled JS |
+| Data set | S10k: 10,000 confirmed expenses over 24 months, in a separate encrypted database (own random key) created for the run and deleted afterwards; the user's own database is never opened |
+| What is timed | `RecordManualEntry` through the real `LedgerWriter` (transaction, posting, split, audit, outbox, invariants) |
+| Runs | 53, the first 3 discarded, 50 measured |
+| Result | median **38.3 ms**, p95 **53.9 ms**, worst 55.5 ms |
+| Rule | p95 under 500 ms: **pass** (about 9 times under the limit) |
+
+Not included in that number: the toast render. Every manual save also logs `save.entry` with the full path to the toast (validation done to toast shown), so the figure can be read from the device log at any time. Run it again with: `adb shell "run-as app.wmbugo touch files/bench-save"`, restart the app, read `bench.save` in `files/logs/wmbugo.log`.
+
+Limits: one device; the interim budget device is an emulator and cannot give valid timings (S8 section 1).
+
+### Scripted checks on an emulator (Android 17 image, API 37)
+
+- `scripts/ci-check-encrypted-db.sh` end to end: install, first launch, pull the database, header check: **OK, encrypted**.
+- `scripts/e2e-smoke.mjs`: onboarding, Add sheet typed with the **hardware keyboard** (digits, decimal key, Backspace), Save and the Saved toast, Activity row, Home Spent: **6 of 6 passed**. This job is part of the CI emulator job and has not yet run on GitHub.
+- The Redmi refuses injected input even with Xiaomi's "USB debugging (Security settings)" on, so taps and keys on that phone remain manual; everything else above was run on it.
+
+### Standard release builds
+
+`assembleNosmsRelease`, `assembleSmsRelease`, `pnpm check:permissions` and `pnpm check:not-debuggable` pass (the last also fails correctly on a debuggable APK).

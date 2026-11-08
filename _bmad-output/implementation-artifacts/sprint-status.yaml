@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 11-08-2026 09:43
-last_updated: 11-08-2026 16:53
+last_updated: 11-08-2026 17:56
 project: wmbugo-app
 project_key: NOKEY
 tracking_system: file-system
@@ -264,19 +264,19 @@ action_items:
     action: "Measure save p95 and the hardware-keyboard path on the Redmi with the
       S8 method (A3)"
     owner: "dev with product owner"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-11-08.md"
   - id: "epic-1-retro-item-7-decide-the-currency-lock-rule-for-an-onb"
     epic: 1
     action: "Decide the currency-lock rule for an onboarding opening balance (A4)"
     owner: "product owner"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-11-08.md"
   - id: "epic-1-retro-item-8-reconcile-or-accept-the-1-13-1-14-and-1"
     epic: 1
     action: "Reconcile or accept the 1.13, 1.14 and 1.16 spec deviations (A5)"
     owner: "product owner"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-11-08.md"
   - id: "epic-1-retro-item-9-sign-gate-03-and-gate-07-and-decide-the"
     epic: 1
@@ -290,24 +290,24 @@ action_items:
     action: "Run the CI emulator job on GitHub and add an emulator or instrumentation
       UI test (A9)"
     owner: "dev"
-    status: open
+    status: in-progress
     ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-11-08.md"
   - id: "epic-1-retro-item-11-independent-review-of-stories-1-1-to-1-1"
     epic: 1
     action: "Independent review of stories 1.1 to 1.16, then mark them done (A10)"
     owner: "product owner"
-    status: open
+    status: in-progress
     ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-11-08.md"
   - id: "epic-1-retro-item-12-add-an-activity-cut-off-note-then-paging"
     epic: 1
     action: "Add an Activity cut-off note, then paging with the search epic (A6)"
     owner: "dev"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-11-08.md"
   - id: "epic-1-retro-item-13-split-addsheet-and-add-a-shared-readprof"
     epic: 1
     action: "Split AddSheet and add a shared readProfile and test kit before Epic
       2 (A7)"
     owner: "dev"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-11-08.md"
