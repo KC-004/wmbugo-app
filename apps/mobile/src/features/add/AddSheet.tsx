@@ -325,7 +325,7 @@ export function AddSheet({
 
   return (
     <View>
-    <ScrollView style={{ maxHeight: Math.max(280, height - insets.top - 230) }} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
+    <ScrollView style={{ maxHeight: Math.max(280, height - insets.top - 190) }} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
       <KindSegments kind={kind} vertical={fontScale >= 1.3} onChoose={chooseKind} />
 
       {kind === 'transfer' ? null : (
@@ -340,6 +340,7 @@ export function AddSheet({
         />
       )}
 
+      <View style={styles.inline}>
       <Text style={[textStyle('label'), ink]}>{kind === 'transfer' ? copy.add.from : kind === 'income' ? copy.add.receivedIn : copy.add.paidFrom}</Text>
       <AccountChip
         accounts={data?.accounts ?? []}
@@ -353,6 +354,7 @@ export function AddSheet({
           setPickingAccount(false);
         }}
       />
+      </View>
 
       {kind === 'transfer' && data ? (
         <TransferTo
@@ -455,6 +457,7 @@ export function AddSheet({
 const styles = StyleSheet.create({
   content: { gap: 8, paddingBottom: 8 },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+  inline: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
   amount: { alignItems: 'center', paddingVertical: 4 },
   hiddenInput: { position: 'absolute', width: 1, height: 1, opacity: 0 },
   footer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', gap: 12, paddingVertical: 8, paddingHorizontal: 8, borderRadius: 12 },

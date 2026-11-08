@@ -5,6 +5,7 @@ import type { KeypadKey } from '@wmbugo/core';
 import { controlA11y } from '../../shared/a11y/labels';
 import { decimalSeparator } from '../../shared/decimalSeparator';
 import { copy } from '../../shared/copy';
+import { resolveColor } from '../../shared/theme/colors';
 import { useTheme } from '../../shared/theme/ThemeProvider';
 import { Icon } from '../../shared/theme/Icon';
 import { radii } from '../../shared/theme/tokens';
@@ -33,8 +34,8 @@ function Key({ k, glyph, onKey, onLong, label }: { k: KeypadKey; glyph: string |
         onLongPress={onLong}
         onFocus={onFocus}
         onBlur={onBlur}
-        style={[styles.key, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
-        {glyph === null ? <Icon icon={Backspace} size={26} /> : <Text style={[textStyle('keypad'), { color: theme.color('text-primary') }]}>{glyph}</Text>}
+        style={[styles.key, { backgroundColor: resolveColor('dark', 'bg-surface'), borderColor: resolveColor('dark', 'border-hairline') }]}>
+        {glyph === null ? <Icon icon={Backspace} size={26} tint={theme.color('on-glass-primary')} /> : <Text style={[textStyle('keypad'), { color: theme.color('on-glass-primary') }]}>{glyph}</Text>}
       </Pressable>
     </FocusRing>
   );

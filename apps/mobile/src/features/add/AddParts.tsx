@@ -1,6 +1,7 @@
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { PAYMENT_METHODS, type AccountRow, type CategoryRow, type PaymentMethod } from '@wmbugo/core';
 import { copy } from '../../shared/copy';
+import { resolveColor } from '../../shared/theme/colors';
 import { useTheme } from '../../shared/theme/ThemeProvider';
 import { layout } from '../../shared/theme/tokens';
 import { textStyle } from '../../shared/theme/typography';
@@ -25,6 +26,7 @@ export function KindSegments({ kind, vertical, onChoose }: { kind: AddKind; vert
     <View style={vertical ? styles.column : styles.row} accessibilityRole="radiogroup" accessibilityLabel={copy.add.typeLabel}>
       {KINDS.map((k, i) => (
         <Chip
+          onGlass
           key={k}
           label={KIND_LABEL[k]}
           variant="period"
@@ -59,15 +61,24 @@ export function CategoryChips({
 }) {
   const theme = useTheme();
   const listed = showAll ? all : quick;
+  const chips = listed.map((c) => (
+    <Chip onGlass key={c.id} label={c.name} icon={categoryIcon(c.icon)} testID={`category-${c.id}`} selected={selectedId === c.id} onPress={() => onPick(c.id)} />
+  ));
+  const more = all.length > quick.length ? <Chip onGlass label={showAll ? copy.add.fewer : copy.add.more} testID="category-more" onPress={onToggleAll} /> : null;
   return (
     <>
-      <Text style={[textStyle('label'), { color: theme.color('on-glass-primary') }]}>{copy.add.category}</Text>
-      <View style={styles.wrap} testID="category-chips">
-        {listed.map((c) => (
-          <Chip onGlass key={c.id} label={c.name} icon={categoryIcon(c.icon)} testID={`category-${c.id}`} selected={selectedId === c.id} onPress={() => onPick(c.id)} />
-        ))}
-        {all.length > quick.length ? <Chip onGlass label={showAll ? copy.add.fewer : copy.add.more} testID="category-more" onPress={onToggleAll} /> : null}
-      </View>
+      <Text accessibilityRole="header" style={[textStyle('label'), { color: theme.color('on-glass-primary') }]}>{copy.add.category}</Text>
+      {showAll ? (
+        <View style={styles.wrap} testID="category-chips">
+          {chips}
+          {more}
+        </View>
+      ) : (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} testID="category-chips" keyboardShouldPersistTaps="handled" contentContainerStyle={styles.strip}>
+          {chips}
+          {more}
+        </ScrollView>
+      )}
       {error ? (
         <Text testID="category-error" accessibilityRole="alert" accessibilityLiveRegion="assertive" style={[textStyle('caption'), { color: theme.color('on-glass-accent') }]}>
           {copy.add.categoryRequired}
@@ -178,7 +189,7 @@ export function DetailsPanel({
   const theme = useTheme();
   const label = [textStyle('label'), { color: theme.color('on-glass-primary') }];
   const alert = [textStyle('caption'), { color: theme.color('on-glass-accent') }];
-  const input = [styles.input, textStyle('body'), { color: theme.color('text-primary'), backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-control') }];
+  const input = [styles.input, textStyle('body'), { color: theme.color('on-glass-primary'), backgroundColor: resolveColor('dark', 'bg-surface'), borderColor: theme.color('on-glass-secondary') }];
   const transfer = kind === 'transfer';
   const feeCategories = quick.concat(categories.filter((c) => !quick.some((q) => q.id === c.id)));
   return (
@@ -238,6 +249,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 8 },
   column: { flexDirection: 'column', alignItems: 'flex-start' },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+  strip: { flexDirection: 'row', gap: 4, paddingRight: 8 },
   details: { gap: 8 },
   input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, minHeight: layout.touchMin },
 });
