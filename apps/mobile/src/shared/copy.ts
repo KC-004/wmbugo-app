@@ -148,6 +148,15 @@ export const copy = {
     payBank: 'Bank transfer',
     payOther: 'Other',
   },
+  duplicate: {
+    looksRecorded: 'Looks like this is already recorded',
+    keepBoth: 'Keep both',
+    merge: 'Merge',
+    keptBoth: 'Kept both',
+    merged: 'Merged',
+    whichCategory: 'Which category?',
+    failed: 'Could not do that. Nothing was changed.',
+  },
   capture: {
     recorded: 'Recorded',
     recordedGuessed: 'Recorded · category guessed',

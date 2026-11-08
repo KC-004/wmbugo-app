@@ -42,6 +42,8 @@ export const reviewCandidate = sqliteTable(
     status: text('status').notNull().default('open'),
     created_at: integer('created_at').notNull(),
     resolved_at: integer('resolved_at'),
+    // What the resolution (Keep both, Merge) changed, so Undo can put every row back exactly. Null while open.
+    undo_json: text('undo_json'),
   },
   (t) => [
     index('review_candidate_status_idx').on(t.status, t.created_at),

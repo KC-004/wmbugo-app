@@ -82,6 +82,20 @@ describe('ToastController', () => {
     return { c: new ToastController(deps), advance, states, announced, timers };
   }
 
+  it('a toast with choices announces them, stays 10 seconds, and an answer closes it and runs once', async () => {
+    const { c, advance, announced } = setup();
+    const chose: string[] = [];
+    await c.show({ message: 'Looks like this is already recorded', choices: [{ label: 'Keep both', onChoose: () => chose.push('keep') }, { label: 'Merge', onChoose: () => chose.push('merge') }] });
+    expect(announced).toEqual(['Looks like this is already recorded. Keep both or Merge']);
+    advance(MIN_TOAST_MS - 1);
+    expect(c.state).not.toBeNull();
+    c.choose(1);
+    expect(chose).toEqual(['merge']);
+    expect(c.state).toBeNull();
+    c.choose(0);
+    expect(chose).toEqual(['merge']);
+  });
+
   it('announces politely with Undo available, and stays at least 10 seconds', async () => {
     const { c, advance, announced } = setup();
     await c.show({ message: 'Saved', undo: { label: 'Undo', onUndo: () => undefined } });

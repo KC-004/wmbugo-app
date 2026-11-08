@@ -26,6 +26,7 @@ import { Button } from '../../shared/ui/Button';
 import { OTHER_CATEGORY_ID } from '@wmbugo/core';
 import { realAddApi, type AddApi, type AddData, type AddKind } from './addApi';
 import { AccountChip, CategoryChips, DetailsPanel, KindSegments, TransferTo } from './AddParts';
+import { useDuplicateChoices } from './duplicateChoices';
 import { Keypad } from './Keypad';
 import { startSaveTiming } from './saveTiming';
 
@@ -80,6 +81,7 @@ export function AddSheet({
 }) {
   const theme = useTheme();
   const toast = useToast();
+  const duplicate = useDuplicateChoices(api);
   const qc = useQueryClient();
   const draft = useUiStore((s) => s.addDraft);
   const setDraft = useUiStore((s) => s.setAddDraft);
@@ -243,15 +245,19 @@ export function AddSheet({
       }
       const id = r.value.transactionId;
       await refresh();
-      toast.show({
-        message: copy.add.saved,
-        undo: {
-          label: copy.common.undo,
-          onUndo: () => void undo([id]),
-        },
-      });
+      // Saved, never blocked; if it looks like something already recorded it waits, counted nowhere, for the user's answer.
+      if (r.value.result === 'POSSIBLE_DUPLICATE') duplicate.offer(id);
+      else
+        toast.show({
+          message: copy.add.saved,
+          undo: {
+            label: copy.common.undo,
+            onUndo: () => void undo([id]),
+          },
+        });
       done();
       setDraft({ typedText: '', categoryId: null });
+      submission.current = null;
       if (another) {
         setText('');
         setMerchant('');

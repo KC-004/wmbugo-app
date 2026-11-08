@@ -2,12 +2,15 @@ export interface ToastRequest {
   readonly message: string;
   /** Reversible actions always offer Undo. */
   readonly undo?: { readonly label: string; readonly onUndo: () => void };
+  /** A question with answers (Keep both / Merge): each answer closes the toast and runs. */
+  readonly choices?: readonly { readonly label: string; readonly onChoose: () => void }[];
 }
 
 export interface ToastState {
   readonly id: number;
   readonly message: string;
   readonly undo?: ToastRequest['undo'];
+  readonly choices?: ToastRequest['choices'];
 }
 
 export interface ToastDeps {
@@ -47,9 +50,9 @@ export class ToastController {
   async show(req: ToastRequest): Promise<void> {
     this.clear();
     const id = this.nextId++;
-    this.current = { id, message: req.message, ...(req.undo ? { undo: req.undo } : {}) };
+    this.current = { id, message: req.message, ...(req.undo ? { undo: req.undo } : {}), ...(req.choices ? { choices: req.choices } : {}) };
     this.deps.onChange(this.current);
-    this.deps.announce(req.undo ? `${req.message}. Undo available` : req.message);
+    this.deps.announce(req.choices ? `${req.message}. ${req.choices.map((c) => c.label).join(' or ')}` : req.undo ? `${req.message}. Undo available` : req.message);
 
     const recommended = await this.deps.recommendedMs(MIN_TOAST_MS).catch(() => MIN_TOAST_MS);
     if (this.current?.id !== id) return; // replaced or dismissed while waiting
@@ -76,6 +79,12 @@ export class ToastController {
     const t = this.current;
     this.dismiss();
     t?.undo?.onUndo();
+  }
+
+  choose(index: number): void {
+    const c = this.current?.choices?.[index];
+    this.dismiss();
+    c?.onChoose();
   }
 
   dismiss(): void {

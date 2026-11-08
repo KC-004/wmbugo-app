@@ -5,7 +5,8 @@
 import { AccessibilityInfo, Text } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { mapCategoryRows, rankCategories, SEED_CATEGORIES, type AccountRow } from '@wmbugo/core';
+import { mapCategoryRows, rankCategories, SEED_CATEGORIES, type AccountRow, type DuplicateInfo } from '@wmbugo/core';
+import { SheetHost } from '../../shared/feedback/SheetHost';
 import { ToastHost } from '../../shared/feedback/ToastHost';
 import { createQueryClient } from '../../shared/queryClient';
 import { EMPTY_DRAFT, useUiStore } from '../../shared/state/uiStore';
@@ -73,8 +74,12 @@ export function fakeApi(over: Partial<AddData> = {}, counts = new Map<string, nu
     };
   });
   let n = 0;
-  const api: AddApi = { load, defaultAccountFor, record, recordTransfer, remove, newSubmissionId: () => `sub-${++n}` };
-  return { api, record, recordTransfer, remove, load, defaultAccountFor };
+  const duplicateInfo = jest.fn<Promise<DuplicateInfo | null>, [string]>(async () => ({ matchedTransactionId: 'm1', heldCategory: { id: 'cat_food', name: 'Food & Drinks' }, confirmedCategory: { id: 'cat_food', name: 'Food & Drinks' }, categoriesDiffer: false }));
+  const keepBoth = jest.fn<Promise<{ ok: boolean }>, [string]>(async () => ({ ok: true }));
+  const merge = jest.fn<Promise<{ ok: boolean; code?: string }>, [string, string?]>(async () => ({ ok: true }));
+  const undoResolution = jest.fn<Promise<{ ok: boolean }>, [string]>(async () => ({ ok: true }));
+  const api: AddApi = { load, defaultAccountFor, record, recordTransfer, remove, newSubmissionId: () => `sub-${++n}`, duplicateInfo, keepBoth, merge, undoResolution };
+  return { api, record, recordTransfer, remove, load, defaultAccountFor, duplicateInfo, keepBoth, merge, undoResolution };
 }
 
 export function mount(api: AddApi, close = jest.fn(), onNewAccount?: () => void, preset?: AddPreset) {
@@ -86,7 +91,9 @@ export function mount(api: AddApi, close = jest.fn(), onNewAccount?: () => void,
       <QueryClientProvider client={qc}>
         <ThemeProvider>
           <ToastHost bottomOffset={0}>
+            <SheetHost>
             <AddSheet api={api} close={close} onNewAccount={onNewAccount} preset={preset} now={() => Date.UTC(2026, 10, 8, 10, 0, 0)} />
+            </SheetHost>
           </ToastHost>
         </ThemeProvider>
       </QueryClientProvider>,

@@ -10,7 +10,9 @@ import { textStyle } from '../../shared/theme/typography';
 import { Amount } from '../../shared/ui/Amount';
 import { Button } from '../../shared/ui/Button';
 import { ScreenHeader } from '../shell/ScreenHeader';
+import { realAddApi, type AddApi } from '../add/addApi';
 import { ActivityRowView } from './ActivityRowView';
+import { HeldRowActions } from './HeldRowActions';
 import { ACTIVITY_QUERY_KEY, realActivityApi, type ActivityApi } from './activityApi';
 
 /** Activity: saved entries grouped under day headers with that day's "Spent" total. */
@@ -19,11 +21,14 @@ export function ActivityScreen({
   onAccounts,
   onProfile,
   onAdd,
+  duplicateApi = realAddApi,
 }: {
   api?: ActivityApi;
   onAccounts: () => void;
   onProfile: () => void;
   onAdd: () => void;
+  /** Keep both / Merge for a flagged entry. */
+  duplicateApi?: Pick<AddApi, 'duplicateInfo' | 'keepBoth' | 'merge' | 'undoResolution'>;
 }) {
   const [limit, setLimit] = useState(ACTIVITY_PAGE_SIZE);
   const q = useQuery({ queryKey: [...ACTIVITY_QUERY_KEY, limit], queryFn: () => api.load(limit), placeholderData: (prev) => prev });
@@ -63,7 +68,9 @@ export function ActivityScreen({
               ) : undefined
             }
             renderSectionHeader={({ section }) => <DayHeader day={section.day} today={d.today} currency={d.currency} locale={d.locale} />}
-            renderItem={({ item, section }) => <ActivityRowView row={item} date={section.day.localDate} currency={d.currency} locale={d.locale} />}
+            renderItem={({ item, section }) => (
+              <ActivityRowView row={item} date={section.day.localDate} currency={d.currency} locale={d.locale} footer={item.held ? <HeldRowActions transactionId={item.id} api={duplicateApi} /> : undefined} />
+            )}
           />
         ) : q.isError ? (
           <View style={styles.pad}>

@@ -230,19 +230,6 @@ describe('saving', () => {
     await settle();
   });
 
-  it('a possible-duplicate result is still a saved entry: the toast reads Saved and offers Undo (the choices arrive in Story 3.3)', async () => {
-    const f = fakeApi();
-    f.record.mockResolvedValueOnce({ ok: true, value: { transactionId: 't2', accountId: 'a1', result: 'POSSIBLE_DUPLICATE' } });
-    const { r, close } = mount(f.api);
-    await settle();
-    tap(r, '9');
-    act(() => fire(r, 'category-cat_food'));
-    await act(async () => fire(r, 'save'));
-    await settle();
-    expect(close).toHaveBeenCalled();
-    expect(texts(r)).toEqual(expect.arrayContaining(['Saved', 'Undo']));
-  });
-
   it('a double tap on Save writes once', async () => {
     const f = fakeApi();
     let release!: () => void;

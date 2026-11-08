@@ -57,12 +57,16 @@ export interface ActivityRow {
   readonly beforeTracking?: boolean;
   /** The signed posting on the row's account. Set for balance adjustments, which read "up" or "down". */
   readonly signedMinor?: number;
+  /** Held back as a possible duplicate: shown to be resolved, never counted in Spent or any total. */
+  readonly held?: boolean;
 }
 
 /** How many entries Activity loads at a time. */
 export const ACTIVITY_PAGE_SIZE = 100;
 
-const ACTIVITY_FILTER = "t2.removed_at IS NULL AND t2.status = 'confirmed' AND t2.event_type IN ('expense','income','transfer','refund','adjustment')";
+// Confirmed entries, plus an entry held back as a possible duplicate (it shows so it can be resolved, but counts nowhere).
+const ACTIVITY_FILTER =
+  "t2.removed_at IS NULL AND (t2.status = 'confirmed' OR (t2.status = 'needs_review' AND EXISTS (SELECT 1 FROM review_candidate rc WHERE rc.transaction_id = t2.id AND rc.reason = 'duplicate' AND rc.status = 'open'))) AND t2.event_type IN ('expense','income','transfer','refund','adjustment')";
 
 /**
  * The newest entries first, one page. Param: the number of entries (ask for one more than you show, to know
@@ -70,7 +74,7 @@ const ACTIVITY_FILTER = "t2.removed_at IS NULL AND t2.status = 'confirmed' AND t
  * the first and joins the two account names.
  */
 export const ACTIVITY_SQL =
-  'SELECT t.id, t.event_type, t.amount_minor, t.local_date, t.original_description, c.name, c.icon, c.color_token, a.name, (p.posting_kind = \'normal\' AND a.opening_effective_at IS NOT NULL AND t.occurred_at_utc < a.opening_effective_at), p.signed_amount_minor FROM "transaction" t LEFT JOIN split s ON s.transaction_id = t.id LEFT JOIN category c ON c.id = s.category_id LEFT JOIN posting p ON p.transaction_id = t.id LEFT JOIN account a ON a.id = p.account_id WHERE t.id IN (SELECT t2.id FROM "transaction" t2 WHERE ' +
+  'SELECT t.id, t.event_type, t.amount_minor, t.local_date, t.original_description, c.name, c.icon, c.color_token, a.name, (p.posting_kind = \'normal\' AND a.opening_effective_at IS NOT NULL AND t.occurred_at_utc < a.opening_effective_at), p.signed_amount_minor, t.status FROM "transaction" t LEFT JOIN split s ON s.transaction_id = t.id LEFT JOIN category c ON c.id = s.category_id LEFT JOIN posting p ON p.transaction_id = t.id LEFT JOIN account a ON a.id = p.account_id WHERE t.id IN (SELECT t2.id FROM "transaction" t2 WHERE ' +
   ACTIVITY_FILTER +
   ' ORDER BY t2.local_date DESC, t2.occurred_at_utc DESC, t2.id DESC LIMIT ?) ORDER BY t.local_date DESC, t.occurred_at_utc DESC, t.id DESC, p.signed_amount_minor ASC';
 
@@ -113,6 +117,7 @@ export function mapActivityRows(rows: readonly (readonly unknown[])[]): Activity
       accountName: s(r[8]),
       beforeTracking: String(r[1]) !== 'transfer' && String(r[1]) !== 'adjustment' && Number(r[9]) === 1,
       ...(String(r[1]) === 'adjustment' ? { signedMinor: Number(r[10]) } : {}),
+      ...(String(r[11]) === 'needs_review' ? { held: true } : {}),
     });
   }
   return out;
@@ -135,6 +140,7 @@ export function groupByDay(rows: readonly ActivityRow[]): ActivityDay[] {
       days.push(day);
     }
     day.rows.push(r);
+    if (r.held) continue;
     if (r.kind === 'expense') day.expenses += r.amountMinor;
     else if (r.kind === 'refund') day.refunds += r.amountMinor;
   }

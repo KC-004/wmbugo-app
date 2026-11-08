@@ -153,7 +153,9 @@ describe('possible duplicates are saved, never blocked, and counted nowhere (TXN
     expect(all.find((r) => r.id === bank)!.postingsMinor).toBe(980000);
     expect(homeAccounts(all)).toMatchObject({ inAccountsMinor: 980000, cardDuesMinor: 20000 });
     const act = mapActivityRows(await db.query(ACTIVITY_SQL, [100]));
-    expect(act).toHaveLength(2);
+    // The held ones are listed so they can be resolved, but they are not counted anywhere.
+    expect(act).toHaveLength(4);
+    expect(act.filter((r) => !r.held)).toHaveLength(2);
     expect(Number((await db.query(INCOME_SQL, PERIOD))[0]![0])).toBe(0);
   });
 

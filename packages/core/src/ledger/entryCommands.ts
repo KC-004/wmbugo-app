@@ -169,7 +169,9 @@ export const entryShape: Invariant = {
   async check(ctx) {
     const ids = ctx.touched.filter((t) => t.entityKind === 'transaction').map((t) => t.entityId);
     for (const id of ids) {
-      const t = (await ctx.query('SELECT event_type, amount_minor FROM "transaction" WHERE id = ?', [id]))[0];
+      const t = (await ctx.query('SELECT event_type, amount_minor, status FROM "transaction" WHERE id = ?', [id]))[0];
+      // A record merged away into another keeps its postings but gives its splits to the survivor: it is no longer an entry.
+      if (t && String(t[2]) === 'excluded') continue;
       if (t && String(t[0]) === 'transfer') {
         const p = await ctx.query('SELECT signed_amount_minor FROM posting WHERE transaction_id = ? ORDER BY signed_amount_minor', [id]);
         const amount = Number(t[1]);

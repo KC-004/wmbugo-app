@@ -6,7 +6,13 @@ import {
   LAST_ACCOUNT_SQL,
   mapAccountRows,
   mapCategoryRows,
+  DUPLICATE_INFO_SQL,
+  KeepBoth,
+  mapDuplicateInfo,
+  MergeDuplicate,
   SubmitCapture,
+  UndoDuplicateResolution,
+  type DuplicateInfo,
   type SubmitResult,
   type TransferInput,
   pickDefaultAccount,
@@ -58,6 +64,11 @@ export interface AddApi {
   record(entry: EntryRequest): Promise<RecordResult>;
   recordTransfer(input: TransferRequest): Promise<TransferResult>;
   remove(transactionId: string): Promise<{ ok: boolean }>;
+  /** The two entries' categories for a possible duplicate (so Merge can ask which one), or null when it is not (or no longer) held. */
+  duplicateInfo(transactionId: string): Promise<DuplicateInfo | null>;
+  keepBoth(transactionId: string): Promise<{ ok: boolean }>;
+  merge(transactionId: string, categoryId?: string): Promise<{ ok: boolean; code?: string }>;
+  undoResolution(transactionId: string): Promise<{ ok: boolean }>;
 }
 
 /** The quick-chip order is recalculated at most once a day, and only when a sheet opens. */
@@ -122,4 +133,10 @@ export const realAddApi: AddApi = {
     return r.ok ? { ok: true, value: { transactionId: r.value.transactionId, feeTransactionId: r.value.feeTransactionId, result: r.value.result } } : r;
   },
   remove: (transactionId) => getServices().writer.run(RemoveEntry, { transactionId }, 'user'),
+  async duplicateInfo(transactionId) {
+    return mapDuplicateInfo(await getServices().db.query(DUPLICATE_INFO_SQL, [transactionId]));
+  },
+  keepBoth: (transactionId) => getServices().writer.run(KeepBoth, { transactionId }, 'user'),
+  merge: (transactionId, categoryId) => getServices().writer.run(MergeDuplicate, { transactionId, ...(categoryId ? { categoryId } : {}) }, 'user'),
+  undoResolution: (transactionId) => getServices().writer.run(UndoDuplicateResolution, { transactionId }, 'user'),
 };

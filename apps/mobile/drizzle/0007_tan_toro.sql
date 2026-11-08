@@ -1,0 +1,1 @@
+ALTER TABLE `review_candidate` ADD `undo_json` text;

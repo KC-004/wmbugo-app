@@ -1,5 +1,6 @@
 import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { ArrowsLeftRight, DotsThree, Scales } from 'phosphor-react-native';
+import type { ReactNode } from 'react';
 import { longDate, type ActivityRow, type CurrencyCode } from '@wmbugo/core';
 import { amountLabel, type AmountKind } from '../../shared/a11y/labels';
 import { copy } from '../../shared/copy';
@@ -24,6 +25,7 @@ export function ActivityRowView({
   locale,
   title: titleOverride,
   showAccount = true,
+  footer,
 }: {
   row: ActivityRow;
   date: string;
@@ -33,6 +35,8 @@ export function ActivityRowView({
   title?: string;
   /** False on an account's timeline, where the account is the page itself. */
   showAccount?: boolean;
+  /** Under the row's text: the Keep both / Merge buttons of a possible duplicate. */
+  footer?: ReactNode;
 }) {
   const theme = useTheme();
   const { fontScale } = useWindowDimensions();
@@ -41,12 +45,13 @@ export function ActivityRowView({
   const title = adjustment ? copy.activity.balanceAdjustment : (titleOverride ?? row.merchant ?? row.categoryName ?? copy.activity.transfer);
   const account = showAccount ? row.accountName : null;
   const kindWord = adjustment ? (up ? copy.activity.adjustedUp : copy.activity.adjustedDown) : row.kind === 'transfer' ? copy.activity.transfer : row.categoryName;
-  const sub = [kindWord, account, row.beforeTracking ? copy.activity.beforeTracking : null].filter(Boolean).join(' · ');
+  const sub = [kindWord, account, row.held ? copy.capture.possibleDuplicate : null, row.beforeTracking ? copy.activity.beforeTracking : null].filter(Boolean).join(' · ');
   const spoken = [
     title,
     adjustment ? `${(up ? copy.activity.up : copy.activity.down).toLowerCase()} ${amountLabel({ amountMinor: row.amountMinor, currency, locale, inline: true })}` : amountLabel({ amountMinor: row.amountMinor, currency, locale, kind: KIND[row.kind], inline: true }),
     row.kind === 'transfer' || adjustment ? null : row.categoryName,
     account,
+    row.held ? copy.capture.possibleDuplicate.toLowerCase() : null,
     row.beforeTracking ? copy.activity.beforeTracking.toLowerCase() : null,
     longDate(date),
   ]
@@ -68,6 +73,7 @@ export function ActivityRowView({
         <View style={styles.rowText}>
           <Text style={[textStyle('body-medium'), { color: theme.color('text-primary') }]}>{title}</Text>
           <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{sub}</Text>
+          {footer}
         </View>
         <Amount
           amountMinor={row.amountMinor}

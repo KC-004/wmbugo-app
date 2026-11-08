@@ -86,6 +86,9 @@ function ToastView({ state, controller, position, offset }: { state: ToastState;
       onTouchCancel={() => controller.resume()}
       style={[styles.toast, position === 'bottom' ? { bottom: offset + 16 } : { top: offset + 16 }, { backgroundColor: bg, borderColor: theme.color('glass-border') }, dark ? styles.bordered : null]}>
       <Text style={[textStyle('body'), styles.message, { color: ink }]}>{state.message}</Text>
+      {state.choices?.map((c, i) => (
+        <Button key={c.label} label={c.label} variant="text" onGlass onPress={() => controller.choose(i)} testID={`toast-choice-${i}`} onFocusChange={(f) => (f ? controller.pause() : controller.resume())} />
+      ))}
       {state.undo ? (
         <Button
           label={state.undo.label ?? copy.common.undo}
