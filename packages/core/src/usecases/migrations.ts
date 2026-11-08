@@ -96,10 +96,20 @@ export async function runMigrations(
     });
   }
 
+  // SQLite changes a CHECK by rebuilding the table (drizzle-kit writes `PRAGMA foreign_keys=OFF` first). That pragma does
+  // nothing inside a transaction, and dropping a parent table that has child rows would then fail. So, outside the
+  // transaction, foreign keys go off for the batch and are checked and switched back on afterwards.
+  const rebuilds = pending.some((m) => m.statements.some((st) => /PRAGMA\s+foreign_keys\s*=\s*OFF/i.test(st)));
   try {
     // A database with no applied migration is empty: there is nothing to protect yet.
     if (applied.size > 0) await db.safetyCopy(`before-v${pending[0]!.version}`);
-    await db.executeBatch(batch);
+    if (rebuilds) await db.query('PRAGMA foreign_keys = OFF');
+    try {
+      await db.executeBatch(batch);
+      if (rebuilds && (await db.query('PRAGMA foreign_key_check')).length > 0) return err('MIGRATION_FAILED');
+    } finally {
+      if (rebuilds) await db.query('PRAGMA foreign_keys = ON');
+    }
   } catch {
     return err('MIGRATION_FAILED');
   }

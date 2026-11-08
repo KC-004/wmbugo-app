@@ -4,14 +4,15 @@ import { createIdGenerator, seededRandom } from '../shared/uuid';
 import { NodeSqliteDatabase } from '../testing/nodeSqlite';
 import { SetUpProfile } from '../usecases/setUpProfile';
 import { AddAccount, openingBalanceShape } from '../ledger/accountCommands';
-import { entryShape, RecordManualEntry } from '../ledger/entryCommands';
-import { RecordTransfer, SETTING_BLOCK_TRANSFERS } from '../ledger/transferCommands';
+import { entryShape } from '../ledger/entryCommands';
+import { SETTING_BLOCK_TRANSFERS } from '../ledger/transferCommands';
 import { LedgerWriter } from '../writer/ledgerWriter';
 import { findRegion } from './regions';
 import { effectiveLocale, parseSettings, paydaySummary, periodRule, SETTINGS_SQL, validateSetting, youSummary, DEFAULT_SETTINGS } from './settings';
 import { AnswerTimezonePrompt, ApplyPendingTimezone, ChangeProfile, ChangeSetting, TrackTimezone } from './settingsCommands';
 import { nextLocalDate, offsetMinutes, PROMPT_TIMEZONE, shouldAskTimezone, timezonesDiffer } from './timezone';
 import { periodFor } from './period';
+import { recordEntry, recordTransfer } from '../testing/capture';
 
 // 2026-11-08T10:00:00Z = 18:00 in Singapore (UTC+8).
 const NOW = Date.UTC(2026, 10, 8, 10, 0, 0);
@@ -90,9 +91,9 @@ describe('ChangeSetting', () => {
     const ids = (await db.query('SELECT id FROM account ORDER BY sort_order')).map((r) => r[0] as string);
     await writer.run(ChangeSetting, { key: SETTING_BLOCK_TRANSFERS, value: true }, 'user');
     expect((await settings()).blockTransfers).toBe(true);
-    expect(await writer.run(RecordTransfer, { amountMinor: 5000, fromAccountId: ids[0]!, toAccountId: ids[1]! }, 'user')).toEqual({ ok: false, code: 'INSUFFICIENT_FUNDS' });
+    expect(await recordTransfer(writer, { amountMinor: 5000, fromAccountId: ids[0]!, toAccountId: ids[1]! })).toEqual({ ok: false, code: 'INSUFFICIENT_FUNDS' });
     await writer.run(ChangeSetting, { key: SETTING_BLOCK_TRANSFERS, value: false }, 'user');
-    expect((await writer.run(RecordTransfer, { amountMinor: 5000, fromAccountId: ids[0]!, toAccountId: ids[1]! }, 'user')).ok).toBe(true);
+    expect((await recordTransfer(writer, { amountMinor: 5000, fromAccountId: ids[0]!, toAccountId: ids[1]! })).ok).toBe(true);
   });
 });
 
@@ -128,7 +129,7 @@ describe('ChangeProfile', () => {
   it('changing payday recomputes the period without modifying any transaction', async () => {
     const { writer, db, profile } = await setup();
     await writer.run(AddAccount, { name: 'DBS', type: 'bank', openingMinor: 5000 }, 'user');
-    await writer.run(RecordManualEntry, { kind: 'expense', amountMinor: 100, categoryId: 'cat_food', accountId: (await db.query('SELECT id FROM account'))[0]![0] as string }, 'user');
+    await recordEntry(writer, { kind: 'expense', amountMinor: 100, categoryId: 'cat_food', accountId: (await db.query('SELECT id FROM account'))[0]![0] as string });
     const txBefore = await db.query('SELECT * FROM "transaction" ORDER BY id');
     expect((await writer.run(ChangeProfile, { payday: { kind: 'first' } }, 'user')).ok).toBe(true);
     expect((await profile())[4]).toBe('first');
@@ -147,7 +148,7 @@ describe('ChangeProfile', () => {
   it('changes the timezone manually; existing local dates stay', async () => {
     const { writer, db, profile } = await setup();
     await writer.run(AddAccount, { name: 'DBS', type: 'bank', openingMinor: null }, 'user');
-    await writer.run(RecordManualEntry, { kind: 'expense', amountMinor: 100, categoryId: 'cat_food', accountId: (await db.query('SELECT id FROM account'))[0]![0] as string }, 'user');
+    await recordEntry(writer, { kind: 'expense', amountMinor: 100, categoryId: 'cat_food', accountId: (await db.query('SELECT id FROM account'))[0]![0] as string });
     await writer.run(ChangeProfile, { timezoneId: 'Asia/Dubai' }, 'user');
     expect((await profile())[6]).toBe('Asia/Dubai');
     expect((await db.query('SELECT local_date, timezone_id FROM "transaction"'))[0]).toEqual(['2026-11-08', 'Asia/Singapore']);

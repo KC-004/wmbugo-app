@@ -11,9 +11,10 @@ import { findRegion } from '../profile/regions';
 import { LedgerWriter } from '../writer/ledgerWriter';
 import { AddAccount, openingBalanceShape } from './accountCommands';
 import { ACCOUNT_LIST_SQL, mapAccountRows } from './accounts';
-import { entryShape, RecordManualEntry, RemoveEntry } from './entryCommands';
-import { RecordTransfer } from './transferCommands';
+import { entryShape, RemoveEntry } from './entryCommands';
+
 import { ACTIVITY_SQL, pageActivity, groupByDay, homeAccounts, mapActivityRows, SPENT_EXPENSES_SQL, SPENT_REFUNDS_SQL, spentMinor } from './readModels';
+import { recordEntry, recordTransfer } from '../testing/capture';
 
 const RULES: PaydayRule[] = [{ kind: 'none' }, { kind: 'first' }, { kind: 'last_day' }, { kind: 'last_working_day' }, { kind: 'day', day: 15 }, { kind: 'day', day: 31 }, { kind: 'day', day: 30 }];
 
@@ -116,7 +117,7 @@ describe('spent this period', () => {
     await writer.run(AddAccount, { name: 'DBS', type: 'bank', openingMinor: 100000 }, 'user');
     const acc = (await db.query('SELECT id FROM account'))[0]![0] as string;
     const rec = (kind: 'expense' | 'income', amountMinor: number, categoryId: string, occurredAtMs?: number) =>
-      writer.run(RecordManualEntry, { kind, amountMinor, categoryId, accountId: acc, ...(occurredAtMs ? { occurredAtMs } : {}) }, 'user');
+      recordEntry(writer, { kind, amountMinor, categoryId, accountId: acc, ...(occurredAtMs ? { occurredAtMs } : {}) });
     await rec('expense', 1250, 'cat_food');
     const gone = await rec('expense', 9999, 'cat_food');
     await rec('income', 500000, 'cat_in_salary');
@@ -174,11 +175,11 @@ describe('activity', () => {
     const { db, writer, clock } = await setup();
     await writer.run(AddAccount, { name: 'DBS', type: 'bank', openingMinor: 100000 }, 'user');
     const acc = (await db.query('SELECT id FROM account'))[0]![0] as string;
-    await writer.run(RecordManualEntry, { kind: 'expense', amountMinor: 1250, categoryId: 'cat_food', accountId: acc, merchant: 'Kopi', occurredAtMs: Date.UTC(2026, 10, 7, 2) }, 'user');
+    await recordEntry(writer, { kind: 'expense', amountMinor: 1250, categoryId: 'cat_food', accountId: acc, merchant: 'Kopi', occurredAtMs: Date.UTC(2026, 10, 7, 2) });
     clock.advance(1000);
-    await writer.run(RecordManualEntry, { kind: 'income', amountMinor: 50000, categoryId: 'cat_in_salary', accountId: acc }, 'user');
+    await recordEntry(writer, { kind: 'income', amountMinor: 50000, categoryId: 'cat_in_salary', accountId: acc });
     clock.advance(1000);
-    const gone = await writer.run(RecordManualEntry, { kind: 'expense', amountMinor: 1, categoryId: 'cat_food', accountId: acc }, 'user');
+    const gone = await recordEntry(writer, { kind: 'expense', amountMinor: 1, categoryId: 'cat_food', accountId: acc });
     if (!gone.ok) throw new Error('x');
     await writer.run(RemoveEntry, { transactionId: gone.value.transactionId }, 'user');
 
@@ -191,8 +192,8 @@ describe('activity', () => {
 
   it('pages: asks for one more than shown, says whether earlier entries exist, and keeps a transfer whole', async () => {
     const { db, writer, ids } = await setupWithAccounts();
-    for (let i = 0; i < 5; i++) await writer.run(RecordManualEntry, { kind: 'expense', amountMinor: 100 + i, categoryId: 'cat_food', accountId: ids[0]!, occurredAtMs: Date.UTC(2026, 10, 1 + i, 4) }, 'user');
-    await writer.run(RecordTransfer, { amountMinor: 700, fromAccountId: ids[0]!, toAccountId: ids[1]!, occurredAtMs: Date.UTC(2026, 10, 7, 4) }, 'user');
+    for (let i = 0; i < 5; i++) await recordEntry(writer, { kind: 'expense', amountMinor: 100 + i, categoryId: 'cat_food', accountId: ids[0]!, occurredAtMs: Date.UTC(2026, 10, 1 + i, 4) });
+    await recordTransfer(writer, { amountMinor: 700, fromAccountId: ids[0]!, toAccountId: ids[1]!, occurredAtMs: Date.UTC(2026, 10, 7, 4) });
     const page = (limit: number) => pageActivity(mapActivityRows([]), limit);
     expect(page(3)).toEqual({ rows: [], hasMore: false });
     const rows3 = mapActivityRows(await db.query(ACTIVITY_SQL, [4]));

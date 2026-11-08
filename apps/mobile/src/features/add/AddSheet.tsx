@@ -60,7 +60,7 @@ function wallParts(nowMs: number, tz: string): { date: string; time: string } {
 
 /**
  * The Add sheet: segmented Expense/Income, quick-category chips (most used first, fixed while open), the
- * account chip, the typed amount and the keypad. Save writes through `RecordManualEntry`; the toast offers
+ * account chip, the typed amount and the keypad. Save writes through `SubmitCapture`; the toast offers
  * Undo. The draft (amount, type, category) lives in memory only.
  */
 export function AddSheet({
@@ -111,6 +111,8 @@ export function AddSheet({
   const accountTouched = useRef(preset !== undefined);
   const dateTouched = useRef(false);
   const saving = useRef(false);
+  /** One id per save: kept across a failed attempt so a retry cannot write twice, dropped once a save succeeds. */
+  const submission = useRef<string | null>(null);
   const amountRef = useRef<ComponentRef<typeof TextInput>>(null);
 
   // Load categories and accounts for the type. The quick order is fixed for as long as this sheet is open.
@@ -223,7 +225,9 @@ export function AddSheet({
     setSaveError(null);
     const done = startSaveTiming(kind);
     try {
+      submission.current ??= api.newSubmissionId();
       const r = await api.record({
+        submissionId: submission.current,
         kind,
         amountMinor: parsed.value,
         categoryId,
@@ -315,7 +319,9 @@ export function AddSheet({
     setSaveError(null);
     const done = startSaveTiming('transfer');
     try {
+      submission.current ??= api.newSubmissionId();
       const r = await api.recordTransfer({
+        submissionId: submission.current,
         amountMinor: parsed.value,
         fromAccountId: accountId,
         toAccountId,

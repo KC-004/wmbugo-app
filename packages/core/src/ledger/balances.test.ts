@@ -9,9 +9,10 @@ import { LedgerWriter } from '../writer/ledgerWriter';
 import { AddAccount, openingBalanceShape } from './accountCommands';
 import { ACCOUNT_LIST_SQL, mapAccountRows, openingPostingMinor, type AccountRow, type AccountType } from './accounts';
 import { beforeTrackingStarted, cardPosition, notSetNote, overviewTotals } from './balances';
-import { entryShape, RecordManualEntry } from './entryCommands';
+import { entryShape } from './entryCommands';
 import { homeAccounts, INCOME_SQL, SPENT_EXPENSES_SQL } from './readModels';
-import { OTHER_CATEGORY_ID, RecordTransfer } from './transferCommands';
+import { OTHER_CATEGORY_ID } from './transferCommands';
+import { recordEntry, recordTransfer } from '../testing/capture';
 
 const row = (over: Partial<AccountRow>): AccountRow => ({
   id: 'a', name: 'A', type: 'bank', icon: 'Bank', colorToken: 'cat-indigo', sortOrder: 0, status: 'active', balanceNotSet: false, postingsMinor: 0, ...over,
@@ -116,25 +117,21 @@ describe('balance property suite (FIN-011, FIN-013, LIR-01)', () => {
           const a = c.t === 'transfer' ? c.a % ids.length : c.a % ids.length;
           if (c.t === 'expense') {
             const at = c.before ? openedAt[a]! - 5000 : clock.nowMs();
-            const r = await writer.run(RecordManualEntry, { kind: 'expense', amountMinor: c.m, categoryId: 'cat_food', accountId: ids[a]!, occurredAtMs: at }, 'user');
+            const r = await recordEntry(writer, { kind: 'expense', amountMinor: c.m, categoryId: 'cat_food', accountId: ids[a]!, occurredAtMs: at });
             if (!r.ok) throw new Error('expense');
             expenses += c.m;
             // An account with no opening balance has no opening instant, so nothing is "before" it.
             const tracked = accounts[a]!.opening !== null;
             if (!tracked || at >= openedAt[a]!) model[a] = (model[a] ?? 0) - c.m;
           } else if (c.t === 'income') {
-            const r = await writer.run(RecordManualEntry, { kind: 'income', amountMinor: c.m, categoryId: 'cat_in_salary', accountId: ids[a]! }, 'user');
+            const r = await recordEntry(writer, { kind: 'income', amountMinor: c.m, categoryId: 'cat_in_salary', accountId: ids[a]! });
             if (!r.ok) throw new Error('income');
             incomes += c.m;
             model[a] = (model[a] ?? 0) + c.m;
           } else {
             const b = c.b % ids.length;
             if (a === b) continue;
-            const r = await writer.run(
-              RecordTransfer,
-              { amountMinor: c.m, fromAccountId: ids[a]!, toAccountId: ids[b]!, ...(c.fee > 0 ? { fee: { amountMinor: c.fee, categoryId: OTHER_CATEGORY_ID } } : {}) },
-              'user',
-            );
+            const r = await recordTransfer(writer, { amountMinor: c.m, fromAccountId: ids[a]!, toAccountId: ids[b]!, ...(c.fee > 0 ? { fee: { amountMinor: c.fee, categoryId: OTHER_CATEGORY_ID } } : {}) });
             if (!r.ok) throw new Error('transfer ' + r.code);
             model[a] = (model[a] ?? 0) - c.m - c.fee;
             model[b] = (model[b] ?? 0) + c.m;

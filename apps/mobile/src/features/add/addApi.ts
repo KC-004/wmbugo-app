@@ -6,12 +6,12 @@ import {
   LAST_ACCOUNT_SQL,
   mapAccountRows,
   mapCategoryRows,
-  RecordTransfer,
+  SubmitCapture,
+  type SubmitResult,
   type TransferInput,
   pickDefaultAccount,
   rankCategories,
   rankIsStale,
-  RecordManualEntry,
   RemoveEntry,
   type AccountRow,
   type CategoryRow,
@@ -41,16 +41,22 @@ export interface AddData {
   readonly blockTransfers: boolean;
 }
 
-export type RecordResult = { ok: true; value: { transactionId: string; accountId: string } } | { ok: false; code: string };
+/** A save carries its submission id: saving again with the same id (a retry) returns the first save instead of writing twice. */
+export type EntryRequest = ManualEntry & { readonly submissionId: string };
+export type TransferRequest = TransferInput & { readonly submissionId: string };
 
-export type TransferResult = { ok: true; value: { transactionId: string; feeTransactionId: string | null } } | { ok: false; code: string };
+export type RecordResult = { ok: true; value: { transactionId: string; accountId: string; result?: SubmitResult } } | { ok: false; code: string };
+
+export type TransferResult = { ok: true; value: { transactionId: string; feeTransactionId: string | null; result?: SubmitResult } } | { ok: false; code: string };
 
 /** What the Add sheet needs. The real one reads and writes through the ledger; tests pass a fake. */
 export interface AddApi {
   load(kind: AddKind): Promise<AddData | null>;
   defaultAccountFor(categoryId: string): Promise<string | null>;
-  record(entry: ManualEntry): Promise<RecordResult>;
-  recordTransfer(input: TransferInput): Promise<TransferResult>;
+  /** A fresh id for one save (UUID v7). */
+  newSubmissionId(): string;
+  record(entry: EntryRequest): Promise<RecordResult>;
+  recordTransfer(input: TransferRequest): Promise<TransferResult>;
   remove(transactionId: string): Promise<{ ok: boolean }>;
 }
 
@@ -106,7 +112,14 @@ export const realAddApi: AddApi = {
     const prof = await readProfile(db);
     return pickDefaultAccount(ids, forCat, lastAny, prof?.settings.defaultAccountId ?? null);
   },
-  record: (entry) => getServices().writer.run(RecordManualEntry, entry, 'user'),
-  recordTransfer: (input) => getServices().writer.run(RecordTransfer, input, 'user'),
+  newSubmissionId: () => getServices().newId(),
+  async record({ submissionId, ...entry }) {
+    const r = await getServices().writer.run(SubmitCapture, { submissionId, sourceKind: 'manual', entry }, 'user');
+    return r.ok ? { ok: true, value: { transactionId: r.value.transactionId, accountId: r.value.accountId ?? '', result: r.value.result } } : r;
+  },
+  async recordTransfer({ submissionId, ...transfer }) {
+    const r = await getServices().writer.run(SubmitCapture, { submissionId, sourceKind: 'manual', transfer }, 'user');
+    return r.ok ? { ok: true, value: { transactionId: r.value.transactionId, feeTransactionId: r.value.feeTransactionId, result: r.value.result } } : r;
+  },
   remove: (transactionId) => getServices().writer.run(RemoveEntry, { transactionId }, 'user'),
 };

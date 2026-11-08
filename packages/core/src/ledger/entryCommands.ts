@@ -1,6 +1,7 @@
 import { toLocalDate } from '../shared/clock';
 import { err, ok } from '../shared/result';
-import type { Invariant, UseCase } from '../writer/ledgerWriter';
+import type { Invariant, UseCase, WriterContext } from '../writer/ledgerWriter';
+import type { Result } from '../shared/result';
 import { insertAccount, profileTimezone } from './accountCommands';
 
 export type EntryKind = 'expense' | 'income';
@@ -42,78 +43,107 @@ const clean = (s: string | undefined, max: number): string | null => {
   return t === '' ? null : t.slice(0, max);
 };
 
+/** What the capture pipeline knows about a new entry once it is validated, before it is written. */
+export interface EntryFacts {
+  readonly accountId: string | null;
+  readonly localDate: string;
+  readonly occurredAtMs: number;
+  readonly timezoneId: string;
+  /** The account was just created (Cash on a first save), so nothing else can be on it yet. */
+  readonly newAccount: boolean;
+}
+
+export interface EntryClassification {
+  readonly status: 'confirmed' | 'needs_review';
+  /** The confirmed item this one looks like, when it was held back as a possible duplicate. */
+  readonly duplicateOf?: string | null;
+}
+
+export interface CreatedEntry {
+  readonly transactionId: string;
+  readonly accountId: string;
+  readonly createdAccount: boolean;
+  readonly status: 'confirmed' | 'needs_review';
+  readonly duplicateOf: string | null;
+}
+
 /**
- * Records one confirmed expense or income: the transaction (UTC instant, capture timezone, fixed local
- * date), one posting on the account (negative out, positive in) and one split equal to the amount, with
- * audit and `TransactionsChanged` in the writer's single transaction. With no account yet, Cash is created
- * (balance not set) in the same save.
+ * The ledger's create-entry command (LIR-06): ONLY `SubmitCapture` may call it. Writes one expense or income: the
+ * transaction (UTC instant, capture timezone, fixed local date), one posting on the account (negative out, positive in)
+ * and one split equal to the amount. With no account yet, Cash is created (balance not set) in the same save. The caller
+ * classifies the entry (confirmed, or held for review) and writes the audit-side records (source, review candidate,
+ * events); a held entry still has its postings but counts in no total until it is confirmed.
  */
-export const RecordManualEntry: UseCase<ManualEntry, { transactionId: string; accountId: string }, RecordEntryError> = {
-  name: 'RecordManualEntry',
-  async execute(ctx, input) {
-    if (!Number.isSafeInteger(input.amountMinor)) return err('AMOUNT_INVALID');
-    if (input.amountMinor <= 0) return err('AMOUNT_REQUIRED');
-    if (input.paymentMethod !== undefined && !PAYMENT_METHODS.includes(input.paymentMethod)) return err('PAYMENT_METHOD_INVALID');
+export async function createEntry(
+  ctx: WriterContext,
+  input: ManualEntry,
+  classify?: (facts: EntryFacts) => Promise<EntryClassification>,
+): Promise<Result<CreatedEntry, RecordEntryError>> {
+if (!Number.isSafeInteger(input.amountMinor)) return err('AMOUNT_INVALID');
+if (input.amountMinor <= 0) return err('AMOUNT_REQUIRED');
+if (input.paymentMethod !== undefined && !PAYMENT_METHODS.includes(input.paymentMethod)) return err('PAYMENT_METHOD_INVALID');
 
-    const tz = await profileTimezone(ctx);
-    if (tz === null) return err('NO_PROFILE');
+const tz = await profileTimezone(ctx);
+if (tz === null) return err('NO_PROFILE');
 
-    const cat = (await ctx.query('SELECT kind FROM category WHERE id = ? AND archived = 0', [input.categoryId]))[0];
-    if (!cat) return err('CATEGORY_NOT_FOUND');
-    if (String(cat[0]) !== input.kind) return err('CATEGORY_KIND_MISMATCH');
+const cat = (await ctx.query('SELECT kind FROM category WHERE id = ? AND archived = 0', [input.categoryId]))[0];
+if (!cat) return err('CATEGORY_NOT_FOUND');
+if (String(cat[0]) !== input.kind) return err('CATEGORY_KIND_MISMATCH');
 
-    const at = input.occurredAtMs ?? ctx.nowMs();
-    const date = toLocalDate(at, tz);
-    if (!date.ok) return err('INSTANT_INVALID');
+const at = input.occurredAtMs ?? ctx.nowMs();
+const date = toLocalDate(at, tz);
+if (!date.ok) return err('INSTANT_INVALID');
 
-    let accountId = input.accountId;
-    let createdAccount = false;
-    if (accountId === null) {
-      const active = Number((await ctx.query("SELECT COUNT(*) FROM account WHERE status = 'active'"))[0]?.[0] ?? 0);
-      if (active > 0) return err('ACCOUNT_REQUIRED');
-      accountId = (await insertAccount(ctx, { name: 'Cash', type: 'cash', openingMinor: null }, tz)).accountId;
-      createdAccount = true;
-    } else {
-      const acc = (await ctx.query('SELECT status FROM account WHERE id = ?', [accountId]))[0];
-      if (!acc) return err('ACCOUNT_NOT_FOUND');
-      if (String(acc[0]) !== 'active') return err('ACCOUNT_ARCHIVED');
-    }
+let accountId = input.accountId;
+let createdAccount = false;
+if (accountId === null) {
+  const active = Number((await ctx.query("SELECT COUNT(*) FROM account WHERE status = 'active'"))[0]?.[0] ?? 0);
+  if (active > 0) return err('ACCOUNT_REQUIRED');
+  accountId = (await insertAccount(ctx, { name: 'Cash', type: 'cash', openingMinor: null }, tz)).accountId;
+  createdAccount = true;
+} else {
+  const acc = (await ctx.query('SELECT status FROM account WHERE id = ?', [accountId]))[0];
+  if (!acc) return err('ACCOUNT_NOT_FOUND');
+  if (String(acc[0]) !== 'active') return err('ACCOUNT_ARCHIVED');
+}
 
-    const now = ctx.nowMs();
-    const transactionId = ctx.newId();
-    const signed = input.kind === 'expense' ? -input.amountMinor : input.amountMinor;
-    await ctx.execute(
-      "INSERT INTO \"transaction\" (id, event_type, status, amount_minor, occurred_at_utc, local_date, timezone_id, original_description, note, payment_method, tags_json, needs_category, created_at, updated_at) VALUES (?, ?, 'confirmed', ?, ?, ?, ?, ?, ?, ?, '[]', 0, ?, ?)",
-      [
-        transactionId,
-        input.kind,
-        input.amountMinor,
-        at,
-        date.value,
-        tz,
-        clean(input.merchant, MAX_MERCHANT_LENGTH),
-        clean(input.note, MAX_NOTE_LENGTH),
-        input.paymentMethod ?? null,
-        now,
-        now,
-      ],
-    );
-    await ctx.execute(
-      "INSERT INTO posting (id, transaction_id, account_id, direction, signed_amount_minor, posting_kind) VALUES (?, ?, ?, ?, ?, 'normal')",
-      [ctx.newId(), transactionId, accountId, input.kind === 'expense' ? 'out' : 'in', signed],
-    );
-    await ctx.execute('INSERT INTO split (id, transaction_id, category_id, amount_minor) VALUES (?, ?, ?, ?)', [
-      ctx.newId(),
-      transactionId,
-      input.categoryId,
-      input.amountMinor,
-    ]);
-    ctx.touch('transaction', transactionId, { eventType: input.kind, created: true });
-    ctx.emit('TransactionsChanged', { transactionIds: [transactionId] });
-    if (createdAccount) ctx.emit('AccountsChanged', { accountIds: [accountId] });
-    return ok({ transactionId, accountId });
-  },
-};
+const now = ctx.nowMs();
+const transactionId = ctx.newId();
+const signed = input.kind === 'expense' ? -input.amountMinor : input.amountMinor;
+const cls: EntryClassification = classify
+  ? await classify({ accountId, localDate: date.value, occurredAtMs: at, timezoneId: tz, newAccount: createdAccount })
+  : { status: 'confirmed' };
+await ctx.execute(
+  "INSERT INTO \"transaction\" (id, event_type, status, amount_minor, occurred_at_utc, local_date, timezone_id, original_description, note, payment_method, capture_resolution, tags_json, needs_category, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', 0, ?, ?)",
+  [
+    transactionId,
+    input.kind,
+    cls.status,
+    input.amountMinor,
+    at,
+    date.value,
+    tz,
+    clean(input.merchant, MAX_MERCHANT_LENGTH),
+    clean(input.note, MAX_NOTE_LENGTH),
+    input.paymentMethod ?? null,
+    cls.status === 'confirmed' ? 'user_approved' : null,
+    now,
+    now,
+  ],
+);
+await ctx.execute(
+  "INSERT INTO posting (id, transaction_id, account_id, direction, signed_amount_minor, posting_kind) VALUES (?, ?, ?, ?, ?, 'normal')",
+  [ctx.newId(), transactionId, accountId, input.kind === 'expense' ? 'out' : 'in', signed],
+);
+await ctx.execute('INSERT INTO split (id, transaction_id, category_id, amount_minor) VALUES (?, ?, ?, ?)', [
+  ctx.newId(),
+  transactionId,
+  input.categoryId,
+  input.amountMinor,
+]);
+ctx.touch('transaction', transactionId, { eventType: input.kind, created: true, status: cls.status });
+return ok({ transactionId, accountId, createdAccount, status: cls.status, duplicateOf: cls.duplicateOf ?? null });
+}
 
 /** Undo for a new entry: marks it removed (`deleted`), so every total ignores it. The rows stay for audit. */
 export const RemoveEntry: UseCase<{ transactionId: string }, void, 'ENTRY_NOT_FOUND' | 'ALREADY_REMOVED'> = {

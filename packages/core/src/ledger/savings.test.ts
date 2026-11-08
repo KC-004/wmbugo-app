@@ -8,10 +8,11 @@ import { LedgerWriter } from '../writer/ledgerWriter';
 import { AddAccount, openingBalanceShape } from './accountCommands';
 import { ACCOUNT_LIST_SQL, mapAccountRows, type AccountType } from './accounts';
 import { accountGroups, accountLine } from './balances';
-import { entryShape, RecordManualEntry } from './entryCommands';
+import { entryShape } from './entryCommands';
 import { homeAccounts, INCOME_SQL, SPENT_EXPENSES_SQL } from './readModels';
 import { ChangeAccountType, SAVINGS_MOVED_IN_SQL, savedDisplay } from './savings';
-import { RecordTransfer } from './transferCommands';
+import { recordEntry, recordTransfer } from '../testing/capture';
+
 
 const NOW = Date.UTC(2026, 10, 8, 10, 0, 0);
 const PERIOD: [string, string] = ['2026-11-01', '2026-11-30'];
@@ -34,7 +35,7 @@ async function setup() {
   const moved = async () => Number((await db.query(SAVINGS_MOVED_IN_SQL, PERIOD))[0]![0]);
   const move = (from: string, to: string, amountMinor: number) => {
     clock.advance(1000);
-    return writer.run(RecordTransfer, { amountMinor, fromAccountId: from, toAccountId: to }, 'user');
+    return recordTransfer(writer, { amountMinor, fromAccountId: from, toAccountId: to });
   };
   return { db, clock, writer, add, rows, moved, move };
 }
@@ -104,7 +105,7 @@ describe('savings pots (Story 2.8)', () => {
   it('expenses are never savings', async () => {
     const { writer, add, moved } = await setup();
     const hdfc = await add('HDFC', 'bank', 3000000);
-    await writer.run(RecordManualEntry, { kind: 'expense', amountMinor: 1000, categoryId: 'cat_food', accountId: hdfc }, 'user');
+    await recordEntry(writer, { kind: 'expense', amountMinor: 1000, categoryId: 'cat_food', accountId: hdfc });
     expect(await moved()).toBe(0);
   });
 });
@@ -120,7 +121,7 @@ describe('ChangeAccountType (Story 2.8)', () => {
   it('between an asset and a card it is blocked once entries exist', async () => {
     const { writer, add, rows } = await setup();
     const a = await add('HDFC', 'bank', 100000);
-    await writer.run(RecordManualEntry, { kind: 'expense', amountMinor: 500, categoryId: 'cat_food', accountId: a }, 'user');
+    await recordEntry(writer, { kind: 'expense', amountMinor: 500, categoryId: 'cat_food', accountId: a });
     expect(await writer.run(ChangeAccountType, { accountId: a, type: 'card' }, 'user')).toEqual({ ok: false, code: 'HAS_ENTRIES' });
     expect((await rows())[0]!.type).toBe('bank');
   });

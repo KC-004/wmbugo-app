@@ -43,6 +43,13 @@
       "when": 1794149953731,
       "tag": "0005_steep_hex",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1794153358956,
+      "tag": "0006_heavy_yellow_claw",
+      "breakpoints": true
     }
   ]
 }

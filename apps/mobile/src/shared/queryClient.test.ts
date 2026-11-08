@@ -52,7 +52,7 @@ describe('query client', () => {
   });
 
   it('every catalogue event has a handler', () => {
-    expect(Object.keys(invalidationHandlers(createQueryClient())).sort()).toEqual(['AccountsChanged', 'ProfileChanged', 'TransactionsChanged']);
+    expect(Object.keys(invalidationHandlers(createQueryClient())).sort()).toEqual(['AccountsChanged', 'CapturesRejected', 'CapturesSubmitted', 'ProfileChanged', 'TransactionsChanged']);
   });
 
   it('invalidating twice (redelivery) is harmless', async () => {

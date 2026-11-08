@@ -7,7 +7,7 @@ import {
   findRegion,
   LedgerWriter,
   openingBalanceShape,
-  RecordManualEntry,
+  SubmitCapture,
   SetUpProfile,
   startStorage,
   type KeyStore,
@@ -56,7 +56,7 @@ const percentile = (sorted: number[], p: number): number => sorted[Math.min(sort
 
 /**
  * NFR-04 on the device: a separate encrypted database (its own random key, never the user's) is migrated,
- * seeded with 10,000 entries and timed over 50 real `RecordManualEntry` writes (3 warm-up). Results go to the
+ * seeded with 10,000 entries and timed over 50 real `SubmitCapture` writes (3 warm-up). Results go to the
  * log as `bench.save`; the file is deleted afterwards. The user's ledger is never opened or changed.
  */
 export async function runSaveBenchmark(log: Logger, clock: { nowMs(): number; timezoneId(): string }): Promise<void> {
@@ -81,7 +81,7 @@ export async function runSaveBenchmark(log: Logger, clock: { nowMs(): number; ti
     const times: number[] = [];
     for (let i = 0; i < RUNS; i++) {
       const t0 = performance.now();
-      const r = await writer.run(RecordManualEntry, { kind: 'expense', amountMinor: 1250 + i, categoryId: 'cat_food', accountId }, 'user');
+      const r = await writer.run(SubmitCapture, { submissionId: `bench-${i}`, sourceKind: 'manual', entry: { kind: 'expense', amountMinor: 1250 + i, categoryId: 'cat_food', accountId } }, 'user');
       const ms = performance.now() - t0;
       if (!r.ok) throw new Error(r.code);
       if (i >= WARMUP) times.push(ms);

@@ -62,6 +62,8 @@ export interface AppServices {
   readonly db: SqlDatabase;
   readonly writer: LedgerWriter;
   readonly dispatcher: OutboxDispatcher;
+  /** A fresh id (UUID v7), e.g. the submission id of one Add-sheet save. */
+  readonly newId: () => string;
 }
 
 let services: AppServices | null = null;
@@ -112,16 +114,17 @@ async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
     logger: log,
     handlers: invalidationHandlers(queryClient),
   });
+  const newId = createIdGenerator(systemClock, secureRandom);
   const writer = new LedgerWriter({
     uow: started.value.db,
     clock: systemClock,
-    newId: createIdGenerator(systemClock, secureRandom),
+    newId,
     logger: log,
     invariants: [singleProfile, openingBalanceShape, entryShape],
     // Deliver after every commit; a failure stays pending and is retried on the next commit or launch.
     onCommitted: () => void dispatcher.deliverPending().catch(() => undefined),
   });
-  services = { db: started.value.db, writer, dispatcher };
+  services = { db: started.value.db, writer, dispatcher, newId };
   // Tab navigation timings (NFR-03) go to the redacting log; durations and tab names only.
   setNavTimingSink((e) => log.debug('nav.tab', { tab: e.tab, durationMs: e.durationMs }));
   // Save timings (NFR-04): kind and duration only.

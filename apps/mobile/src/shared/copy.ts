@@ -148,6 +148,16 @@ export const copy = {
     payBank: 'Bank transfer',
     payOther: 'Other',
   },
+  capture: {
+    recorded: 'Recorded',
+    recordedGuessed: 'Recorded · category guessed',
+    recordedNeedsCategory: 'Recorded · needs a category',
+    recordedLinked: 'Recorded · linked as transfer',
+    waiting: 'Waiting for you',
+    possibleDuplicate: 'Possible duplicate — check it',
+    scam: 'Looks like a scam — not added',
+    rejected: 'Rejected',
+  },
   money: {
     amountHidden: 'Amount hidden',
     notSet: 'Not set',

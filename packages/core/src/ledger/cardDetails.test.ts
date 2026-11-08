@@ -11,7 +11,8 @@ import { accountGroups } from './balances';
 import { CARD_DETAILS_SQL, LAST_PAYER_SQL, mapCardDetails, payBillAmount, pickPayerAccount, statementStatus, UpdateCardDetails } from './cardDetails';
 import { entryShape } from './entryCommands';
 import { homeAccounts } from './readModels';
-import { RecordTransfer } from './transferCommands';
+import { recordTransfer } from '../testing/capture';
+
 
 const NOW = Date.UTC(2026, 10, 8, 10, 0, 0);
 
@@ -72,15 +73,15 @@ describe('UpdateCardDetails (Story 2.6)', () => {
     const { writer, clock, add, details } = await setup();
     const card = await add('HDFC Card', 'card', 1245000);
     const bank = await add('HDFC', 'bank', 3000000);
-    await writer.run(RecordTransfer, { amountMinor: 100000, fromAccountId: bank, toAccountId: card }, 'user'); // before the statement
+    await recordTransfer(writer, { amountMinor: 100000, fromAccountId: bank, toAccountId: card }); // before the statement
     clock.advance(1000);
     await writer.run(UpdateCardDetails, { accountId: card, statementDueMinor: 820000, dueDate: '2026-11-15', limitMinor: null }, 'user');
     expect((await details(card)).paidSinceMinor).toBe(0);
     clock.advance(1000);
-    await writer.run(RecordTransfer, { amountMinor: 500000, fromAccountId: bank, toAccountId: card }, 'user');
+    await recordTransfer(writer, { amountMinor: 500000, fromAccountId: bank, toAccountId: card });
     expect((await details(card)).paidSinceMinor).toBe(500000);
     clock.advance(1000);
-    await writer.run(RecordTransfer, { amountMinor: 320000, fromAccountId: bank, toAccountId: card }, 'user');
+    await recordTransfer(writer, { amountMinor: 320000, fromAccountId: bank, toAccountId: card });
     const d = await details(card);
     expect(statementStatus(d, '2026-11-10')).toEqual({ kind: 'paid', amountMinor: 820000 });
   });
@@ -117,7 +118,7 @@ describe('Pay card bill helpers (Story 2.7)', () => {
     const card = await add('HDFC Card', 'card', 1245000);
     const bank = await add('HDFC', 'bank', 3120000);
     expect((await db.query(LAST_PAYER_SQL, [card])).length).toBe(0);
-    await writer.run(RecordTransfer, { amountMinor: 820000, fromAccountId: bank, toAccountId: card }, 'user');
+    await recordTransfer(writer, { amountMinor: 820000, fromAccountId: bank, toAccountId: card });
     const rows = mapAccountRows(await db.query(ACCOUNT_LIST_SQL));
     expect(homeAccounts(rows)).toMatchObject({ inAccountsMinor: 2300000, cardDuesMinor: 425000 });
     expect(String((await db.query(LAST_PAYER_SQL, [card]))[0]![0])).toBe(bank);
@@ -133,7 +134,7 @@ describe('review fixes (Epic 2)', () => {
     const bank = await add('HDFC', 'bank', 3000000);
     await writer.run(UpdateCardDetails, { accountId: card, statementDueMinor: 500000, dueDate: '2026-11-15', limitMinor: null }, 'user');
     clock.advance(1000);
-    await writer.run(RecordTransfer, { amountMinor: 500000, fromAccountId: bank, toAccountId: card }, 'user');
+    await recordTransfer(writer, { amountMinor: 500000, fromAccountId: bank, toAccountId: card });
     expect(statementStatus(await details(card), '2026-11-10')).toEqual({ kind: 'paid', amountMinor: 500000 });
     clock.advance(1000);
     await writer.run(UpdateCardDetails, { accountId: card, statementDueMinor: 500000, dueDate: '2026-11-15', limitMinor: 9000000 }, 'user');

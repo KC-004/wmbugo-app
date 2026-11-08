@@ -5,13 +5,13 @@
 import { AccessibilityInfo, Text } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { mapCategoryRows, rankCategories, SEED_CATEGORIES, type AccountRow, type ManualEntry, type TransferInput } from '@wmbugo/core';
+import { mapCategoryRows, rankCategories, SEED_CATEGORIES, type AccountRow } from '@wmbugo/core';
 import { ToastHost } from '../../shared/feedback/ToastHost';
 import { createQueryClient } from '../../shared/queryClient';
 import { EMPTY_DRAFT, useUiStore } from '../../shared/state/uiStore';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
 import { AddSheet, type AddPreset } from './AddSheet';
-import type { AddApi, AddData, AddKind } from './addApi';
+import type { AddApi, AddData, AddKind, EntryRequest, RecordResult, TransferRequest, TransferResult } from './addApi';
 
 const live: ReactTestRenderer[] = [];
 const clients: ReturnType<typeof createQueryClient>[] = [];
@@ -54,12 +54,12 @@ export const cats = (kind: AddKind) =>
   mapCategoryRows(SEED_CATEGORIES.filter((c) => c.kind === (kind === 'income' ? 'income' : 'expense')).map((c, i) => [c.id, c.name, c.kind, c.budgetType, c.icon, c.color, i]));
 
 export function fakeApi(over: Partial<AddData> = {}, counts = new Map<string, number>()) {
-  const record = jest.fn<Promise<{ ok: true; value: { transactionId: string; accountId: string } } | { ok: false; code: string }>, [ManualEntry]>(async () => ({
+  const record = jest.fn<Promise<RecordResult>, [EntryRequest]>(async () => ({
     ok: true,
     value: { transactionId: 'tx1', accountId: 'a1' },
   }));
   const remove = jest.fn(async (...ids: string[]) => ({ ok: ids.length >= 0 }));
-  const recordTransfer = jest.fn<Promise<{ ok: true; value: { transactionId: string; feeTransactionId: string | null } } | { ok: false; code: string }>, [TransferInput]>(
+  const recordTransfer = jest.fn<Promise<TransferResult>, [TransferRequest]>(
     async () => ({ ok: true, value: { transactionId: 'tr1', feeTransactionId: null } }),
   );
   const defaultAccountFor = jest.fn(async (c: string) => (c === 'cat_transport' ? 'a2' : 'a1'));
@@ -72,7 +72,8 @@ export function fakeApi(over: Partial<AddData> = {}, counts = new Map<string, nu
       defaultAccountId: 'a1', blockTransfers: false, ...over,
     };
   });
-  const api: AddApi = { load, defaultAccountFor, record, recordTransfer, remove };
+  let n = 0;
+  const api: AddApi = { load, defaultAccountFor, record, recordTransfer, remove, newSubmissionId: () => `sub-${++n}` };
   return { api, record, recordTransfer, remove, load, defaultAccountFor };
 }
 

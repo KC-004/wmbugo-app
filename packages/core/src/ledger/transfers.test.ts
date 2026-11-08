@@ -7,9 +7,10 @@ import { findRegion } from '../profile/regions';
 import { LedgerWriter } from '../writer/ledgerWriter';
 import { AddAccount, openingBalanceShape } from './accountCommands';
 import { ACCOUNT_LIST_SQL, mapAccountRows } from './accounts';
-import { entryShape, RecordManualEntry } from './entryCommands';
+import { entryShape } from './entryCommands';
 import { ACTIVITY_SQL, groupByDay, mapActivityRows, SPENT_EXPENSES_SQL } from './readModels';
-import { OTHER_CATEGORY_ID, RecordTransfer, SETTING_BLOCK_TRANSFERS } from './transferCommands';
+import { OTHER_CATEGORY_ID, SETTING_BLOCK_TRANSFERS } from './transferCommands';
+import { recordEntry, recordTransfer } from '../testing/capture';
 
 const NOW = Date.UTC(2026, 10, 8, 10, 0, 0);
 
@@ -36,7 +37,7 @@ async function setup() {
 describe('RecordTransfer', () => {
   it('writes one transfer with -20000 on From and +20000 on To, neither income nor expense', async () => {
     const { writer, from, to, balances, spent, db } = await setup();
-    const r = await writer.run(RecordTransfer, { amountMinor: 20000, fromAccountId: from, toAccountId: to }, 'user');
+    const r = await recordTransfer(writer, { amountMinor: 20000, fromAccountId: from, toAccountId: to });
     expect(r.ok).toBe(true);
     expect(await balances()).toEqual({ DBS: 80000, Cash: 25000 });
     expect(await db.query("SELECT event_type, status, amount_minor, local_date FROM \"transaction\" WHERE event_type = 'transfer'")).toEqual([['transfer', 'confirmed', 20000, '2026-11-08']]);
@@ -48,7 +49,7 @@ describe('RecordTransfer', () => {
 
   it('a fee is a separate confirmed expense from From (default Other) in the same commit; only the fee is spending', async () => {
     const { writer, from, to, balances, spent, db } = await setup();
-    const r = await writer.run(RecordTransfer, { amountMinor: 20000, fromAccountId: from, toAccountId: to, fee: { amountMinor: 200, categoryId: OTHER_CATEGORY_ID } }, 'user');
+    const r = await recordTransfer(writer, { amountMinor: 20000, fromAccountId: from, toAccountId: to, fee: { amountMinor: 200, categoryId: OTHER_CATEGORY_ID } });
     expect(r.ok && r.value.feeTransactionId).toBeTruthy();
     expect(await balances()).toEqual({ DBS: 79800, Cash: 25000 });
     expect(await spent()).toBe(200);
@@ -58,13 +59,13 @@ describe('RecordTransfer', () => {
   it('refuses the same account and writes nothing', async () => {
     const { writer, from, count } = await setup();
     const before = await count('SELECT COUNT(*) FROM "transaction"');
-    expect(await writer.run(RecordTransfer, { amountMinor: 100, fromAccountId: from, toAccountId: from }, 'user')).toEqual({ ok: false, code: 'SAME_ACCOUNT' });
+    expect(await recordTransfer(writer, { amountMinor: 100, fromAccountId: from, toAccountId: from })).toEqual({ ok: false, code: 'SAME_ACCOUNT' });
     expect(await count('SELECT COUNT(*) FROM "transaction"')).toBe(before);
   });
 
   it('validates the amount, accounts, archived accounts, fee and category', async () => {
     const { writer, from, to, db } = await setup();
-    const run = (over: object) => writer.run(RecordTransfer, { amountMinor: 100, fromAccountId: from, toAccountId: to, ...over } as never, 'user');
+    const run = (over: object) => recordTransfer(writer, { amountMinor: 100, fromAccountId: from, toAccountId: to, ...over } as never);
     expect(await run({ amountMinor: 0 })).toEqual({ ok: false, code: 'AMOUNT_REQUIRED' });
     expect(await run({ amountMinor: 1.5 })).toEqual({ ok: false, code: 'AMOUNT_INVALID' });
     expect(await run({ toAccountId: 'nope' })).toEqual({ ok: false, code: 'ACCOUNT_NOT_FOUND' });
@@ -76,16 +77,16 @@ describe('RecordTransfer', () => {
 
   it('allows an amount above the balance by default (the screen warns)', async () => {
     const { writer, from, to, balances } = await setup();
-    expect((await writer.run(RecordTransfer, { amountMinor: 500000, fromAccountId: from, toAccountId: to }, 'user')).ok).toBe(true);
+    expect((await recordTransfer(writer, { amountMinor: 500000, fromAccountId: from, toAccountId: to })).ok).toBe(true);
     expect((await balances()).DBS).toBe(-400000);
   });
 
   it('with Block transfers above the balance on, refuses with INSUFFICIENT_FUNDS and keeps allowing amounts within the balance', async () => {
     const { writer, from, to, db, balances } = await setup();
     await db.query("INSERT INTO settings (key, value_json, version, updated_at) VALUES (?, 'true', 1, 1)", [SETTING_BLOCK_TRANSFERS]);
-    expect(await writer.run(RecordTransfer, { amountMinor: 100001, fromAccountId: from, toAccountId: to }, 'user')).toEqual({ ok: false, code: 'INSUFFICIENT_FUNDS' });
+    expect(await recordTransfer(writer, { amountMinor: 100001, fromAccountId: from, toAccountId: to })).toEqual({ ok: false, code: 'INSUFFICIENT_FUNDS' });
     expect((await balances()).DBS).toBe(100000);
-    expect((await writer.run(RecordTransfer, { amountMinor: 100000, fromAccountId: from, toAccountId: to }, 'user')).ok).toBe(true);
+    expect((await recordTransfer(writer, { amountMinor: 100000, fromAccountId: from, toAccountId: to })).ok).toBe(true);
   });
 
   it('never treats an unknown balance as zero when blocking', async () => {
@@ -93,7 +94,7 @@ describe('RecordTransfer', () => {
     await writer.run(AddAccount, { name: 'Unknown', type: 'bank', openingMinor: null }, 'user');
     const unknown = (await db.query("SELECT id FROM account WHERE name = 'Unknown'"))[0]![0] as string;
     await db.query("INSERT INTO settings (key, value_json, version, updated_at) VALUES (?, 'true', 1, 1)", [SETTING_BLOCK_TRANSFERS]);
-    expect((await writer.run(RecordTransfer, { amountMinor: 999, fromAccountId: unknown, toAccountId: to }, 'user')).ok).toBe(true);
+    expect((await recordTransfer(writer, { amountMinor: 999, fromAccountId: unknown, toAccountId: to })).ok).toBe(true);
   });
 
   it('the invariant rejects a transfer that does not sum to zero', async () => {
@@ -116,8 +117,8 @@ describe('RecordTransfer', () => {
 describe('Activity with transfers and income', () => {
   it('shows one transfer row "From → To", unsigned and excluded from the day Spent, and income excluded too', async () => {
     const { writer, from, to, db } = await setup();
-    await writer.run(RecordManualEntry, { kind: 'income', amountMinor: 420000, categoryId: 'cat_in_salary', accountId: from, note: 'Nov' }, 'user');
-    await writer.run(RecordTransfer, { amountMinor: 20000, fromAccountId: from, toAccountId: to }, 'user');
+    await recordEntry(writer, { kind: 'income', amountMinor: 420000, categoryId: 'cat_in_salary', accountId: from, note: 'Nov' });
+    await recordTransfer(writer, { amountMinor: 20000, fromAccountId: from, toAccountId: to });
     const rows = mapActivityRows(await db.query(ACTIVITY_SQL, [100]));
     expect(rows.filter((r) => r.kind === 'transfer')).toHaveLength(1);
     expect(rows.find((r) => r.kind === 'transfer')!.accountName).toBe('DBS → Cash');

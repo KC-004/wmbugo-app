@@ -10,8 +10,9 @@ import { LedgerWriter } from '../writer/ledgerWriter';
 import { AddAccount, openingBalanceShape } from './accountCommands';
 import { ChangeTrackingDate, SetStartingBalance } from './accountBalanceCommands';
 import { ACCOUNT_LIST_SQL, mapAccountRows, type AccountType } from './accounts';
-import { entryShape, RecordManualEntry } from './entryCommands';
+import { entryShape } from './entryCommands';
 import { ACTIVITY_SQL, homeAccounts, INCOME_SQL, mapActivityRows, SPENT_EXPENSES_SQL } from './readModels';
+import { recordEntry } from '../testing/capture';
 
 const NOW = Date.UTC(2026, 10, 7, 10, 0, 0); // 7 Nov 15:30 in Kolkata
 const DAY = 86_400_000;
@@ -31,7 +32,7 @@ async function setup() {
   };
   const account = async (id: string) => mapAccountRows(await db.query(ACCOUNT_LIST_SQL)).find((x) => x.id === id)!;
   const spend = (accountId: string, amountMinor: number, occurredAtMs?: number) =>
-    writer.run(RecordManualEntry, { kind: 'expense', amountMinor, categoryId: 'cat_food', accountId, ...(occurredAtMs ? { occurredAtMs } : {}) }, 'user');
+    recordEntry(writer, { kind: 'expense', amountMinor, categoryId: 'cat_food', accountId, ...(occurredAtMs ? { occurredAtMs } : {}) });
   return { db, clock, writer, add, account, spend };
 }
 

@@ -24,6 +24,8 @@ export const EVENT_CATALOGUE = {
   TransactionsChanged: { areas: ['ledger', 'budgets', 'insights', 'home', 'widget'] },
   AccountsChanged: { areas: ['ledger', 'insights', 'home', 'widget'] },
   ProfileChanged: { areas: ['ledger', 'budgets', 'insights', 'home', 'periods', 'notifications', 'widget'] },
+  CapturesSubmitted: { areas: ['captures', 'ledger', 'home', 'widget'] },
+  CapturesRejected: { areas: ['captures', 'ledger', 'home', 'widget'] },
 } as const satisfies Record<string, EventSpec>;
 
 export type EventName = keyof typeof EVENT_CATALOGUE;
@@ -33,6 +35,8 @@ export interface EventPayloads {
   TransactionsChanged: { readonly transactionIds: readonly string[] };
   AccountsChanged: { readonly accountIds: readonly string[] };
   ProfileChanged: { readonly fields: readonly string[] };
+  CapturesSubmitted: { readonly transactionIds: readonly string[] };
+  CapturesRejected: { readonly transactionIds: readonly string[] };
 }
 
 // Compile-time check: the catalogue and the payload map list exactly the same events.

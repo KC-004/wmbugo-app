@@ -10,8 +10,9 @@ import { LedgerWriter } from '../writer/ledgerWriter';
 import { AddAccount, ArchiveAccount, DeleteAccount, MoveAccount, NEEDS_REVIEW_COUNT_SQL, openingBalanceShape, RestoreAccount } from './accountCommands';
 import { ACCOUNT_LIST_SQL, mapAccountRows, type AccountType } from './accounts';
 import { accountGroups } from './balances';
-import { entryShape, LAST_ACCOUNT_FOR_CATEGORY_SQL, RecordManualEntry } from './entryCommands';
+import { entryShape, LAST_ACCOUNT_FOR_CATEGORY_SQL } from './entryCommands';
 import { ACTIVITY_SQL, homeAccounts, mapActivityRows, SPENT_EXPENSES_SQL } from './readModels';
+import { recordEntry } from '../testing/capture';
 
 const NOW = Date.UTC(2026, 10, 8, 10, 0, 0);
 
@@ -41,7 +42,7 @@ describe('archive, restore and delete (Story 2.9)', () => {
     await add('HDFC', 'bank', 3000000);
     const card = await add('HDFC Card', 'card', 410000);
     clock.advance(1000);
-    await writer.run(RecordManualEntry, { kind: 'expense', amountMinor: 20000, categoryId: 'cat_food', accountId: sbi }, 'user');
+    await recordEntry(writer, { kind: 'expense', amountMinor: 20000, categoryId: 'cat_food', accountId: sbi });
 
     await writer.run(ArchiveAccount, { accountId: sbi }, 'user');
     await writer.run(ArchiveAccount, { accountId: card }, 'user');
@@ -67,7 +68,7 @@ describe('archive, restore and delete (Story 2.9)', () => {
     const { db, writer, add, clock } = await setup();
     const sbi = await add('SBI', 'bank', 100);
     clock.advance(1000);
-    await writer.run(RecordManualEntry, { kind: 'expense', amountMinor: 1, categoryId: 'cat_food', accountId: sbi }, 'user');
+    await recordEntry(writer, { kind: 'expense', amountMinor: 1, categoryId: 'cat_food', accountId: sbi });
     expect((await db.query(LAST_ACCOUNT_FOR_CATEGORY_SQL, ['cat_food'])).length).toBe(1);
     await writer.run(ArchiveAccount, { accountId: sbi }, 'user');
     expect((await db.query(LAST_ACCOUNT_FOR_CATEGORY_SQL, ['cat_food'])).length).toBe(0);
@@ -140,7 +141,7 @@ describe('review fixes (Epic 2)', () => {
     const { db, writer, add, clock } = await setup();
     const a = await add('SBI', 'bank', 100000);
     clock.advance(1000);
-    const r = await writer.run(RecordManualEntry, { kind: 'expense', amountMinor: 500, categoryId: 'cat_food', accountId: a }, 'user');
+    const r = await recordEntry(writer, { kind: 'expense', amountMinor: 500, categoryId: 'cat_food', accountId: a });
     if (!r.ok) throw new Error('entry');
     db.raw.prepare('UPDATE "transaction" SET status = ? WHERE id = ?').run('needs_review', r.value.transactionId);
     expect(Number((await db.query(NEEDS_REVIEW_COUNT_SQL, [a]))[0]![0])).toBe(1);

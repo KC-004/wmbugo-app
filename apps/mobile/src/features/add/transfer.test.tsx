@@ -82,7 +82,7 @@ describe('Transfer', () => {
     await toTransfer(r);
     await act(async () => fire(r, 'save'));
     await settle();
-    expect(recordTransfer).toHaveBeenCalledWith({ amountMinor: 20000, fromAccountId: 'a1', toAccountId: 'a2' });
+    expect(recordTransfer).toHaveBeenCalledWith({ submissionId: 'sub-1', amountMinor: 20000, fromAccountId: 'a1', toAccountId: 'a2' });
     expect(close).toHaveBeenCalled();
     expect(texts(r)).toEqual(expect.arrayContaining(['Saved', 'Undo']));
   });

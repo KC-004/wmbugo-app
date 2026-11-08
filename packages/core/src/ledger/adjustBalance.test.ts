@@ -8,9 +8,10 @@ import { LedgerWriter } from '../writer/ledgerWriter';
 import { AddAccount, openingBalanceShape } from './accountCommands';
 import { ACCOUNT_LIST_SQL, mapAccountRows, type AccountType } from './accounts';
 import { AdjustBalance, adjustmentDelta, ADJUST_REASONS } from './adjustBalance';
-import { entryShape, RecordManualEntry, RemoveEntry } from './entryCommands';
+import { entryShape, RemoveEntry } from './entryCommands';
 import { ACTIVITY_SQL, homeAccounts, INCOME_SQL, mapActivityRows, SPENT_EXPENSES_SQL } from './readModels';
 import { ACCOUNT_TIMELINE_SQL, mapTimelineRows } from './timeline';
+import { recordEntry } from '../testing/capture';
 
 const NOW = Date.UTC(2026, 10, 8, 10, 0, 0);
 
@@ -106,7 +107,7 @@ describe('AdjustBalance (Story 2.5)', () => {
     clock.advance(1000);
     await writer.run(AdjustBalance, { accountId: hdfc, actualMinor: 3120000, reason: 'rough' }, 'user');
     await writer.run(AdjustBalance, { accountId: cash, actualMinor: 190000, reason: 'missed' }, 'user');
-    await writer.run(RecordManualEntry, { kind: 'expense', amountMinor: 1000, categoryId: 'cat_food', accountId: cash }, 'user');
+    await recordEntry(writer, { kind: 'expense', amountMinor: 1000, categoryId: 'cat_food', accountId: cash });
 
     const rows = mapActivityRows(await db.query(ACTIVITY_SQL, [100]));
     const adj = rows.filter((r) => r.kind === 'adjustment').map((r) => [r.amountMinor, r.signedMinor, r.accountName, r.beforeTracking]);

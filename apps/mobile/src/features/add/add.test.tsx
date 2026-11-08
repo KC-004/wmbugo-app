@@ -135,7 +135,7 @@ describe('saving', () => {
     await act(async () => fire(r, 'save'));
     await settle();
     expect(record).toHaveBeenCalledTimes(1);
-    expect(record).toHaveBeenCalledWith({ kind: 'expense', amountMinor: 1250, categoryId: 'cat_food', accountId: 'a1' });
+    expect(record).toHaveBeenCalledWith({ submissionId: 'sub-1', kind: 'expense', amountMinor: 1250, categoryId: 'cat_food', accountId: 'a1' });
     expect(close).toHaveBeenCalledTimes(1);
     expect(texts(r)).toEqual(expect.arrayContaining(['Saved', 'Undo']));
   });
@@ -213,6 +213,36 @@ describe('saving', () => {
     expect(texts(r)).toContain('S$9.00');
   });
 
+  it('a retry after a failed save uses the same submission id; a save that succeeds starts the next one fresh', async () => {
+    const f = fakeApi();
+    f.record.mockResolvedValueOnce({ ok: false, code: 'INVARIANT_VIOLATED' });
+    const { r } = mount(f.api);
+    await settle();
+    tap(r, '9');
+    act(() => fire(r, 'category-cat_food'));
+    await act(async () => fire(r, 'save'));
+    await act(async () => fire(r, 'save'));
+    await settle();
+    expect(f.record.mock.calls.map((c) => c[0].submissionId)).toEqual(['sub-1', 'sub-1']);
+    tap(r, '5');
+    act(() => fire(r, 'category-cat_food'));
+    await act(async () => fire(r, 'save-another'));
+    await settle();
+  });
+
+  it('a possible-duplicate result is still a saved entry: the toast reads Saved and offers Undo (the choices arrive in Story 3.3)', async () => {
+    const f = fakeApi();
+    f.record.mockResolvedValueOnce({ ok: true, value: { transactionId: 't2', accountId: 'a1', result: 'POSSIBLE_DUPLICATE' } });
+    const { r, close } = mount(f.api);
+    await settle();
+    tap(r, '9');
+    act(() => fire(r, 'category-cat_food'));
+    await act(async () => fire(r, 'save'));
+    await settle();
+    expect(close).toHaveBeenCalled();
+    expect(texts(r)).toEqual(expect.arrayContaining(['Saved', 'Undo']));
+  });
+
   it('a double tap on Save writes once', async () => {
     const f = fakeApi();
     let release!: () => void;
@@ -254,6 +284,7 @@ describe('saving', () => {
     act(() => fire(r, 'time-input', 'onChangeText', '09:15'));
     await act(async () => fire(r, 'save'));
     expect(record).toHaveBeenCalledWith({
+      submissionId: 'sub-1',
       kind: 'expense',
       amountMinor: 800,
       categoryId: 'cat_food',

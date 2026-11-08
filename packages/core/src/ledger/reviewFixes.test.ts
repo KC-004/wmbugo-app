@@ -15,7 +15,8 @@ import { AddAccount, openingBalanceShape } from './accountCommands';
 import { ACCOUNT_LIST_SQL, assetTotal, mapAccountRows } from './accounts';
 import { entryShape } from './entryCommands';
 import { homeAccounts, pageActivity, type ActivityRow } from './readModels';
-import { RecordTransfer } from './transferCommands';
+import { recordTransfer } from '../testing/capture';
+
 
 const NOW = Date.UTC(2026, 10, 8, 10, 0, 0);
 
@@ -56,8 +57,8 @@ describe('strict transfers count the fee', () => {
     const ids = (await db.query('SELECT id FROM account ORDER BY sort_order')).map((r) => r[0] as string);
     await writer.run(ChangeSetting, { key: SETTING_BLOCK_TRANSFERS_KEY, value: true }, 'user');
     const withFee = { amountMinor: 10000, fromAccountId: ids[0]!, toAccountId: ids[1]!, fee: { amountMinor: 500, categoryId: 'cat_other' } };
-    expect(await writer.run(RecordTransfer, withFee, 'user')).toEqual({ ok: false, code: 'INSUFFICIENT_FUNDS' });
-    expect((await writer.run(RecordTransfer, { ...withFee, fee: undefined }, 'user')).ok).toBe(true);
+    expect(await recordTransfer(writer, withFee)).toEqual({ ok: false, code: 'INSUFFICIENT_FUNDS' });
+    expect((await recordTransfer(writer, { ...withFee, fee: undefined })).ok).toBe(true);
   });
 });
 

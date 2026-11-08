@@ -7,10 +7,11 @@ import { findRegion } from '../profile/regions';
 import { LedgerWriter } from '../writer/ledgerWriter';
 import { AddAccount, openingBalanceShape } from './accountCommands';
 import { ACCOUNT_LIST_SQL, mapAccountRows, type AccountType } from './accounts';
-import { entryShape, RecordManualEntry } from './entryCommands';
+import { entryShape } from './entryCommands';
 import { ACTIVITY_SQL, mapActivityRows, pageActivity } from './readModels';
 import { ACCOUNT_START_SQL, ACCOUNT_TIMELINE_SQL, mapTimelineRows } from './timeline';
-import { OTHER_CATEGORY_ID, RecordTransfer } from './transferCommands';
+import { OTHER_CATEGORY_ID } from './transferCommands';
+import { recordEntry, recordTransfer } from '../testing/capture';
 
 const NOW = Date.UTC(2026, 10, 8, 10, 0, 0);
 const DAY = 86_400_000;
@@ -40,11 +41,11 @@ describe('account timeline (Story 2.3)', () => {
     const hdfc = await add('HDFC', 'bank', 3000000);
     const cash = await add('Cash', 'cash', 100000);
     clock.advance(DAY);
-    await writer.run(RecordManualEntry, { kind: 'expense', amountMinor: 45000, categoryId: 'cat_food', accountId: hdfc }, 'user');
+    await recordEntry(writer, { kind: 'expense', amountMinor: 45000, categoryId: 'cat_food', accountId: hdfc });
     clock.advance(1000);
-    await writer.run(RecordManualEntry, { kind: 'income', amountMinor: 500000, categoryId: 'cat_in_salary', accountId: hdfc }, 'user');
+    await recordEntry(writer, { kind: 'income', amountMinor: 500000, categoryId: 'cat_in_salary', accountId: hdfc });
     clock.advance(1000);
-    await writer.run(RecordTransfer, { amountMinor: 20000, fromAccountId: hdfc, toAccountId: cash, fee: { amountMinor: 500, categoryId: OTHER_CATEGORY_ID } }, 'user');
+    await recordTransfer(writer, { amountMinor: 20000, fromAccountId: hdfc, toAccountId: cash, fee: { amountMinor: 500, categoryId: OTHER_CATEGORY_ID } });
 
     const h = await timeline(hdfc);
     expect(h.map((r) => [r.kind, r.signedMinor, r.accountName])).toEqual([
@@ -60,8 +61,8 @@ describe('account timeline (Story 2.3)', () => {
   it('an entry dated before the tracking start is flagged, leaves the balance alone, and the opening is not in the list', async () => {
     const { writer, clock, add, timeline, balance } = await setup();
     const cash = await add('Cash', 'cash', 100000);
-    await writer.run(RecordManualEntry, { kind: 'expense', amountMinor: 30000, categoryId: 'cat_food', accountId: cash, occurredAtMs: clock.nowMs() - 3 * DAY }, 'user');
-    await writer.run(RecordManualEntry, { kind: 'expense', amountMinor: 10000, categoryId: 'cat_food', accountId: cash, occurredAtMs: clock.nowMs() + 1000 }, 'user');
+    await recordEntry(writer, { kind: 'expense', amountMinor: 30000, categoryId: 'cat_food', accountId: cash, occurredAtMs: clock.nowMs() - 3 * DAY });
+    await recordEntry(writer, { kind: 'expense', amountMinor: 10000, categoryId: 'cat_food', accountId: cash, occurredAtMs: clock.nowMs() + 1000 });
     const rows = await timeline(cash);
     expect(rows.map((r) => [r.amountMinor, r.beforeTracking])).toEqual([[10000, false], [30000, true]]);
     expect((await balance(cash)).postingsMinor).toBe(90000);
@@ -72,8 +73,8 @@ describe('account timeline (Story 2.3)', () => {
     const { db, writer, clock, add } = await setup();
     const cash = await add('Cash', 'cash', 100000);
     const bare = await add('Wallet', 'wallet', null);
-    await writer.run(RecordManualEntry, { kind: 'expense', amountMinor: 30000, categoryId: 'cat_food', accountId: cash, occurredAtMs: clock.nowMs() - 3 * DAY }, 'user');
-    await writer.run(RecordManualEntry, { kind: 'expense', amountMinor: 7000, categoryId: 'cat_food', accountId: bare, occurredAtMs: clock.nowMs() - 3 * DAY }, 'user');
+    await recordEntry(writer, { kind: 'expense', amountMinor: 30000, categoryId: 'cat_food', accountId: cash, occurredAtMs: clock.nowMs() - 3 * DAY });
+    await recordEntry(writer, { kind: 'expense', amountMinor: 7000, categoryId: 'cat_food', accountId: bare, occurredAtMs: clock.nowMs() - 3 * DAY });
     const rows = pageActivity(mapActivityRows(await db.query(ACTIVITY_SQL, [101])), 100).rows;
     expect(rows.map((r) => [r.amountMinor, r.beforeTracking])).toEqual(expect.arrayContaining([[30000, true], [7000, false]]));
   });
@@ -83,7 +84,7 @@ describe('account timeline (Story 2.3)', () => {
     const a = await add('A', 'bank', 0);
     for (let i = 0; i < 5; i++) {
       clock.advance(1000);
-      await writer.run(RecordManualEntry, { kind: 'expense', amountMinor: 100 + i, categoryId: 'cat_food', accountId: a }, 'user');
+      await recordEntry(writer, { kind: 'expense', amountMinor: 100 + i, categoryId: 'cat_food', accountId: a });
     }
     expect(await timeline(a, 3)).toHaveLength(4);
     expect(await timeline(a, 10)).toHaveLength(5);

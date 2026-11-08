@@ -9,10 +9,11 @@ import { LedgerWriter, type UseCase } from '../../../src/writer/ledgerWriter';
 import { AddAccount, openingBalanceShape } from '../../../src/ledger/accountCommands';
 import { ACCOUNT_LIST_SQL, mapAccountRows } from '../../../src/ledger/accounts';
 import { BEFORE_TRACKING_SQL, overviewTotals } from '../../../src/ledger/balances';
-import { entryShape, RecordManualEntry } from '../../../src/ledger/entryCommands';
+import { entryShape } from '../../../src/ledger/entryCommands';
 import { INCOME_SQL, SPENT_EXPENSES_SQL, SPENT_REFUNDS_SQL, spentMinor } from '../../../src/ledger/readModels';
-import { OTHER_CATEGORY_ID, RecordTransfer } from '../../../src/ledger/transferCommands';
+import { OTHER_CATEGORY_ID } from '../../../src/ledger/transferCommands';
 import type { Fixture } from './fixtures';
+import { recordEntry, recordTransfer } from '../../../src/testing/capture';
 
 /** 2026-11-08 10:00 UTC. Local time is 15:30 in Kolkata and 18:00 in Singapore: the same date everywhere. */
 export const NOW = Date.UTC(2026, 10, 8, 10, 0, 0);
@@ -76,14 +77,14 @@ export async function runFixture(f: Fixture) {
         must(await writer.run(adjustTo(id(s.account), s.toMinor), undefined, 'user'), 'adjust');
         break;
       case 'expense':
-        must(await writer.run(RecordManualEntry, { kind: 'expense', amountMinor: s.minor, categoryId: 'cat_food', accountId: id(s.account), ...(s.daysAgo ? { occurredAtMs: clock.nowMs() - s.daysAgo * DAY } : {}) }, 'user'), 'expense');
+        must(await recordEntry(writer, { kind: 'expense', amountMinor: s.minor, categoryId: 'cat_food', accountId: id(s.account), ...(s.daysAgo ? { occurredAtMs: clock.nowMs() - s.daysAgo * DAY } : {}) }), 'expense');
         break;
       case 'income':
-        must(await writer.run(RecordManualEntry, { kind: 'income', amountMinor: s.minor, categoryId: 'cat_in_salary', accountId: id(s.account) }, 'user'), 'income');
+        must(await recordEntry(writer, { kind: 'income', amountMinor: s.minor, categoryId: 'cat_in_salary', accountId: id(s.account) }), 'income');
         break;
       case 'transfer':
         must(
-          await writer.run(RecordTransfer, { amountMinor: s.minor, fromAccountId: id(s.from), toAccountId: id(s.to), ...(s.fee ? { fee: { amountMinor: s.fee, categoryId: OTHER_CATEGORY_ID } } : {}) }, 'user'),
+          await recordTransfer(writer, { amountMinor: s.minor, fromAccountId: id(s.from), toAccountId: id(s.to), ...(s.fee ? { fee: { amountMinor: s.fee, categoryId: OTHER_CATEGORY_ID } } : {}) }),
           'transfer',
         );
         break;

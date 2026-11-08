@@ -8,8 +8,9 @@ import { LedgerWriter } from '../writer/ledgerWriter';
 import { AddAccount, openingBalanceShape } from './accountCommands';
 import { ACCOUNT_LIST_SQL, mapAccountRows } from './accounts';
 import { CATEGORY_LIST_SQL, CATEGORY_USE_SQL, mapCategoryRows, rankCategories, rankIsStale, SEED_CATEGORIES } from './categories';
-import { entryShape, instantFromLocal, LAST_ACCOUNT_FOR_CATEGORY_SQL, LAST_ACCOUNT_SQL, pickDefaultAccount, RecordManualEntry, RemoveEntry } from './entryCommands';
+import { entryShape, instantFromLocal, LAST_ACCOUNT_FOR_CATEGORY_SQL, LAST_ACCOUNT_SQL, pickDefaultAccount, RemoveEntry } from './entryCommands';
 import { applyKey, keypadKeyFromHardware } from './keypad';
+import { recordEntry } from '../testing/capture';
 
 // 2026-11-08T10:00:00Z, which is 2026-11-08 18:00 in Singapore.
 const NOW = Date.UTC(2026, 10, 8, 10, 0, 0);
@@ -50,7 +51,7 @@ describe('seeded categories (migration 5)', () => {
 describe('RecordManualEntry', () => {
   it('with no account creates Cash (balance not set) and one confirmed expense, one negative posting, one split, audit and event', async () => {
     const { writer, q, accounts } = await setup();
-    const r = await writer.run(RecordManualEntry, { kind: 'expense', amountMinor: 1250, categoryId: 'cat_food', accountId: null }, 'user');
+    const r = await recordEntry(writer, { kind: 'expense', amountMinor: 1250, categoryId: 'cat_food', accountId: null });
     expect(r.ok).toBe(true);
     const acc = await accounts();
     expect(acc).toHaveLength(1);
@@ -70,7 +71,7 @@ describe('RecordManualEntry', () => {
     const { writer, q } = await setup();
     await writer.run(AddAccount, { name: 'DBS', type: 'bank', openingMinor: 100000 }, 'user');
     const id = (await q('SELECT id FROM account'))[0]![0] as string;
-    const r = await writer.run(RecordManualEntry, { kind: 'income', amountMinor: 500000, categoryId: 'cat_in_salary', accountId: id }, 'user');
+    const r = await recordEntry(writer, { kind: 'income', amountMinor: 500000, categoryId: 'cat_in_salary', accountId: id });
     expect(r.ok).toBe(true);
     expect(await q("SELECT direction, signed_amount_minor FROM posting WHERE posting_kind = 'normal'")).toEqual([['in', 500000]]);
   });
@@ -80,7 +81,7 @@ describe('RecordManualEntry', () => {
     await writer.run(AddAccount, { name: 'DBS', type: 'bank', openingMinor: null }, 'user');
     const id = (await q('SELECT id FROM account'))[0]![0] as string;
     const at = instantFromLocal('2026-11-07', '23:30', 'Asia/Singapore')!;
-    await writer.run(RecordManualEntry, { kind: 'expense', amountMinor: 500, categoryId: 'cat_transport', accountId: id, merchant: ' Grab ', note: 'late', paymentMethod: 'upi', occurredAtMs: at }, 'user');
+    await recordEntry(writer, { kind: 'expense', amountMinor: 500, categoryId: 'cat_transport', accountId: id, merchant: ' Grab ', note: 'late', paymentMethod: 'upi', occurredAtMs: at });
     expect((await q('SELECT original_description, note, payment_method, local_date, occurred_at_utc FROM "transaction"'))[0]).toEqual(['Grab', 'late', 'upi', '2026-11-07', at]);
   });
 
@@ -88,7 +89,7 @@ describe('RecordManualEntry', () => {
     const { writer, q } = await setup();
     await writer.run(AddAccount, { name: 'DBS', type: 'bank', openingMinor: null }, 'user');
     const id = (await q('SELECT id FROM account'))[0]![0] as string;
-    const run = (over: object) => writer.run(RecordManualEntry, { kind: 'expense', amountMinor: 100, categoryId: 'cat_food', accountId: id, ...over } as never, 'user');
+    const run = (over: object) => recordEntry(writer, { kind: 'expense', amountMinor: 100, categoryId: 'cat_food', accountId: id, ...over } as never);
     expect(await run({ amountMinor: 0 })).toEqual({ ok: false, code: 'AMOUNT_REQUIRED' });
     expect(await run({ amountMinor: 1.5 })).toEqual({ ok: false, code: 'AMOUNT_INVALID' });
     expect(await run({ amountMinor: Number.MAX_SAFE_INTEGER + 1 })).toEqual({ ok: false, code: 'AMOUNT_INVALID' });
@@ -107,7 +108,7 @@ describe('RecordManualEntry', () => {
     await writer.run(AddAccount, { name: 'Old', type: 'bank', openingMinor: null }, 'user');
     const id = (await q('SELECT id FROM account'))[0]![0] as string;
     await q("UPDATE account SET status = 'archived'");
-    const r = await writer.run(RecordManualEntry, { kind: 'expense', amountMinor: 100, categoryId: 'cat_food', accountId: id }, 'user');
+    const r = await recordEntry(writer, { kind: 'expense', amountMinor: 100, categoryId: 'cat_food', accountId: id });
     expect(r).toEqual({ ok: false, code: 'ACCOUNT_ARCHIVED' });
   });
 });
@@ -117,7 +118,7 @@ describe('RemoveEntry (Undo)', () => {
     const { writer, q, accounts } = await setup();
     await writer.run(AddAccount, { name: 'DBS', type: 'bank', openingMinor: 100000 }, 'user');
     const id = (await q('SELECT id FROM account'))[0]![0] as string;
-    const r = await writer.run(RecordManualEntry, { kind: 'expense', amountMinor: 2500, categoryId: 'cat_food', accountId: id }, 'user');
+    const r = await recordEntry(writer, { kind: 'expense', amountMinor: 2500, categoryId: 'cat_food', accountId: id });
     if (!r.ok) throw new Error('record');
     expect((await accounts())[0]!.postingsMinor).toBe(97500);
 
@@ -133,8 +134,8 @@ describe('RemoveEntry (Undo)', () => {
     const { writer, q } = await setup();
     await writer.run(AddAccount, { name: 'DBS', type: 'bank', openingMinor: null }, 'user');
     const id = (await q('SELECT id FROM account'))[0]![0] as string;
-    const a = await writer.run(RecordManualEntry, { kind: 'expense', amountMinor: 100, categoryId: 'cat_food', accountId: id }, 'user');
-    await writer.run(RecordManualEntry, { kind: 'expense', amountMinor: 100, categoryId: 'cat_transport', accountId: id }, 'user');
+    const a = await recordEntry(writer, { kind: 'expense', amountMinor: 100, categoryId: 'cat_food', accountId: id });
+    await recordEntry(writer, { kind: 'expense', amountMinor: 100, categoryId: 'cat_transport', accountId: id });
     if (!a.ok) throw new Error('x');
     await writer.run(RemoveEntry, { transactionId: a.value.transactionId }, 'user');
     expect(await q(CATEGORY_USE_SQL)).toEqual([['cat_transport', 1]]);
@@ -173,9 +174,9 @@ describe('default account', () => {
 
     expect(pickDefaultAccount(ids, await last('cat_food'), await any())).toBe(ids[0]);
 
-    await writer.run(RecordManualEntry, { kind: 'expense', amountMinor: 100, categoryId: 'cat_food', accountId: ids[0]! }, 'user');
+    await recordEntry(writer, { kind: 'expense', amountMinor: 100, categoryId: 'cat_food', accountId: ids[0]! });
     clock.advance(1000);
-    await writer.run(RecordManualEntry, { kind: 'expense', amountMinor: 100, categoryId: 'cat_transport', accountId: ids[1]! }, 'user');
+    await recordEntry(writer, { kind: 'expense', amountMinor: 100, categoryId: 'cat_transport', accountId: ids[1]! });
     expect(pickDefaultAccount(ids, await last('cat_food'), await any())).toBe(ids[0]);
     expect(pickDefaultAccount(ids, await last('cat_groceries'), await any())).toBe(ids[1]);
     expect(pickDefaultAccount(ids.slice(0, 1), null, ids[1]!)).toBe(ids[0]);
