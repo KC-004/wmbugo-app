@@ -9,6 +9,7 @@ import {
 import type { Clock, Logger, Result, StartupErrorCode, StartupOk } from '@wmbugo/core';
 import migrations from '../../drizzle/migrations';
 import { ensureDir, PRIVATE_DIR, rnFileStore } from './files/rnFileStore';
+import { setNavTimingSink } from '../features/shell/navTiming';
 import { invalidationHandlers, queryClient } from '../shared/queryClient';
 import { keychainKeyStore } from './storage/keychainKeyStore';
 import { opSqliteOpener } from './storage/opSqliteOpener';
@@ -80,6 +81,8 @@ export async function startApp(): Promise<Result<StartupOk, StartupErrorCode>> {
     onCommitted: () => void dispatcher.deliverPending().catch(() => undefined),
   });
   services = { writer, dispatcher };
+  // Tab navigation timings (NFR-03) go to the redacting log; durations and tab names only.
+  setNavTimingSink((e) => log.debug('nav.tab', { tab: e.tab, durationMs: e.durationMs }));
   // Events committed before the app was last killed are delivered now, without holding up the first screen.
   void dispatcher.deliverPending().catch(() => undefined);
   return started;

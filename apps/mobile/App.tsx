@@ -6,6 +6,7 @@
 import { StatusBar, StyleSheet, Text, View } from 'react-native';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { RootNavigator } from './src/features/shell/RootNavigator';
 import { startApp } from './src/adapters/startApp';
 import { StartupGate, type StartFn } from './src/features/startup/StartupGate';
 import { copy } from './src/shared/copy';
@@ -14,12 +15,13 @@ import { textStyle, ThemeProvider, useTheme } from './src/shared/theme';
 
 function Screen({ route }: { route: 'home' | 'onboarding' }) {
   const theme = useTheme();
+  if (route === 'home') return <RootNavigator />;
   return (
     <View style={[styles.container, { backgroundColor: theme.color('bg-canvas') }]}>
       {/* Edge-to-edge (target SDK 36): the bar is transparent, so only the icon style follows the theme. */}
       <StatusBar barStyle={theme.scheme === 'dark' ? 'light-content' : 'dark-content'} />
       <Text accessibilityRole="header" style={[textStyle('title'), { color: theme.color('text-primary') }]}>
-        {route === 'onboarding' ? copy.onboarding.placeholder : copy.app.name}
+        {copy.onboarding.placeholder}
       </Text>
     </View>
   );

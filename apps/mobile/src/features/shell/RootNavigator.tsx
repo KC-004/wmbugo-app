@@ -1,0 +1,139 @@
+import { useCallback, useEffect, useRef } from 'react';
+import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { DefaultTheme, NavigationContainer, useNavigation } from '@react-navigation/native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { copy } from '../../shared/copy';
+import { navLayout } from '../../shared/feedback/layout';
+import { SheetHost, useSheet } from '../../shared/feedback/SheetHost';
+import { ToastHost } from '../../shared/feedback/ToastHost';
+import { useTheme } from '../../shared/theme/ThemeProvider';
+import { textStyle } from '../../shared/theme/typography';
+import { Button } from '../../shared/ui/Button';
+import type { AddButtonRef } from './AddButton';
+import { ScreenHeader } from './ScreenHeader';
+import { TabBar, type TabRoute } from './TabBar';
+import { markTabFirstFrame } from './navTiming';
+
+type RootParams = { Tabs: undefined; Accounts: undefined; Settings: undefined };
+const RootStack = createNativeStackNavigator<RootParams>();
+const Tabs = createBottomTabNavigator();
+const TabStack = createNativeStackNavigator();
+
+/** Header only: Insights and Plan show nothing else until their epics land. */
+function TabScreen({ title, tab }: { title: string; tab?: TabRoute }) {
+  const theme = useTheme();
+  const nav = useNavigation<{ navigate: (s: keyof RootParams) => void }>();
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const column = navLayout(width).contentWidth;
+  useEffect(() => {
+    if (tab) requestAnimationFrame(() => markTabFirstFrame(tab));
+  }, [tab]);
+  return (
+    <View style={[styles.screen, { backgroundColor: theme.color('bg-canvas'), paddingTop: insets.top }]}>
+      <View style={[styles.column, { maxWidth: column }]}>
+        <ScreenHeader title={title} onAccounts={() => nav.navigate('Accounts')} onProfile={() => nav.navigate('Settings')} />
+      </View>
+    </View>
+  );
+}
+
+const tabStack = (title: string, tab: TabRoute) =>
+  function TabStackScreen() {
+    return (
+      <TabStack.Navigator screenOptions={{ headerShown: false }}>
+        <TabStack.Screen name={`${tab}Root`}>{() => <TabScreen title={title} tab={tab} />}</TabStack.Screen>
+      </TabStack.Navigator>
+    );
+  };
+
+const HomeStack = tabStack(copy.nav.home, 'Home');
+const ActivityStack = tabStack(copy.nav.activity, 'Activity');
+const InsightsStack = tabStack(copy.nav.insights, 'Insights');
+const PlanStack = tabStack(copy.nav.plan, 'Plan');
+
+function AddSheetContent() {
+  const theme = useTheme();
+  // The Add sheet content arrives in Story 1.13; the host and the opening path are what this story ships.
+  return <Text style={[textStyle('body'), { color: theme.color('on-glass-primary') }]}>{copy.sheet.addTitle}</Text>;
+}
+
+function TabsWithAdd() {
+  const sheet = useSheet();
+  const opener: AddButtonRef = useRef(null);
+  const { width } = useWindowDimensions();
+  const nav = navLayout(width);
+  const onAdd = useCallback(() => {
+    sheet.open(
+      {
+        id: 'add',
+        title: copy.sheet.addTitle,
+        body: () => <AddSheetContent />,
+        footer: (close) => <Button label={copy.common.cancel} variant="secondary-on-footer" onPress={close} />,
+      },
+      opener,
+    );
+  }, [sheet]);
+
+  return (
+    <View style={styles.fill}>
+      <Tabs.Navigator
+        initialRouteName="Home"
+        screenOptions={{ headerShown: false, tabBarPosition: nav.kind === 'rail' ? 'left' : 'bottom' }}
+        tabBar={(props) => <TabBar {...props} onAdd={onAdd} addRef={opener} />}>
+        <Tabs.Screen name="Home" component={HomeStack} />
+        <Tabs.Screen name="Activity" component={ActivityStack} />
+        <Tabs.Screen name="Insights" component={InsightsStack} />
+        <Tabs.Screen name="Plan" component={PlanStack} />
+      </Tabs.Navigator>
+    </View>
+  );
+}
+
+function Placeholder({ title }: { title: string }) {
+  const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={[styles.screen, { backgroundColor: theme.color('bg-canvas'), paddingTop: insets.top }]}>
+      <Text accessibilityRole="header" style={[textStyle('title'), styles.pad, { color: theme.color('text-primary') }]}>
+        {title}
+      </Text>
+    </View>
+  );
+}
+
+/**
+ * Root navigator: bottom tabs Home, Activity, Insights, Plan (the ＋ sits in the bar) with a
+ * stack per tab, no drawer, state kept across switches. Accounts and Settings open above the tabs.
+ */
+export function RootNavigator() {
+  const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  const navTheme = {
+    ...DefaultTheme,
+    dark: theme.scheme === 'dark',
+    colors: { ...DefaultTheme.colors, background: theme.color('bg-canvas'), card: theme.color('bg-surface'), text: theme.color('text-primary'), border: theme.color('border-hairline'), primary: theme.color('accent-primary') },
+  };
+  return (
+    <NavigationContainer theme={navTheme}>
+      <ToastHost bottomOffset={88 + insets.bottom}>
+        <SheetHost>
+          <RootStack.Navigator screenOptions={{ headerShown: false }}>
+            <RootStack.Screen name="Tabs" component={TabsWithAdd} />
+            <RootStack.Screen name="Accounts">{() => <Placeholder title={copy.nav.accounts} />}</RootStack.Screen>
+            <RootStack.Screen name="Settings">{() => <Placeholder title={copy.nav.settings} />}</RootStack.Screen>
+          </RootStack.Navigator>
+        </SheetHost>
+      </ToastHost>
+    </NavigationContainer>
+  );
+}
+
+const styles = StyleSheet.create({
+  fill: { flex: 1 },
+  screen: { flex: 1, alignItems: 'center' },
+  column: { width: '100%' },
+  pad: { padding: 16 },
+});

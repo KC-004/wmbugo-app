@@ -12,6 +12,24 @@ export const copy = {
     cancel: 'Cancel',
     save: 'Save',
     saved: 'Saved',
+    gotIt: 'Got it',
+    close: 'Close',
+  },
+  errors: {
+    nothingSaved: 'Nothing was saved',
+  },
+  nav: {
+    home: 'Home',
+    activity: 'Activity',
+    insights: 'Insights',
+    plan: 'Plan',
+    addEntry: 'Add entry',
+    accounts: 'Accounts',
+    settings: 'Settings',
+    profile: 'Profile and settings',
+  },
+  sheet: {
+    addTitle: 'Add entry',
   },
   money: {
     amountHidden: 'Amount hidden',

@@ -29,9 +29,10 @@ async function render(start: () => Promise<Result<StartupOk, StartupErrorCode>>)
 const texts = (r: ReactTestRenderer.ReactTestRenderer) =>
   r.root.findAll((n) => typeof n.type === 'string' && typeof n.props.children === 'string').map((n) => n.props.children as string);
 
-test('shows the home placeholder when a profile exists', async () => {
+test('shows the app shell (tabs and Home header) when a profile exists', async () => {
   const r = await render(() => Promise.resolve(ready('home')));
-  expect(texts(r)).toContain('wmbugo');
+  expect(texts(r)).toContain('Home');
+  expect(r.root.findAll((n) => typeof n.type === 'string' && (n.props.testID === 'tab-bar' || n.props.testID === 'nav-rail')).length).toBe(1); // Jest's default window is wide, so the rail
 });
 
 test('routes to onboarding when no profile exists', async () => {
@@ -51,7 +52,7 @@ test('shows nothing (and no spinner) until startup resolves, then the screen', a
   await ReactTestRenderer.act(async () => {
     resolve(ready('home'));
   });
-  expect(texts(r)).toContain('wmbugo');
+  expect(texts(r)).toContain('Home');
 });
 
 test.each<StartupErrorCode>(['STORAGE_UNSAFE', 'KEY_UNAVAILABLE', 'DATABASE_OPEN_FAILED', 'MIGRATION_FAILED'])(
