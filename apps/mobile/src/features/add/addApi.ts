@@ -2,13 +2,15 @@ import {
   ACCOUNT_LIST_SQL,
   CATEGORY_LIST_SQL,
   CATEGORY_USE_SQL,
+  effectiveLocale,
   getCurrency,
+  parseSettings,
+  SETTINGS_SQL,
   LAST_ACCOUNT_FOR_CATEGORY_SQL,
   LAST_ACCOUNT_SQL,
   mapAccountRows,
   mapCategoryRows,
   RecordTransfer,
-  blockTransfersAboveBalance,
   type TransferInput,
   pickDefaultAccount,
   rankCategories,
@@ -87,17 +89,18 @@ export const realAddApi: AddApi = {
     const quick = cached.ids.map((id) => byId.get(id)).filter((c): c is CategoryRow => c !== undefined);
 
     const accounts = mapAccountRows(await db.query(ACCOUNT_LIST_SQL)).filter((a) => a.status === 'active');
+    const settings = parseSettings(await db.query(SETTINGS_SQL));
     const lastAny = ((await db.query(LAST_ACCOUNT_SQL))[0]?.[0] as string | undefined) ?? null;
     return {
       currency: cur.value.code,
       exponent: Number(prof[1]),
-      locale: String(prof[2]),
+      locale: effectiveLocale(String(prof[2]), settings.numberFormat),
       timezoneId: String(prof[3]),
       categories,
       quick,
       accounts,
-      defaultAccountId: pickDefaultAccount(accounts.map((a) => a.id), null, lastAny),
-      blockTransfers: await blockTransfersAboveBalance({ query: (q, params) => db.query(q, params) }),
+      defaultAccountId: pickDefaultAccount(accounts.map((a) => a.id), null, lastAny, settings.defaultAccountId),
+      blockTransfers: settings.blockTransfers,
     };
   },
   async defaultAccountFor(categoryId) {
@@ -105,7 +108,8 @@ export const realAddApi: AddApi = {
     const ids = await activeAccountIds();
     const forCat = ((await db.query(LAST_ACCOUNT_FOR_CATEGORY_SQL, [categoryId]))[0]?.[0] as string | undefined) ?? null;
     const lastAny = ((await db.query(LAST_ACCOUNT_SQL))[0]?.[0] as string | undefined) ?? null;
-    return pickDefaultAccount(ids, forCat, lastAny);
+    const settings = parseSettings(await db.query(SETTINGS_SQL));
+    return pickDefaultAccount(ids, forCat, lastAny, settings.defaultAccountId);
   },
   record: (entry) => getServices().writer.run(RecordManualEntry, entry, 'user'),
   recordTransfer: (input) => getServices().writer.run(RecordTransfer, input, 'user'),

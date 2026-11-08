@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { greetingFor, shortDate } from '@wmbugo/core';
 import { amountLabel } from '../../shared/a11y/labels';
 import { copy } from '../../shared/copy';
@@ -13,6 +13,7 @@ import { textStyle } from '../../shared/theme/typography';
 import { Amount } from '../../shared/ui/Amount';
 import { Button } from '../../shared/ui/Button';
 import { ScreenHeader } from '../shell/ScreenHeader';
+import { realSettingsApi, type SettingsApi } from '../settings/settingsApi';
 import { HOME_QUERY_KEY, realHomeApi, type HomeApi, type HomeData } from './homeApi';
 
 const TIP_ID = 'tip.in-accounts';
@@ -26,8 +27,10 @@ export function HomeScreen({
   onAccounts,
   onProfile,
   onAddAccount,
+  settingsApi = realSettingsApi,
 }: {
   api?: HomeApi;
+  settingsApi?: SettingsApi;
   onAccounts: () => void;
   onProfile: () => void;
   onAddAccount: () => void;
@@ -37,6 +40,8 @@ export function HomeScreen({
   const { fontScale } = useWindowDimensions();
   const home = useQuery({ queryKey: HOME_QUERY_KEY, queryFn: () => api.load() });
   const d = home.data ?? null;
+  const tz = useQuery({ queryKey: ['home', 'timezone'], queryFn: () => settingsApi.timezoneCheck() });
+  const qc = useQueryClient();
   const stack = fontScale >= 1.3;
 
   const [tip, setTip] = useState<string | null>(null);
@@ -117,6 +122,15 @@ export function HomeScreen({
               )}
             </View>
 
+            {tz.data ? (
+              <View testID="timezone-prompt" accessibilityLiveRegion="polite" style={card}>
+                <Text style={[textStyle('body'), ink]}>{copy.settings.tzPrompt}</Text>
+                <View style={styles.row}>
+                  <Button label={copy.settings.tzYes} testID="tz-yes" onPress={() => void settingsApi.answerTimezone(true, tz.data!.deviceTz).then(() => qc.invalidateQueries())} />
+                  <Button label={copy.settings.tzNo} variant="text" testID="tz-no" onPress={() => void settingsApi.answerTimezone(false, tz.data!.deviceTz).then(() => qc.invalidateQueries())} />
+                </View>
+              </View>
+            ) : null}
             {tip ? <Tooltip text={copy.home.tip} onAcknowledge={() => void tips.current?.acknowledge()} /> : null}
           </View>
         ) : home.isError ? (

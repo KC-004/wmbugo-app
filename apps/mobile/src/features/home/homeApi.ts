@@ -4,7 +4,11 @@ import {
   homeAccounts,
   mapAccountRows,
   MarkPromptSeen,
+  effectiveLocale,
   paydayRuleFromRow,
+  parseSettings,
+  periodRule,
+  SETTINGS_SQL,
   periodFor,
   periodLabel,
   SEEN_PROMPT_SQL,
@@ -68,14 +72,15 @@ export const realHomeApi: HomeApi = {
     const now = systemClock.nowMs();
     const date = toLocalDate(now, tz);
     if (!date.ok) return null;
-    const rule = paydayRuleFromRow(p[3] === null ? null : String(p[3]), p[4] === null ? null : Number(p[4]));
+    const settings = parseSettings(await db.query(SETTINGS_SQL));
+    const rule = periodRule(paydayRuleFromRow(p[3] === null ? null : String(p[3]), p[4] === null ? null : Number(p[4])), settings.periodMode);
     const period = periodFor(date.value, rule);
     const expenses = Number((await db.query(SPENT_EXPENSES_SQL, [period.start, period.end]))[0]![0]);
     const refunds = Number((await db.query(SPENT_REFUNDS_SQL, [period.start, period.end]))[0]![0]);
     const accounts = mapAccountRows(await db.query(ACCOUNT_LIST_SQL));
     return {
       currency: cur.value.code,
-      locale: String(p[1]),
+      locale: effectiveLocale(String(p[1]), settings.numberFormat),
       timezoneId: tz,
       today: date.value,
       hour: hourIn(now, tz),

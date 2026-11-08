@@ -158,9 +158,15 @@ export const entryShape: Invariant = {
 };
 
 /** Account the Add sheet should pick: last used with the category, else most recently used, else the first. */
-export function pickDefaultAccount(activeIds: readonly string[], lastForCategory: string | null, lastUsed: string | null): string | null {
+export function pickDefaultAccount(
+  activeIds: readonly string[],
+  lastForCategory: string | null,
+  lastUsed: string | null,
+  settingDefault: string | null = null,
+): string | null {
   if (lastForCategory && activeIds.includes(lastForCategory)) return lastForCategory;
   if (lastUsed && activeIds.includes(lastUsed)) return lastUsed;
+  if (settingDefault && activeIds.includes(settingDefault)) return settingDefault;
   return activeIds[0] ?? null;
 }
 

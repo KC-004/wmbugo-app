@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react';
-import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import { DefaultTheme, NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -9,11 +9,11 @@ import { navLayout } from '../../shared/feedback/layout';
 import { SheetHost } from '../../shared/feedback/SheetHost';
 import { ToastHost } from '../../shared/feedback/ToastHost';
 import { useTheme } from '../../shared/theme/ThemeProvider';
-import { textStyle } from '../../shared/theme/typography';
 import type { AddButtonRef } from './AddButton';
 import { useOpenAdd } from '../add/useOpenAdd';
 import { ActivityScreen } from '../activity/ActivityScreen';
 import { HomeScreen } from '../home/HomeScreen';
+import { SettingsScreen } from '../settings/SettingsScreen';
 import { AccountsScreen } from '../accounts/AccountsScreen';
 import { ScreenHeader } from './ScreenHeader';
 import { TabBar, type TabRoute } from './TabBar';
@@ -106,14 +106,13 @@ function TabsWithAdd() {
   );
 }
 
-function Placeholder({ title }: { title: string }) {
+function SettingsRoute() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const nav = useNavigation<{ goBack: () => void }>();
   return (
-    <View style={[styles.screen, { backgroundColor: theme.color('bg-canvas'), paddingTop: insets.top }]}>
-      <Text accessibilityRole="header" style={[textStyle('title'), styles.pad, { color: theme.color('text-primary') }]}>
-        {title}
-      </Text>
+    <View style={[styles.fill, { backgroundColor: theme.color('bg-canvas'), paddingTop: insets.top }]}>
+      <SettingsScreen onBack={() => nav.goBack()} />
     </View>
   );
 }
@@ -147,7 +146,7 @@ export function RootNavigator() {
           <RootStack.Navigator screenOptions={{ headerShown: false }}>
             <RootStack.Screen name="Tabs" component={TabsWithAdd} />
             <RootStack.Screen name="Accounts" component={AccountsRoute} />
-            <RootStack.Screen name="Settings">{() => <Placeholder title={copy.nav.settings} />}</RootStack.Screen>
+            <RootStack.Screen name="Settings" component={SettingsRoute} />
           </RootStack.Navigator>
         </SheetHost>
       </ToastHost>

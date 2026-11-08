@@ -27,7 +27,13 @@ async function render(start: () => Promise<Result<StartupOk, StartupErrorCode>>,
   await ReactTestRenderer.act(async () => {
     renderer = ReactTestRenderer.create(<App start={start} setUp={setUp} />);
   });
+  await flush();
   return renderer;
+}
+
+/** Lets the settings read behind the app shell settle (it fails fast here: the test has no database). */
+async function flush() {
+  for (let i = 0; i < 3; i++) await ReactTestRenderer.act(async () => new Promise((res) => setTimeout(res, 0)));
 }
 
 const texts = (r: ReactTestRenderer.ReactTestRenderer) =>
@@ -61,6 +67,7 @@ test('routes to onboarding when no profile exists, and finishing it opens Home',
   expect(setUp).not.toHaveBeenCalled(); // nothing is written before the last step
   await press('onboarding-continue'); // Finish
   expect(setUp).toHaveBeenCalledTimes(1);
+  await flush();
   expect(texts(r)).toContain('Home');
 });
 

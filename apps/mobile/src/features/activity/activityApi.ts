@@ -1,4 +1,4 @@
-import { ACTIVITY_SQL, getCurrency, groupByDay, mapActivityRows, toLocalDate, type ActivityDay, type CurrencyCode } from '@wmbugo/core';
+import { ACTIVITY_SQL, effectiveLocale, getCurrency, groupByDay, mapActivityRows, parseSettings, SETTINGS_SQL, toLocalDate, type ActivityDay, type CurrencyCode } from '@wmbugo/core';
 import { getServices, systemClock } from '../../adapters/startApp';
 
 export interface ActivityData {
@@ -24,7 +24,7 @@ export const realActivityApi: ActivityApi = {
     if (!cur.ok || !today.ok) return null;
     return {
       currency: cur.value.code,
-      locale: String(p[1]),
+      locale: effectiveLocale(String(p[1]), parseSettings(await db.query(SETTINGS_SQL)).numberFormat),
       today: today.value,
       days: groupByDay(mapActivityRows(await db.query(ACTIVITY_SQL))),
     };

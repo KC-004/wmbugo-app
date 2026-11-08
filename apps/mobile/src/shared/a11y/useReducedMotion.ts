@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AccessibilityInfo } from 'react-native';
 import { useDeviceCapabilities } from '../theme/deviceCapabilities';
+import { useInAppReduceMotion } from './inAppMotion';
 
 /**
  * True when motion must be removed: the animator duration scale is 0, the system
@@ -10,7 +11,9 @@ export function reducedMotion(input: { animatorScale: number; systemReduceMotion
   return input.animatorScale === 0 || input.systemReduceMotion || input.inApp;
 }
 
-export function useReducedMotion(inApp = false): boolean {
+export function useReducedMotion(inAppOverride?: boolean): boolean {
+  const stored = useInAppReduceMotion();
+  const inApp = inAppOverride ?? stored;
   const { animatorScale } = useDeviceCapabilities();
   const [system, setSystem] = useState(false);
   useEffect(() => {

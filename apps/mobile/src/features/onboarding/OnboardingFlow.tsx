@@ -267,7 +267,7 @@ export function OnboardingFlow({ detected, timezoneId, onFinish }: OnboardingFlo
   );
 }
 
-function RegionPicker({ detected, onPick, onClose }: { detected: Region | null; onPick: (r: Region) => void; onClose: () => void }) {
+export function RegionPicker({ detected, onPick, onClose }: { detected: Region | null; onPick: (r: Region) => void; onClose: () => void }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');

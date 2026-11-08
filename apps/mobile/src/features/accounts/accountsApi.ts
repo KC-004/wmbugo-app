@@ -2,7 +2,10 @@ import {
   ACCOUNT_LIST_SQL,
   AddAccount,
   ArchiveAccount,
+  effectiveLocale,
   getCurrency,
+  parseSettings,
+  SETTINGS_SQL,
   mapAccountRows,
   MoveAccount,
   RenameAccount,
@@ -39,7 +42,7 @@ export const realAccountsApi: AccountsApi = {
     const r = rows[0];
     if (!r) return null;
     const cur = getCurrency(String(r[0]));
-    return cur.ok ? { currency: cur.value.code, exponent: Number(r[1]), locale: String(r[2]) } : null;
+    return cur.ok ? { currency: cur.value.code, exponent: Number(r[1]), locale: effectiveLocale(String(r[2]), parseSettings(await getServices().db.query(SETTINGS_SQL)).numberFormat) } : null;
   },
   async list() {
     return mapAccountRows(await getServices().db.query(ACCOUNT_LIST_SQL));
