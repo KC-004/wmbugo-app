@@ -16,8 +16,7 @@ export interface FormatAmountInput {
   readonly locale?: string;
 }
 
-// Where Intl prints the bare code or an ambiguous '$', show the short market symbol.
-const SYMBOL_OVERRIDE: Readonly<Record<string, string>> = { SGD: 'S$' };
+import { SYMBOL_OVERRIDE } from './currencySymbol';
 
 const SIGN_CHARS = /[-‐-―−﹣－]/g;
 
@@ -108,3 +107,4 @@ export function formatPlainNumber(amountMinor: number, currency: string, locale?
   for (const part of f.formatToParts(whole)) out += part.type === 'fraction' ? fraction : part.value;
   return ok(out.replace(SIGN_CHARS, ''));
 }
+

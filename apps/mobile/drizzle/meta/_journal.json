@@ -15,6 +15,13 @@
       "when": 1794119058011,
       "tag": "0001_superb_harry_osborn",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1794129680099,
+      "tag": "0002_faulty_shatterstar",
+      "breakpoints": true
     }
   ]
 }

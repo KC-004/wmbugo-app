@@ -21,6 +21,16 @@ import com.facebook.react.uimanager.ViewManager
 class DeviceCapabilitiesModule(private val ctx: ReactApplicationContext) : ReactContextBaseJavaModule(ctx) {
   override fun getName() = "WmbugoDeviceCapabilities"
 
+  /** The device region (ISO 3166 country of the primary locale), or an empty string when unknown. */
+  @ReactMethod
+  fun getRegion(promise: Promise) {
+    try {
+      promise.resolve(ctx.resources.configuration.locales[0]?.country ?: "")
+    } catch (e: Exception) {
+      promise.reject("E_REGION", e)
+    }
+  }
+
   @ReactMethod
   fun getCapabilities(promise: Promise) {
     try {

@@ -41,3 +41,14 @@ export function useDeviceCapabilities(reduceTransparency = false): DeviceCapabil
   }, [reduceTransparency]);
   return caps;
 }
+
+/** The device region (country of the primary locale), or null when unknown. Independent of the UI language. */
+export async function readDeviceRegion(): Promise<string | null> {
+  const native = NativeModules.WmbugoDeviceCapabilities as { getRegion?: () => Promise<string> } | undefined;
+  try {
+    const r = await native?.getRegion?.();
+    return r ? r : null;
+  } catch {
+    return null;
+  }
+}

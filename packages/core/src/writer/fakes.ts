@@ -19,16 +19,28 @@ export interface OutboxRow {
   delivered_at: number | null;
 }
 
+export interface Recorded {
+  sql: string;
+  params: readonly SqlParam[];
+}
+
 interface State {
   audit: AuditRow[];
   outbox: OutboxRow[];
   data: string[];
+  /** Rows of the profile tables, recorded as the statements that wrote them. */
+  profile: Recorded[];
+  settings: Recorded[];
+  promptState: Recorded[];
 }
 
 const clone = (s: State): State => ({
   audit: s.audit.map((r) => ({ ...r })),
   outbox: s.outbox.map((r) => ({ ...r })),
   data: [...s.data],
+  profile: [...s.profile],
+  settings: [...s.settings],
+  promptState: [...s.promptState],
 });
 
 /**
@@ -37,7 +49,7 @@ const clone = (s: State): State => ({
  * a detector records whether two transactions ever overlapped.
  */
 export class MemoryDatabase implements Pick<SqlDatabase, 'query' | 'transaction'> {
-  state: State = { audit: [], outbox: [], data: [] };
+  state: State = { audit: [], outbox: [], data: [], profile: [], settings: [], promptState: [] };
   active = 0;
   maxActive = 0;
   transactions = 0;
@@ -53,6 +65,15 @@ export class MemoryDatabase implements Pick<SqlDatabase, 'query' | 'transaction'
   get data(): string[] {
     return this.state.data;
   }
+  get profile(): Recorded[] {
+    return this.state.profile;
+  }
+  get settings(): Recorded[] {
+    return this.state.settings;
+  }
+  get promptState(): Recorded[] {
+    return this.state.promptState;
+  }
 
   query(sql: string): Promise<SqlParam[][]> {
     return Promise.resolve(this.read(this.state, sql));
@@ -65,6 +86,7 @@ export class MemoryDatabase implements Pick<SqlDatabase, 'query' | 'transaction'
         .sort((a, b) => a.created_at - b.created_at || (a.id < b.id ? -1 : 1))
         .map((r) => [r.id, r.event, r.actor, r.payload_json, r.created_at]);
     }
+    if (sql === 'SELECT 1 FROM profile LIMIT 1') return state.profile.length > 0 ? [[1]] : [];
     if (sql === 'SELECT v FROM ledger_test') return state.data.map((v) => [v]);
     throw new Error(`MemoryDatabase: unsupported query ${sql}`);
   }
@@ -96,6 +118,12 @@ export class MemoryDatabase implements Pick<SqlDatabase, 'query' | 'transaction'
       }
       const row = state.outbox.find((r) => r.id === p[1]);
       if (row) row.delivered_at = Number(p[0]);
+    } else if (sql.startsWith('INSERT INTO profile')) {
+      state.profile.push({ sql, params: p });
+    } else if (sql.startsWith('INSERT INTO settings')) {
+      state.settings.push({ sql, params: p });
+    } else if (sql.startsWith('INSERT INTO prompt_state')) {
+      state.promptState.push({ sql, params: p });
     } else if (sql.startsWith('INSERT INTO ledger_test')) {
       state.data.push(String(p[0]));
     } else {

@@ -4,7 +4,10 @@ import {
   createRedactingLogger,
   LedgerWriter,
   OutboxDispatcher,
+  SetUpProfile,
   startStorage,
+  type Invariant,
+  type SetUpProfileInput,
 } from '@wmbugo/core';
 import type { Clock, Logger, Result, StartupErrorCode, StartupOk } from '@wmbugo/core';
 import migrations from '../../drizzle/migrations';
@@ -14,6 +17,16 @@ import { invalidationHandlers, queryClient } from '../shared/queryClient';
 import { keychainKeyStore } from './storage/keychainKeyStore';
 import { opSqliteOpener } from './storage/opSqliteOpener';
 import { secureRandom } from './storage/secureRandom';
+
+/** There is one profile per install. */
+const singleProfile: Invariant = {
+  name: 'singleProfile',
+  async check(ctx) {
+    if (!ctx.touched.some((t) => t.entityKind === 'profile')) return null;
+    const rows = await ctx.query('SELECT count(*) AS n FROM profile');
+    return Number(rows[0]?.[0] ?? 0) > 1 ? 'more than one profile' : null;
+  },
+};
 
 const LOG_DIR = `${PRIVATE_DIR}/logs`;
 const LOG_MAX_BYTES = 256 * 1024;
@@ -77,6 +90,7 @@ export async function startApp(): Promise<Result<StartupOk, StartupErrorCode>> {
     clock: systemClock,
     newId: createIdGenerator(systemClock, secureRandom),
     logger: log,
+    invariants: [singleProfile],
     // Deliver after every commit; a failure stays pending and is retried on the next commit or launch.
     onCommitted: () => void dispatcher.deliverPending().catch(() => undefined),
   });
@@ -86,4 +100,10 @@ export async function startApp(): Promise<Result<StartupOk, StartupErrorCode>> {
   // Events committed before the app was last killed are delivered now, without holding up the first screen.
   void dispatcher.deliverPending().catch(() => undefined);
   return started;
+}
+
+/** Finishes onboarding: writes the profile through the writer. True when saved. */
+export async function setUpProfile(input: SetUpProfileInput): Promise<boolean> {
+  const result = await getServices().writer.run(SetUpProfile, input, 'user');
+  return result.ok;
 }
