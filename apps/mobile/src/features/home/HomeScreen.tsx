@@ -13,7 +13,7 @@ import { textStyle } from '../../shared/theme/typography';
 import { Amount } from '../../shared/ui/Amount';
 import { Button } from '../../shared/ui/Button';
 import { ScreenHeader } from '../shell/ScreenHeader';
-import { realSettingsApi, type SettingsApi } from '../settings/settingsApi';
+import { realSettingsApi, TIMEZONE_QUERY_KEY, type SettingsApi } from '../settings/settingsApi';
 import { HOME_QUERY_KEY, realHomeApi, type HomeApi, type HomeData } from './homeApi';
 
 const TIP_ID = 'tip.in-accounts';
@@ -40,7 +40,7 @@ export function HomeScreen({
   const { fontScale } = useWindowDimensions();
   const home = useQuery({ queryKey: HOME_QUERY_KEY, queryFn: () => api.load() });
   const d = home.data ?? null;
-  const tz = useQuery({ queryKey: ['home', 'timezone'], queryFn: () => settingsApi.timezoneCheck() });
+  const tz = useQuery({ queryKey: TIMEZONE_QUERY_KEY, queryFn: () => settingsApi.timezoneCheck() });
   const qc = useQueryClient();
   const stack = fontScale >= 1.3;
 
@@ -126,8 +126,8 @@ export function HomeScreen({
               <View testID="timezone-prompt" accessibilityLiveRegion="polite" style={card}>
                 <Text style={[textStyle('body'), ink]}>{copy.settings.tzPrompt}</Text>
                 <View style={styles.row}>
-                  <Button label={copy.settings.tzYes} testID="tz-yes" onPress={() => void settingsApi.answerTimezone(true, tz.data!.deviceTz).then(() => qc.invalidateQueries())} />
-                  <Button label={copy.settings.tzNo} variant="text" testID="tz-no" onPress={() => void settingsApi.answerTimezone(false, tz.data!.deviceTz).then(() => qc.invalidateQueries())} />
+                  <Button label={copy.settings.tzYes} testID="tz-yes" onPress={() => void settingsApi.answerTimezone(true, tz.data!.deviceTz).then(() => qc.invalidateQueries({ queryKey: TIMEZONE_QUERY_KEY }))} />
+                  <Button label={copy.settings.tzNo} variant="text" testID="tz-no" onPress={() => void settingsApi.answerTimezone(false, tz.data!.deviceTz).then(() => qc.invalidateQueries({ queryKey: TIMEZONE_QUERY_KEY }))} />
                 </View>
               </View>
             ) : null}

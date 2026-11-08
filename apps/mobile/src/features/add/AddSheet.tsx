@@ -15,6 +15,7 @@ import { announce } from '../../shared/a11y/announce';
 import { systemClock } from '../../adapters/startApp';
 import { typedAmountLabel } from '../../shared/a11y/labels';
 import { copy } from '../../shared/copy';
+import { invalidateForEvent } from '../../shared/queryClient';
 import { useToast } from '../../shared/feedback/ToastHost';
 import { useUiStore } from '../../shared/state/uiStore';
 import { useTheme } from '../../shared/theme/ThemeProvider';
@@ -128,7 +129,7 @@ export function AddSheet({
     }
   }, [kind, data, accountId, toAccountId]);
 
-  const refresh = useCallback(() => qc.invalidateQueries(), [qc]);
+  const refresh = useCallback(() => invalidateForEvent(qc, 'TransactionsChanged'), [qc]);
 
   const exponent = data?.exponent ?? 2;
   const locale = data?.locale ?? 'en';

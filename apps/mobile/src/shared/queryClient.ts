@@ -15,11 +15,14 @@ export function createQueryClient(): QueryClient {
   });
 }
 
+/** Invalidates exactly the areas an event maps to: what a screen calls right after its own write. */
+export async function invalidateForEvent(queryClient: QueryClient, name: EventName): Promise<void> {
+  await Promise.all(areasFor(name).map((area) => queryClient.invalidateQueries({ queryKey: [area] })));
+}
+
 /** An event invalidates only the query areas the catalogue maps it to. */
 export function invalidationHandler(queryClient: QueryClient, name: EventName): EventHandler {
-  return async () => {
-    await Promise.all(areasFor(name).map((area) => queryClient.invalidateQueries({ queryKey: [area] })));
-  };
+  return () => invalidateForEvent(queryClient, name);
 }
 
 export function invalidationHandlers(queryClient: QueryClient): HandlerMap {

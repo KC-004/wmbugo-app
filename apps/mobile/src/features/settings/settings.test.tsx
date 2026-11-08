@@ -271,6 +271,30 @@ describe('time zone prompt on Home', () => {
     expect(f.answerTimezone).toHaveBeenCalledWith(false, 'Asia/Dubai');
   });
 
+  it('is not re-run by a save: invalidating the home area leaves the time zone check alone', async () => {
+    const f = fakeApi(data());
+    const qc = createQueryClient();
+    clients.push(qc);
+    let r!: ReactTestRenderer;
+    act(() => {
+      r = create(
+        <QueryClientProvider client={qc}>
+          <ThemeProvider>
+            <SheetHost>
+              <HomeScreen api={homeApi} settingsApi={f.api} onAccounts={jest.fn()} onProfile={jest.fn()} onAddAccount={jest.fn()} />
+            </SheetHost>
+          </ThemeProvider>
+        </QueryClientProvider>,
+      );
+    });
+    live.push(r);
+    await settle();
+    expect(f.timezoneCheck).toHaveBeenCalledTimes(1);
+    await act(async () => qc.invalidateQueries({ queryKey: ['home'] }));
+    await settle();
+    expect(f.timezoneCheck).toHaveBeenCalledTimes(1);
+  });
+
   it('shows nothing when no prompt is due', async () => {
     const f = fakeApi(data());
     const r = mount(

@@ -17,6 +17,7 @@ import {
 } from '@wmbugo/core';
 import { controlA11y } from '../../shared/a11y/labels';
 import { copy } from '../../shared/copy';
+import { invalidateForEvent } from '../../shared/queryClient';
 import { Icon } from '../../shared/theme/Icon';
 import { useTheme } from '../../shared/theme/ThemeProvider';
 import { layout, radii } from '../../shared/theme/tokens';
@@ -80,7 +81,7 @@ export function SettingsScreen({ api = realSettingsApi, onBack }: { api?: Settin
     return () => sub.remove();
   }, [page]);
 
-  const refresh = () => qc.invalidateQueries();
+  const refresh = () => invalidateForEvent(qc, 'ProfileChanged');
   const setSetting = async (key: string, value: unknown) => {
     setNote(null);
     const r = await api.changeSetting(key, value);

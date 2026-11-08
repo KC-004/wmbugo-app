@@ -52,6 +52,8 @@ export interface SettingsApi {
 }
 
 export const SETTINGS_QUERY_KEY = ['ledger', 'settings'] as const;
+/** Not in an event area on purpose: it writes, so it runs once per app open and after the user answers, not after every save. */
+export const TIMEZONE_QUERY_KEY = ['app', 'timezone-check'] as const;
 
 export const realSettingsApi: SettingsApi = {
   async load() {

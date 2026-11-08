@@ -1,11 +1,12 @@
 import { toLocalDate } from '../shared/clock';
 import { err, ok } from '../shared/result';
 import type { UseCase, WriterContext } from '../writer/ledgerWriter';
+import { SETTING_BLOCK_TRANSFERS_KEY, parseSettings, SETTINGS_SQL } from '../profile/settings';
 import { profileTimezone } from './accountCommands';
 import { MAX_NOTE_LENGTH } from './entryCommands';
 
 /** Settings key for "Block transfers above the balance" (Settings > You, Story 1.16). Off by default. */
-export const SETTING_BLOCK_TRANSFERS = 'finance.block_transfers_above_balance';
+export const SETTING_BLOCK_TRANSFERS = SETTING_BLOCK_TRANSFERS_KEY;
 
 export const OTHER_CATEGORY_ID = 'cat_other';
 
@@ -32,8 +33,7 @@ export type TransferError =
   | 'INSTANT_INVALID';
 
 export async function blockTransfersAboveBalance(ctx: Pick<WriterContext, 'query'>): Promise<boolean> {
-  const rows = await ctx.query('SELECT value_json FROM settings WHERE key = ?', [SETTING_BLOCK_TRANSFERS]);
-  return rows.length > 0 && String(rows[0]![0]) === 'true';
+  return parseSettings(await ctx.query(SETTINGS_SQL)).blockTransfers;
 }
 
 /**

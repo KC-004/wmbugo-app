@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 11-08-2026 09:43
-last_updated: 11-08-2026 10:35
+last_updated: 11-08-2026 16:53
 project: wmbugo-app
 project_key: NOKEY
 tracking_system: file-system
@@ -52,7 +52,7 @@ development_status:
   1-14-home-shell-and-activity-list-of-saved-entries: review
   1-15-record-income-and-transfers-between-accounts: review
   1-16-settings-hub-with-appearance-and-finance-settings: review
-  epic-1-retrospective: optional
+  epic-1-retrospective: done
 
   epic-2: backlog
   2-1-account-balance-read-model-and-finance-fixtures: backlog
@@ -228,22 +228,86 @@ development_status:
 # 'epic' = the epic that must not start until the item is done.
 action_items:
   - epic: 3
-    action: "AD-3: record the decision for cross-module reads (Insights sources filter + merchant display names, search index ownership, Activity list query owner) - bmad-architecture Update (stories 3.6, 7.1, 7.6)"
+    action: "AD-3: record the decision for cross-module reads (Insights sources filter
+      + merchant display names, search index ownership, Activity list query owner)
+      - bmad-architecture Update (stories 3.6, 7.1, 7.6)"
     owner: "KCPK"
     status: open
   - epic: 4
-    action: "Architecture sync pass: add story-introduced events (AccountsChanged, CategoriesChanged, BudgetsChanged, GoalsChanged, RecurringChanged, ReceiptItemCategorised), ports (CategorySuggester, Crypto, CsvTokenizer) and tables to the spine; record manual saves bypassing SubmitCapture until 3.2 as an accepted sequencing exception; refresh stale date / PRD v1.3.6 source / SMS-UPI open question - bmad-architecture Update"
+    action: "Architecture sync pass: add story-introduced events (AccountsChanged,
+      CategoriesChanged, BudgetsChanged, GoalsChanged, RecurringChanged, ReceiptItemCategorised),
+      ports (CategorySuggester, Crypto, CsvTokenizer) and tables to the spine; record
+      manual saves bypassing SubmitCapture until 3.2 as an accepted sequencing exception;
+      refresh stale date / PRD v1.3.6 source / SMS-UPI open question - bmad-architecture
+      Update"
     owner: "KCPK"
     status: open
   - epic: 8
-    action: "AD-10 vs SEC-001: sms_cursor after restore (rebuild vs keep) and the 30-day resume rule from story 13.9 - decide and record in architecture + PRD (stories 8.8, 13.8, 13.9)"
+    action: "AD-10 vs SEC-001: sms_cursor after restore (rebuild vs keep) and the
+      30-day resume rule from story 13.9 - decide and record in architecture + PRD
+      (stories 8.8, 13.8, 13.9)"
     owner: "KCPK"
     status: open
   - epic: 8
-    action: "AD-10: low-space restore without a safety copy - fix story 8.9 copy ('nothing on this phone changes' is false there) and record that this phone's lock settings survive a restore (stories 8.8, 8.9)"
+    action: "AD-10: low-space restore without a safety copy - fix story 8.9 copy ('nothing
+      on this phone changes' is false there) and record that this phone's lock settings
+      survive a restore (stories 8.8, 8.9)"
     owner: "KCPK"
     status: open
   - epic: 11
-    action: "Add 'widget' to the BudgetsChanged invalidation so budget changes refresh the home-screen widget (stories 4.6, 11.15)"
+    action: "Add 'widget' to the BudgetsChanged invalidation so budget changes refresh
+      the home-screen widget (stories 4.6, 11.15)"
     owner: "KCPK"
     status: open
+  - id: "epic-1-retro-item-6-measure-save-p95-and-the-hardware-keyboa"
+    epic: 1
+    action: "Measure save p95 and the hardware-keyboard path on the Redmi with the
+      S8 method (A3)"
+    owner: "dev with product owner"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-11-08.md"
+  - id: "epic-1-retro-item-7-decide-the-currency-lock-rule-for-an-onb"
+    epic: 1
+    action: "Decide the currency-lock rule for an onboarding opening balance (A4)"
+    owner: "product owner"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-11-08.md"
+  - id: "epic-1-retro-item-8-reconcile-or-accept-the-1-13-1-14-and-1"
+    epic: 1
+    action: "Reconcile or accept the 1.13, 1.14 and 1.16 spec deviations (A5)"
+    owner: "product owner"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-11-08.md"
+  - id: "epic-1-retro-item-9-sign-gate-03-and-gate-07-and-decide-the"
+    epic: 1
+    action: "Sign GATE-03 and GATE-07 and decide the account.opening_minor duplicate
+      column (A8)"
+    owner: "product owner and finance reviewer"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-11-08.md"
+  - id: "epic-1-retro-item-10-run-the-ci-emulator-job-on-github-and-ad"
+    epic: 1
+    action: "Run the CI emulator job on GitHub and add an emulator or instrumentation
+      UI test (A9)"
+    owner: "dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-11-08.md"
+  - id: "epic-1-retro-item-11-independent-review-of-stories-1-1-to-1-1"
+    epic: 1
+    action: "Independent review of stories 1.1 to 1.16, then mark them done (A10)"
+    owner: "product owner"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-11-08.md"
+  - id: "epic-1-retro-item-12-add-an-activity-cut-off-note-then-paging"
+    epic: 1
+    action: "Add an Activity cut-off note, then paging with the search epic (A6)"
+    owner: "dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-11-08.md"
+  - id: "epic-1-retro-item-13-split-addsheet-and-add-a-shared-readprof"
+    epic: 1
+    action: "Split AddSheet and add a shared readProfile and test kit before Epic
+      2 (A7)"
+    owner: "dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-11-08.md"
