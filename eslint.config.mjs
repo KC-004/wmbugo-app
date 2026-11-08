@@ -65,6 +65,40 @@ export default tseslint.config(
     },
   },
   {
+    // Design-system guards for shipped app code (Story 1.8). Tests may assert colours and strings.
+    files: ['apps/mobile/src/**/*.{ts,tsx}', 'apps/mobile/App.tsx'],
+    ignores: ['**/*.test.{ts,tsx}', 'apps/mobile/src/shared/theme/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            { name: 'react-native', importNames: ['ActivityIndicator'], message: 'Spinners are banned. Use a skeleton or inline state.' },
+            ...['react-native-vector-icons', '@expo/vector-icons', 'lucide-react-native', '@tabler/icons-react-native', 'react-native-elements', 'react-native-paper', 'react-native-ui-lib', 'native-base'].map((name) => ({
+              name,
+              message: 'Phosphor (via shared/theme Icon) is the only icon set, and there is no UI kit.',
+            })),
+          ],
+          patterns: [{ group: ['react-native-vector-icons/*', '@expo/vector-icons/*'], message: 'Phosphor is the only icon set.' }],
+        },
+      ],
+      'no-restricted-syntax': [
+        'error',
+        { selector: 'Literal[value=/^#[0-9a-fA-F]{3,8}$/]', message: 'Colour literal: use a theme token (shared/theme). Hex values live only in the token module.' },
+        { selector: 'Literal[value=/\\p{Extended_Pictographic}/u]', message: 'No emoji in UI strings; use a Phosphor icon.' },
+        { selector: 'TemplateElement[value.raw=/\\p{Extended_Pictographic}/u]', message: 'No emoji in UI strings; use a Phosphor icon.' },
+        { selector: 'JSXText[value=/\\p{Extended_Pictographic}/u]', message: 'No emoji in UI strings; use a Phosphor icon.' },
+        { selector: 'Literal[value=/\\binbox\\b/i]', message: 'The word "Inbox" is banned in UI copy.' },
+        { selector: 'JSXText[value=/\\binbox\\b/i]', message: 'The word "Inbox" is banned in UI copy.' },
+        { selector: 'Literal[value=/coming soon/i]', message: '"Coming soon" is banned: unavailable features are not shown at all.' },
+        { selector: 'JSXText[value=/coming soon/i]', message: '"Coming soon" is banned: unavailable features are not shown at all.' },
+        { selector: 'JSXIdentifier[name=/^ActivityIndicator$/]', message: 'Spinners are banned. Use a skeleton or inline state.' },
+        { selector: 'JSXAttribute[name.name=/^(badge|badgeCount|badgeNumber)$/]', message: 'Numeric badges are banned.' },
+        { selector: 'Property[key.name=/^(shadow(Color|Offset|Opacity|Radius)|elevation|textShadow(Color|Offset|Radius))$/]', message: 'Shadows are banned except the ＋ button token (shared/theme elevation).' },
+      ],
+    },
+  },
+  {
     files: ['packages/core/**/*.{ts,tsx,js}'],
     rules: {
       'no-restricted-imports': [

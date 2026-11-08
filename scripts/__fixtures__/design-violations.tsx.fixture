@@ -1,0 +1,19 @@
+import { ActivityIndicator, Text, View } from 'react-native';
+
+export const hex = '#0F766E';
+export const emoji = 'Saved \u{1F389}';
+export const emojiLiteral = 'Saved 🎉';
+export const inbox = 'Open your Inbox';
+export const soon = 'Reports coming soon';
+export const style = { shadowColor: 'black', elevation: 4 };
+
+export function Screen() {
+  return (
+    <View>
+      <ActivityIndicator />
+      <Text badgeCount={3}>Inbox</Text>
+      <Text>Coming soon</Text>
+      <Text>Done 🎉</Text>
+    </View>
+  );
+}

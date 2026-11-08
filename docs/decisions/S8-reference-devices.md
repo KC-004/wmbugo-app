@@ -48,7 +48,7 @@ Results are reported as median, p95, worst, run count and discarded count, in a 
 `glass-fallback` is used when **any** of these holds (UX-DR4's other conditions — battery saver, animator scale 0, reduce transparency, photo/receipt imagery — still apply):
 
 1. API level < 31.
-2. Total RAM < 4 GB (`ActivityManager.MemoryInfo.totalMem`), the static capability rule.
+2. Reported total RAM (`ActivityManager.MemoryInfo.totalMem`) below **3,500 MB**, the static capability rule. (Story 1.8: a phone sold as 4 GB reports about 3.7-3.9 GB, so the check is on reported memory; marketed-4 GB phones keep glass, 3 GB phones fall back.)
 3. Measured rule: the device's glass scroll set (NFR-19 row) fails its pass rule. Glass does not exist yet, so this rule cannot be measured today; Story 1.8 builds the first glass surface and the measurement, and revisits this rule then.
 
 | Device | API rule | RAM rule | Result |
