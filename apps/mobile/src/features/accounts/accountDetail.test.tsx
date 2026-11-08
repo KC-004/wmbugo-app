@@ -1,7 +1,7 @@
 import { AccessibilityInfo, Text } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { groupByDay, type AccountRow, type ActivityRow } from '@wmbugo/core';
+import { groupByDay, type AccountRow, type ActivityRow, type CardDetails, type CardDetailsRead } from '@wmbugo/core';
 import { ToastHost } from '../../shared/feedback/ToastHost';
 import { createQueryClient } from '../../shared/queryClient';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
@@ -41,7 +41,7 @@ const row = (id: string, kind: ActivityRow['kind'], amountMinor: number, localDa
   id, kind, amountMinor, localDate, merchant: null, categoryName: 'Food & Drinks', categoryIcon: 'ForkKnife', categoryColor: 'cat-rose', accountName: null, ...over,
 });
 const data = (rows: ActivityRow[], signed: Record<string, number> = {}, over: Partial<AccountDetailData> = {}): AccountDetailData => ({
-  currency: 'INR', exponent: 2, locale: 'en-IN', today: '2026-11-08', account: account(), days: groupByDay(rows), signed, hasMore: false, starting: { minor: 3000000, localDate: '2026-11-01' }, ...over,
+  currency: 'INR', exponent: 2, locale: 'en-IN', today: '2026-11-08', account: account(), days: groupByDay(rows), signed, hasMore: false, card: null, starting: { minor: 3000000, localDate: '2026-11-01' }, ...over,
 });
 
 async function mountDetail(d: AccountDetailData | 'missing', props: Partial<Parameters<typeof AccountDetailScreen>[0]> = {}) {
@@ -50,7 +50,8 @@ async function mountDetail(d: AccountDetailData | 'missing', props: Partial<Para
   const changeTrackingDate = jest.fn<Promise<{ ok: boolean; code?: string }>, [string, string]>(async () => ({ ok: true }));
   const adjustBalance = jest.fn<Promise<{ ok: boolean; code?: string; transactionId?: string }>, [{ accountId: string; actualMinor: number; reason: string; note?: string }]>(async () => ({ ok: true, transactionId: 'adj1' }));
   const remove = jest.fn<Promise<{ ok: boolean }>, [string]>(async () => ({ ok: true }));
-  const api: AccountDetailApi = { load, setStartingBalance, changeTrackingDate, adjustBalance, remove: remove as AccountDetailApi['remove'] };
+  const updateCardDetails = jest.fn<Promise<{ ok: boolean; code?: string }>, [string, CardDetails]>(async () => ({ ok: true }));
+  const api: AccountDetailApi = { load, setStartingBalance, changeTrackingDate, adjustBalance, updateCardDetails, remove: remove as AccountDetailApi['remove'] };
   const qc = createQueryClient();
   clients.push(qc);
   const onBack = jest.fn();
@@ -70,7 +71,7 @@ async function mountDetail(d: AccountDetailData | 'missing', props: Partial<Para
   });
   live.push(r);
   await settle();
-  return { r, load, onBack, onMoveMoney, onAddExpense, setStartingBalance, changeTrackingDate, adjustBalance, remove };
+  return { r, load, onBack, onMoveMoney, onAddExpense, setStartingBalance, changeTrackingDate, adjustBalance, remove, updateCardDetails };
 }
 
 const typeIn = (r: ReactTestRenderer, id: string, value: string) =>
@@ -302,6 +303,79 @@ describe('AccountDetailScreen', () => {
       expect(texts(f.r).join(' ')).not.toMatch(/[-−–+]\s?₹/);
       expect(host(f.r, 'activity-row-a1')[0]!.props.accessibilityLabel).toBe('Balance adjustment, up 1,200 rupees, Saturday 7 November');
       expect(host(f.r, 'activity-row-a2')[0]!.props.accessibilityLabel).toContain('Balance adjustment, down 400 rupees');
+    });
+  });
+
+  describe('Card details (Story 2.6)', () => {
+    const cardAccount = account({ type: 'card', icon: 'CreditCard', name: 'HDFC Card', postingsMinor: -1245000 });
+    const card = (over: Partial<CardDetailsRead> = {}): CardDetailsRead => ({ statementDueMinor: 820000, dueDate: '2026-11-15', limitMinor: 10000000, paidSinceMinor: 0, ...over });
+    const mountCard = (c: CardDetailsRead | null, over: Partial<AccountDetailData> = {}) => mountDetail(data([], {}, { account: cardAccount, card: c, ...over }));
+    const line = (r: ReactTestRenderer, id: string) =>
+      host(r, id)[0]!.findAll((n) => n.type === Text).map((n) => [n.props.children].flat().filter((c) => typeof c === 'string').join('')).join('');
+
+    it('the header reads You owe with the caption From your entries in wmbugo, and offers Card details', async () => {
+      const f = await mountCard(null);
+      expect(texts(f.r)).toEqual(expect.arrayContaining(['You owe', '₹12,450.00', 'From your entries in wmbugo']));
+      expect(host(f.r, 'account-card-details')).toHaveLength(1);
+      expect(host(f.r, 'card-lines')).toHaveLength(0);
+    });
+
+    it('shows Statement due with its date and the Limit as separate lines', async () => {
+      const f = await mountCard(card());
+      expect(line(f.r, 'statement-line')).toBe('Statement due ₹8,200.00 · by 15 Nov');
+      expect(line(f.r, 'limit-line')).toBe('Limit ₹1,00,000.00');
+      expect(host(f.r, 'statement-line')[0]!.props.accessibilityLabel).toBe('Statement due 8,200 rupees · by 15 Nov');
+    });
+
+    it('reads Statement paid once payments reach the statement, and keeps showing it', async () => {
+      const f = await mountCard(card({ paidSinceMinor: 820000 }));
+      expect(line(f.r, 'statement-line')).toBe('Statement paid · ₹8,200.00');
+    });
+
+    it('past the due date and unpaid it reads "was due" with a warning icon in primary text, not red', async () => {
+      const f = await mountCard(card(), { today: '2026-11-20' });
+      expect(line(f.r, 'statement-line')).toBe('Statement due ₹8,200.00 · was due 15 Nov');
+      const texts2 = host(f.r, 'statement-line')[0]!.findAll((n) => n.type === Text);
+      expect(texts2.some((n) => JSON.stringify(n.props.style).includes('semantic-expense'))).toBe(false);
+    });
+
+    it('the panel says wmbugo is not connected to the bank, prefills what is stored and saves exact minor units', async () => {
+      const f = await mountCard(card());
+      act(() => press(f.r, 'account-card-details'));
+      expect(texts(f.r)).toContain("You enter these from your statement. wmbugo isn't connected to your bank.");
+      expect(host(f.r, 'card-statement')[0]!.props.value).toBe('8200');
+      expect(host(f.r, 'card-date')[0]!.props.value).toBe('2026-11-15');
+      typeIn(f.r, 'card-limit', '150000');
+      await act(async () => press(f.r, 'card-save'));
+      await settle();
+      expect(f.updateCardDetails).toHaveBeenCalledWith('h', { statementDueMinor: 820000, dueDate: '2026-11-15', limitMinor: 15000000 });
+      expect(host(f.r, 'card-panel')).toHaveLength(0);
+    });
+
+    it('clearing a field removes it; zero is refused with a calm error and nothing is written', async () => {
+      const f = await mountCard(card());
+      act(() => press(f.r, 'account-card-details'));
+      typeIn(f.r, 'card-limit', '0');
+      await act(async () => press(f.r, 'card-save'));
+      expect(texts(f.r)).toContain('Error: enter a limit or leave it empty');
+      expect(f.updateCardDetails).not.toHaveBeenCalled();
+      typeIn(f.r, 'card-limit', '');
+      typeIn(f.r, 'card-statement', '0');
+      await act(async () => press(f.r, 'card-save'));
+      expect(texts(f.r)).toContain('Error: enter an amount or leave it empty');
+      typeIn(f.r, 'card-statement', '');
+      typeIn(f.r, 'card-date', '');
+      await act(async () => press(f.r, 'card-save'));
+      expect(f.updateCardDetails).toHaveBeenCalledWith('h', { statementDueMinor: null, dueDate: null, limitMinor: null });
+    });
+
+    it('a bad date shows the calm error and keeps the input', async () => {
+      const f = await mountCard(card());
+      act(() => press(f.r, 'account-card-details'));
+      typeIn(f.r, 'card-date', 'soon');
+      await act(async () => press(f.r, 'card-save'));
+      expect(texts(f.r)).toContain('Error: check the date');
+      expect(host(f.r, 'card-date')[0]!.props.value).toBe('soon');
     });
   });
 });

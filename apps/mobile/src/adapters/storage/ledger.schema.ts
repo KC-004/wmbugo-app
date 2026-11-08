@@ -17,6 +17,8 @@ export const account = sqliteTable(
     credit_limit_minor: integer('credit_limit_minor'),
     statement_due_minor: integer('statement_due_minor'),
     statement_due_date: text('statement_due_date'),
+    // When the statement details were last entered; payments after it count toward "Statement paid".
+    statement_set_at: integer('statement_set_at'),
     // Convenience copy of the opening posting (the posting is the source of truth, AD-5); null when not set.
     opening_minor: integer('opening_minor'),
     opening_effective_at: integer('opening_effective_at'),

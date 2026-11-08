@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bank, CreditCard, Money, PiggyBank, Wallet } from 'phosphor-react-native';
-import { accountLine, ACTIVITY_PAGE_SIZE, type AdjustReason, dayHeading, longDate, parseAmountInput, shortDate, type ActivityRow, type CurrencyCode } from '@wmbugo/core';
+import { accountLine, ACTIVITY_PAGE_SIZE, type AdjustReason, type CardDetails, dayHeading, longDate, parseAmountInput, shortDate, type ActivityRow, type CurrencyCode } from '@wmbugo/core';
 import { amountLabel } from '../../shared/a11y/labels';
 import { copy } from '../../shared/copy';
 import { EmptyState, ErrorBlock, Reveal, Skeleton } from '../../shared/feedback/Feedback';
@@ -18,6 +18,8 @@ import { Button } from '../../shared/ui/Button';
 import { ActivityRowView } from '../activity/ActivityRowView';
 import { ScreenHeader } from '../shell/ScreenHeader';
 import { AdjustBalancePanel } from './AdjustBalancePanel';
+import { CardDetailsPanel } from './CardDetailsPanel';
+import { CardLines, dayMonth } from './CardLines';
 import { TYPE_LABEL } from './AccountForm';
 import { accountDetailKey, realAccountDetailApi, type AccountDetailApi, type AccountDetailData } from './accountDetailApi';
 
@@ -50,7 +52,7 @@ export function AccountDetailScreen({
   const d = q.data && q.data !== 'missing' ? q.data : null;
   const ink = { color: theme.color('text-primary') };
   const toast = useToast();
-  const [panel, setPanel] = useState<'balance' | 'date' | 'adjust' | null>(null);
+  const [panel, setPanel] = useState<'balance' | 'date' | 'adjust' | 'card' | null>(null);
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const busy = useRef(false);
@@ -72,6 +74,15 @@ export function AccountDetailScreen({
               .catch(() => toast.show({ message: copy.accountDetail.saveError })),
         },
       });
+    }
+    return r;
+  };
+
+  const saveCard = async (details: CardDetails) => {
+    const r = await api.updateCardDetails(accountId, details);
+    if (r.ok) {
+      setPanel(null);
+      await invalidateForEvent(qc, 'AccountsChanged');
     }
     return r;
   };
@@ -140,8 +151,10 @@ export function AccountDetailScreen({
             ListHeaderComponent={
               <View style={styles.headerBlock}>
                 <Header d={d} />
+                {d.card ? <CardLines card={d.card} today={d.today} currency={d.currency} locale={d.locale} formatDate={(x) => dayMonth(shortDate(x))} /> : null}
                 <View style={styles.actions}>
                   {d.account.type === 'card' ? null : <Button label={copy.accountDetail.moveMoney} variant="secondary" onPress={onMoveMoney} testID="account-move-money" />}
+                  {d.account.type === 'card' ? <Button label={copy.cardDetails.action} variant="secondary" onPress={() => setPanel('card')} testID="account-card-details" /> : null}
                   {d.account.balanceNotSet ? null : (
                     <Button label={copy.adjust.action} variant="secondary" onPress={() => setPanel('adjust')} testID="account-adjust" />
                   )}
@@ -151,10 +164,11 @@ export function AccountDetailScreen({
                 </View>
                 {d.starting && !d.account.balanceNotSet ? (
                   <View style={styles.inline}>
-                    <Text testID="tracking-since" style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{`${copy.accountDetail.trackingSince} ${shortDate(d.starting.localDate).split(' ').slice(1).join(' ')}`}</Text>
+                    <Text testID="tracking-since" style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{`${copy.accountDetail.trackingSince} ${dayMonth(shortDate(d.starting.localDate))}`}</Text>
                     <Button label={copy.accountDetail.changeDate} variant="text" onPress={() => open('date')} testID="account-change-date" />
                   </View>
                 ) : null}
+                {panel === 'card' && d.account.type === 'card' ? <CardDetailsPanel initial={d.card ?? { statementDueMinor: null, dueDate: null, limitMinor: null }} exponent={d.exponent} onSave={saveCard} onCancel={() => setPanel(null)} /> : null}
                 {panel === 'adjust' ? (
                   <AdjustBalancePanel type={d.account.type} currentMinor={d.account.postingsMinor} exponent={d.exponent} currency={d.currency} locale={d.locale} onSave={adjust} onCancel={() => setPanel(null)} />
                 ) : null}
@@ -251,6 +265,7 @@ function Header({ d }: { d: AccountDetailData }) {
           <Amount amountMinor={line.minor} currency={d.currency} direction="neutral" role="headline" locale={d.locale} />
         </View>
       )}
+      {a.type === 'card' && line.kind !== 'not-set' ? <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{copy.cardDetails.fromEntries}</Text> : null}
     </View>
   );
 }
@@ -268,7 +283,7 @@ function StartingRow({ minor, localDate, currency, locale }: { minor: number; lo
   const theme = useTheme();
   const amount = Math.abs(minor);
   // "Sun 1 Nov" without the weekday: the starting day reads "1 Nov".
-  const when = shortDate(localDate).split(' ').slice(1).join(' ');
+  const when = dayMonth(shortDate(localDate));
   return (
     <View
       testID="starting-balance"
