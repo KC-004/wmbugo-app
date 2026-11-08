@@ -2,6 +2,7 @@ import { AccessibilityInfo, Text } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { groupByDay, type AccountRow, type ActivityRow } from '@wmbugo/core';
+import { ToastHost } from '../../shared/feedback/ToastHost';
 import { createQueryClient } from '../../shared/queryClient';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
 import { AccountDetailScreen } from './AccountDetailScreen';
@@ -47,7 +48,9 @@ async function mountDetail(d: AccountDetailData | 'missing', props: Partial<Para
   const load = jest.fn<Promise<AccountDetailData | 'missing'>, [string, number?]>(async () => d);
   const setStartingBalance = jest.fn<Promise<{ ok: boolean; code?: string }>, [string, number]>(async () => ({ ok: true }));
   const changeTrackingDate = jest.fn<Promise<{ ok: boolean; code?: string }>, [string, string]>(async () => ({ ok: true }));
-  const api: AccountDetailApi = { load, setStartingBalance, changeTrackingDate };
+  const adjustBalance = jest.fn<Promise<{ ok: boolean; code?: string; transactionId?: string }>, [{ accountId: string; actualMinor: number; reason: string; note?: string }]>(async () => ({ ok: true, transactionId: 'adj1' }));
+  const remove = jest.fn<Promise<{ ok: boolean }>, [string]>(async () => ({ ok: true }));
+  const api: AccountDetailApi = { load, setStartingBalance, changeTrackingDate, adjustBalance, remove: remove as AccountDetailApi['remove'] };
   const qc = createQueryClient();
   clients.push(qc);
   const onBack = jest.fn();
@@ -58,16 +61,20 @@ async function mountDetail(d: AccountDetailData | 'missing', props: Partial<Para
     r = create(
       <QueryClientProvider client={qc}>
         <ThemeProvider>
-          <AccountDetailScreen accountId="h" onBack={onBack} onMoveMoney={onMoveMoney} onAddExpense={onAddExpense} api={api} {...props} />
+          <ToastHost bottomOffset={0}>
+            <AccountDetailScreen accountId="h" onBack={onBack} onMoveMoney={onMoveMoney} onAddExpense={onAddExpense} api={api} {...props} />
+          </ToastHost>
         </ThemeProvider>
       </QueryClientProvider>,
     );
   });
   live.push(r);
   await settle();
-  return { r, load, onBack, onMoveMoney, onAddExpense, setStartingBalance, changeTrackingDate };
+  return { r, load, onBack, onMoveMoney, onAddExpense, setStartingBalance, changeTrackingDate, adjustBalance, remove };
 }
 
+const typeIn = (r: ReactTestRenderer, id: string, value: string) =>
+  act(() => r.root.findAll((n) => n.props.testID === id && typeof n.props.onChangeText === 'function')[0]!.props.onChangeText(value));
 const r2 = (r: ReactTestRenderer) => String(host(r, 'account-panel-input')[0]!.props.value);
 
 describe('AccountDetailScreen', () => {
@@ -213,6 +220,88 @@ describe('AccountDetailScreen', () => {
       await settle();
       expect(f.changeTrackingDate).toHaveBeenLastCalledWith('h', '2026-10-30');
       expect(host(f.r, 'account-panel')).toHaveLength(0);
+    });
+  });
+
+  describe('Adjust balance (Story 2.5)', () => {
+    const open = async (over: Partial<AccountDetailData> = {}) => {
+      const f = await mountDetail(data(rows, {}, over));
+      act(() => press(f.r, 'account-adjust'));
+      return f;
+    };
+
+    it('is offered when a balance is set and replaced by Set balance when not', async () => {
+      const a = await mountDetail(data(rows, {}));
+      expect(host(a.r, 'account-adjust')).toHaveLength(1);
+      const b = await mountDetail(data([], {}, { starting: null, account: account({ balanceNotSet: true, postingsMinor: 0 }) }));
+      expect(host(b.r, 'account-adjust')).toHaveLength(0);
+      expect(host(b.r, 'account-set-balance')).toHaveLength(1);
+    });
+
+    it('previews the difference without a minus sign, then saves the actual balance with the reason and offers Undo', async () => {
+      const f = await open();
+      expect(texts(f.r)).toContain('Actual balance today');
+      typeIn(f.r, 'adjust-input', '32400');
+      const preview = host(f.r, 'adjust-preview')[0]!.findAll((n) => n.type === Text).map((n) => [n.props.children].flat().filter((c) => typeof c === 'string').join(''));
+      expect(preview).toEqual(['Adjust up by', '₹1,200.00']);
+      act(() => press(f.r, 'adjust-reason-rough'));
+      await act(async () => press(f.r, 'adjust-save'));
+      await settle();
+      expect(f.adjustBalance).toHaveBeenCalledWith({ accountId: 'h', actualMinor: 3240000, reason: 'rough', note: '' });
+      expect(host(f.r, 'adjust-panel')).toHaveLength(0);
+      expect(texts(f.r)).toContain('Balance adjusted');
+      await act(async () => press(f.r, 'toast-undo'));
+      expect(f.remove).toHaveBeenCalledWith('adj1');
+    });
+
+    it('lower reads "Adjust down by"; the four reasons are offered; Other asks for a note', async () => {
+      const f = await open();
+      typeIn(f.r, 'adjust-input', '30800');
+      expect(texts(f.r)).toEqual(expect.arrayContaining(['Adjust down by', '₹400.00', 'Starting balance was rough', 'Missed some entries', 'Bank charges or interest', 'Other']));
+      expect(host(f.r, 'adjust-note')).toHaveLength(0);
+      act(() => press(f.r, 'adjust-reason-other'));
+      typeIn(f.r, 'adjust-note', 'Lent to Sam');
+      await act(async () => press(f.r, 'adjust-save'));
+      expect(f.adjustBalance).toHaveBeenCalledWith({ accountId: 'h', actualMinor: 3080000, reason: 'other', note: 'Lent to Sam' });
+    });
+
+    it('a missing reason shows "Error: reason required" and writes nothing', async () => {
+      const f = await open();
+      typeIn(f.r, 'adjust-input', '32400');
+      await act(async () => press(f.r, 'adjust-save'));
+      expect(texts(f.r)).toContain('Error: reason required');
+      expect(f.adjustBalance).not.toHaveBeenCalled();
+    });
+
+    it('the same amount says it already matches and writes nothing; an empty amount asks for one', async () => {
+      const f = await open();
+      await act(async () => press(f.r, 'adjust-save'));
+      expect(texts(f.r)).toContain('Error: amount required');
+      typeIn(f.r, 'adjust-input', '31200');
+      expect(texts(f.r)).toContain('Already matches. Nothing to adjust.');
+      act(() => press(f.r, 'adjust-reason-rough'));
+      await act(async () => press(f.r, 'adjust-save'));
+      expect(f.adjustBalance).not.toHaveBeenCalled();
+    });
+
+    it('a card asks for the amount you owe: 4,350 against 4,100 reads "You owe ₹250.00 more"', async () => {
+      const f = await open({ account: account({ type: 'card', icon: 'CreditCard', name: 'HDFC Card', postingsMinor: -410000 }) });
+      expect(texts(f.r)).toContain('Amount you owe today');
+      typeIn(f.r, 'adjust-input', '4350');
+      expect(texts(f.r)).toEqual(expect.arrayContaining(['You owe ', '₹250.00', ' more']));
+      act(() => press(f.r, 'adjust-reason-charges'));
+      await act(async () => press(f.r, 'adjust-save'));
+      expect(f.adjustBalance).toHaveBeenCalledWith({ accountId: 'h', actualMinor: 435000, reason: 'charges', note: '' });
+    });
+
+    it('an adjustment row reads Balance adjustment, Adjusted up, unsigned, and TalkBack hears the direction', async () => {
+      const adj = row('a1', 'adjustment', 120000, '2026-11-07', { categoryName: null, categoryIcon: null, categoryColor: null, signedMinor: 120000 });
+      const down = row('a2', 'adjustment', 40000, '2026-11-06', { categoryName: null, categoryIcon: null, categoryColor: null, signedMinor: -40000 });
+      const f = await mountDetail(data([adj, down], { a1: 120000, a2: -40000 }));
+      expect(texts(f.r)).toEqual(expect.arrayContaining(['Balance adjustment', 'Adjusted up', 'Adjusted down', '₹1,200.00', '₹400.00']));
+      expect(texts(f.r).join(' ')).not.toMatch(/[-−–+]\s?₹/);
+      expect(host(f.r, 'activity-row-a1')[0]!.props.accessibilityLabel).toBe('Balance adjustment, up 1,200 rupees, Saturday 7 November');
+      expect(host(f.r, 'activity-row-a2')[0]!.props.accessibilityLabel).toContain('Balance adjustment, down 400 rupees');
     });
   });
 });

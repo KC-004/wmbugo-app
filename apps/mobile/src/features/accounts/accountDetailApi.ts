@@ -5,7 +5,10 @@ import {
   ACTIVITY_PAGE_SIZE,
   groupByDay,
   mapAccountRows,
+  AdjustBalance,
   ChangeTrackingDate,
+  RemoveEntry,
+  type AdjustReason,
   mapTimelineRows,
   pageActivity,
   SetStartingBalance,
@@ -38,6 +41,10 @@ export interface AccountDetailApi {
   load(accountId: string, limit?: number): Promise<AccountDetailData | 'missing' | null>;
   /** Gives a not-set account its balance as of today (a card takes the amount owed). */
   setStartingBalance(accountId: string, amountMinor: number): Promise<{ ok: boolean; code?: string }>;
+  /** Records the difference between the ledger and what the account really holds, with a reason. */
+  adjustBalance(input: { accountId: string; actualMinor: number; reason: AdjustReason; note?: string }): Promise<{ ok: boolean; code?: string; transactionId?: string }>;
+  /** Undo for an adjustment. */
+  remove(transactionId: string): Promise<{ ok: boolean }>;
   /** Moves the day tracking starts to the start of this local day (yyyy-mm-dd). */
   changeTrackingDate(accountId: string, localDate: string): Promise<{ ok: boolean; code?: string }>;
 }
@@ -72,5 +79,10 @@ export const realAccountDetailApi: AccountDetailApi = {
     };
   },
   setStartingBalance: (accountId, amountMinor) => getServices().writer.run(SetStartingBalance, { accountId, amountMinor }, 'user'),
+  async adjustBalance(input) {
+    const r = await getServices().writer.run(AdjustBalance, input, 'user');
+    return r.ok ? { ok: true, transactionId: r.value.transactionId } : { ok: false, code: r.code };
+  },
+  remove: (transactionId) => getServices().writer.run(RemoveEntry, { transactionId }, 'user'),
   changeTrackingDate: (accountId, localDate) => getServices().writer.run(ChangeTrackingDate, { accountId, localDate }, 'user'),
 };

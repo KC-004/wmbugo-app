@@ -8,3 +8,4 @@ export * from './transferCommands';
 export * from './balances';
 export * from './timeline';
 export * from './accountBalanceCommands';
+export * from './adjustBalance';

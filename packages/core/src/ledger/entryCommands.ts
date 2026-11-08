@@ -146,6 +146,11 @@ export const entryShape: Invariant = {
         if (p.length !== 2 || Number(p[0]![0]) !== -amount || Number(p[1]![0]) !== amount) return 'a transfer must be two postings that sum to zero';
         continue;
       }
+      if (t && String(t[0]) === 'adjustment') {
+        const p = await ctx.query('SELECT signed_amount_minor, posting_kind FROM posting WHERE transaction_id = ?', [id]);
+        if (p.length !== 1 || String(p[0]![1]) !== 'adjustment' || Math.abs(Number(p[0]![0])) !== Number(t[1]) || Number(t[1]) === 0) return 'an adjustment must be one adjustment posting equal to its amount';
+        continue;
+      }
       if (!t || (String(t[0]) !== 'expense' && String(t[0]) !== 'income')) continue;
       const p = await ctx.query('SELECT signed_amount_minor FROM posting WHERE transaction_id = ?', [id]);
       const want = String(t[0]) === 'expense' ? -Number(t[1]) : Number(t[1]);

@@ -2,10 +2,11 @@ import { useRef, useState } from 'react';
 import { SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bank, CreditCard, Money, PiggyBank, Wallet } from 'phosphor-react-native';
-import { accountLine, ACTIVITY_PAGE_SIZE, dayHeading, longDate, parseAmountInput, shortDate, type ActivityRow, type CurrencyCode } from '@wmbugo/core';
+import { accountLine, ACTIVITY_PAGE_SIZE, type AdjustReason, dayHeading, longDate, parseAmountInput, shortDate, type ActivityRow, type CurrencyCode } from '@wmbugo/core';
 import { amountLabel } from '../../shared/a11y/labels';
 import { copy } from '../../shared/copy';
 import { EmptyState, ErrorBlock, Reveal, Skeleton } from '../../shared/feedback/Feedback';
+import { useToast } from '../../shared/feedback/ToastHost';
 import { invalidateForEvent } from '../../shared/queryClient';
 import { Icon, type IconComponent } from '../../shared/theme/Icon';
 import type { ColorName } from '../../shared/theme/colors';
@@ -16,6 +17,7 @@ import { Amount } from '../../shared/ui/Amount';
 import { Button } from '../../shared/ui/Button';
 import { ActivityRowView } from '../activity/ActivityRowView';
 import { ScreenHeader } from '../shell/ScreenHeader';
+import { AdjustBalancePanel } from './AdjustBalancePanel';
 import { TYPE_LABEL } from './AccountForm';
 import { accountDetailKey, realAccountDetailApi, type AccountDetailApi, type AccountDetailData } from './accountDetailApi';
 
@@ -47,10 +49,32 @@ export function AccountDetailScreen({
   const qc = useQueryClient();
   const d = q.data && q.data !== 'missing' ? q.data : null;
   const ink = { color: theme.color('text-primary') };
-  const [panel, setPanel] = useState<'balance' | 'date' | null>(null);
+  const toast = useToast();
+  const [panel, setPanel] = useState<'balance' | 'date' | 'adjust' | null>(null);
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const busy = useRef(false);
+
+  const adjust = async (input: { actualMinor: number; reason: AdjustReason; note: string }) => {
+    const r = await api.adjustBalance({ accountId, ...input });
+    if (r.ok) {
+      setPanel(null);
+      await invalidateForEvent(qc, 'AccountsChanged');
+      const id = r.transactionId;
+      toast.show({
+        message: copy.adjust.done,
+        undo: {
+          label: copy.common.undo,
+          onUndo: () =>
+            void api
+              .remove(id ?? '')
+              .then(() => invalidateForEvent(qc, 'AccountsChanged'))
+              .catch(() => toast.show({ message: copy.accountDetail.saveError })),
+        },
+      });
+    }
+    return r;
+  };
 
   const open = (kind: 'balance' | 'date') => {
     setPanel(kind);
@@ -118,6 +142,9 @@ export function AccountDetailScreen({
                 <Header d={d} />
                 <View style={styles.actions}>
                   {d.account.type === 'card' ? null : <Button label={copy.accountDetail.moveMoney} variant="secondary" onPress={onMoveMoney} testID="account-move-money" />}
+                  {d.account.balanceNotSet ? null : (
+                    <Button label={copy.adjust.action} variant="secondary" onPress={() => setPanel('adjust')} testID="account-adjust" />
+                  )}
                   {d.account.balanceNotSet ? (
                     <Button label={d.account.type === 'card' ? copy.accountDetail.setAmountOwed : copy.accountDetail.setBalance} variant="secondary" onPress={() => open('balance')} testID="account-set-balance" />
                   ) : null}
@@ -128,7 +155,10 @@ export function AccountDetailScreen({
                     <Button label={copy.accountDetail.changeDate} variant="text" onPress={() => open('date')} testID="account-change-date" />
                   </View>
                 ) : null}
-                {panel ? (
+                {panel === 'adjust' ? (
+                  <AdjustBalancePanel type={d.account.type} currentMinor={d.account.postingsMinor} exponent={d.exponent} currency={d.currency} locale={d.locale} onSave={adjust} onCancel={() => setPanel(null)} />
+                ) : null}
+                {panel === 'balance' || panel === 'date' ? (
                   <View testID="account-panel" style={[styles.card, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
                     <Text style={[textStyle('body-medium'), ink]}>
                       {panel === 'date' ? copy.accountDetail.dateLabel : d.account.type === 'card' ? copy.accountDetail.owedQuestion : copy.accountDetail.todayQuestion}
