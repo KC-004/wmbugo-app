@@ -13,6 +13,7 @@ import type { AddButtonRef } from './AddButton';
 import { useOpenAdd, useOpenAddWith } from '../add/useOpenAdd';
 import { ActivityScreen } from '../activity/ActivityScreen';
 import { TransactionDetailScreen } from '../activity/TransactionDetailScreen';
+import { useReviewDot } from '../activity/reviewDot';
 import { useEntryActions } from '../activity/useEntryActions';
 import { HomeScreen } from '../home/HomeScreen';
 import { SettingsScreen } from '../settings/SettingsScreen';
@@ -95,13 +96,14 @@ function TabsWithAdd() {
   const { width } = useWindowDimensions();
   const nav = navLayout(width);
   const onAdd = useOpenAdd(opener);
+  const reviewDot = useReviewDot();
 
   return (
     <View style={styles.fill}>
       <Tabs.Navigator
         initialRouteName="Home"
         screenOptions={{ headerShown: false, tabBarPosition: nav.kind === 'rail' ? 'left' : 'bottom' }}
-        tabBar={(props) => <TabBar {...props} onAdd={onAdd} addRef={opener} />}>
+        tabBar={(props) => <TabBar {...props} onAdd={onAdd} addRef={opener} reviewDot={reviewDot} />}>
         <Tabs.Screen name="Home" component={HomeStack} />
         <Tabs.Screen name="Activity" component={ActivityStack} />
         <Tabs.Screen name="Insights" component={InsightsStack} />

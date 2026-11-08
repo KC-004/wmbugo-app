@@ -30,7 +30,7 @@ const TABS: Record<TabRoute, { label: string; icon: IconComponent }> = {
  * solid rail with the ＋ at the top. Slots are at least 64 x 56dp; there are no badges; a long press
  * shows the tab's label in a tooltip.
  */
-export function TabBar({ state, navigation, onAdd, addRef }: BottomTabBarProps & { onAdd: () => void; addRef?: AddButtonRef }) {
+export function TabBar({ state, navigation, onAdd, addRef, reviewDot = false }: BottomTabBarProps & { onAdd: () => void; addRef?: AddButtonRef; /** Entries wait for the user: a small dot on Activity, no count. */ reviewDot?: boolean }) {
   const { width } = useWindowDimensions();
   const nav = navLayout(width);
   const rail = nav.kind === 'rail';
@@ -45,6 +45,7 @@ export function TabBar({ state, navigation, onAdd, addRef }: BottomTabBarProps &
         name={name}
         focused={state.index === index}
         rail={rail}
+        dot={name === 'Activity' && reviewDot}
         onPress={() => {
           markTabPress(name);
           const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
@@ -79,7 +80,7 @@ function Rail({ children, top }: { children: React.ReactNode; top: number }) {
   );
 }
 
-function TabSlot({ name, focused, rail, onPress }: { name: TabRoute; focused: boolean; rail: boolean; onPress: () => void }) {
+function TabSlot({ name, focused, rail, dot = false, onPress }: { name: TabRoute; focused: boolean; rail: boolean; dot?: boolean; onPress: () => void }) {
   const theme = useTheme();
   const { focused: ring, onFocus, onBlur } = useFocusRing(!rail);
   const [hint, setHint] = useState(false);
@@ -98,7 +99,7 @@ function TabSlot({ name, focused, rail, onPress }: { name: TabRoute; focused: bo
   return (
     <Pressable
       testID={`tab-${name}`}
-      {...controlA11y({ label, role: 'tab', selected: focused })}
+      {...controlA11y({ label: dot ? `${label}, ${copy.activity.entriesToCheck.toLowerCase()}` : label, role: 'tab', selected: focused })}
       onPress={onPress}
       onLongPress={() => {
         setHint(true);
@@ -110,7 +111,10 @@ function TabSlot({ name, focused, rail, onPress }: { name: TabRoute; focused: bo
       style={styles.slot}>
       <FocusRing focused={ring} onGlass={!rail} radius={12}>
         <View style={styles.slotInner}>
-          <Icon icon={icon} selected={focused} color={ink} />
+          <View>
+            <Icon icon={icon} selected={focused} color={ink} />
+            {dot ? <View testID="review-dot" style={[styles.dot, { backgroundColor: theme.color(rail ? 'semantic-warning' : 'on-glass-accent') }]} /> : null}
+          </View>
           <Text
             maxFontSizeMultiplier={1.3}
             adjustsFontSizeToFit
@@ -136,5 +140,6 @@ const styles = StyleSheet.create({
   slot: { flex: 1, minWidth: TAB_SLOT.minWidth, minHeight: TAB_SLOT.minHeight, alignItems: 'center', justifyContent: 'center' },
   slotInner: { alignItems: 'center', justifyContent: 'center', gap: 2 },
   rail: { width: RAIL_WIDTH, alignItems: 'center', paddingTop: 16, gap: 8, borderRightWidth: 1 },
+  dot: { position: 'absolute', top: -2, right: -4, width: 8, height: 8, borderRadius: 4 },
   hint: { position: 'absolute', top: 2, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
 });

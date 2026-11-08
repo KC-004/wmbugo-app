@@ -127,8 +127,9 @@ describe('a flagged entry in Activity (durable path)', () => {
   it('shows "Possible duplicate — check it" with Keep both and Merge, and the day Spent leaves it out', async () => {
     const m = await mountActivity([row('a'), row('held', { held: true })]);
     const t = m.r.root.findAll((n) => n.type === Text).map((n) => [n.props.children].flat().filter((c) => typeof c === 'string').join(''));
-    expect(t).toEqual(expect.arrayContaining(['Food & Drinks · DBS · Possible duplicate — check it', 'Keep both', 'Merge']));
-    expect(host(m.r, 'activity-row-held').props.accessibilityLabel).toContain('possible duplicate — check it');
+    expect(t).toEqual(expect.arrayContaining(['Food & Drinks · DBS', 'Check', 'Keep both', 'Merge']));
+    expect(host(m.r, 'activity-row-held').props.accessibilityLabel).toContain('possible duplicate, check it');
+    expect(host(m.r, 'activity-row-held').props.accessibilityHint).toBe('Double-tap to review possible duplicate');
     const day = host(m.r, 'day-2026-11-07').props.accessibilityLabel as string;
     expect(day).toBe('Saturday 7 November, spent 450 Singapore dollars');
     m.unmount();

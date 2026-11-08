@@ -123,7 +123,7 @@ describe('AccountDetailScreen', () => {
   it('flags an entry dated before tracking started, in the subtitle and for TalkBack', async () => {
     const before = row('b', 'expense', 30000, '2026-11-05', { beforeTracking: true, categoryName: 'Food & Drinks' });
     const { r } = await mountDetail(data([before], { b: -30000 }));
-    expect(texts(r)).toContain('Food & Drinks · Before tracking started');
+    expect(texts(r)).toEqual(expect.arrayContaining(['Food & Drinks', 'before tracking']));
     expect(host(r, 'activity-row-b')[0]!.props.accessibilityLabel).toContain('before tracking started');
   });
 

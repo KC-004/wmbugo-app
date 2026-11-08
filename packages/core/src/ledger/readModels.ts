@@ -61,24 +61,63 @@ export interface ActivityRow {
   readonly held?: boolean;
   /** Came from a capture source, not typed by the user: it is rejected (Reject · Not mine), never deleted. */
   readonly captured?: boolean;
+  /** Waiting for the user (needs_review) and not a possible duplicate. Counts nowhere until confirmed. */
+  readonly waiting?: boolean;
+  /** Reversed: shown struck through, counts nowhere. */
+  readonly reversed?: boolean;
+  /** The category was never set ("add category"). */
+  readonly needsCategory?: boolean;
+  /** Approved automatically with a guessed category ("guessed"). */
+  readonly guessed?: boolean;
+  /** A foreign amount (waiting for its currency to be settled): "USD 12.99". */
+  readonly foreign?: { readonly currency: string; readonly amountMinor: number };
+}
+
+/** The states of an Activity row (UX-DR29), most important first. */
+export type RowState = 'reversed' | 'check' | 'currency' | 'waiting' | 'needs-category' | 'guessed' | 'refund' | 'transfer' | 'income' | 'expense' | 'adjustment';
+
+export function rowState(r: ActivityRow): RowState {
+  if (r.reversed) return 'reversed';
+  if (r.held) return 'check';
+  if (r.waiting && r.foreign) return 'currency';
+  if (r.waiting) return 'waiting';
+  if (r.needsCategory) return 'needs-category';
+  if (r.guessed) return 'guessed';
+  return r.kind;
 }
 
 /** How many entries Activity loads at a time. */
 export const ACTIVITY_PAGE_SIZE = 100;
 
-// Confirmed entries, plus an entry held back as a possible duplicate (it shows so it can be resolved, but counts nowhere).
+// Everything the user can see and act on: confirmed entries, entries waiting for review (a possible duplicate included) and
+// reversed ones. Only confirmed entries count in any total; the rest are listed so they can be looked at.
 const ACTIVITY_FILTER =
-  "t2.removed_at IS NULL AND (t2.status = 'confirmed' OR (t2.status = 'needs_review' AND EXISTS (SELECT 1 FROM review_candidate rc WHERE rc.transaction_id = t2.id AND rc.reason = 'duplicate' AND rc.status = 'open'))) AND t2.event_type IN ('expense','income','transfer','refund','adjustment')";
+  "t2.removed_at IS NULL AND t2.status IN ('confirmed','needs_review','reversed') AND t2.event_type IN ('expense','income','transfer','refund','adjustment')";
+
+export interface ActivityFilter {
+  /** Only entries that touch this account (both sides of a transfer). */
+  readonly accountId?: string | null;
+}
 
 /**
- * The newest entries first, one page. Param: the number of entries (ask for one more than you show, to know
- * whether there are earlier ones). Transfers have two postings, so rows can repeat; `mapActivityRows` keeps
- * the first and joins the two account names.
+ * The newest entries first, one page (the read model behind Activity and its day headers). Params: the account id when a
+ * filter is given, then the number of entries (ask for one more than you show, to know whether there are earlier ones).
+ * Transfers have two postings, so rows can repeat; `mapActivityRows` keeps the first and joins the two account names.
  */
-export const ACTIVITY_SQL =
-  'SELECT t.id, t.event_type, t.amount_minor, t.local_date, t.original_description, c.name, c.icon, c.color_token, a.name, (p.posting_kind = \'normal\' AND a.opening_effective_at IS NOT NULL AND t.occurred_at_utc < a.opening_effective_at), p.signed_amount_minor, t.status, (SELECT 1 FROM source_record sr WHERE sr.transaction_id = t.id AND sr.source_kind <> \'manual\' LIMIT 1) FROM "transaction" t LEFT JOIN split s ON s.transaction_id = t.id LEFT JOIN category c ON c.id = s.category_id LEFT JOIN posting p ON p.transaction_id = t.id LEFT JOIN account a ON a.id = p.account_id WHERE t.id IN (SELECT t2.id FROM "transaction" t2 WHERE ' +
-  ACTIVITY_FILTER +
-  ' ORDER BY t2.local_date DESC, t2.occurred_at_utc DESC, t2.id DESC LIMIT ?) ORDER BY t.local_date DESC, t.occurred_at_utc DESC, t.id DESC, p.signed_amount_minor ASC';
+export function activitySql(filter: ActivityFilter = {}): string {
+  const byAccount = filter.accountId ? ' AND EXISTS (SELECT 1 FROM posting pf WHERE pf.transaction_id = t2.id AND pf.account_id = ?)' : '';
+  return (
+    'SELECT t.id, t.event_type, t.amount_minor, t.local_date, t.original_description, c.name, c.icon, c.color_token, a.name, (p.posting_kind = \'normal\' AND a.opening_effective_at IS NOT NULL AND t.occurred_at_utc < a.opening_effective_at), p.signed_amount_minor, t.status, (SELECT 1 FROM source_record sr WHERE sr.transaction_id = t.id AND sr.source_kind <> \'manual\' LIMIT 1), t.needs_category, t.capture_resolution, t.foreign_currency, t.foreign_amount_minor, (SELECT 1 FROM review_candidate rc WHERE rc.transaction_id = t.id AND rc.reason = \'duplicate\' AND rc.status = \'open\' LIMIT 1) FROM "transaction" t LEFT JOIN split s ON s.transaction_id = t.id LEFT JOIN category c ON c.id = s.category_id LEFT JOIN posting p ON p.transaction_id = t.id LEFT JOIN account a ON a.id = p.account_id WHERE t.id IN (SELECT t2.id FROM "transaction" t2 WHERE ' +
+    ACTIVITY_FILTER +
+    byAccount +
+    ' ORDER BY t2.local_date DESC, t2.occurred_at_utc DESC, t2.id DESC LIMIT ?) ORDER BY t.local_date DESC, t.occurred_at_utc DESC, t.id DESC, p.signed_amount_minor ASC'
+  );
+}
+
+export const ACTIVITY_SQL = activitySql();
+
+/** Entries waiting for the user (the dot on the Activity tab). */
+export const REVIEW_COUNT_SQL = "SELECT COUNT(*) FROM \"transaction\" WHERE status = 'needs_review' AND removed_at IS NULL";
 
 /** The page to show and whether earlier entries exist (the query was asked for `limit + 1`). */
 export function pageActivity(rows: readonly ActivityRow[], limit: number): { rows: ActivityRow[]; hasMore: boolean } {
@@ -119,8 +158,13 @@ export function mapActivityRows(rows: readonly (readonly unknown[])[]): Activity
       accountName: s(r[8]),
       beforeTracking: String(r[1]) !== 'transfer' && String(r[1]) !== 'adjustment' && Number(r[9]) === 1,
       ...(String(r[1]) === 'adjustment' ? { signedMinor: Number(r[10]) } : {}),
-      ...(String(r[11]) === 'needs_review' ? { held: true } : {}),
+      ...(String(r[11]) === 'needs_review' && Number(r[17]) === 1 ? { held: true } : {}),
+      ...(String(r[11]) === 'needs_review' && Number(r[17]) !== 1 ? { waiting: true } : {}),
+      ...(String(r[11]) === 'reversed' ? { reversed: true } : {}),
       ...(Number(r[12]) === 1 ? { captured: true } : {}),
+      ...(Number(r[13]) === 1 ? { needsCategory: true } : {}),
+      ...(String(r[14]) === 'auto_approved' && Number(r[13]) !== 1 ? { guessed: true } : {}),
+      ...(r[15] !== null && r[15] !== undefined ? { foreign: { currency: String(r[15]), amountMinor: Number(r[16]) } } : {}),
     });
   }
   return out;
@@ -143,7 +187,7 @@ export function groupByDay(rows: readonly ActivityRow[]): ActivityDay[] {
       days.push(day);
     }
     day.rows.push(r);
-    if (r.held) continue;
+    if (r.held || r.waiting || r.reversed) continue;
     if (r.kind === 'expense') day.expenses += r.amountMinor;
     else if (r.kind === 'refund') day.refunds += r.amountMinor;
   }

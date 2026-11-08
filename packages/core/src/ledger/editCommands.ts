@@ -247,7 +247,7 @@ export const TRANSACTION_DETAIL_SQL =
   "(SELECT a.name FROM posting p JOIN account a ON a.id = p.account_id WHERE p.transaction_id = t.id AND p.signed_amount_minor > 0 AND p.posting_kind = 'normal' LIMIT 1), " +
   "(SELECT sr.source_kind FROM source_record sr WHERE sr.transaction_id = t.id ORDER BY sr.created_at LIMIT 1), " +
   "(SELECT sr.created_at FROM source_record sr WHERE sr.transaction_id = t.id ORDER BY sr.created_at LIMIT 1), " +
-  "t.timezone_id, t.created_at FROM \"transaction\" t WHERE t.id = ?";
+  "t.timezone_id, t.created_at, (SELECT 1 FROM review_candidate rc WHERE rc.transaction_id = t.id AND rc.reason = 'duplicate' AND rc.status = 'open' LIMIT 1) FROM \"transaction\" t WHERE t.id = ?";
 
 export interface TransactionDetail {
   readonly id: string;
@@ -270,6 +270,8 @@ export interface TransactionDetail {
   readonly sourceKind: string;
   readonly addedAtMs: number;
   readonly timezoneId: string;
+  /** An open duplicate candidate: the entry is held back and waits for Keep both or Merge. */
+  readonly openDuplicate: boolean;
 }
 
 export function mapTransactionDetail(rows: readonly (readonly unknown[])[]): TransactionDetail | null {
@@ -299,5 +301,6 @@ export function mapTransactionDetail(rows: readonly (readonly unknown[])[]): Tra
     sourceKind: s(r[20]) ?? 'manual',
     addedAtMs: r[21] === null ? Number(r[23]) : Number(r[21]),
     timezoneId: String(r[22]),
+    openDuplicate: Number(r[24]) === 1,
   };
 }

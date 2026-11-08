@@ -19,6 +19,8 @@ import { categoryIcon } from '../add/categoryIcons';
 import { ScreenHeader } from '../shell/ScreenHeader';
 import { duplicatePresetOf, editSpecOf, realTransactionApi, transactionKey, type TransactionApi } from './transactionApi';
 import type { AddPreset, EditSpec } from '../add/AddSheet';
+import { realAddApi, type AddApi } from '../add/addApi';
+import { HeldRowActions } from './HeldRowActions';
 
 const TYPE_LABEL: Readonly<Record<TransactionDetail['type'], string>> = {
   expense: copy.detail.typeExpense,
@@ -53,12 +55,14 @@ export function TransactionDetailScreen({
   onEdit,
   onDuplicate,
   api = realTransactionApi,
+  duplicateApi = realAddApi,
 }: {
   transactionId: string;
   onBack: () => void;
   onEdit: (spec: EditSpec) => void;
   onDuplicate: (preset: AddPreset) => void;
   api?: TransactionApi;
+  duplicateApi?: Pick<AddApi, 'duplicateInfo' | 'keepBoth' | 'merge' | 'undoResolution'>;
 }) {
   const theme = useTheme();
   const toast = useToast();
@@ -139,7 +143,7 @@ export function TransactionDetailScreen({
       status: d.status as 'draft' | 'needs_review' | 'confirmed' | 'excluded' | 'reversed',
       resolution: d.resolution as 'user_approved' | 'auto_approved' | 'auto_linked' | 'rejected' | null,
       needsCategory: false,
-      openDuplicate: d.status === 'needs_review',
+      openDuplicate: d.openDuplicate,
     });
     const spoken = [title, amountLabel({ amountMinor: d.amountMinor, currency: data.currency, locale: data.locale, kind: AMOUNT_KIND[d.type] ?? 'plain', inline: true }), d.category?.name, accountText].filter(Boolean).join(', ');
     const glyph = d.type === 'transfer' ? ArrowsLeftRight : d.category ? categoryIcon(d.category.icon) : DotsThree;
@@ -174,6 +178,13 @@ export function TransactionDetailScreen({
               <Text style={[textStyle('body'), ink, styles.value]}>{value}</Text>
             </View>
           ))}
+
+        {d.openDuplicate ? (
+          <View testID="detail-check" style={styles.row}>
+            <Text style={[textStyle('body-medium'), ink]}>{copy.capture.possibleDuplicate}</Text>
+            <HeldRowActions transactionId={d.id} api={duplicateApi} />
+          </View>
+        ) : null}
 
         {error ? (
           <Text testID="detail-error" accessibilityRole="alert" accessibilityLiveRegion="assertive" style={[textStyle('body-medium'), ink]}>

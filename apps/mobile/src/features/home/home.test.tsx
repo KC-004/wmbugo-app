@@ -199,7 +199,7 @@ describe('Activity', () => {
 
   it('an entry dated before its account was tracked says so, and TalkBack hears it after the account', async () => {
     const { r } = await mountActivity(activity([row('x', 'expense', 30000, '2026-11-05', { beforeTracking: true, accountName: 'Cash' })]));
-    expect(texts(r)).toContain('Food & Drinks · Cash · Before tracking started');
+    expect(texts(r)).toEqual(expect.arrayContaining(['Food & Drinks · Cash', 'before tracking']));
     expect(host(r, 'activity-row-x')[0]!.props.accessibilityLabel).toContain('Cash, before tracking started, Thursday 5 November');
   });
 

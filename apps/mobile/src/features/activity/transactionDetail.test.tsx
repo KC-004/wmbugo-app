@@ -23,7 +23,7 @@ beforeEach(() => {
 const detail = (over: Partial<TransactionDetail> = {}): TransactionDetail => ({
   id: 't1', type: 'expense', status: 'confirmed', amountMinor: 45000, occurredAtMs: Date.UTC(2026, 10, 7, 13, 12), localDate: '2026-11-07', merchant: 'Swiggy', note: 'lunch', paymentMethod: 'upi',
   resolution: 'user_approved', removed: false, category: { id: 'cat_food', name: 'Food & Drinks', icon: 'ForkKnife', color: 'cat-rose' }, splitCount: 1,
-  from: { id: 'a1', name: 'HDFC' }, to: null, sourceKind: 'manual', addedAtMs: Date.UTC(2026, 10, 7, 13, 12), timezoneId: 'Asia/Kolkata', ...over,
+  from: { id: 'a1', name: 'HDFC' }, to: null, sourceKind: 'manual', addedAtMs: Date.UTC(2026, 10, 7, 13, 12), timezoneId: 'Asia/Kolkata', openDuplicate: false, ...over,
 });
 const data = (d: TransactionDetail): TransactionData => ({ currency: 'INR', exponent: 2, locale: 'en-IN', detail: d });
 
@@ -36,7 +36,7 @@ function fakeApi(d: TransactionDetail | 'missing' = detail()) {
   return { api, load, remove, restore, state };
 }
 
-async function mountDetail(d: TransactionDetail | 'missing', over: { api?: TransactionApi } = {}) {
+async function mountDetail(d: TransactionDetail | 'missing', over: { api?: TransactionApi; duplicateApi?: Parameters<typeof TransactionDetailScreen>[0]['duplicateApi'] } = {}) {
   const f = fakeApi(d);
   const qc = createQueryClient();
   const onBack = jest.fn();
@@ -48,7 +48,9 @@ async function mountDetail(d: TransactionDetail | 'missing', over: { api?: Trans
       <QueryClientProvider client={qc}>
         <ThemeProvider>
           <ToastHost bottomOffset={0}>
-            <TransactionDetailScreen transactionId="t1" onBack={onBack} onEdit={onEdit} onDuplicate={onDuplicate} api={over.api ?? f.api} />
+            <SheetHost>
+              <TransactionDetailScreen transactionId="t1" onBack={onBack} onEdit={onEdit} onDuplicate={onDuplicate} api={over.api ?? f.api} duplicateApi={over.duplicateApi} />
+            </SheetHost>
           </ToastHost>
         </ThemeProvider>
       </QueryClientProvider>,
@@ -134,6 +136,24 @@ describe('TransactionDetailScreen (Story 3.4)', () => {
     expect(m.onEdit).toHaveBeenCalledWith(expect.objectContaining({ transactionId: 't1', kind: 'expense', amountMinor: 45000, categoryId: 'cat_food', accountId: 'a1', merchant: 'Swiggy', note: 'lunch', paymentMethod: 'upi' }));
     act(() => fire(m.r, 'detail-duplicate'));
     expect(m.onDuplicate).toHaveBeenCalledWith(expect.objectContaining({ kind: 'expense', amountMinor: 45000, categoryId: 'cat_food', accountId: 'a1', merchant: 'Swiggy', note: 'lunch', copiedFrom: 't1' }));
+    m.unmount();
+  });
+
+  it('a held entry shows "Possible duplicate — check it" with Keep both and Merge (the durable path)', async () => {
+    const keepBoth = jest.fn(async () => ({ ok: true }));
+    const duplicateApi = { duplicateInfo: jest.fn(async () => null), keepBoth, merge: jest.fn(async () => ({ ok: true })), undoResolution: jest.fn(async () => ({ ok: true })) };
+    const m = await mountDetail(detail({ status: 'needs_review', resolution: null, openDuplicate: true }), { duplicateApi });
+    expect(texts(m.r)).toEqual(expect.arrayContaining(['Possible duplicate — check it', 'Keep both', 'Merge']));
+    expect(texts(m.r)).toContain('Possible duplicate — check it');
+    await act(async () => fire(m.r, 'keep-both-t1'));
+    await settle();
+    expect(keepBoth).toHaveBeenCalledWith('t1');
+    m.unmount();
+  });
+
+  it('an entry that is not held has no Check line', async () => {
+    const m = await mountDetail(detail());
+    expect(has(m.r, 'detail-check')).toBe(false);
     m.unmount();
   });
 
