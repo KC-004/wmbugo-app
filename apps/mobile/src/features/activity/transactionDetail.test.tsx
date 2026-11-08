@@ -25,14 +25,15 @@ const detail = (over: Partial<TransactionDetail> = {}): TransactionDetail => ({
   resolution: 'user_approved', removed: false, category: { id: 'cat_food', name: 'Food & Drinks', icon: 'ForkKnife', color: 'cat-rose' }, splitCount: 1,
   from: { id: 'a1', name: 'HDFC' }, to: null, sourceKind: 'manual', addedAtMs: Date.UTC(2026, 10, 7, 13, 12), timezoneId: 'Asia/Kolkata', openDuplicate: false, ...over,
 });
-const data = (d: TransactionDetail): TransactionData => ({ currency: 'INR', exponent: 2, locale: 'en-IN', detail: d });
+const data = (d: TransactionDetail): TransactionData => ({ currency: 'INR', exponent: 2, locale: 'en-IN', detail: d, splits: [], categories: [{ id: 'cat_food', name: 'Food & Drinks' }] });
 
 function fakeApi(d: TransactionDetail | 'missing' = detail()) {
   const state = { d };
   const load = jest.fn<Promise<TransactionData | 'missing' | null>, [string]>(async () => (state.d === 'missing' ? 'missing' : data(state.d)));
   const remove = jest.fn<Promise<RemoveResult>, [string, 'delete' | 'reject']>(async () => ({ ok: true, value: { snapshot: { id: 't1' } as TxSnapshot } }));
   const restore = jest.fn<Promise<{ ok: boolean }>, [TxSnapshot]>(async () => ({ ok: true }));
-  const api: TransactionApi = { load, remove, restore };
+  const setSplits = jest.fn<ReturnType<TransactionApi['setSplits']>, Parameters<TransactionApi['setSplits']>>(async () => ({ ok: true, value: { snapshot: { id: 't1' } as TxSnapshot } }));
+  const api: TransactionApi = { load, remove, restore, setSplits };
   return { api, load, remove, restore, state };
 }
 

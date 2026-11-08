@@ -77,6 +77,8 @@ export interface EditSpec {
   readonly note: string | null;
   readonly paymentMethod: PaymentMethod | null;
   readonly occurredAtMs: number;
+  /** More than one: the amount and categories change only through the split editor. */
+  readonly splitCount?: number;
 }
 
 /**
@@ -90,6 +92,7 @@ export function AddSheet({
   onNewAccount,
   preset,
   edit,
+  onSplit,
   now = systemClock.nowMs,
 }: {
   api?: AddApi;
@@ -100,6 +103,8 @@ export function AddSheet({
   preset?: AddPreset;
   /** Editing an existing entry. */
   edit?: EditSpec;
+  /** A split entry's amount changed: the split editor takes over (the sheet closes first). */
+  onSplit?: (transactionId: string, newAmountMinor: number) => void;
   now?: () => number;
 }) {
   const theme = useTheme();
@@ -231,6 +236,12 @@ export function AddSheet({
     if (at === null) return setError('date');
     if (kind === 'transfer' && (!accountId || !toAccountId || accountId === toAccountId)) return setError('same');
     if (kind !== 'transfer' && (!categoryId || !data.categories.some((c) => c.id === categoryId))) return setError('category');
+    // A split entry's new amount commits only together with balanced splits: hand over to the split editor.
+    if ((edit.splitCount ?? 1) > 1 && parsed.value !== edit.amountMinor && onSplit) {
+      close();
+      onSplit(edit.transactionId, parsed.value);
+      return;
+    }
     saving.current = true;
     setEditError(null);
     try {

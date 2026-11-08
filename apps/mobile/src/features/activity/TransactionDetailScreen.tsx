@@ -54,6 +54,7 @@ export function TransactionDetailScreen({
   onBack,
   onEdit,
   onDuplicate,
+  onSplit,
   api = realTransactionApi,
   duplicateApi = realAddApi,
 }: {
@@ -61,6 +62,8 @@ export function TransactionDetailScreen({
   onBack: () => void;
   onEdit: (spec: EditSpec) => void;
   onDuplicate: (preset: AddPreset) => void;
+  /** Opens the split editor. */
+  onSplit?: (transactionId: string) => void;
   api?: TransactionApi;
   duplicateApi?: Pick<AddApi, 'duplicateInfo' | 'keepBoth' | 'merge' | 'undoResolution'>;
 }) {
@@ -151,7 +154,7 @@ export function TransactionDetailScreen({
       [copy.detail.type, TYPE_LABEL[d.type]],
       [copy.detail.date, `${longDate(d.localDate)}, ${whenText(d.occurredAtMs, d.timezoneId).split(', ')[1] ?? ''}`],
       [d.type === 'transfer' ? `${copy.detail.from} → ${copy.detail.to}` : copy.detail.account, accountText],
-      [copy.detail.category, d.category?.name ?? null],
+      [copy.detail.category, data.splits.length > 1 ? `${d.category?.name ?? ''} ${copy.split.more.replace('{n}', String(data.splits.length - 1))}` : (d.category?.name ?? null)],
       [copy.detail.merchant, d.merchant],
       [copy.detail.note, d.note],
       [copy.detail.payment, d.paymentMethod ? (PAYMENT_LABEL[d.paymentMethod] ?? d.paymentMethod) : null],
@@ -179,6 +182,17 @@ export function TransactionDetailScreen({
             </View>
           ))}
 
+        {data.splits.length > 1 ? (
+          <View testID="detail-splits" style={styles.row}>
+            {data.splits.map((sp) => (
+              <View key={sp.id} accessible accessibilityLabel={`${sp.notItemised ? copy.split.notItemised : sp.categoryName}, ${amountLabel({ amountMinor: sp.amountMinor, currency: data.currency, locale: data.locale })}`} style={styles.splitLine}>
+                <Text style={[textStyle('body'), sp.notItemised ? muted : ink]}>{sp.notItemised ? copy.split.notItemised : sp.categoryName}</Text>
+                <Amount amountMinor={sp.amountMinor} currency={data.currency} direction="neutral" locale={data.locale} />
+              </View>
+            ))}
+          </View>
+        ) : null}
+
         {d.openDuplicate ? (
           <View testID="detail-check" style={styles.row}>
             <Text style={[textStyle('body-medium'), ink]}>{copy.capture.possibleDuplicate}</Text>
@@ -196,6 +210,7 @@ export function TransactionDetailScreen({
           <View style={styles.actions}>
             {editSpecOf(d) ? <Button label={copy.detail.edit} variant="secondary" onPress={() => void edit()} testID="detail-edit" /> : null}
             {editSpecOf(d) ? <Button label={copy.detail.duplicate} variant="secondary" onPress={duplicate} testID="detail-duplicate" /> : null}
+            {(d.type === 'expense' || d.type === 'income') && onSplit ? <Button label={copy.split.action} variant="secondary" onPress={() => onSplit(d.id)} testID="detail-split" /> : null}
             {['expense', 'income', 'transfer', 'refund'].includes(d.type) ? (
               <Button label={captured ? copy.detail.reject : copy.detail.delete} variant="text" onPress={() => void remove(captured ? 'reject' : 'delete')} testID={captured ? 'detail-reject' : 'detail-delete'} />
             ) : null}
@@ -231,5 +246,6 @@ const styles = StyleSheet.create({
   chip: { width: 48, height: 48, borderRadius: radii.full, alignItems: 'center', justifyContent: 'center' },
   row: { gap: 2, minHeight: 48, justifyContent: 'center' },
   value: { flexShrink: 1 },
+  splitLine: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 40 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
 });

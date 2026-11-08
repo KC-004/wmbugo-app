@@ -75,7 +75,8 @@ export function ActivityRowView({
   const title = adjustment ? copy.activity.balanceAdjustment : (titleOverride ?? row.merchant ?? row.categoryName ?? copy.activity.transfer);
   const account = showAccount ? row.accountName : null;
   const kindWord = adjustment ? (up ? copy.activity.adjustedUp : copy.activity.adjustedDown) : row.kind === 'transfer' ? copy.activity.transfer : row.categoryName;
-  const sub = [kindWord, account, showDate ? shortDate(row.localDate) : null].filter(Boolean).join(' · ');
+  const category = kindWord && row.splitCount && row.kind !== 'transfer' && !adjustment ? `${kindWord} + ${row.splitCount - 1} more` : kindWord;
+  const sub = [category, account, showDate ? shortDate(row.localDate) : null].filter(Boolean).join(' · ');
   const tags = tagsOf(row);
   const foreignCurrency = row.foreign?.currency as CurrencyCode | undefined;
   const amountSpoken =

@@ -2,11 +2,13 @@ import { useCallback, type RefObject } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { copy } from '../../shared/copy';
 import { useSheet } from '../../shared/feedback/SheetHost';
+import { useOpenSplit } from '../activity/useOpenSplit';
 import { AddSheet, type AddPreset, type EditSpec } from './AddSheet';
 
 /** Opens the Add sheet with a preset chosen at the moment of the tap (one at a time). */
 export function useOpenAddWith(opener?: RefObject<unknown>): (preset?: AddPreset, edit?: EditSpec) => void {
   const sheet = useSheet();
+  const openSplit = useOpenSplit();
   const nav = useNavigation<{ navigate: (s: 'Accounts') => void }>();
   return useCallback(
     (preset?: AddPreset, edit?: EditSpec) => {
@@ -19,6 +21,7 @@ export function useOpenAddWith(opener?: RefObject<unknown>): (preset?: AddPreset
               close={close}
               preset={preset}
               edit={edit}
+              onSplit={(id, amount) => openSplit(id, amount)}
               onNewAccount={() => {
                 close();
                 nav.navigate('Accounts');
@@ -29,7 +32,7 @@ export function useOpenAddWith(opener?: RefObject<unknown>): (preset?: AddPreset
         opener,
       );
     },
-    [sheet, nav, opener],
+    [sheet, nav, opener, openSplit],
   );
 }
 

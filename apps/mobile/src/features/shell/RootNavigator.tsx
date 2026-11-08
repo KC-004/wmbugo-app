@@ -11,6 +11,7 @@ import { ToastHost } from '../../shared/feedback/ToastHost';
 import { useTheme } from '../../shared/theme/ThemeProvider';
 import type { AddButtonRef } from './AddButton';
 import { useOpenAdd, useOpenAddWith } from '../add/useOpenAdd';
+import { useOpenSplit } from '../activity/useOpenSplit';
 import { ActivityScreen } from '../activity/ActivityScreen';
 import { TransactionDetailScreen } from '../activity/TransactionDetailScreen';
 import { useReviewDot } from '../activity/reviewDot';
@@ -158,6 +159,7 @@ function TransactionDetailRoute() {
   const nav = useNavigation<{ goBack: () => void }>();
   const route = useRoute<RouteProp<RootParams, 'TransactionDetail'>>();
   const openAdd = useOpenAddWith();
+  const openSplit = useOpenSplit();
   return (
     <View style={[styles.fill, { backgroundColor: theme.color('bg-canvas'), paddingTop: insets.top }]}>
       <TransactionDetailScreen
@@ -165,6 +167,7 @@ function TransactionDetailRoute() {
         onBack={() => nav.goBack()}
         onEdit={(spec) => openAdd(undefined, spec)}
         onDuplicate={(preset) => openAdd(preset)}
+        onSplit={(id) => openSplit(id)}
       />
     </View>
   );

@@ -117,13 +117,17 @@ export const EditTransaction: UseCase<
       if (e.note !== undefined && clean(e.note, MAX_NOTE_LENGTH) !== before.note) changed.push('note');
     } else if (type === 'expense' || type === 'income') {
       if (!input.entry) return err('NOT_EDITABLE');
-      if (before.splits.length !== 1 || before.postings.length !== 1) return err('NOT_EDITABLE');
+      if (before.splits.length < 1 || before.postings.length !== 1) return err('NOT_EDITABLE');
       const e = input.entry;
       const posting = before.postings[0]!;
-      const split = before.splits[0]!;
+      // A split entry (Story 3.7): its amount and categories change only through SetSplits, together and balanced. Everything
+      // else about it (account, date, merchant, note, payment method) edits as usual.
+      const multi = before.splits.length > 1;
+      const split = [...before.splits].sort((x, y) => y.amount - x.amount)[0]!;
       const a = amountOf(e.amountMinor);
       if (a === 'bad') return err('AMOUNT_INVALID');
       if (a !== null && a <= 0) return err('AMOUNT_REQUIRED');
+      if (multi && ((a !== null && a !== before.amount) || (e.categoryId !== undefined && e.categoryId !== split.category))) return err('NOT_EDITABLE');
       if (e.paymentMethod !== undefined && e.paymentMethod !== null && !PAYMENT_METHODS.includes(e.paymentMethod)) return err('PAYMENT_METHOD_INVALID');
       if (e.categoryId !== undefined && e.categoryId !== split.category) {
         const c = (await ctx.query('SELECT kind FROM category WHERE id = ? AND archived = 0', [e.categoryId]))[0];
@@ -151,7 +155,7 @@ export const EditTransaction: UseCase<
         input.transactionId,
       ]);
       await ctx.execute('UPDATE posting SET account_id = ?, signed_amount_minor = ? WHERE id = ?', [account, type === 'expense' ? -amount : amount, posting.id]);
-      await ctx.execute('UPDATE split SET category_id = ?, amount_minor = ? WHERE id = ?', [category, amount, split.id]);
+      if (!multi) await ctx.execute('UPDATE split SET category_id = ?, amount_minor = ? WHERE id = ?', [category, amount, split.id]);
       if (a !== null && a !== before.amount) changed.push('amount');
       if (category !== split.category) changed.push('category');
       if (account !== posting.account) changed.push('account');
