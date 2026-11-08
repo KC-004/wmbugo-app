@@ -2,10 +2,6 @@ import {
   ACCOUNT_LIST_SQL,
   CATEGORY_LIST_SQL,
   CATEGORY_USE_SQL,
-  effectiveLocale,
-  getCurrency,
-  parseSettings,
-  SETTINGS_SQL,
   LAST_ACCOUNT_FOR_CATEGORY_SQL,
   LAST_ACCOUNT_SQL,
   mapAccountRows,
@@ -24,6 +20,7 @@ import {
   type ManualEntry,
 } from '@wmbugo/core';
 import { getServices, systemClock } from '../../adapters/startApp';
+import { readProfile } from '../../adapters/readProfile';
 
 /** The sheet's three segments. */
 export type AddKind = EntryKind | 'transfer';
@@ -72,10 +69,8 @@ async function activeAccountIds(): Promise<string[]> {
 export const realAddApi: AddApi = {
   async load(kind) {
     const db = getServices().db;
-    const prof = (await db.query('SELECT currency_code, currency_exponent, locale, timezone_id FROM profile LIMIT 1'))[0];
+    const prof = await readProfile(db);
     if (!prof) return null;
-    const cur = getCurrency(String(prof[0]));
-    if (!cur.ok) return null;
 
     const categories = mapCategoryRows(await db.query(CATEGORY_LIST_SQL)).filter((c) => c.kind === (kind === 'income' ? 'income' : 'expense'));
     const now = systemClock.nowMs();
@@ -89,13 +84,13 @@ export const realAddApi: AddApi = {
     const quick = cached.ids.map((id) => byId.get(id)).filter((c): c is CategoryRow => c !== undefined);
 
     const accounts = mapAccountRows(await db.query(ACCOUNT_LIST_SQL)).filter((a) => a.status === 'active');
-    const settings = parseSettings(await db.query(SETTINGS_SQL));
+    const settings = prof.settings;
     const lastAny = ((await db.query(LAST_ACCOUNT_SQL))[0]?.[0] as string | undefined) ?? null;
     return {
-      currency: cur.value.code,
-      exponent: Number(prof[1]),
-      locale: effectiveLocale(String(prof[2]), settings.numberFormat),
-      timezoneId: String(prof[3]),
+      currency: prof.currency,
+      exponent: prof.exponent,
+      locale: prof.locale,
+      timezoneId: prof.timezoneId,
       categories,
       quick,
       accounts,
@@ -108,8 +103,8 @@ export const realAddApi: AddApi = {
     const ids = await activeAccountIds();
     const forCat = ((await db.query(LAST_ACCOUNT_FOR_CATEGORY_SQL, [categoryId]))[0]?.[0] as string | undefined) ?? null;
     const lastAny = ((await db.query(LAST_ACCOUNT_SQL))[0]?.[0] as string | undefined) ?? null;
-    const settings = parseSettings(await db.query(SETTINGS_SQL));
-    return pickDefaultAccount(ids, forCat, lastAny, settings.defaultAccountId);
+    const prof = await readProfile(db);
+    return pickDefaultAccount(ids, forCat, lastAny, prof?.settings.defaultAccountId ?? null);
   },
   record: (entry) => getServices().writer.run(RecordManualEntry, entry, 'user'),
   recordTransfer: (input) => getServices().writer.run(RecordTransfer, input, 'user'),

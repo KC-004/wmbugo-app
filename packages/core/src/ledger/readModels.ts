@@ -48,9 +48,30 @@ export interface ActivityRow {
   readonly accountName: string | null;
 }
 
-/** Newest first. Transfers have two postings, so rows can repeat; `mapActivityRows` keeps the first. */
+/** How many entries Activity loads at a time. */
+export const ACTIVITY_PAGE_SIZE = 100;
+
+const ACTIVITY_FILTER = "t2.removed_at IS NULL AND t2.status = 'confirmed' AND t2.event_type IN ('expense','income','transfer','refund')";
+
+/**
+ * The newest entries first, one page. Param: the number of entries (ask for one more than you show, to know
+ * whether there are earlier ones). Transfers have two postings, so rows can repeat; `mapActivityRows` keeps
+ * the first and joins the two account names.
+ */
 export const ACTIVITY_SQL =
-  "SELECT t.id, t.event_type, t.amount_minor, t.local_date, t.original_description, c.name, c.icon, c.color_token, a.name FROM \"transaction\" t LEFT JOIN split s ON s.transaction_id = t.id LEFT JOIN category c ON c.id = s.category_id LEFT JOIN posting p ON p.transaction_id = t.id LEFT JOIN account a ON a.id = p.account_id WHERE t.removed_at IS NULL AND t.status = 'confirmed' AND t.event_type IN ('expense','income','transfer','refund') ORDER BY t.local_date DESC, t.occurred_at_utc DESC, t.id DESC, p.signed_amount_minor ASC LIMIT 500";
+  'SELECT t.id, t.event_type, t.amount_minor, t.local_date, t.original_description, c.name, c.icon, c.color_token, a.name FROM "transaction" t LEFT JOIN split s ON s.transaction_id = t.id LEFT JOIN category c ON c.id = s.category_id LEFT JOIN posting p ON p.transaction_id = t.id LEFT JOIN account a ON a.id = p.account_id WHERE t.id IN (SELECT t2.id FROM "transaction" t2 WHERE ' +
+  ACTIVITY_FILTER +
+  ' ORDER BY t2.local_date DESC, t2.occurred_at_utc DESC, t2.id DESC LIMIT ?) ORDER BY t.local_date DESC, t.occurred_at_utc DESC, t.id DESC, p.signed_amount_minor ASC';
+
+/** The page to show and whether earlier entries exist (the query was asked for `limit + 1`). */
+export function pageActivity(rows: readonly ActivityRow[], limit: number): { rows: ActivityRow[]; hasMore: boolean } {
+  if (rows.length <= limit) return { rows: [...rows], hasMore: false };
+  // The first row left out belongs to a day that may be only partly shown: leave that whole day for the next
+  // page so a day's "Spent" is never under-reported. (If one day fills the page, show it as it is.)
+  const cut = rows[limit]!.localDate;
+  const kept = rows.slice(0, limit).filter((r) => r.localDate !== cut);
+  return { rows: kept.length > 0 ? kept : rows.slice(0, limit), hasMore: true };
+}
 
 export function mapActivityRows(rows: readonly (readonly unknown[])[]): ActivityRow[] {
   const seen = new Set<string>();

@@ -129,7 +129,7 @@ Constraint: exactly one row (`CHECK` via fixed id or app-level; writer asserts).
 
 Indexes: `(status, sort_order)`. Checks: `credit_limit_minor >= 0`, `balance_not_set = 1 OR opening_minor IS NOT NULL`.
 
-The opening balance is stored on the account only as a convenience copy of the derived opening posting's amount; the posting with `posting_kind = opening_balance` is the source of truth (AD-5, one representation). **Open point for GATE-07:** whether `opening_minor` is dropped entirely and read from the posting; this design keeps the column nullable and the writer keeps it equal to the posting.
+The opening balance is stored on the account only as a convenience copy of the derived opening posting's amount; the posting with `posting_kind = opening_balance` is the source of truth (AD-5, one representation). **Decision (proposed for GATE-07 sign-off):** keep `opening_minor` as a nullable convenience copy; the `openingBalanceShape` invariant (Story 1.12 follow-up) now checks on every write that it equals the sum of the account's opening postings, so the two cannot drift. Dropping the column stays possible later as a new migration; no reader depends on it.
 
 ### 4.2 `transaction` (ledger, 0004)
 

@@ -99,7 +99,7 @@ describe('Region and currency (SCR-02)', () => {
   it('says currency is fixed once entries exist', () => {
     const r = mount('SG');
     next(r);
-    expect(texts(r)).toContain('You can change the currency until you add your first entry.');
+    expect(texts(r)).toContain('You can change the currency until you save an amount (an opening balance counts).');
   });
 
   it('a device region that is not a Phase 1 market pre-selects nothing and disables Continue with a hint', () => {

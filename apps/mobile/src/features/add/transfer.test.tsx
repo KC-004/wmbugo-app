@@ -1,13 +1,6 @@
-import { AccessibilityInfo, Text } from 'react-native';
-import { act, create, type ReactTestRenderer } from 'react-test-renderer';
-import { QueryClientProvider } from '@tanstack/react-query';
-import { mapCategoryRows, rankCategories, SEED_CATEGORIES, type AccountRow, type TransferInput } from '@wmbugo/core';
-import { ToastHost } from '../../shared/feedback/ToastHost';
-import { createQueryClient } from '../../shared/queryClient';
-import { EMPTY_DRAFT, useUiStore } from '../../shared/state/uiStore';
-import { ThemeProvider } from '../../shared/theme/ThemeProvider';
-import { AddSheet } from './AddSheet';
-import type { AddApi, AddData, AddKind } from './addApi';
+import { AccessibilityInfo } from 'react-native';
+import { act, type ReactTestRenderer } from 'react-test-renderer';
+import { account, cleanup, fire, has, host, mountReady, quietAccessibility, settle, tap, texts } from './testKit';
 
 jest.mock('../../adapters/startApp', () => ({ getServices: jest.fn(), systemClock: { nowMs: () => 0, timezoneId: () => 'Asia/Singapore' } }));
 
@@ -17,82 +10,11 @@ jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
   default: () => ({ width: 400, height: 800, scale: 2, fontScale: mockFontScale }),
 }));
 
-const live: ReactTestRenderer[] = [];
-const clients: ReturnType<typeof createQueryClient>[] = [];
 afterEach(async () => {
-  await act(async () => new Promise((res) => setTimeout(res, 0)));
-  for (const r of live.splice(0)) act(() => r.unmount());
-  for (const c of clients.splice(0)) c.clear();
-  jest.restoreAllMocks();
-  useUiStore.setState({ addDraft: EMPTY_DRAFT });
+  await cleanup();
   mockFontScale = 1;
 });
-beforeEach(() => {
-  jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(true);
-  jest.spyOn(AccessibilityInfo, 'isScreenReaderEnabled').mockResolvedValue(false);
-  jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
-  jest.spyOn(AccessibilityInfo, 'addEventListener').mockReturnValue({ remove: () => undefined } as never);
-  jest.spyOn(AccessibilityInfo, 'getRecommendedTimeoutMillis').mockImplementation(async (ms: number) => ms);
-});
-
-const fire = (r: ReactTestRenderer, id: string, handler = 'onPress', ...args: unknown[]) =>
-  r.root.findAll((n) => n.props.testID === id && typeof n.props[handler] === 'function')[0]!.props[handler](...args);
-const host = (r: ReactTestRenderer, id: string) => r.root.findAll((n) => typeof n.type === 'string' && n.props.testID === id)[0]!;
-const has = (r: ReactTestRenderer, id: string) => r.root.findAll((n) => typeof n.type === 'string' && n.props.testID === id).length > 0;
-const texts = (r: ReactTestRenderer) => r.root.findAll((n) => n.type === Text).map((n) => [n.props.children].flat().filter((c) => typeof c === 'string').join(''));
-const settle = async () => {
-  for (let i = 0; i < 3; i++) await act(async () => new Promise((res) => setTimeout(res, 0)));
-};
-const tap = (r: ReactTestRenderer, keys: string) => {
-  for (const k of keys) act(() => fire(r, k === '.' ? 'key-decimal' : `key-${k}`));
-};
-
-const account = (id: string, name: string, over: Partial<AccountRow> = {}): AccountRow => ({
-  id, name, type: 'bank', icon: 'Bank', colorToken: 'cat-indigo', sortOrder: 0, status: 'active', balanceNotSet: true, postingsMinor: 0, ...over,
-});
-const cats = (kind: AddKind) =>
-  mapCategoryRows(SEED_CATEGORIES.filter((c) => c.kind === (kind === 'income' ? 'income' : 'expense')).map((c, i) => [c.id, c.name, c.kind, c.budgetType, c.icon, c.color, i]));
-
-function fakeApi(over: Partial<AddData> = {}) {
-  const record = jest.fn(async () => ({ ok: true as const, value: { transactionId: 'tx1', accountId: 'a1' } }));
-  const remove = jest.fn(async (...ids: string[]) => ({ ok: ids.length >= 0 }));
-  const recordTransfer = jest.fn<Promise<{ ok: true; value: { transactionId: string; feeTransactionId: string | null } } | { ok: false; code: string }>, [TransferInput]>(
-    async () => ({ ok: true, value: { transactionId: 'tr1', feeTransactionId: null } }),
-  );
-  const load = jest.fn(async (kind: AddKind): Promise<AddData> => {
-    const categories = cats(kind);
-    return {
-      currency: 'SGD', exponent: 2, locale: 'en-SG', timezoneId: 'Asia/Singapore', categories,
-      quick: rankCategories(categories, new Map()),
-      accounts: [account('a1', 'DBS'), account('a2', 'Cash')],
-      defaultAccountId: 'a1', blockTransfers: false, ...over,
-    };
-  });
-  const api: AddApi = { load, defaultAccountFor: async () => 'a1', record, recordTransfer, remove };
-  return { api, record, recordTransfer, remove };
-}
-
-async function mountReady(over: Partial<AddData> = {}, onNewAccount?: () => void) {
-  const f = fakeApi(over);
-  const qc = createQueryClient();
-  clients.push(qc);
-  const close = jest.fn();
-  let r!: ReactTestRenderer;
-  act(() => {
-    r = create(
-      <QueryClientProvider client={qc}>
-        <ThemeProvider>
-          <ToastHost bottomOffset={0}>
-            <AddSheet api={f.api} close={close} onNewAccount={onNewAccount} now={() => Date.UTC(2026, 10, 8, 10)} />
-          </ToastHost>
-        </ThemeProvider>
-      </QueryClientProvider>,
-    );
-  });
-  live.push(r);
-  await settle();
-  return { r, close, ...f };
-}
+beforeEach(quietAccessibility);
 
 describe('segments', () => {
   it('are a radio group "Entry type" with "n of 3"', async () => {
@@ -187,7 +109,7 @@ describe('Transfer', () => {
 
   it('with one account offers + New account and refuses "Choose two different accounts", keeping the input', async () => {
     const onNew = jest.fn();
-    const { r, recordTransfer } = await mountReady({ accounts: [account('a1', 'DBS')] }, onNew);
+    const { r, recordTransfer } = await mountReady({ accounts: [account('a1', 'DBS')] }, undefined, onNew);
     tap(r, '200');
     await toTransfer(r);
     act(() => fire(r, 'to-new-account'));

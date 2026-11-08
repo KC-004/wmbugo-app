@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bank, CreditCard, Money, PiggyBank, Wallet } from 'phosphor-react-native';
 import { balanceOf, cardDues, validateAccountName, type AccountRow, type CurrencyCode, type NewAccount } from '@wmbugo/core';
 import { amountLabel } from '../../shared/a11y/labels';
 import { copy } from '../../shared/copy';
-import { EmptyState } from '../../shared/feedback/Feedback';
+import { EmptyState, ErrorBlock, Skeleton } from '../../shared/feedback/Feedback';
 import { useToast } from '../../shared/feedback/ToastHost';
 import { Icon, type IconComponent } from '../../shared/theme/Icon';
 import type { ColorName } from '../../shared/theme/colors';
@@ -38,8 +38,16 @@ export function AccountsScreen({ api = realAccountsApi }: { api?: AccountsApi })
   const active = (accounts.data ?? []).filter((a) => a.status === 'active');
   const ink = { color: theme.color('text-primary') };
 
+  const adding = useRef(false);
   const add = async (account: NewAccount) => {
-    const r = await api.add(account);
+    if (adding.current) return;
+    adding.current = true;
+    let r: { ok: boolean };
+    try {
+      r = await api.add(account);
+    } finally {
+      adding.current = false;
+    }
     if (r.ok) {
       setSaveError(null);
       setMode({ kind: 'list' });
@@ -55,7 +63,14 @@ export function AccountsScreen({ api = realAccountsApi }: { api?: AccountsApi })
       message: `${copy.accounts.archived} ${a.name}`,
       undo: {
         label: copy.common.undo,
-        onUndo: () => void api.restore(a.id).then(refresh),
+        onUndo: () =>
+          void api
+            .restore(a.id)
+            .then(async (res) => {
+              await refresh();
+              if (!res.ok) toast.show({ message: copy.accounts.restoreFailed });
+            })
+            .catch(() => toast.show({ message: copy.accounts.restoreFailed })),
       },
     });
   };
@@ -82,7 +97,16 @@ export function AccountsScreen({ api = realAccountsApi }: { api?: AccountsApi })
         <Button label={copy.accounts.add} variant="secondary" onPress={() => setMode({ kind: 'add' })} testID="accounts-add" />
       </View>
 
-      {active.length === 0 && !accounts.isLoading ? (
+      {accounts.isError ? (
+        <ErrorBlock cause={copy.accounts.loadError} onRetry={() => void accounts.refetch()} />
+      ) : accounts.isLoading ? (
+        <View testID="accounts-skeleton" style={styles.pad}>
+          <Skeleton height={64} />
+          <Skeleton height={64} />
+        </View>
+      ) : null}
+
+      {active.length === 0 && !accounts.isLoading && !accounts.isError ? (
         <EmptyState sentence={copy.accounts.empty} actionLabel={copy.accounts.add} onAction={() => setMode({ kind: 'add' })} />
       ) : null}
 
@@ -103,7 +127,7 @@ export function AccountsScreen({ api = realAccountsApi }: { api?: AccountsApi })
             if (r.ok) {
               setMode({ kind: 'list' });
               await refresh();
-            }
+            } else toast.show({ message: copy.accounts.renameFailed });
             return r.ok;
           }}
           onRenameCancel={() => setMode({ kind: 'list' })}

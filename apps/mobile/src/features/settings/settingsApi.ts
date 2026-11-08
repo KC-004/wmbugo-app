@@ -6,11 +6,8 @@ import {
   ChangeSetting,
   findRegion,
   mapAccountRows,
-  paydayRuleFromRow,
-  parseSettings,
   PROMPT_TIMEZONE,
   SETTING_TZ_MISMATCH_SINCE,
-  SETTINGS_SQL,
   shouldAskTimezone,
   TrackTimezone,
   type AccountRow,
@@ -20,6 +17,7 @@ import {
   type Region,
 } from '@wmbugo/core';
 import { getServices, systemClock } from '../../adapters/startApp';
+import { readProfile } from '../../adapters/readProfile';
 
 export interface ProfileView {
   readonly region: Region | null;
@@ -58,18 +56,18 @@ export const TIMEZONE_QUERY_KEY = ['app', 'timezone-check'] as const;
 export const realSettingsApi: SettingsApi = {
   async load() {
     const db = getServices().db;
-    const p = (await db.query('SELECT region, currency_code, locale, timezone_id, payday_rule, payday_day FROM profile LIMIT 1'))[0];
+    const p = await readProfile(db);
     if (!p) return null;
     const count = Number((await db.query('SELECT COUNT(*) FROM "transaction"'))[0]![0]);
     return {
-      settings: parseSettings(await db.query(SETTINGS_SQL)),
+      settings: p.settings,
       profile: {
-        region: findRegion(String(p[0])),
-        regionCode: String(p[0]),
-        currency: String(p[1]),
-        locale: String(p[2]),
-        timezoneId: String(p[3]),
-        payday: paydayRuleFromRow(p[4] === null ? null : String(p[4]), p[5] === null ? null : Number(p[5])),
+        region: findRegion(p.regionCode),
+        regionCode: p.regionCode,
+        currency: p.currency,
+        locale: p.regionLocale,
+        timezoneId: p.timezoneId,
+        payday: p.payday,
       },
       hasTransactions: count > 0,
       accounts: mapAccountRows(await db.query(ACCOUNT_LIST_SQL)).filter((a) => a.status === 'active'),

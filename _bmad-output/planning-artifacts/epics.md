@@ -1611,6 +1611,8 @@ So that recording a coffee takes seconds and I can undo a mistake immediately.
 **When** she reopens ＋
 **Then** amount, type and category are restored from an in-memory draft (Zustand only, never persisted, gone after process death); Save or `Clear` discards it.
 
+**As built (reconciled after Epic 1, accepted deviations):** the spoken amount uses the currency's full name ("12 point 50 Singapore dollars"); the merchant is stored as text in `transaction.original_description` until the merchant table exists in the learning epic; Date and time are two typed fields (`YYYY-MM-DD`, `HH:MM`) until a picker library is chosen, and are sent only when edited; the Save row is a fixed bar under the scrolling sheet so Save is always on screen; the third segment (Transfer) is delivered by Story 1.15.
+
 **Covers:** TXN-001, TXN-002, FIN-001, FIN-002, FIN-020, FIN-021, NFR-04, UX-DR32, UX-DR35, UX-DR36, UX-DR37, UX-DR47, UX-DR93, FLOW-02, CAT-001 (seed data), CAT-006 (type column)
 
 ### Story 1.14: Home shell and Activity list of saved entries
@@ -1651,6 +1653,8 @@ So that I can see my first expense reflected straight away.
 **Given** Activity with no entries, or Home while loading
 **When** it renders
 **Then** Activity shows the boat empty state with one sentence and an `Add an expense` button opening the Add sheet, and Home shows skeletons until values fade in.
+
+**As built (reconciled after Epic 1, accepted deviations):** the one-time tip is a card directly under the accounts line (not an arrow popover); Card dues shows only when a card with a known balance exists, so a missing card is never shown as zero; Activity loads 100 entries at a time with a "Show earlier entries" button.
 
 **Covers:** ONB-003, ONB-005, AD-7, HOM-006, UX-DR28, UX-DR29, UX-DR30, UX-DR48, UX-DR50, UX-DR52, UX-DR70, UX-DR86, UX-DR99, FLOW-01 (Home climax), FLOW-02 (climax)
 
@@ -1730,6 +1734,8 @@ So that wmbugo keeps fitting how I live without redoing setup.
 **Given** Settings › You
 **When** Mei turns on `Block transfers above the balance`
 **Then** the setting persists across restarts and the transfer form enforces it.
+
+**As built (reconciled after Epic 1, accepted deviations):** Haptics is a stored choice that takes effect when haptic feedback is introduced (nothing vibrates today); First day of the week is stored for the calendar and weekly views that arrive later; any saved amount, including an onboarding opening balance, locks the currency; Reduce motion is applied to sheets and toasts through the shared hook.
 
 **Covers:** SET-001, SET-002, FIN-002 (timezone prompt), ONB-006 (period change, no mutation), AD-7, UX-DR1, UX-DR60, UX-DR91, UX-DR104
 

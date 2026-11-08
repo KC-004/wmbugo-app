@@ -2,10 +2,6 @@ import {
   ACCOUNT_LIST_SQL,
   AddAccount,
   ArchiveAccount,
-  effectiveLocale,
-  getCurrency,
-  parseSettings,
-  SETTINGS_SQL,
   mapAccountRows,
   MoveAccount,
   RenameAccount,
@@ -15,6 +11,7 @@ import {
   type NewAccount,
 } from '@wmbugo/core';
 import { getServices } from '../../adapters/startApp';
+import { readProfile } from '../../adapters/readProfile';
 
 export interface ProfileCurrency {
   readonly currency: CurrencyCode;
@@ -38,11 +35,8 @@ export const PROFILE_QUERY_KEY = ['ledger', 'profile'] as const;
 
 export const realAccountsApi: AccountsApi = {
   async profile() {
-    const rows = await getServices().db.query('SELECT currency_code, currency_exponent, locale FROM profile LIMIT 1');
-    const r = rows[0];
-    if (!r) return null;
-    const cur = getCurrency(String(r[0]));
-    return cur.ok ? { currency: cur.value.code, exponent: Number(r[1]), locale: effectiveLocale(String(r[2]), parseSettings(await getServices().db.query(SETTINGS_SQL)).numberFormat) } : null;
+    const p = await readProfile(getServices().db);
+    return p ? { currency: p.currency, exponent: p.exponent, locale: p.locale } : null;
   },
   async list() {
     return mapAccountRows(await getServices().db.query(ACCOUNT_LIST_SQL));

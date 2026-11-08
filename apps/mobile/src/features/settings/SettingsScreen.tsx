@@ -15,7 +15,7 @@ import {
   type Region,
   type ThemeChoice,
 } from '@wmbugo/core';
-import { controlA11y } from '../../shared/a11y/labels';
+import { amountLabel, controlA11y } from '../../shared/a11y/labels';
 import { copy } from '../../shared/copy';
 import { invalidateForEvent } from '../../shared/queryClient';
 import { Icon } from '../../shared/theme/Icon';
@@ -25,6 +25,7 @@ import { textStyle } from '../../shared/theme/typography';
 import { Amount } from '../../shared/ui/Amount';
 import { Button } from '../../shared/ui/Button';
 import { Chip } from '../../shared/ui/Chip';
+import { useFocusRing } from '../../shared/ui/FocusRing';
 import { RegionPicker } from '../onboarding/OnboardingFlow';
 import { realSettingsApi, SETTINGS_QUERY_KEY, type SettingsApi, type SettingsData } from './settingsApi';
 
@@ -147,7 +148,11 @@ function Appearance({ d, onSet }: { d: SettingsData; onSet: (key: string, value:
           <Chip key={f.v} label={f.label} role="radio" variant="period" testID={`format-${f.v}`} selected={d.settings.numberFormat === f.v} onPress={() => void onSet('ui.number_format', f.v)} />
         ))}
       </Group>
-      <View style={styles.preview} testID="format-preview" accessible accessibilityLabel={copy.settings.previewLead}>
+      <View
+        style={styles.preview}
+        testID="format-preview"
+        accessible
+        accessibilityLabel={`${copy.settings.previewLead} ${amountLabel({ amountMinor: sampleMinor(d.profile.currency), currency: d.profile.currency as never, locale: previewLocale(d), inline: true })}`}>
         <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{copy.settings.previewLead}</Text>
         <Amount amountMinor={sampleMinor(d.profile.currency)} currency={d.profile.currency as never} direction="neutral" locale={previewLocale(d)} />
       </View>
@@ -263,7 +268,7 @@ function Money({
           />
           {dayError ? (
             <Text testID="payday-day-error" accessibilityRole="alert" style={[textStyle('caption'), { color: theme.color('semantic-expense') }]}>
-              {copy.onboarding.paydayDay}
+              {copy.onboarding.paydayDayError}
             </Text>
           ) : null}
           <Button
@@ -334,12 +339,15 @@ function Group({ label, children }: { label: string; children: ReactNode }) {
 
 function Row({ label, summary, onPress, testID }: { label: string; summary: string; onPress: () => void; testID: string }) {
   const theme = useTheme();
+  const { focused, onFocus, onBlur } = useFocusRing();
   return (
     <Pressable
       testID={testID}
       {...controlA11y({ label: `${label}, ${summary}`, role: 'button' })}
       onPress={onPress}
-      style={[styles.row, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
+      onFocus={onFocus}
+      onBlur={onBlur}
+      style={[styles.row, { backgroundColor: theme.color('bg-surface'), borderColor: focused ? theme.color('focus-ring') : theme.color('border-hairline'), borderWidth: focused ? 2 : 1 }]}>
       <View style={styles.rowText}>
         <Text style={[textStyle('body-medium'), { color: theme.color('text-primary') }]}>{label}</Text>
         <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{summary}</Text>

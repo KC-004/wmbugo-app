@@ -77,7 +77,7 @@ export function Skeleton({ width = '100%', height = 16 }: { width?: DimensionVal
 }
 
 /** Shows `skeleton` while loading, then fades the values in over 200 ms (instantly under reduced motion). */
-export function Reveal({ loading, skeleton, children }: { loading: boolean; skeleton: ReactNode; children: ReactNode }) {
+export function Reveal({ loading, skeleton, children, fill = false }: { loading: boolean; skeleton: ReactNode; children: ReactNode; fill?: boolean }) {
   const reduced = useReducedMotion();
   const opacity = useRef(new Animated.Value(loading || reduced ? 1 : 0)).current;
   useEffect(() => {
@@ -90,7 +90,7 @@ export function Reveal({ loading, skeleton, children }: { loading: boolean; skel
     Animated.timing(opacity, { toValue: 1, duration: motion.standard, useNativeDriver: true }).start();
   }, [loading, reduced, opacity]);
   if (loading) return <>{skeleton}</>;
-  return <Animated.View style={{ opacity }}>{children}</Animated.View>;
+  return <Animated.View style={fill ? { opacity, flex: 1 } : { opacity }}>{children}</Animated.View>;
 }
 
 const styles = StyleSheet.create({

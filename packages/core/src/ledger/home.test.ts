@@ -12,7 +12,8 @@ import { LedgerWriter } from '../writer/ledgerWriter';
 import { AddAccount, openingBalanceShape } from './accountCommands';
 import { ACCOUNT_LIST_SQL, mapAccountRows } from './accounts';
 import { entryShape, RecordManualEntry, RemoveEntry } from './entryCommands';
-import { ACTIVITY_SQL, groupByDay, homeAccounts, mapActivityRows, SPENT_EXPENSES_SQL, SPENT_REFUNDS_SQL, spentMinor } from './readModels';
+import { RecordTransfer } from './transferCommands';
+import { ACTIVITY_SQL, pageActivity, groupByDay, homeAccounts, mapActivityRows, SPENT_EXPENSES_SQL, SPENT_REFUNDS_SQL, spentMinor } from './readModels';
 
 const RULES: PaydayRule[] = [{ kind: 'none' }, { kind: 'first' }, { kind: 'last_day' }, { kind: 'last_working_day' }, { kind: 'day', day: 15 }, { kind: 'day', day: 31 }, { kind: 'day', day: 30 }];
 
@@ -160,6 +161,14 @@ describe('home accounts', () => {
   });
 });
 
+async function setupWithAccounts() {
+  const base = await setup();
+  await base.writer.run(AddAccount, { name: 'DBS', type: 'bank', openingMinor: 100000 }, 'user');
+  await base.writer.run(AddAccount, { name: 'Cash', type: 'cash', openingMinor: 5000 }, 'user');
+  const ids = (await base.db.query('SELECT id FROM account ORDER BY sort_order')).map((r) => r[0] as string);
+  return { ...base, ids };
+}
+
 describe('activity', () => {
   it('lists newest first with category and account, one row per entry, excluding removed and opening balances', async () => {
     const { db, writer, clock } = await setup();
@@ -173,11 +182,28 @@ describe('activity', () => {
     if (!gone.ok) throw new Error('x');
     await writer.run(RemoveEntry, { transactionId: gone.value.transactionId }, 'user');
 
-    const rows = mapActivityRows(await db.query(ACTIVITY_SQL));
+    const rows = mapActivityRows(await db.query(ACTIVITY_SQL, [100]));
     expect(rows.map((r) => [r.kind, r.amountMinor, r.localDate, r.merchant, r.categoryName, r.accountName])).toEqual([
       ['income', 50000, '2026-11-08', null, 'Salary', 'DBS'],
       ['expense', 1250, '2026-11-07', 'Kopi', 'Food & Drinks', 'DBS'],
     ]);
+  });
+
+  it('pages: asks for one more than shown, says whether earlier entries exist, and keeps a transfer whole', async () => {
+    const { db, writer, ids } = await setupWithAccounts();
+    for (let i = 0; i < 5; i++) await writer.run(RecordManualEntry, { kind: 'expense', amountMinor: 100 + i, categoryId: 'cat_food', accountId: ids[0]!, occurredAtMs: Date.UTC(2026, 10, 1 + i, 4) }, 'user');
+    await writer.run(RecordTransfer, { amountMinor: 700, fromAccountId: ids[0]!, toAccountId: ids[1]!, occurredAtMs: Date.UTC(2026, 10, 7, 4) }, 'user');
+    const page = (limit: number) => pageActivity(mapActivityRows([]), limit);
+    expect(page(3)).toEqual({ rows: [], hasMore: false });
+    const rows3 = mapActivityRows(await db.query(ACTIVITY_SQL, [4]));
+    expect(rows3).toHaveLength(4);
+    const shown = pageActivity(rows3, 3);
+    expect(shown.hasMore).toBe(true);
+    expect(shown.rows.map((r) => r.kind)).toEqual(['transfer', 'expense', 'expense']);
+    expect(shown.rows[0]!.accountName).toBe('DBS → Cash');
+    const all = pageActivity(mapActivityRows(await db.query(ACTIVITY_SQL, [100])), 50);
+    expect(all.hasMore).toBe(false);
+    expect(all.rows.length).toBeGreaterThanOrEqual(6);
   });
 
   it('groups by day with Spent = expenses minus refunds, floored at zero; income and transfers are not counted', () => {

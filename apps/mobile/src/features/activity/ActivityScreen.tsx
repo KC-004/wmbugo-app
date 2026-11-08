@@ -1,10 +1,11 @@
 import { SectionList, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowsLeftRight, DotsThree } from 'phosphor-react-native';
-import { dayHeading, longDate, type ActivityDay, type ActivityRow, type CurrencyCode } from '@wmbugo/core';
+import { ACTIVITY_PAGE_SIZE, dayHeading, longDate, type ActivityDay, type ActivityRow, type CurrencyCode } from '@wmbugo/core';
 import { amountLabel, type AmountKind } from '../../shared/a11y/labels';
 import { copy } from '../../shared/copy';
-import { EmptyState, Reveal, Skeleton } from '../../shared/feedback/Feedback';
+import { EmptyState, ErrorBlock, Reveal, Skeleton } from '../../shared/feedback/Feedback';
 import { Icon } from '../../shared/theme/Icon';
 import type { ColorName } from '../../shared/theme/colors';
 import { useTheme } from '../../shared/theme/ThemeProvider';
@@ -30,7 +31,8 @@ export function ActivityScreen({
   onProfile: () => void;
   onAdd: () => void;
 }) {
-  const q = useQuery({ queryKey: ACTIVITY_QUERY_KEY, queryFn: () => api.load() });
+  const [limit, setLimit] = useState(ACTIVITY_PAGE_SIZE);
+  const q = useQuery({ queryKey: [...ACTIVITY_QUERY_KEY, limit], queryFn: () => api.load(limit), placeholderData: (prev) => prev });
   const d = q.data ?? null;
   const header = <ScreenHeader title={copy.nav.activity} onAccounts={onAccounts} onProfile={onProfile} />;
   const skeleton = (
@@ -53,7 +55,7 @@ export function ActivityScreen({
   return (
     <View style={styles.fill}>
       <View style={styles.pad}>{header}</View>
-      <Reveal loading={q.isLoading} skeleton={skeleton}>
+      <Reveal loading={q.isLoading} skeleton={skeleton} fill>
         {d ? (
           <SectionList
             testID="activity-list"
@@ -61,13 +63,17 @@ export function ActivityScreen({
             keyExtractor={(r) => r.id}
             stickySectionHeadersEnabled={false}
             contentContainerStyle={styles.list}
+            ListFooterComponent={
+              d.hasMore ? (
+                <Button label={copy.activity.showEarlier} variant="secondary" testID="activity-show-earlier" onPress={() => setLimit((n) => n + ACTIVITY_PAGE_SIZE)} />
+              ) : undefined
+            }
             renderSectionHeader={({ section }) => <DayHeader day={section.day} today={d.today} currency={d.currency} locale={d.locale} />}
             renderItem={({ item, section }) => <Row row={item} date={section.day.localDate} currency={d.currency} locale={d.locale} />}
           />
         ) : q.isError ? (
           <View style={styles.pad}>
-            <Text style={textStyle('body')}>{copy.activity.loadError}</Text>
-            <Button label={copy.common.tryAgain} variant="secondary" onPress={() => void q.refetch()} />
+            <ErrorBlock cause={copy.activity.loadError} onRetry={() => void q.refetch()} alternative={{ label: copy.activity.addExpense, onPress: onAdd }} />
           </View>
         ) : null}
       </Reveal>
@@ -126,7 +132,14 @@ function Row({ row, date, currency, locale }: { row: ActivityRow; date: string; 
           <Text style={[textStyle('body-medium'), { color: theme.color('text-primary') }]}>{title}</Text>
           <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{sub}</Text>
         </View>
-        <Amount amountMinor={row.amountMinor} currency={currency} direction={direction} locale={locale} color={direction === 'income' ? 'semantic-income' : 'text-primary'} />
+        <Amount
+          amountMinor={row.amountMinor}
+          currency={currency}
+          direction={direction}
+          locale={locale}
+          style={stack ? styles.stackedAmount : undefined}
+          color={direction === 'income' ? 'semantic-income' : 'text-primary'}
+        />
       </View>
     </View>
   );
@@ -139,6 +152,7 @@ const styles = StyleSheet.create({
   dayHeader: { paddingTop: 12, paddingBottom: 4, gap: 2 },
   between: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   column: { flexDirection: 'column', alignItems: 'flex-start' },
+  stackedAmount: { alignSelf: 'flex-end' },
   spent: { flexDirection: 'row', gap: 6, alignItems: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: radii.md, padding: 12 },
   chip: { width: 40, height: 40, borderRadius: radii.full, alignItems: 'center', justifyContent: 'center' },

@@ -6,7 +6,8 @@ import { copy } from '../../shared/copy';
 import { headerSplits } from '../../shared/feedback/layout';
 import { Icon } from '../../shared/theme/Icon';
 import { useTheme } from '../../shared/theme/ThemeProvider';
-import { layout } from '../../shared/theme/tokens';
+import { layout, radii } from '../../shared/theme/tokens';
+import { FocusRing, useFocusRing } from '../../shared/ui/FocusRing';
 import { textStyle } from '../../shared/theme/typography';
 
 /**
@@ -57,9 +58,12 @@ export function ScreenHeader({
 }
 
 export function IconButton({ label, onPress, children, testID }: { label: string; onPress: () => void; children: ReactNode; testID?: string }) {
+  const { focused, onFocus, onBlur } = useFocusRing();
   return (
-    <Pressable testID={testID} {...controlA11y({ label, role: 'button' })} onPress={onPress} style={styles.icon}>
-      {children}
+    <Pressable testID={testID} {...controlA11y({ label, role: 'button' })} onPress={onPress} onFocus={onFocus} onBlur={onBlur} style={styles.icon}>
+      <FocusRing focused={focused} radius={radii.full}>
+        {children}
+      </FocusRing>
     </Pressable>
   );
 }

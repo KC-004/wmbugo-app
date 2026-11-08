@@ -10,11 +10,12 @@ const SAFETY_DIR = `${PRIVATE_DIR}/safety`;
  * go through executeRaw / executeBatch: Drizzle's own op-sqlite driver does not
  * work with op-sqlite 19 (see docs/decisions/S1-storage-migrations.md).
  */
-export const opSqliteOpener: DatabaseOpener = {
-  exists: () => fileExists(`${ANDROID_DATABASE_PATH}/${DB_NAME}`),
+export function createOpSqliteOpener(name: string = DB_NAME): DatabaseOpener {
+  return {
+  exists: () => fileExists(`${ANDROID_DATABASE_PATH}/${name}`),
 
   async open(keyHex: string): Promise<SqlDatabase> {
-    const db = open({ name: DB_NAME, encryptionKey: keyHex });
+    const db = open({ name, encryptionKey: keyHex });
     // Foreign keys are off by default in SQLite and are per connection: the ledger relies on them.
     db.executeSync('PRAGMA foreign_keys = ON');
     return {
@@ -52,11 +53,14 @@ export const opSqliteOpener: DatabaseOpener = {
         await db.executeRaw('PRAGMA wal_checkpoint(TRUNCATE)');
         await ensureDir(SAFETY_DIR);
         // The copy is the encrypted file as-is: same key, no plaintext on disk.
-        await copyFile(db.getDbPath(), `${SAFETY_DIR}/${DB_NAME}.${label}`);
+        await copyFile(db.getDbPath(), `${SAFETY_DIR}/${name}.${label}`);
       },
       async close() {
         db.close();
       },
     };
   },
-};
+  };
+}
+
+export const opSqliteOpener: DatabaseOpener = createOpSqliteOpener();

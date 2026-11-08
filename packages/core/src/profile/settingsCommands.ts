@@ -2,7 +2,7 @@ import { toLocalDate } from '../shared/clock';
 import { getCurrency } from '../shared/currency';
 import { err, ok } from '../shared/result';
 import type { UseCase, WriterContext } from '../writer/ledgerWriter';
-import type { PaydayRule } from './payday';
+import { isValidPayday, type PaydayRule } from './payday';
 import type { Region } from './regions';
 import { SETTING_DEFAULT_ACCOUNT, validateSetting } from './settings';
 import { nextLocalDate, offsetMinutes, PROMPT_TIMEZONE, SETTING_TZ_MISMATCH_SINCE, SETTING_TZ_PENDING, TIMEZONE_GAP_MINUTES } from './timezone';
@@ -47,7 +47,7 @@ export interface ProfileChange {
   readonly timezoneId?: string;
 }
 
-export type ChangeProfileError = 'NO_PROFILE' | 'CURRENCY_LOCKED' | 'CURRENCY_UNSUPPORTED' | 'TIMEZONE_INVALID' | 'NOTHING_TO_CHANGE';
+export type ChangeProfileError = 'PAYDAY_INVALID' | 'NO_PROFILE' | 'CURRENCY_LOCKED' | 'CURRENCY_UNSUPPORTED' | 'TIMEZONE_INVALID' | 'NOTHING_TO_CHANGE';
 
 /**
  * Money basics: region and currency, payday and timezone. A currency change is refused once any
@@ -57,6 +57,7 @@ export const ChangeProfile: UseCase<ProfileChange, void, ChangeProfileError> = {
   name: 'ChangeProfile',
   async execute(ctx, input) {
     if (!input.region && !input.payday && !input.timezoneId) return err('NOTHING_TO_CHANGE');
+    if (input.payday && !isValidPayday(input.payday)) return err('PAYDAY_INVALID');
     const p = (await ctx.query('SELECT id, currency_code FROM profile LIMIT 1'))[0];
     if (!p) return err('NO_PROFILE');
     const fields: string[] = [];

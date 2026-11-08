@@ -151,7 +151,7 @@ describe('Home', () => {
 const row = (id: string, kind: ActivityRow['kind'], amountMinor: number, localDate: string, over: Partial<ActivityRow> = {}): ActivityRow => ({
   id, kind, amountMinor, localDate, merchant: null, categoryName: 'Food & Drinks', categoryIcon: 'ForkKnife', categoryColor: 'cat-rose', accountName: 'DBS', ...over,
 });
-const activity = (rows: ActivityRow[]): ActivityData => ({ currency: 'SGD', locale: 'en-SG', today: '2026-11-07', days: groupByDay(rows) });
+const activity = (rows: ActivityRow[]): ActivityData => ({ currency: 'SGD', locale: 'en-SG', today: '2026-11-07', days: groupByDay(rows), hasMore: false });
 const mountActivity = async (d: ActivityData, onAdd = noop) => {
   const api: ActivityApi = { load: async () => d };
   const m = mount(<ActivityScreen api={api} onAccounts={noop} onProfile={noop} onAdd={onAdd} />);
@@ -194,6 +194,19 @@ describe('Activity', () => {
     mockFontScale = 1.3;
     const { r } = await mountActivity(activity(rows));
     expect(host(r, 'day-2026-11-07')[0]!.props.style.flat().some((s: { flexDirection?: string }) => s?.flexDirection === 'column')).toBe(true);
+  });
+
+  it('offers Show earlier entries when there are more, and asks for a bigger page', async () => {
+    const load = jest.fn(async (limit?: number) => ({ ...activity(rows), hasMore: (limit ?? 100) < 200 }));
+    mount(<ActivityScreen api={{ load }} onAccounts={noop} onProfile={noop} onAdd={noop} />);
+    await settle();
+    expect(load).toHaveBeenLastCalledWith(100);
+    const r = live[live.length - 1]!;
+    expect(host(r, 'activity-show-earlier')).toHaveLength(1);
+    await act(async () => fire(r, 'activity-show-earlier'));
+    await settle();
+    expect(load).toHaveBeenLastCalledWith(200);
+    expect(host(r, 'activity-show-earlier')).toHaveLength(0);
   });
 
   it('with no entries shows the boat empty state and Add an expense', async () => {

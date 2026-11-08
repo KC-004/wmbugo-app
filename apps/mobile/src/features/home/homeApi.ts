@@ -1,14 +1,9 @@
 import {
   ACCOUNT_LIST_SQL,
-  getCurrency,
   homeAccounts,
   mapAccountRows,
   MarkPromptSeen,
-  effectiveLocale,
-  paydayRuleFromRow,
-  parseSettings,
   periodRule,
-  SETTINGS_SQL,
   periodFor,
   periodLabel,
   SEEN_PROMPT_SQL,
@@ -20,6 +15,7 @@ import {
   type HomeAccounts,
 } from '@wmbugo/core';
 import { getServices, systemClock } from '../../adapters/startApp';
+import { readProfile } from '../../adapters/readProfile';
 import type { SeenStore } from '../../shared/feedback/tooltipController';
 
 export interface HomeData {
@@ -64,23 +60,20 @@ export const realHomeApi: HomeApi = {
   seen: promptStateSeenStore,
   async load() {
     const db = getServices().db;
-    const p = (await db.query('SELECT currency_code, locale, timezone_id, payday_rule, payday_day FROM profile LIMIT 1'))[0];
+    const p = await readProfile(db);
     if (!p) return null;
-    const cur = getCurrency(String(p[0]));
-    if (!cur.ok) return null;
-    const tz = String(p[2]);
+    const tz = p.timezoneId;
     const now = systemClock.nowMs();
     const date = toLocalDate(now, tz);
     if (!date.ok) return null;
-    const settings = parseSettings(await db.query(SETTINGS_SQL));
-    const rule = periodRule(paydayRuleFromRow(p[3] === null ? null : String(p[3]), p[4] === null ? null : Number(p[4])), settings.periodMode);
+    const rule = periodRule(p.payday, p.settings.periodMode);
     const period = periodFor(date.value, rule);
     const expenses = Number((await db.query(SPENT_EXPENSES_SQL, [period.start, period.end]))[0]![0]);
     const refunds = Number((await db.query(SPENT_REFUNDS_SQL, [period.start, period.end]))[0]![0]);
     const accounts = mapAccountRows(await db.query(ACCOUNT_LIST_SQL));
     return {
-      currency: cur.value.code,
-      locale: effectiveLocale(String(p[1]), settings.numberFormat),
+      currency: p.currency,
+      locale: p.locale,
       timezoneId: tz,
       today: date.value,
       hour: hourIn(now, tz),

@@ -76,7 +76,7 @@ export function Amount({
       adjustsFontSizeToFit={fit !== undefined}
       minimumFontScale={fit}
       ellipsizeMode="clip"
-      style={[textStyle(role), styles.amount, { color: theme.color(color) }, style]}>
+      style={[styles.tnum, textStyle(role), styles.amount, { color: theme.color(color) }, style]}>
       {text}
     </Text>
   );
@@ -85,4 +85,5 @@ export function Amount({
 const styles = StyleSheet.create({
   // A number is never broken across lines.
   amount: { flexShrink: 0 },
+  tnum: { fontVariant: ['tabular-nums'] },
 });

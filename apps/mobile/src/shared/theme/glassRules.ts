@@ -50,3 +50,10 @@ export function glassFallbackReasons(caps: DeviceCapabilities, opts: { overImage
   return reasons;
 }
 
+
+/**
+ * Backdrop blur is not wired yet (the library choice is deferred, see deferred-work.md). Without blur a
+ * translucent surface lets whatever is behind it show through the text, so until blur exists glass is drawn
+ * with the opaque `glass-fallback` colour (same layout, tint and border). Set to true when blur lands.
+ */
+export const BLUR_AVAILABLE = false;

@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { AccessibilityInfo, Animated, findNodeHandle, Modal, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Animated, findNodeHandle, Keyboard, Modal, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { announce } from '../a11y/announce';
+import { useToastView } from './ToastHost';
 import { useReducedMotion } from '../a11y/useReducedMotion';
 import { copy } from '../copy';
 import { Glass } from '../theme/Glass';
@@ -80,6 +81,8 @@ function SheetView({ spec, close }: { spec: SheetSpec; close: () => void }) {
   const theme = useTheme();
   const reduced = useReducedMotion();
   const insets = useSafeAreaInsets();
+  const toastView = useToastView();
+  const keyboard = useKeyboardHeight();
   const translateY = useRef(new Animated.Value(reduced ? 0 : 400)).current;
 
   useEffect(() => {
@@ -103,7 +106,7 @@ function SheetView({ spec, close }: { spec: SheetSpec; close: () => void }) {
 
   return (
     <Modal transparent visible animationType="none" statusBarTranslucent onRequestClose={close}>
-      <View style={styles.fill} accessibilityViewIsModal>
+      <View style={[styles.fill, { paddingBottom: keyboard }]} accessibilityViewIsModal>
         <Pressable
           testID="sheet-scrim"
           accessibilityRole="button"
@@ -127,9 +130,24 @@ function SheetView({ spec, close }: { spec: SheetSpec; close: () => void }) {
             ) : null}
           </Glass>
         </Animated.View>
+        {toastView ? toastView('top', insets.top) : null}
       </View>
     </Modal>
   );
+}
+
+/** The soft keyboard's height, so a sheet (a Modal, which Android does not resize) can lift its fixed bar above it. */
+function useKeyboardHeight(): number {
+  const [height, setHeight] = useState(0);
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', (e) => setHeight(e.endCoordinates.height));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setHeight(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+  return height;
 }
 
 const styles = StyleSheet.create({

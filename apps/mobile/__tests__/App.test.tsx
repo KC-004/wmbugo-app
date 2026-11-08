@@ -33,7 +33,7 @@ async function render(start: () => Promise<Result<StartupOk, StartupErrorCode>>,
 
 /** Lets the settings read behind the app shell settle (it fails fast here: the test has no database). */
 async function flush() {
-  for (let i = 0; i < 3; i++) await ReactTestRenderer.act(async () => new Promise((res) => setTimeout(res, 0)));
+  for (let i = 0; i < 8; i++) await ReactTestRenderer.act(async () => new Promise((res) => setTimeout(res, 0)));
 }
 
 const texts = (r: ReactTestRenderer.ReactTestRenderer) =>
@@ -83,6 +83,7 @@ test('shows nothing (and no spinner) until startup resolves, then the screen', a
   await ReactTestRenderer.act(async () => {
     resolve(ready('home'));
   });
+  await flush();
   expect(texts(r)).toContain('Home');
 });
 

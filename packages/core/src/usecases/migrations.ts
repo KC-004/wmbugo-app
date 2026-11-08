@@ -75,6 +75,8 @@ export async function runMigrations(
   const latestKnown = migrations.length;
   const highestApplied = applied.size === 0 ? 0 : Math.max(...applied.keys());
   if (highestApplied > latestKnown) return err('DATABASE_NEWER_THAN_APP');
+  // Applied versions must be 1..n with no gap; a hole means the database was not built by this runner.
+  for (let v = 1; v <= highestApplied; v++) if (!applied.has(v)) return err('MIGRATION_CHECKSUM_MISMATCH');
 
   for (const m of migrations) {
     const sum = applied.get(m.version);

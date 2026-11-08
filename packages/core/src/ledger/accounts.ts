@@ -47,6 +47,8 @@ export interface AccountRow {
   readonly balanceNotSet: boolean;
   /** Sum of the account's postings (opening included). Meaningful only when the balance is set. */
   readonly postingsMinor: number;
+  /** Included in the Home totals (default true; the account settings screen arrives later). */
+  readonly includeInOverview?: boolean;
 }
 
 export function balanceOf(row: Pick<AccountRow, 'balanceNotSet' | 'postingsMinor'>): BalanceView {
@@ -68,7 +70,7 @@ export function assetTotal(rows: readonly AccountRow[]): { minor: number; accoun
   let counted = 0;
   let notSet = 0;
   for (const r of rows) {
-    if (r.status !== 'active' || r.type === 'card') continue;
+    if (r.status !== 'active' || r.type === 'card' || r.includeInOverview === false) continue;
     const b = balanceOf(r);
     if (b.kind === 'not-set') notSet += 1;
     else {
@@ -81,7 +83,7 @@ export function assetTotal(rows: readonly AccountRow[]): { minor: number; accoun
 
 /** SQL for the accounts list: postings summed per account, in the user's order. Archived rows are included; callers filter. */
 export const ACCOUNT_LIST_SQL =
-  'SELECT a.id, a.name, a.type, a.icon, a.color_token, a.sort_order, a.status, a.balance_not_set, COALESCE(SUM(CASE WHEN t.removed_at IS NULL THEN p.signed_amount_minor END), 0) AS postings_minor FROM account a LEFT JOIN posting p ON p.account_id = a.id LEFT JOIN "transaction" t ON t.id = p.transaction_id GROUP BY a.id ORDER BY a.sort_order, a.id';
+  'SELECT a.id, a.name, a.type, a.icon, a.color_token, a.sort_order, a.status, a.balance_not_set, COALESCE(SUM(CASE WHEN t.removed_at IS NULL THEN p.signed_amount_minor END), 0) AS postings_minor, a.include_in_overview FROM account a LEFT JOIN posting p ON p.account_id = a.id LEFT JOIN "transaction" t ON t.id = p.transaction_id GROUP BY a.id ORDER BY a.sort_order, a.id';
 
 export function mapAccountRows(rows: readonly (readonly unknown[])[]): AccountRow[] {
   return rows.map((r) => ({
@@ -94,6 +96,7 @@ export function mapAccountRows(rows: readonly (readonly unknown[])[]): AccountRo
     status: String(r[6]) as 'active' | 'archived',
     balanceNotSet: Number(r[7]) === 1,
     postingsMinor: Number(r[8]),
+    includeInOverview: Number(r[9] ?? 1) === 1,
   }));
 }
 

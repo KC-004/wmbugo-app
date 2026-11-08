@@ -15,8 +15,10 @@ import {
 import type { Clock, Logger, Result, StartupErrorCode, StartupOk } from '@wmbugo/core';
 import migrations from '../../drizzle/migrations';
 import { ensureDir, PRIVATE_DIR, rnFileStore } from './files/rnFileStore';
+import { setSaveTimingSink } from '../features/add/saveTiming';
 import { setNavTimingSink } from '../features/shell/navTiming';
 import { invalidationHandlers, queryClient } from '../shared/queryClient';
+import { BENCH_TRIGGER, runSaveBenchmark } from './benchmark';
 import { keychainKeyStore } from './storage/keychainKeyStore';
 import { opSqliteOpener } from './storage/opSqliteOpener';
 import { secureRandom } from './storage/secureRandom';
@@ -70,8 +72,29 @@ export function getServices(): AppServices {
   return services;
 }
 
-/** Cold-start path: key, encrypted database, migrations, "does a profile exist?". */
-export async function startApp(): Promise<Result<StartupOk, StartupErrorCode>> {
+/**
+ * Cold-start path: key, encrypted database, migrations, "does a profile exist?". Single-flight: a second call
+ * while one is running (or after it succeeded) gets the same result, so two callers can never both create a key
+ * or open a second writer. A failed start may be retried.
+ */
+let starting: Promise<Result<StartupOk, StartupErrorCode>> | null = null;
+export function startApp(): Promise<Result<StartupOk, StartupErrorCode>> {
+  if (!starting) {
+    starting = startAppOnce().then(
+      (r) => {
+        if (!r.ok) starting = null;
+        return r;
+      },
+      (e: unknown) => {
+        starting = null;
+        throw e;
+      },
+    );
+  }
+  return starting;
+}
+
+async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
   const log = await getLogger();
   const started = await startStorage({
     keyStore: keychainKeyStore,
@@ -101,8 +124,16 @@ export async function startApp(): Promise<Result<StartupOk, StartupErrorCode>> {
   services = { db: started.value.db, writer, dispatcher };
   // Tab navigation timings (NFR-03) go to the redacting log; durations and tab names only.
   setNavTimingSink((e) => log.debug('nav.tab', { tab: e.tab, durationMs: e.durationMs }));
+  // Save timings (NFR-04): kind and duration only.
+  setSaveTimingSink((e) => log.debug('save.entry', { kind: e.kind, durationMs: e.durationMs }));
   // Events committed before the app was last killed are delivered now, without holding up the first screen.
   void dispatcher.deliverPending().catch(() => undefined);
+  // NFR-04 benchmark: only when the trigger file was placed in the private directory (debuggable builds via run-as).
+  void rnFileStore.exists(BENCH_TRIGGER).then(async (on) => {
+    if (!on) return;
+    await rnFileStore.remove(BENCH_TRIGGER);
+    await runSaveBenchmark(log, systemClock);
+  });
   return started;
 }
 

@@ -4,7 +4,8 @@ import { insertAccount, type NewAccount } from '../ledger/accountCommands';
 import { validateAccountName, type AccountNameError } from '../ledger/accounts';
 import type { UseCase } from '../writer/ledgerWriter';
 import type { BudgetOffer } from '../profile/onboarding';
-import type { PaydayRule } from '../profile/payday';
+import { isValidPayday, type PaydayRule } from '../profile/payday';
+import { toLocalDate } from '../shared/clock';
 import type { Region } from '../profile/regions';
 
 export interface SetUpProfileInput {
@@ -17,7 +18,7 @@ export interface SetUpProfileInput {
   readonly account?: NewAccount | null;
 }
 
-export type SetUpProfileError = 'PROFILE_EXISTS' | 'CURRENCY_UNSUPPORTED' | AccountNameError | 'AMOUNT_INVALID';
+export type SetUpProfileError = 'PROFILE_EXISTS' | 'CURRENCY_UNSUPPORTED' | 'PAYDAY_INVALID' | 'TIMEZONE_INVALID' | AccountNameError | 'AMOUNT_INVALID';
 
 /** prompt_state keys written by onboarding for the budgets epic. */
 export const PROMPT_BUDGET_YES = 'budget_503020_yes';
@@ -39,6 +40,8 @@ export const SetUpProfile: UseCase<SetUpProfileInput, { profileId: string }, Set
 
     const currency = getCurrency(input.region.currency);
     if (!currency.ok) return err('CURRENCY_UNSUPPORTED');
+    if (!isValidPayday(input.payday)) return err('PAYDAY_INVALID');
+    if (!toLocalDate(ctx.nowMs(), input.timezoneId).ok) return err('TIMEZONE_INVALID');
 
     if (input.account) {
       const name = validateAccountName(input.account.name);

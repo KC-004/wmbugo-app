@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type ComponentRef } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   applyKey,
   instantFromLocal,
   keypadKeyFromHardware,
   parseAmountInput,
   toLocalDate,
-  PAYMENT_METHODS,
   type KeypadKey,
   type PaymentMethod,
 } from '@wmbugo/core';
@@ -19,30 +19,18 @@ import { invalidateForEvent } from '../../shared/queryClient';
 import { useToast } from '../../shared/feedback/ToastHost';
 import { useUiStore } from '../../shared/state/uiStore';
 import { useTheme } from '../../shared/theme/ThemeProvider';
-import { layout } from '../../shared/theme/tokens';
 import { textStyle } from '../../shared/theme/typography';
 import { Amount } from '../../shared/ui/Amount';
 import { Button } from '../../shared/ui/Button';
-import { Chip } from '../../shared/ui/Chip';
 import { OTHER_CATEGORY_ID } from '@wmbugo/core';
 import { realAddApi, type AddApi, type AddData, type AddKind } from './addApi';
-import { categoryIcon } from './categoryIcons';
+import { AccountChip, CategoryChips, DetailsPanel, KindSegments, TransferTo } from './AddParts';
 import { Keypad } from './Keypad';
+import { startSaveTiming } from './saveTiming';
 
 const QUICK_COUNT = 6;
 
-const PAYMENT_LABEL: Readonly<Record<PaymentMethod, string>> = {
-  upi: copy.add.payUpi,
-  card: copy.add.payCard,
-  cash: copy.add.payCash,
-  bank_transfer: copy.add.payBank,
-  other: copy.add.payOther,
-};
-
 type FieldError = 'amount' | 'category' | 'date' | 'same' | 'fee' | null;
-
-const KINDS: readonly AddKind[] = ['expense', 'income', 'transfer'];
-const KIND_LABEL: Readonly<Record<AddKind, string>> = { expense: copy.add.expense, income: copy.add.income, transfer: copy.add.transfer };
 
 function wallParts(nowMs: number, tz: string): { date: string; time: string } {
   const d = toLocalDate(nowMs, tz);
@@ -78,6 +66,7 @@ export function AddSheet({
   const draft = useUiStore((s) => s.addDraft);
   const setDraft = useUiStore((s) => s.setAddDraft);
   const { height, fontScale } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
 
   const [data, setData] = useState<AddData | null>(null);
   const [kind, setKind] = useState<AddKind>(draft.kind);
@@ -128,6 +117,13 @@ export function AddSheet({
       setToAccountId(data.accounts.find((a) => a.id !== accountId)?.id ?? null);
     }
   }, [kind, data, accountId, toAccountId]);
+
+  /** Undo: removes the entries; if that fails the toast says so, so nobody thinks it was undone. */
+  const undo = async (ids: readonly string[]) => {
+    const results = await Promise.all(ids.map((i) => api.remove(i).catch(() => ({ ok: false }))));
+    await refresh();
+    if (results.some((r) => !r.ok)) toast.show({ message: copy.add.removeFailed });
+  };
 
   const refresh = useCallback(() => invalidateForEvent(qc, 'TransactionsChanged'), [qc]);
 
@@ -185,7 +181,7 @@ export function AddSheet({
       await saveTransfer(another);
       return;
     }
-    if (!categoryId) {
+    if (!categoryId || !data.categories.some((c) => c.id === categoryId)) {
       setError('category');
       return;
     }
@@ -200,6 +196,7 @@ export function AddSheet({
     }
     saving.current = true;
     setSaveError(null);
+    const done = startSaveTiming(kind);
     try {
       const r = await api.record({
         kind,
@@ -221,9 +218,10 @@ export function AddSheet({
         message: copy.add.saved,
         undo: {
           label: copy.common.undo,
-          onUndo: () => void api.remove(id).then(() => refresh()),
+          onUndo: () => void undo([id]),
         },
       });
+      done();
       setDraft({ typedText: '', categoryId: null });
       if (another) {
         setText('');
@@ -280,6 +278,7 @@ export function AddSheet({
     }
     saving.current = true;
     setSaveError(null);
+    const done = startSaveTiming('transfer');
     try {
       const r = await api.recordTransfer({
         amountMinor: parsed.value,
@@ -299,8 +298,9 @@ export function AddSheet({
       await refresh();
       toast.show({
         message: copy.add.saved,
-        undo: { label: copy.common.undo, onUndo: () => void Promise.all(ids.map((i) => api.remove(i))).then(() => refresh()) },
+        undo: { label: copy.common.undo, onUndo: () => void undo(ids) },
       });
+      done();
       setDraft({ typedText: '', categoryId: null });
       setWarned(null);
       if (another) {
@@ -321,100 +321,52 @@ export function AddSheet({
 
   const ink = { color: theme.color('on-glass-primary') };
   const secondary = { color: theme.color('on-glass-secondary') };
-  const inputStyle = [styles.input, textStyle('body'), { color: theme.color('text-primary'), backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-control') }];
 
-  const quick = (data?.quick ?? []).slice(0, QUICK_COUNT);
-  const listed = showAllCategories ? (data?.categories ?? []) : quick;
-  const currentAccount = data?.accounts.find((a) => a.id === accountId) ?? null;
-  const noAccounts = data !== null && data.accounts.length === 0;
 
   return (
     <View>
-    <ScrollView style={{ maxHeight: height * 0.62 }} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
-      <View style={fontScale >= 1.3 ? styles.column : styles.row} accessibilityRole="radiogroup" accessibilityLabel={copy.add.typeLabel}>
-        {KINDS.map((k, i) => (
-          <Chip
-            key={k}
-            label={KIND_LABEL[k]}
-            variant="period"
-            role="radio"
-            hint={copy.add.position.replace("{n}", String(i + 1))}
-            testID={`kind-${k}`}
-            selected={kind === k}
-            onPress={() => chooseKind(k)}
-          />
-        ))}
-      </View>
+    <ScrollView style={{ maxHeight: Math.max(280, height - insets.top - 230) }} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
+      <KindSegments kind={kind} vertical={fontScale >= 1.3} onChoose={chooseKind} />
 
-      {kind === 'transfer' ? null : <Text style={[textStyle('label'), ink]}>{copy.add.category}</Text>}
       {kind === 'transfer' ? null : (
-      <View style={styles.wrap} testID="category-chips">
-        {listed.map((c) => (
-          <Chip key={c.id} label={c.name} icon={categoryIcon(c.icon)} testID={`category-${c.id}`} selected={categoryId === c.id} onPress={() => chooseCategory(c.id)} />
-        ))}
-        {data && data.categories.length > quick.length ? (
-          <Chip label={showAllCategories ? copy.add.fewer : copy.add.more} testID="category-more" onPress={() => setShowAllCategories((v) => !v)} />
-        ) : null}
-      </View>
+        <CategoryChips
+          quick={(data?.quick ?? []).slice(0, QUICK_COUNT)}
+          all={data?.categories ?? []}
+          showAll={showAllCategories}
+          selectedId={categoryId}
+          error={error === 'category'}
+          onToggleAll={() => setShowAllCategories((v) => !v)}
+          onPick={chooseCategory}
+        />
       )}
-      {error === 'category' ? (
-        <Text testID="category-error" accessibilityRole="alert" accessibilityLiveRegion="assertive" style={[textStyle('caption'), { color: theme.color('on-glass-accent') }]}>
-          {copy.add.categoryRequired}
-        </Text>
-      ) : null}
 
       <Text style={[textStyle('label'), ink]}>{kind === 'transfer' ? copy.add.from : kind === 'income' ? copy.add.receivedIn : copy.add.paidFrom}</Text>
-      <View style={styles.wrap}>
-        {noAccounts ? (
-          <Chip label={copy.add.cashNew} variant="account" testID="account-chip" selected onPress={() => undefined} />
-        ) : pickingAccount ? (
-          (data?.accounts ?? []).map((a) => (
-            <Chip
-              key={a.id}
-              label={a.name}
-              variant="account"
-              testID={`account-option-${a.id}`}
-              selected={a.id === accountId}
-              onPress={() => {
-                accountTouched.current = true;
-                setAccountId(a.id);
-                setPickingAccount(false);
-              }}
-            />
-          ))
-        ) : currentAccount ? (
-          <Chip label={currentAccount.name} variant="account" testID="account-chip" selected onPress={() => setPickingAccount((data?.accounts.length ?? 0) > 1)} />
-        ) : null}
-      </View>
+      <AccountChip
+        accounts={data?.accounts ?? []}
+        loaded={data !== null}
+        selectedId={accountId}
+        picking={pickingAccount}
+        onTogglePicking={() => setPickingAccount((v) => !v)}
+        onPick={(id) => {
+          accountTouched.current = true;
+          setAccountId(id);
+          setPickingAccount(false);
+        }}
+      />
 
       {kind === 'transfer' && data ? (
-        <>
-          <Text style={[textStyle('label'), ink]}>{copy.add.to}</Text>
-          <View style={styles.wrap} testID="to-accounts">
-            {data.accounts
-              .filter((a) => a.id !== accountId)
-              .map((a) => (
-                <Chip
-                  key={a.id}
-                  label={a.name}
-                  variant="account"
-                  testID={`to-option-${a.id}`}
-                  selected={a.id === toAccountId}
-                  onPress={() => {
-                    setToAccountId(a.id);
-                    setWarned(null);
-                    if (error === 'same') setError(null);
-                  }}
-                />
-              ))}
-            {data.accounts.length < 2 ? <Chip label={copy.add.newAccount} variant="account" testID="to-new-account" onPress={() => onNewAccount?.()} /> : null}
-          </View>
-          {error === 'same' ? (
-            <Text testID="same-error" accessibilityRole="alert" accessibilityLiveRegion="assertive" style={[textStyle('body-medium'), { color: theme.color('on-glass-accent') }]}>
-              {copy.add.sameAccount}
-            </Text>
-          ) : null}
-        </>
+        <TransferTo
+          accounts={data.accounts}
+          fromId={accountId}
+          toId={toAccountId}
+          sameError={error === 'same'}
+          onNewAccount={onNewAccount}
+          onPick={(id) => {
+            setToAccountId(id);
+            setWarned(null);
+            if (error === 'same') setError(null);
+          }}
+        />
       ) : null}
 
       <View
@@ -424,14 +376,15 @@ export function AddSheet({
         accessibilityLiveRegion="polite"
         style={styles.amount}>
         {data ? (
-          <Amount amountMinor={minor} currency={data.currency} direction={kind === 'income' ? 'income' : kind === 'transfer' ? 'neutral' : 'expense'} role="display-amount" locale={locale} color={error === 'amount' ? 'semantic-expense' : 'text-primary'} />
+          <Amount amountMinor={minor} currency={data.currency} direction={kind === 'income' ? 'income' : kind === 'transfer' ? 'neutral' : 'expense'} role="display-amount" locale={locale} color={error === 'amount' ? 'on-glass-accent' : 'on-glass-primary'} />
         ) : null}
       </View>
       {/* Takes hardware number keys and Backspace; the soft keyboard stays closed (the keypad is the input). */}
       <TextInput
         ref={amountRef}
         testID="amount-input"
-        accessibilityLabel={copy.add.amountLabel}
+        accessible={false}
+        importantForAccessibility="no"
         autoFocus
         showSoftInputOnFocus={false}
         caretHidden
@@ -449,95 +402,34 @@ export function AddSheet({
         </Text>
       ) : null}
 
-      <Keypad exponent={exponent} locale={locale} onKey={press} />
-
-      <Button
-        label={details ? copy.add.detailsHide : copy.add.detailsShow}
-        variant="text"
-        onGlass
-        onPress={() => setDetails((v) => !v)}
-        testID="details-toggle"
+      <Keypad
+        exponent={exponent}
+        locale={locale}
+        onKey={press}
+        trailing={
+          <Button label={details ? copy.add.detailsHide : copy.add.detailsShow} variant="text" onGlass onPress={() => setDetails((v) => !v)} testID="details-toggle" />
+        }
       />
       {details ? (
-        <View style={styles.details} testID="details">
-          {kind === 'transfer' ? null : (
-            <>
-              <Text style={[textStyle('label'), ink]}>{copy.add.merchant}</Text>
-              <TextInput testID="merchant-input" accessibilityLabel={copy.add.merchant} value={merchant} onChangeText={setMerchant} maxLength={120} style={inputStyle} />
-            </>
-          )}
-          <Text style={[textStyle('label'), ink]}>{copy.add.date}</Text>
-          <TextInput
-            testID="date-input"
-            accessibilityLabel={copy.add.date}
-            value={dateText}
-            onChangeText={(t) => {
-              dateTouched.current = true;
-              setDateText(t);
-              if (error === 'date') setError(null);
-            }}
-            keyboardType="numbers-and-punctuation"
-            style={inputStyle}
-          />
-          <Text style={[textStyle('label'), ink]}>{copy.add.time}</Text>
-          <TextInput
-            testID="time-input"
-            accessibilityLabel={copy.add.time}
-            value={timeText}
-            onChangeText={(t) => {
-              dateTouched.current = true;
-              setTimeText(t);
-              if (error === 'date') setError(null);
-            }}
-            keyboardType="numbers-and-punctuation"
-            style={inputStyle}
-          />
-          {error === 'date' ? (
-            <Text testID="date-error" accessibilityRole="alert" accessibilityLiveRegion="assertive" style={[textStyle('caption'), { color: theme.color('on-glass-accent') }]}>
-              {copy.add.dateInvalid}
-            </Text>
-          ) : null}
-          <Text style={[textStyle('label'), ink]}>{copy.add.note}</Text>
-          <TextInput testID="note-input" accessibilityLabel={copy.add.note} value={note} onChangeText={setNote} maxLength={500} multiline style={inputStyle} />
-          {kind === 'transfer' ? (
-            <>
-              <Text style={[textStyle('label'), ink]}>{copy.add.fee}</Text>
-              <TextInput
-                testID="fee-input"
-                accessibilityLabel={copy.add.fee}
-                value={feeText}
-                onChangeText={(t) => {
-                  setFeeText(t);
-                  if (error === 'fee') setError(null);
-                }}
-                keyboardType="decimal-pad"
-                style={inputStyle}
-              />
-              {error === 'fee' ? (
-                <Text testID="fee-error" accessibilityRole="alert" accessibilityLiveRegion="assertive" style={[textStyle('caption'), { color: theme.color('on-glass-accent') }]}>
-                  {copy.add.feeInvalid}
-                </Text>
-              ) : null}
-              {feeText.trim() !== '' ? (
-                <>
-                  <Text style={[textStyle('label'), ink]}>{copy.add.feeCategory}</Text>
-                  <View style={styles.wrap}>
-                    {(data?.quick ?? []).concat((data?.categories ?? []).filter((c) => !(data?.quick ?? []).some((q) => q.id === c.id))).map((c) => (
-                      <Chip key={c.id} label={c.name} testID={`fee-category-${c.id}`} selected={feeCategoryId === c.id} onPress={() => setFeeCategoryId(c.id)} />
-                    ))}
-                  </View>
-                </>
-              ) : null}
-            </>
-          ) : (
-            <Text style={[textStyle('label'), ink]}>{copy.add.payment}</Text>
-          )}
-          <View style={styles.wrap}>
-            {(kind === 'transfer' ? [] : PAYMENT_METHODS).map((m) => (
-              <Chip key={m} label={PAYMENT_LABEL[m]} variant="paid-with" testID={`payment-${m}`} selected={payment === m} onPress={() => setPayment(payment === m ? null : m)} />
-            ))}
-          </View>
-        </View>
+        <DetailsPanel
+          kind={kind}
+          values={{ merchant, date: dateText, time: timeText, note, payment, fee: feeText, feeCategoryId }}
+          error={error === 'date' || error === 'fee' ? error : null}
+          quick={data?.quick ?? []}
+          categories={data?.categories ?? []}
+          onChange={(c) => {
+            if (c.merchant !== undefined) setMerchant(c.merchant);
+            if (c.note !== undefined) setNote(c.note);
+            if (c.payment !== undefined) setPayment(c.payment);
+            if (c.feeCategoryId !== undefined) setFeeCategoryId(c.feeCategoryId);
+            if (c.date !== undefined) setDateText(c.date);
+            if (c.time !== undefined) setTimeText(c.time);
+            if (c.dateEdited) dateTouched.current = true;
+            if (c.fee !== undefined) setFeeText(c.fee);
+            if ((c.date !== undefined || c.time !== undefined) && error === 'date') setError(null);
+            if (c.fee !== undefined && error === 'fee') setError(null);
+          }}
+        />
       ) : null}
 
       {warned ? (
@@ -562,12 +454,8 @@ export function AddSheet({
 
 const styles = StyleSheet.create({
   content: { gap: 8, paddingBottom: 8 },
-  row: { flexDirection: 'row', gap: 8 },
-  column: { flexDirection: 'column', alignItems: 'flex-start' },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
   amount: { alignItems: 'center', paddingVertical: 4 },
   hiddenInput: { position: 'absolute', width: 1, height: 1, opacity: 0 },
-  details: { gap: 8 },
-  input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, minHeight: layout.touchMin },
-  footer: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 12, paddingVertical: 8, paddingHorizontal: 8, borderRadius: 12 },
+  footer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', gap: 12, paddingVertical: 8, paddingHorizontal: 8, borderRadius: 12 },
 });

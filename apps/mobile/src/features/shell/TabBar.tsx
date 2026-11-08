@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { CalendarCheck, ChartBar, House, ListBullets } from 'phosphor-react-native';
@@ -83,6 +83,13 @@ function TabSlot({ name, focused, rail, onPress }: { name: TabRoute; focused: bo
   const theme = useTheme();
   const { focused: ring, onFocus, onBlur } = useFocusRing(!rail);
   const [hint, setHint] = useState(false);
+  const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (hintTimer.current) clearTimeout(hintTimer.current);
+    },
+    [],
+  );
   const { label, icon } = TABS[name];
   // On glass the inks are on-glass; on the rail's solid surface they are the normal text colours.
   const active = rail ? 'accent-primary' : 'on-glass-accent';
@@ -95,7 +102,8 @@ function TabSlot({ name, focused, rail, onPress }: { name: TabRoute; focused: bo
       onPress={onPress}
       onLongPress={() => {
         setHint(true);
-        setTimeout(() => setHint(false), 2000);
+        if (hintTimer.current) clearTimeout(hintTimer.current);
+        hintTimer.current = setTimeout(() => setHint(false), 2000);
       }}
       onFocus={onFocus}
       onBlur={onBlur}
@@ -128,5 +136,5 @@ const styles = StyleSheet.create({
   slot: { flex: 1, minWidth: TAB_SLOT.minWidth, minHeight: TAB_SLOT.minHeight, alignItems: 'center', justifyContent: 'center' },
   slotInner: { alignItems: 'center', justifyContent: 'center', gap: 2 },
   rail: { width: RAIL_WIDTH, alignItems: 'center', paddingTop: 16, gap: 8, borderRightWidth: 1 },
-  hint: { position: 'absolute', top: -34, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  hint: { position: 'absolute', top: 2, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
 });

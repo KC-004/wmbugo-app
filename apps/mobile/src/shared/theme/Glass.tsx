@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useDeviceCapabilities } from './deviceCapabilities';
-import { glassFallbackReasons } from './glassRules';
+import { BLUR_AVAILABLE, glassFallbackReasons } from './glassRules';
 import { radii } from './tokens';
 import { useTheme } from './ThemeProvider';
 
@@ -28,7 +28,7 @@ export function Glass({
 }) {
   const theme = useTheme();
   const caps = useDeviceCapabilities();
-  const fallback = forceFallback ?? glassFallbackReasons(caps, { overImagery }).length > 0;
+  const fallback = forceFallback ?? (!BLUR_AVAILABLE || glassFallbackReasons(caps, { overImagery }).length > 0);
   const backgroundColor = fallback ? theme.color('glass-fallback') : theme.color('glass-surface');
   return (
     <View

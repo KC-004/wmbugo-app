@@ -29,6 +29,8 @@ export interface ChipProps {
   role?: 'button' | 'radio';
   /** Spoken after the label, e.g. "2 of 3". */
   hint?: string;
+  /** Sits on the (dark) glass sheet: on-glass ink, outline and focus ring. */
+  onGlass?: boolean;
 }
 
 /**
@@ -36,22 +38,22 @@ export interface ChipProps {
  * Selected: accent fill with a filled icon (never colour alone: the icon and the
  * "selected" state change too). Paid with / Paid from chips speak their prefix.
  */
-export function Chip({ label, variant = 'quick-category', selected = false, onPress, icon, testID, role = 'button', hint }: ChipProps) {
+export function Chip({ label, variant = 'quick-category', selected = false, onPress, icon, testID, role = 'button', hint, onGlass = false }: ChipProps) {
   const theme = useTheme();
-  const { focused, onFocus, onBlur } = useFocusRing();
+  const { focused, onFocus, onBlur } = useFocusRing(onGlass);
   const a11y = controlA11y({ label: `${SPOKEN_PREFIX[variant] ?? ''}${label}`, role, selected, hint });
 
   // chip-selected (DESIGN.md): white on the light accent fill, dark canvas ink on the light-teal dark fill.
-  const ink = selected ? (theme.scheme === 'dark' ? colorTokens['bg-canvas-dark'] : colorTokens['bg-surface']) : theme.color('text-primary');
+  const ink = selected ? (theme.scheme === 'dark' ? colorTokens['bg-canvas-dark'] : colorTokens['bg-surface']) : theme.color(onGlass ? 'on-glass-primary' : 'text-primary');
   return (
     <Pressable testID={testID} {...a11y} onPress={onPress} onFocus={onFocus} onBlur={onBlur} style={styles.hit}>
-      <FocusRing focused={focused} radius={radii.full}>
+      <FocusRing focused={focused} onGlass={onGlass} radius={radii.full}>
         <View
           style={[
             styles.visual,
             selected
               ? { backgroundColor: theme.color('accent-primary') }
-              : { borderColor: theme.color('border-control'), borderWidth: 1 },
+              : { borderColor: theme.color(onGlass ? 'on-glass-secondary' : 'border-control'), borderWidth: 1 },
           ]}>
           {icon ? <Icon icon={icon} size={18} selected={selected} tint={ink} /> : null}
           <Text style={[textStyle('label'), { color: ink }]}>{label}</Text>

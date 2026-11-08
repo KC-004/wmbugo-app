@@ -307,3 +307,21 @@ describe('ledger invariant', () => {
     expect(await count('posting')).toBe(1);
   });
 });
+
+describe('opening_minor equals the opening posting', () => {
+  it('rejects a write that makes the account copy disagree with its posting', async () => {
+    const { writer, db } = await setup();
+    await add(writer, 'DBS', 'bank', 5000);
+    const id = (await db.query('SELECT id FROM account'))[0]![0] as string;
+    const drift: UseCase<void, void, never> = {
+      name: 'Drift',
+      async execute(ctx) {
+        await ctx.execute('UPDATE account SET opening_minor = 9999 WHERE id = ?', [id]);
+        ctx.touch('account', id);
+        return ok(undefined);
+      },
+    };
+    expect((await writer.run(drift, undefined, 'user')).ok).toBe(false);
+    expect(Number((await db.query('SELECT opening_minor FROM account'))[0]![0])).toBe(5000);
+  });
+});

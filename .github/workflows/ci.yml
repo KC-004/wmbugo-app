@@ -64,6 +64,9 @@ jobs:
       - name: Permission allowlist check (both flavors)
         run: pnpm check:permissions
 
+      - name: Standard release APKs are not debuggable
+        run: pnpm check:not-debuggable
+
   encrypted-db:
     name: Encrypted database header check (emulator)
     runs-on: ubuntu-latest

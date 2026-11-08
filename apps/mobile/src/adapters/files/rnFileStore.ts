@@ -20,8 +20,10 @@ export function ensureDir(path: string): Promise<void> {
   return RNFS.mkdir(path);
 }
 
-export function copyFile(from: string, to: string): Promise<void> {
-  return RNFS.copyFile(from, to);
+export async function copyFile(from: string, to: string): Promise<void> {
+  // A retry after a failed migration reuses the file name; copy over it rather than fail.
+  if (await RNFS.exists(to)) await RNFS.unlink(to);
+  await RNFS.copyFile(from, to);
 }
 
 export function fileExists(path: string): Promise<boolean> {

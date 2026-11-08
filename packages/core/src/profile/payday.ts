@@ -29,3 +29,18 @@ export type PeriodMode = 'pay_cycle' | 'calendar_month';
 export function periodModeFor(rule: PaydayRule): PeriodMode {
   return rule.kind === 'none' ? 'calendar_month' : 'pay_cycle';
 }
+
+/** True for a payday rule the app can store: a known kind, and for `day` an integer from 1 to 31. */
+export function isValidPayday(rule: PaydayRule): boolean {
+  switch (rule.kind) {
+    case 'first':
+    case 'last_day':
+    case 'last_working_day':
+    case 'none':
+      return true;
+    case 'day':
+      return Number.isInteger(rule.day) && rule.day >= 1 && rule.day <= 31;
+    default:
+      return false;
+  }
+}

@@ -1,5 +1,5 @@
-import { useMemo, useReducer, useRef, useState } from 'react';
-import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { BackHandler,FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   canContinue,
@@ -70,6 +70,19 @@ export function OnboardingFlow({ detected, timezoneId, onFinish }: OnboardingFlo
   const [failed, setFailed] = useState(false);
   // A ref, not state: two quick taps on Finish must save once (state would still be stale on the second tap).
   const saving = useRef(false);
+
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (picking) {
+        setPicking(false);
+        return true;
+      }
+      if (state.step === 'welcome') return false;
+      dispatch({ type: 'back' });
+      return true;
+    });
+    return () => sub.remove();
+  }, [picking, state.step]);
 
   const hint = continueHint(state);
   const last = state.step === 'budget-offer';

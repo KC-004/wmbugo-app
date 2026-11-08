@@ -118,7 +118,7 @@ describe('Activity with transfers and income', () => {
     const { writer, from, to, db } = await setup();
     await writer.run(RecordManualEntry, { kind: 'income', amountMinor: 420000, categoryId: 'cat_in_salary', accountId: from, note: 'Nov' }, 'user');
     await writer.run(RecordTransfer, { amountMinor: 20000, fromAccountId: from, toAccountId: to }, 'user');
-    const rows = mapActivityRows(await db.query(ACTIVITY_SQL));
+    const rows = mapActivityRows(await db.query(ACTIVITY_SQL, [100]));
     expect(rows.filter((r) => r.kind === 'transfer')).toHaveLength(1);
     expect(rows.find((r) => r.kind === 'transfer')!.accountName).toBe('DBS → Cash');
     expect(groupByDay(rows)[0]!.spentMinor).toBe(0);

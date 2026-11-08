@@ -18,6 +18,8 @@ export interface ButtonProps {
   /** Text button sitting on a glass surface. */
   onGlass?: boolean;
   testID?: string;
+  /** Extra focus listeners (the toast pauses while Undo is focused). */
+  onFocusChange?: (focused: boolean) => void;
 }
 
 /**
@@ -25,7 +27,7 @@ export interface ButtonProps {
  * primary keeps focus and announces "disabled" plus the reason as a hint, so a
  * screen-reader user can find out what is missing instead of hitting a dead control.
  */
-export function Button({ label, onPress, variant = 'primary', disabledReason, onGlass = false, testID }: ButtonProps) {
+export function Button({ label, onPress, variant = 'primary', disabledReason, onGlass = false, testID, onFocusChange }: ButtonProps) {
   const theme = useTheme();
   const { focused, onFocus, onBlur } = useFocusRing(onGlass || variant === 'secondary-on-footer');
   const disabled = disabledReason !== undefined;
@@ -56,8 +58,14 @@ export function Button({ label, onPress, variant = 'primary', disabledReason, on
         testID={testID}
         {...a11y}
         onPress={disabled ? undefined : onPress}
-        onFocus={onFocus}
-        onBlur={onBlur}
+        onFocus={() => {
+          onFocus();
+          onFocusChange?.(true);
+        }}
+        onBlur={() => {
+          onBlur();
+          onFocusChange?.(false);
+        }}
         style={[styles.base, fill ? { backgroundColor: fill } : null, border ? { borderColor: border, borderWidth: 1 } : null]}>
         {variant === 'primary' && !disabled ? <Gradient /> : null}
         <Text style={[textStyle('label'), { color: fg }, variant === 'text' && onGlass ? styles.underline : null]}>{label}</Text>

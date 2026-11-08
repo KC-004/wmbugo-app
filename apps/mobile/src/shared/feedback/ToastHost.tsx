@@ -14,6 +14,12 @@ interface ToastApi {
 }
 
 const ToastContext = createContext<ToastApi | null>(null);
+/** Renders the current toast at a position; a sheet uses it to show the toast above its own scrim. */
+const ToastViewContext = createContext<((position: 'bottom' | 'top', offset: number) => ReactNode) | null>(null);
+
+export function useToastView(): ((position: 'bottom' | 'top', offset: number) => ReactNode) | null {
+  return useContext(ToastViewContext);
+}
 
 export function useToast(): ToastApi {
   const api = useContext(ToastContext);
@@ -51,15 +57,22 @@ export function ToastHost({ children, bottomOffset = 0 }: { children: ReactNode;
 
   const api = useMemo<ToastApi>(() => ({ show: (r) => void controller.show(r), dismiss: () => controller.dismiss() }), [controller]);
 
+  const renderView = useMemo(
+    () => (position: 'bottom' | 'top', offset: number) => (state ? <ToastView state={state} controller={controller} position={position} offset={offset} /> : null),
+    [state, controller],
+  );
+
   return (
     <ToastContext.Provider value={api}>
-      {children}
-      {state ? <ToastView state={state} controller={controller} bottomOffset={bottomOffset} /> : null}
+      <ToastViewContext.Provider value={renderView}>
+        {children}
+        {renderView('bottom', bottomOffset)}
+      </ToastViewContext.Provider>
     </ToastContext.Provider>
   );
 }
 
-function ToastView({ state, controller, bottomOffset }: { state: ToastState; controller: ToastController; bottomOffset: number }) {
+function ToastView({ state, controller, position, offset }: { state: ToastState; controller: ToastController; position: 'bottom' | 'top'; offset: number }) {
   const theme = useTheme();
   // Inverse colours (DESIGN.md Toast): light = text-primary background, dark = bg-muted-dark.
   const dark = theme.scheme === 'dark';
@@ -68,11 +81,10 @@ function ToastView({ state, controller, bottomOffset }: { state: ToastState; con
   return (
     <View
       testID="toast"
-      accessibilityLiveRegion="polite"
       onTouchStart={() => controller.pause()}
       onTouchEnd={() => controller.resume()}
       onTouchCancel={() => controller.resume()}
-      style={[styles.toast, { bottom: bottomOffset + 16, backgroundColor: bg, borderColor: theme.color('glass-border') }, dark ? styles.bordered : null]}>
+      style={[styles.toast, position === 'bottom' ? { bottom: offset + 16 } : { top: offset + 16 }, { backgroundColor: bg, borderColor: theme.color('glass-border') }, dark ? styles.bordered : null]}>
       <Text style={[textStyle('body'), styles.message, { color: ink }]}>{state.message}</Text>
       {state.undo ? (
         <Button
@@ -81,6 +93,7 @@ function ToastView({ state, controller, bottomOffset }: { state: ToastState; con
           onGlass
           onPress={() => controller.undo()}
           testID="toast-undo"
+          onFocusChange={(f) => (f ? controller.pause() : controller.resume())}
         />
       ) : null}
     </View>

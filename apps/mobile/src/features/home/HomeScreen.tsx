@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { greetingFor, shortDate } from '@wmbugo/core';
 import { amountLabel } from '../../shared/a11y/labels';
 import { copy } from '../../shared/copy';
-import { Reveal, Skeleton, Tooltip } from '../../shared/feedback/Feedback';
+import { ErrorBlock, Reveal, Skeleton, Tooltip } from '../../shared/feedback/Feedback';
 import { useSheet } from '../../shared/feedback/SheetHost';
 import { TooltipController } from '../../shared/feedback/tooltipController';
 import { useTheme } from '../../shared/theme/ThemeProvider';
@@ -52,7 +52,7 @@ export function HomeScreen({
 
   const hasAccounts = d?.accounts.hasAccounts ?? false;
   useEffect(() => {
-    if (hasAccounts) void tips.current?.request(TIP_ID);
+    if (hasAccounts) void tips.current?.request(TIP_ID).catch(() => undefined);
   }, [hasAccounts]);
   useEffect(() => {
     if (sheet.openId !== null) tips.current?.suspendForSheet();
@@ -131,13 +131,10 @@ export function HomeScreen({
                 </View>
               </View>
             ) : null}
-            {tip ? <Tooltip text={copy.home.tip} onAcknowledge={() => void tips.current?.acknowledge()} /> : null}
+            {tip ? <Tooltip text={copy.home.tip} onAcknowledge={() => void tips.current?.acknowledge().catch(() => undefined)} /> : null}
           </View>
         ) : home.isError ? (
-          <View style={card}>
-            <Text style={[textStyle('body'), ink]}>{copy.home.loadError}</Text>
-            <Button label={copy.common.tryAgain} variant="secondary" onPress={() => void home.refetch()} />
-          </View>
+          <ErrorBlock cause={copy.home.loadError} onRetry={() => void home.refetch()} alternative={{ label: copy.nav.accounts, onPress: onAccounts }} />
         ) : null}
       </Reveal>
     </ScrollView>

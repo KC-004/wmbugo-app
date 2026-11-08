@@ -18,7 +18,7 @@ export const TYPE_LABEL: Readonly<Record<AccountType, string>> = {
 
 const ERROR_COPY: Readonly<Record<BuildAccountError, string>> = {
   NAME_REQUIRED: copy.accounts.nameRequired,
-  NAME_TOO_LONG: copy.accounts.nameRequired,
+  NAME_TOO_LONG: copy.accounts.nameTooLong,
   AMOUNT_INVALID: copy.accounts.balanceInvalid,
   AMOUNT_NEGATIVE: copy.accounts.balanceInvalid,
   AMOUNT_TOO_LARGE: copy.accounts.balanceTooLarge,

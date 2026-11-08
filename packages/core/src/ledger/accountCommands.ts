@@ -151,6 +151,16 @@ export const RestoreAccount: UseCase<{ accountId: string }, void, 'ACCOUNT_NOT_F
 export const openingBalanceShape: Invariant = {
   name: 'openingBalanceShape',
   async check(ctx) {
+    // account.opening_minor is a convenience copy of the opening posting (S2 4.1); the two must agree.
+    for (const a of ctx.touched.filter((t) => t.entityKind === 'account')) {
+      const r = (
+        await ctx.query(
+          "SELECT opening_minor, COALESCE((SELECT SUM(signed_amount_minor) FROM posting WHERE account_id = account.id AND posting_kind = 'opening_balance'), 0) FROM account WHERE id = ?",
+          [a.entityId],
+        )
+      )[0];
+      if (r && r[0] !== null && Number(r[0]) !== Number(r[1])) return 'account opening balance must equal its opening posting';
+    }
     const ids = ctx.touched.filter((t) => t.entityKind === 'transaction').map((t) => t.entityId);
     for (const id of ids) {
       const rows = await ctx.query(

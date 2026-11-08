@@ -44,7 +44,7 @@ export class OutboxDispatcher {
   private async deliverOnce(): Promise<DeliveryReport> {
     const { db, clock, logger, handlers } = this.deps;
     const rows = await db.query(
-      'SELECT id, event, actor, payload_json, created_at FROM outbox WHERE delivered_at IS NULL ORDER BY created_at, id',
+      'SELECT id, event, actor, payload_json, created_at FROM outbox WHERE delivered_at IS NULL ORDER BY created_at, rowid',
     );
     let delivered = 0;
     for (const row of rows) {

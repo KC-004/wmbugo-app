@@ -9,3 +9,7 @@ for i in $(seq 1 30); do
 done
 adb exec-out run-as app.wmbugo cat databases/wmbugo.db > /tmp/wmbugo.db
 node scripts/check-encrypted-db.mjs /tmp/wmbugo.db
+
+# Scripted walk through onboarding, the Add sheet with hardware keys, Activity and Home (fresh data).
+adb shell pm clear app.wmbugo
+node scripts/e2e-smoke.mjs

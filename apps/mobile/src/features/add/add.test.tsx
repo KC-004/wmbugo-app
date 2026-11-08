@@ -1,104 +1,16 @@
-import { AccessibilityInfo, Text, TextInput } from 'react-native';
-import { act, create, type ReactTestRenderer } from 'react-test-renderer';
-import { QueryClientProvider } from '@tanstack/react-query';
-import { mapCategoryRows, rankCategories, SEED_CATEGORIES, type AccountRow, type ManualEntry, type TransferInput } from '@wmbugo/core';
-import { ToastHost } from '../../shared/feedback/ToastHost';
-import { createQueryClient } from '../../shared/queryClient';
-import { EMPTY_DRAFT, useUiStore } from '../../shared/state/uiStore';
-import { ThemeProvider } from '../../shared/theme/ThemeProvider';
+import { TextInput } from 'react-native';
+import { act, type ReactTestRenderer } from 'react-test-renderer';
 import { typedAmountLabel } from '../../shared/a11y/labels';
-import { AddSheet } from './AddSheet';
-import type { AddApi, AddData, AddKind } from './addApi';
+import { useUiStore } from '../../shared/state/uiStore';
 import { KEY_SIZE } from './Keypad';
+import { cleanup, fakeApi, find, fire, has, host, mount, mountReady, quietAccessibility, settle, tap, texts, unmountNow } from './testKit';
 
 jest.mock('../../adapters/startApp', () => ({ getServices: jest.fn(), systemClock: { nowMs: () => 0, timezoneId: () => 'Asia/Singapore' } }));
 
-const live: ReactTestRenderer[] = [];
-const clients: ReturnType<typeof createQueryClient>[] = [];
-afterEach(async () => {
-  await act(async () => new Promise((res) => setTimeout(res, 0)));
-  for (const r of live.splice(0)) act(() => r.unmount());
-  for (const c of clients.splice(0)) c.clear();
-  jest.restoreAllMocks();
-  useUiStore.setState({ addDraft: EMPTY_DRAFT });
-});
-beforeEach(() => {
-  jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(true);
-  jest.spyOn(AccessibilityInfo, 'isScreenReaderEnabled').mockResolvedValue(false);
-  jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
-  jest.spyOn(AccessibilityInfo, 'addEventListener').mockReturnValue({ remove: () => undefined } as never);
-  jest.spyOn(AccessibilityInfo, 'getRecommendedTimeoutMillis').mockImplementation(async (ms: number) => ms);
-});
+afterEach(cleanup);
+beforeEach(quietAccessibility);
 
-const find = (r: ReactTestRenderer, testID: string, handler: string) =>
-  r.root.findAll((n) => n.props.testID === testID && typeof n.props[handler] === 'function')[0]!;
-const host = (r: ReactTestRenderer, testID: string) => r.root.findAll((n) => typeof n.type === 'string' && n.props.testID === testID)[0]!;
-const fire = (r: ReactTestRenderer, testID: string, handler = 'onPress', ...args: unknown[]) => find(r, testID, handler).props[handler](...args);
-const settle = async () => {
-  for (let i = 0; i < 3; i++) await act(async () => new Promise((res) => setTimeout(res, 0)));
-};
-const has = (r: ReactTestRenderer, testID: string) => r.root.findAll((n) => typeof n.type === 'string' && n.props.testID === testID).length > 0;
-const texts = (r: ReactTestRenderer) => r.root.findAll((n) => n.type === Text).map((n) => [n.props.children].flat().filter((c) => typeof c === 'string').join(''));
-const tap = (r: ReactTestRenderer, keys: string) => {
-  for (const k of keys) act(() => fire(r, k === '.' ? 'key-decimal' : `key-${k}`));
-};
-const amountText = (r: ReactTestRenderer) => r.root.findAll((n) => n.props.testID === 'typed-amount')[0]!;
-
-const account = (id: string, name: string): AccountRow => ({ id, name, type: 'bank', icon: 'Bank', colorToken: 'cat-indigo', sortOrder: 0, status: 'active', balanceNotSet: true, postingsMinor: 0 });
-const cats = (kind: AddKind) => mapCategoryRows(SEED_CATEGORIES.filter((c) => c.kind === (kind === 'income' ? 'income' : 'expense')).map((c, i) => [c.id, c.name, c.kind, c.budgetType, c.icon, c.color, i]));
-
-function fakeApi(over: Partial<AddData> = {}, counts = new Map<string, number>()) {
-  const record = jest.fn<Promise<{ ok: true; value: { transactionId: string; accountId: string } } | { ok: false; code: string }>, [ManualEntry]>(async () => ({
-    ok: true,
-    value: { transactionId: 'tx1', accountId: 'a1' },
-  }));
-  const remove = jest.fn(async (...ids: string[]) => ({ ok: ids.length >= 0 }));
-  const recordTransfer = jest.fn<Promise<{ ok: true; value: { transactionId: string; feeTransactionId: string | null } } | { ok: false; code: string }>, [TransferInput]>(async () => ({ ok: true, value: { transactionId: 'tr1', feeTransactionId: null } }));
-  const defaultAccountFor = jest.fn(async (c: string) => (c === 'cat_transport' ? 'a2' : 'a1'));
-  const load = jest.fn(async (kind: AddKind): Promise<AddData> => {
-    const categories = cats(kind);
-    return {
-      currency: 'SGD',
-      exponent: 2,
-      locale: 'en-SG',
-      timezoneId: 'Asia/Singapore',
-      categories,
-      quick: rankCategories(categories, counts),
-      accounts: [account('a1', 'DBS'), account('a2', 'Cash wallet')],
-      defaultAccountId: 'a1',
-      blockTransfers: false,
-      ...over,
-    };
-  });
-  const api: AddApi = { load, defaultAccountFor, record, recordTransfer, remove };
-  return { api, record, recordTransfer, remove, load, defaultAccountFor };
-}
-
-function mount(api: AddApi, close = jest.fn()) {
-  const qc = createQueryClient();
-  clients.push(qc);
-  let r!: ReactTestRenderer;
-  act(() => {
-    r = create(
-      <QueryClientProvider client={qc}>
-        <ThemeProvider>
-          <ToastHost bottomOffset={0}>
-            <AddSheet api={api} close={close} now={() => Date.UTC(2026, 10, 8, 10, 0, 0)} />
-          </ToastHost>
-        </ThemeProvider>
-      </QueryClientProvider>,
-    );
-  });
-  live.push(r);
-  return { r, close, qc };
-}
-
-async function mountReady(over: Partial<AddData> = {}, counts?: Map<string, number>) {
-  const f = fakeApi(over, counts);
-  const m = mount(f.api);
-  await settle();
-  return { ...f, ...m };
-}
+const amountText = (r: Parameters<typeof host>[0]) => host(r, 'typed-amount');
 
 describe('Add sheet layout', () => {
   it('shows Expense selected, Income, quick categories, account, amount and keypad; no capture chips or CSV', async () => {
@@ -384,8 +296,7 @@ describe('draft', () => {
     tap(first.r, '45');
     act(() => fire(first.r, 'category-cat_in_gifts'));
     await settle();
-    act(() => first.r.unmount());
-    live.splice(live.indexOf(first.r), 1);
+    unmountNow(first.r);
 
     const second = await mountReady();
     expect(host(second.r, 'kind-income').props.accessibilityState.selected).toBe(true);

@@ -73,7 +73,7 @@ export const RecordTransfer: UseCase<TransferInput, { transactionId: string; fee
         )
       )[0];
       // Only a known asset balance can be compared; an unknown balance is never treated as zero.
-      if (f && Number(f[0]) === 0 && String(f[1]) !== 'card' && input.amountMinor > Number(f[2])) return err('INSUFFICIENT_FUNDS');
+      if (f && Number(f[0]) === 0 && String(f[1]) !== 'card' && input.amountMinor + (input.fee?.amountMinor ?? 0) > Number(f[2])) return err('INSUFFICIENT_FUNDS');
     }
 
     const now = ctx.nowMs();
