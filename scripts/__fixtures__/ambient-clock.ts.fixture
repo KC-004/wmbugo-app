@@ -1,0 +1,3 @@
+export const t = Date.now();
+export const u = new Date();
+export const p = performance.now();

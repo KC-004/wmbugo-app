@@ -63,6 +63,11 @@ for (const target of ['packages/core/src/__gate_console.ts', 'apps/mobile/src/__
   });
 }
 
+// 2b. Ambient clock reads in core (Clock port only).
+withTempFile(join(root, 'packages/core/src/__gate_clock.ts'), copy(fx('ambient-clock.ts.fixture')), () => {
+  expectFail('Date.now/new Date()/performance.now in core: pnpm lint', 'pnpm lint', [/Clock port/]);
+});
+
 // 3. Foreign lockfiles anywhere outside node_modules.
 for (const target of [
   'package-lock.json',

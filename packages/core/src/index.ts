@@ -6,3 +6,4 @@
  * tsconfig `paths` stubs both enforce this.
  */
 export const CORE_PACKAGE = '@wmbugo/core';
+export * from './shared';

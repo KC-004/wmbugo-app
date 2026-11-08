@@ -48,6 +48,23 @@ export default tseslint.config(
     rules: { 'no-console': 'error' },
   },
   {
+    // Core takes all time from the Clock port: no ambient clock reads.
+    files: ['packages/core/src/**/*.{ts,tsx}'],
+    ignores: ['packages/core/src/**/*.test.ts'],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        { object: 'Date', property: 'now', message: 'Use the Clock port, not Date.now().' },
+        { object: 'performance', property: 'now', message: 'Use the Clock port.' },
+      ],
+      'no-restricted-syntax': [
+        'error',
+        { selector: 'NewExpression[callee.name="Date"][arguments.length=0]', message: 'new Date() reads the ambient clock. Use the Clock port.' },
+        { selector: 'CallExpression[callee.name="Date"]', message: 'Date() reads the ambient clock. Use the Clock port.' },
+      ],
+    },
+  },
+  {
     files: ['packages/core/**/*.{ts,tsx,js}'],
     rules: {
       'no-restricted-imports': [
