@@ -10,3 +10,5 @@ allowBuilds:
   # The root postinstall script installs the git hooks; the package's own
   # install script is not needed.
   simple-git-hooks: false
+  # drizzle-kit pulls esbuild; its postinstall is only a binary sanity check.
+  esbuild: false

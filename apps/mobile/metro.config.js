@@ -20,6 +20,8 @@ const config = {
     path.resolve(workspaceRoot, 'node_modules'),
   ],
   resolver: {
+    // .sql files are migrations; babel-plugin-inline-import inlines them.
+    sourceExts: [...getDefaultConfig(projectRoot).resolver.sourceExts, 'sql'],
     nodeModulesPaths: [
       path.resolve(projectRoot, 'node_modules'),
       path.resolve(workspaceRoot, 'node_modules'),

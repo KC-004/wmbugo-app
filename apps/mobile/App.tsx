@@ -3,6 +3,7 @@
  */
 import { StatusBar, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Probe } from './src/spike/Probe';
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
@@ -16,6 +17,7 @@ function App() {
           style={[styles.title, isDarkMode ? styles.titleDark : styles.titleLight]}>
           wmbugo
         </Text>
+        <Probe />
       </View>
     </SafeAreaProvider>
   );
