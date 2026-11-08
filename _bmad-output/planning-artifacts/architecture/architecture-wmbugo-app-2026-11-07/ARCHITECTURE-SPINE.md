@@ -169,7 +169,7 @@ flowchart LR
 
 - **Binds:** SEC-002, SMS-001, SMS-015, NFR-01, §16.3, GATE-02, GATE-13
 - **Prevents:** shipping `INTERNET`, SMS permissions or SMS code by accident; the measurement build reaching production.
-- **Rule:** applicationId `app.wmbugo`; minSdk 26, targetSdk 36, compileSdk 36. Gradle flavors `nosms` and `sms` (in-package or `app.wmbugo.sms` per GATE-02 at M3). SMS and UPI-share feature code live in modules excluded from the `nosms` bundle at build time, so it contains no SMS code or strings. Release builds are checked against a **permission allowlist** (no `INTERNET`, no `ACCESS_NETWORK_STATE`; SMS permissions only in `sms`); anything added by a library is removed with `tools:node="remove"`. The measurement app is `app.wmbugo.lab`, never under the production ID. Debug builds keep `INTERNET` for Metro only.
+- **Rule:** applicationId `app.wmbugo`; minSdk 26, targetSdk 36, compileSdk 36. Gradle flavors `nosms` and `sms` (in-package or `app.wmbugo.sms` per GATE-02 at M3). SMS feature code lives in modules excluded from the `nosms` bundle at build time, so it contains no SMS code or strings. UPI-share code ships in both flavors and is enabled at runtime only for region IN (PRD §1.3, §13.2). Release builds are checked against a **permission allowlist** (no `INTERNET`, no `ACCESS_NETWORK_STATE`; SMS permissions only in `sms`); anything added by a library is removed with `tools:node="remove"`. The measurement app is `app.wmbugo.lab`, never under the production ID. Debug builds keep `INTERNET` for Metro only.
 
 ### AD-18 — Verification gates
 
