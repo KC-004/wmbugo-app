@@ -1,0 +1,249 @@
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created, ready for development
+#   - in-progress: Developer actively working on implementation
+#   - review: Implementation complete, ready for review
+#   - done: Story completed
+
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+
+# Action Item Status:
+#   - open: Committed during a retrospective, not yet addressed
+#   - in-progress: Actively being worked on
+#   - done: Completed
+
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when its first story starts (via build's sprint sync)
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates the next story after the previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+# - Retrospective appends its action items to action_items; the status view surfaces open ones
+generated: 11-08-2026 09:43
+last_updated: 11-08-2026 09:43
+project: wmbugo-app
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+development_status:
+  epic-1: backlog
+  1-1-starter-workspace-android-flavors-and-ci-gates: backlog
+  1-2-spike-s1-encrypted-storage-and-migration-toolchain: backlog
+  1-3-spike-s8-reference-devices-and-benchmark-method: backlog
+  1-4-exact-money-and-time-primitives-with-a-property-suite: backlog
+  1-5-spike-s2-initial-schema-and-migration-plan: backlog
+  1-6-encrypted-database-opens-on-first-launch: backlog
+  1-7-atomic-writer-with-audit-trail-outbox-and-query-cache: backlog
+  1-8-design-tokens-theming-and-brand-assets: backlog
+  1-9-shared-controls-and-accessibility-primitives: backlog
+  1-10-app-shell-navigation-and-feedback-patterns: backlog
+  1-11-onboarding-privacy-welcome-region-and-currency-payday: backlog
+  1-12-first-account-and-the-accounts-list: backlog
+  1-13-add-sheet-record-a-first-expense-in-about-six-seconds: backlog
+  1-14-home-shell-and-activity-list-of-saved-entries: backlog
+  1-15-record-income-and-transfers-between-accounts: backlog
+  1-16-settings-hub-with-appearance-and-finance-settings: backlog
+  epic-1-retrospective: optional
+
+  epic-2: backlog
+  2-1-account-balance-read-model-and-finance-fixtures: backlog
+  2-2-accounts-list-with-money-you-have-and-money-you-owe: backlog
+  2-3-account-detail-and-its-timeline: backlog
+  2-4-starting-balance-and-tracking-date: backlog
+  2-5-adjust-balance-with-a-reason: backlog
+  2-6-credit-card-details-outstanding-statement-due-and-limit: backlog
+  2-7-pay-card-bill: backlog
+  2-8-savings-pots: backlog
+  2-9-archive-restore-and-delete-accounts-safely: backlog
+  epic-2-retrospective: optional
+
+  epic-3: backlog
+  3-1-duplicate-matching-rules-in-core: backlog
+  3-2-shared-capture-pipeline-with-manual-entry-as-its-first-sourc: backlog
+  3-3-possible-duplicate-on-save-keep-both-or-merge: backlog
+  3-4-transaction-detail-edit-duplicate-delete-or-reject: backlog
+  3-5-activity-rows-in-every-state-and-the-refund-net-day-header: backlog
+  3-6-search-filters-and-sort-in-activity: backlog
+  3-7-split-one-entry-across-categories: backlog
+  3-8-refunds-reimbursements-and-failed-payments: backlog
+  3-9-select-many-entries-and-move-them-to-another-category: backlog
+  3-10-review-queue-one-list-of-everything-to-check: backlog
+  3-11-receipt-photos-and-source-details-survive-edits: backlog
+  3-12-retention-purge-and-tombstones: backlog
+  3-13-recently-deleted-show-rejected-and-delete-permanently: backlog
+  epic-3-retrospective: optional
+
+  epic-4: backlog
+  4-1-categories-screen-add-edit-reorder-icons-palette-colours-and: backlog
+  4-2-category-kinds-spending-income-or-both: backlog
+  4-3-archive-and-merge-categories-with-a-remap-preview: backlog
+  4-4-suggested-categories-are-always-overridable: backlog
+  4-5-budget-rules-and-the-budget-used-read-model: backlog
+  4-6-budget-list-and-editor-with-limit-bars: backlog
+  4-7-budget-detail-past-periods-and-target-changes: backlog
+  4-8-changing-payday-mid-cycle-the-shortened-cycle: backlog
+  4-9-budget-threshold-alerts-once-per-threshold-per-period: backlog
+  4-10-one-tap-50-30-20-targets: backlog
+  4-11-needs-wants-and-savings-progress-and-left-in-budget: backlog
+  epic-4-retrospective: optional
+
+  epic-5: backlog
+  5-1-home-read-model-refresh-and-stale-indication: backlog
+  5-2-the-am-i-okay-hero-card: backlog
+  5-3-hide-amounts-with-one-tap: backlog
+  5-4-home-cards-things-to-check-income-and-expense-budgets-and-ne: backlog
+  5-5-top-categories-and-7-day-spend-charts-with-view-as-table: backlog
+  5-6-edit-home-reorder-hide-resize-and-reset-cards: backlog
+  epic-5-retrospective: optional
+
+  epic-6: backlog
+  6-1-bill-rules-and-due-dates-in-core: backlog
+  6-2-bills-recurring-add-edit-pause-and-end-a-bill: backlog
+  6-3-link-a-payment-to-a-bill-rent-paid-yes-link-it: backlog
+  6-4-subscriptions-filter-with-monthly-cost-and-past-charges: backlog
+  6-5-bill-reminders-with-a-just-in-time-permission-ask: backlog
+  6-6-savings-goals-name-a-goal-and-set-money-aside: backlog
+  6-7-moved-to-savings-goal-progress-and-pace: backlog
+  6-8-plan-hub-with-the-before-payday-timeline: backlog
+  6-9-free-to-use-the-honest-estimate-on-plan: backlog
+  6-10-home-cards-coming-up-and-savings-goal: backlog
+  epic-6-retrospective: optional
+
+  epic-7: backlog
+  7-1-insights-aggregation-core-with-like-for-like-comparisons: backlog
+  7-2-insights-overview-with-the-period-picker-filters-and-kpi-til: backlog
+  7-3-insight-drill-down-to-the-exact-entries-with-explanation-and: backlog
+  7-4-where-did-it-go-category-donut-and-ranked-bars: backlog
+  7-5-is-it-going-up-expense-trend-and-income-vs-expense: backlog
+  7-6-who-got-it-top-merchants: backlog
+  7-7-am-i-on-track-budgets-needs-wants-savings-and-goal-rings: backlog
+  7-8-insights-accessibility-privacy-and-performance-pass: backlog
+  epic-7-retrospective: optional
+
+  epic-8: backlog
+  8-1-redacted-logs-local-crash-records-and-the-no-network-guarant: backlog
+  8-2-privacy-settings-hiding-wmbugo-in-recent-apps-and-what-stays: backlog
+  8-3-app-lock-with-lockgate-and-re-authentication: backlog
+  8-4-offer-app-lock-once-after-the-first-saved-entry: backlog
+  8-5-notification-privacy-hidden-form-and-notification-detail: backlog
+  8-6-encrypted-backup-format-in-core: backlog
+  8-7-make-a-backup-with-a-passphrase: backlog
+  8-8-restorebackup-in-maintenance-mode: backlog
+  8-9-restore-preview-and-confirmation: backlog
+  8-10-diagnostics-with-a-preview-before-anything-is-exported: backlog
+  8-11-storage-retention-and-erase-all-data: backlog
+  8-12-safe-mode-when-the-data-can-t-be-opened-safely: backlog
+  epic-8-retrospective: optional
+
+  epic-9: backlog
+  9-1-read-any-bank-csv-file-in-core: backlog
+  9-2-column-mapping-row-validation-and-saved-bank-formats-in-core: backlog
+  9-3-import-plan-classify-every-row-against-the-ledger-before-wri: backlog
+  9-4-importcsvbatch-atomic-resumable-idempotent-commit: backlog
+  9-5-imported-transfer-pairs-and-edge-day-rows-in-the-review-queu: backlog
+  9-6-import-wizard-choose-a-file-confirm-columns-and-preview: backlog
+  9-7-import-wizard-check-matches-import-and-see-the-summary: backlog
+  9-8-keep-or-delete-imported-files: backlog
+  9-9-export-transactions-and-account-summaries-as-csv: backlog
+  epic-9-retrospective: optional
+
+  epic-10: backlog
+  10-1-spike-s3-ocr-engine-choice-and-the-synthetic-receipt-set: backlog
+  10-2-read-receipt-lines-and-fields-in-core: backlog
+  10-3-reconcile-a-receipt-and-allocate-tax-fees-and-discounts-in-c: backlog
+  10-4-review-a-read-receipt-and-save-it-as-one-expense: backlog
+  10-5-give-each-receipt-item-its-own-category: backlog
+  10-6-pick-a-receipt-photo-and-watch-it-being-read: backlog
+  10-7-snap-a-receipt-with-the-camera: backlog
+  10-8-a-receipt-that-matches-an-entry-attach-to-it-keep-separate-o: backlog
+  10-9-snap-a-receipt-to-split-an-entry-and-one-way-in-for-every-re: backlog
+  epic-10-retrospective: optional
+
+  epic-11: backlog
+  11-1-spike-s5-capture-sheet-open-time-in-a-dialog-styled-activity: backlog
+  11-2-learning-core-normalized-keys-learned-categories-and-user-on: backlog
+  11-3-remembered-accounts-items-and-corrections-inside-the-app: backlog
+  11-4-capture-sheet-decide-one-capture-with-one-tap: backlog
+  11-5-swipe-through-several-captures-with-apply-to-all-similar: backlog
+  11-6-capture-notifications-full-and-hidden-forms-grouped-decided: backlog
+  11-7-money-in-salary-from-a-person-paid-me-back-refund-learned-pe: backlog
+  11-8-transfers-and-bills-from-a-capture-own-accounts-card-bill-ca: backlog
+  11-9-a-new-account-discovered-from-a-capture: backlog
+  11-10-auto-approve-as-one-honest-write-after-the-cutoff-with-a-clo: backlog
+  11-11-settings-capture-auto-approve-time-notifications-and-lock-sc: backlog
+  11-12-the-evening-summary-after-the-auto-approve-write: backlog
+  11-13-learned-merchants-see-edit-and-forget-what-wmbugo-learned: backlog
+  11-14-spike-s6-home-screen-widget-library: backlog
+  11-15-home-screen-widget-snap-add-and-n-to-check: backlog
+  epic-11-retrospective: optional
+
+  epic-12: backlog
+  12-1-read-gpay-phonepe-and-paytm-payment-screens-in-core: backlog
+  12-2-upi-captures-through-the-shared-pipeline-one-entry-per-upi-r: backlog
+  12-3-share-a-payment-screenshot-to-wmbugo: backlog
+  12-4-the-upi-capture-sheet-pre-filled-paid-from-one-tap-to-save: backlog
+  12-5-a-share-while-wmbugo-is-locked-waits-for-unlock-and-is-never: backlog
+  12-6-share-from-upi-app-in-the-add-sheet-and-the-flow-13-end-to-e: backlog
+  epic-12-retrospective: optional
+
+  epic-13: backlog
+  13-1-spike-s7-keep-sms-code-strings-and-permissions-out-of-the-no: backlog
+  13-2-read-bank-and-card-sms-in-core: backlog
+  13-3-verified-senders-unknown-bank-senders-and-scam-warnings-in-c: backlog
+  13-4-balance-chain-per-account-tolerate-one-surprise-flag-two-in: backlog
+  13-5-sms-captures-through-the-shared-pipeline-one-entry-per-payme: backlog
+  13-6-scam-notices-new-senders-and-block-sender-in-the-capture-she: backlog
+  13-7-spike-s4-sms-to-notification-latency-through-the-background: backlog
+  13-8-the-sms-receiver-and-catch-up-job-live-after-unlock-after-re: backlog
+  13-9-turn-on-bank-sms-the-explainer-the-permission-turning-it-off: backlog
+  13-10-tired-of-typing-payments-the-limited-re-ask-on-home: backlog
+  13-11-background-capture-help-in-diagnostics-and-checking-a-bank-m: backlog
+  13-12-play-sms-declaration-package-both-gate-02-outcomes-and-the-f: backlog
+  epic-13-retrospective: optional
+
+  epic-14: backlog
+  14-1-help-how-totals-work-glossary-faq-and-about: backlog
+  14-2-every-phase-1-flow-in-airplane-mode-on-the-release-builds-in: backlog
+  14-3-money-correctness-and-data-safety-release-blockers: backlog
+  14-4-performance-on-the-reference-device-matrix: backlog
+  14-5-whole-app-accessibility-audit: backlog
+  14-6-wmbugo-lab-measuring-capture-accuracy-on-testers-own-phones: backlog
+  14-7-security-and-play-permission-review-of-the-release-builds: backlog
+  14-8-guerrilla-usability-study: backlog
+  14-9-privacy-policy-data-safety-and-store-listings-for-every-mark: backlog
+  14-10-closed-test-gate-ledger-and-the-play-launch: backlog
+  epic-14-retrospective: optional
+
+# Action items from the implementation-readiness gate (CONCERNS, 11-08-2026).
+# Details: _bmad-output/planning-artifacts/implementation-readiness.md
+# 'epic' = the epic that must not start until the item is done.
+action_items:
+  - epic: 3
+    action: "AD-3: record the decision for cross-module reads (Insights sources filter + merchant display names, search index ownership, Activity list query owner) - bmad-architecture Update (stories 3.6, 7.1, 7.6)"
+    owner: "KCPK"
+    status: open
+  - epic: 4
+    action: "Architecture sync pass: add story-introduced events (AccountsChanged, CategoriesChanged, BudgetsChanged, GoalsChanged, RecurringChanged, ReceiptItemCategorised), ports (CategorySuggester, Crypto, CsvTokenizer) and tables to the spine; record manual saves bypassing SubmitCapture until 3.2 as an accepted sequencing exception; refresh stale date / PRD v1.3.6 source / SMS-UPI open question - bmad-architecture Update"
+    owner: "KCPK"
+    status: open
+  - epic: 8
+    action: "AD-10 vs SEC-001: sms_cursor after restore (rebuild vs keep) and the 30-day resume rule from story 13.9 - decide and record in architecture + PRD (stories 8.8, 13.8, 13.9)"
+    owner: "KCPK"
+    status: open
+  - epic: 8
+    action: "AD-10: low-space restore without a safety copy - fix story 8.9 copy ('nothing on this phone changes' is false there) and record that this phone's lock settings survive a restore (stories 8.8, 8.9)"
+    owner: "KCPK"
+    status: open
+  - epic: 11
+    action: "Add 'widget' to the BudgetsChanged invalidation so budget changes refresh the home-screen widget (stories 4.6, 11.15)"
+    owner: "KCPK"
+    status: open
