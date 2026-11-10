@@ -109,7 +109,7 @@ export function CategoriesScreen({ api = realCategoriesApi }: { api?: Categories
             <Pressable
               testID={`category-row-${row.id}`}
               {...controlA11y({ label: spoken, role: system ? 'text' : 'button' })}
-              accessibilityActions={system ? undefined : [{ name: 'moveUp', label: copy.categories.moveUp }, { name: 'moveDown', label: copy.categories.moveDown }]}
+              accessibilityActions={system ? undefined : [...(i > 0 ? [{ name: 'moveUp', label: copy.categories.moveUp }] : []), ...(i < siblings.length - 1 ? [{ name: 'moveDown', label: copy.categories.moveDown }] : [])]}
               onAccessibilityAction={(e) => void move(line, e.nativeEvent.actionName === 'moveUp' ? 'up' : 'down')}
               onPress={system ? undefined : () => open({ mode: 'edit', row })}
               style={[styles.row, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>

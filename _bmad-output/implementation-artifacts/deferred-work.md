@@ -5,3 +5,6 @@
 - source_spec: `spec-1-8-design-tokens-theming-and-brand-assets.md`
   summary: Replace the placeholder coin-flip Lottie with the final asset (GATE-12).
   evidence: Placeholder shipped on purpose; the AC allows it until GATE-12.
+- source_spec: `spec-4-1-categories-screen-add-edit-reorder-icons-palette-colours-and-need-want-type.md`
+  summary: SaveCategory should refuse (or define behaviour for) editing an archived category.
+  evidence: Review of 4.1: edit path does not check archived; unreachable from the UI until Story 4.3 archives categories.

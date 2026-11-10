@@ -70,8 +70,14 @@ export function CategorySheet({
   const submit = async () => {
     if (busy) return;
     setBusy(true);
-    const r = await onSave({ ...(editing ? { id: editing.id } : {}), name, kind, icon, colour, budgetType: isSpending ? type : null, parentId });
-    setBusy(false);
+    let r: SaveOutcome;
+    try {
+      r = await onSave({ ...(editing ? { id: editing.id } : {}), name, kind, icon, colour, budgetType: isSpending ? type : null, parentId });
+    } catch {
+      r = { ok: false, code: 'WRITE_FAILED' };
+    } finally {
+      setBusy(false);
+    }
     if (r.ok) {
       close();
       return;

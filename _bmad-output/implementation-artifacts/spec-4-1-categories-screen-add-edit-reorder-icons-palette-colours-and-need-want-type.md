@@ -31,3 +31,12 @@ Plan (decided during investigation, no open questions):
 - A subcategory's parent is chosen when adding; an existing category cannot be re-parented in this story.
 - Review: the independent Blind Hunter subagent layer was skipped (subagents were not authorised for this run); verified by lint, typecheck, 502 core tests and 998 mobile tests. Epic-level independent review still applies at the end of Epic 4.
 - Not checked on a device with TalkBack. The Add sheet More list uses the new order through the same sort_order query, but no Add-sheet test was added for it.
+
+## Review Triage Log
+
+- medium (patched): `CategorySheet.submit` left `busy` stuck if the write threw; now try/finally, shown as a save error.
+- low (patched): TalkBack Move up/down were offered on the first/last row; now only where a move is possible.
+- false: SPENDING_BY_BUDGET_TYPE_SQL already filters `event_type = 'expense'`; Settings count refreshes because `CategoriesChanged` invalidates the `ledger` area; name uniqueness per kind matches the epic; `Other` neutral chip and the `Money` row name are epic-mandated.
+- low (rejected): no-op edit still audits; UTF-16 vs code-point maxLength; ICON_INVALID shape-only (UI offers catalogue icons only); no retry on load error.
+- defer: editing an archived category (unreachable until Story 4.3 adds archiving; handle there).
+- noted: migration 0012 changes Family/Other types for existing installs by design of the epic (no user edit was possible before).
