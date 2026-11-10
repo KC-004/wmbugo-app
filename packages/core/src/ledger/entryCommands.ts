@@ -185,6 +185,8 @@ export const entryShape: Invariant = {
       }
       if (!t || (String(t[0]) !== 'expense' && String(t[0]) !== 'income')) continue;
       const p = await ctx.query('SELECT signed_amount_minor FROM posting WHERE transaction_id = ?', [id]);
+      // A foreign-currency capture waiting for its amount (Story 3.10) has neither a profile amount nor a posting yet.
+      if (p.length === 0 && String(t[2]) === 'needs_review' && Number(t[1]) === 0 && (await ctx.query('SELECT 1 FROM "transaction" WHERE id = ? AND foreign_currency IS NOT NULL', [id]))[0]) continue;
       const want = String(t[0]) === 'expense' ? -Number(t[1]) : Number(t[1]);
       if (p.length !== 1 || Number(p[0]![0]) !== want) return 'an expense or income must be one posting equal to its amount';
       const s = Number((await ctx.query('SELECT COALESCE(SUM(amount_minor), 0) FROM split WHERE transaction_id = ?', [id]))[0]![0]);

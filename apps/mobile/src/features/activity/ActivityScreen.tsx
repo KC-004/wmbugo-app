@@ -99,6 +99,7 @@ export function ActivityScreen({
   onOpen,
   onDeleteRow,
   onRecategorise,
+  onReview,
 }: {
   api?: ActivityApi;
   onAccounts: () => void;
@@ -111,6 +112,8 @@ export function ActivityScreen({
   /** TalkBack custom actions on a row: Delete (Reject for a captured entry) and Recategorise. */
   onDeleteRow?: (row: ActivityRow) => void;
   onRecategorise?: (row: ActivityRow) => void;
+  /** Opens the review queue at an entry that waits for a decision (Check, waiting or currency). */
+  onReview?: (transactionId: string) => void;
 }) {
   const theme = useTheme();
   const sheet = useSheet();
@@ -332,7 +335,7 @@ export function ActivityScreen({
       locale={data.locale}
       showDate={showDate}
       footer={item.held ? <HeldRowActions transactionId={item.id} api={duplicateApi} /> : undefined}
-      onPress={selected ? () => toggle(item.id) : onOpen ? () => onOpen(item.id) : undefined}
+      onPress={selected ? () => toggle(item.id) : (item.held || item.waiting) && onReview ? () => onReview(item.id) : onOpen ? () => onOpen(item.id) : undefined}
       onLongPress={api.bulkMove && !selected && item.kind !== 'adjustment' ? () => setSelected(new Set([item.id])) : undefined}
       selection={selected ? { selected: selected.has(item.id) } : undefined}
       actions={onDeleteRow && onRecategorise && item.kind !== 'adjustment' ? [{ name: 'recategorise', label: copy.detail.recategorise }, { name: 'delete', label: item.captured ? copy.detail.reject : copy.detail.delete }] : undefined}

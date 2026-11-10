@@ -10,12 +10,14 @@ import { editSpecOf, realTransactionApi, type TransactionApi } from './transacti
 
 /** What a row can do without opening it: open its detail, Delete (Reject for a captured entry), Recategorise. */
 export function useEntryActions(api: TransactionApi = realTransactionApi) {
-  const nav = useNavigation<{ navigate: (s: 'TransactionDetail', p: { transactionId: string }) => void }>();
+  const nav = useNavigation<{ navigate: (s: 'TransactionDetail' | 'ReviewQueue', p: { transactionId: string } | { focusId: string }) => void }>();
   const toast = useToast();
   const qc = useQueryClient();
   const openAdd = useOpenAddWith();
 
   const open = useCallback((transactionId: string) => nav.navigate('TransactionDetail', { transactionId }), [nav]);
+
+  const review = useCallback((focusId: string) => nav.navigate('ReviewQueue', { focusId }), [nav]);
 
   const remove = useCallback(
     async (row: ActivityRow) => {
@@ -52,5 +54,5 @@ export function useEntryActions(api: TransactionApi = realTransactionApi) {
     [api, toast, openAdd],
   );
 
-  return { open, remove, recategorise };
+  return { open, review, remove, recategorise };
 }

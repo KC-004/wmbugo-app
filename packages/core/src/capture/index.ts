@@ -4,3 +4,4 @@ export * from './submitCapture';
 export * from './statusLabel';
 export * from './resolveDuplicate';
 export * from './snapshot';
+export * from './reviewQueue';

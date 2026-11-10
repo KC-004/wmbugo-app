@@ -76,7 +76,7 @@ development_status:
   3-7-split-one-entry-across-categories: review
   3-8-refunds-reimbursements-and-failed-payments: review
   3-9-select-many-entries-and-move-them-to-another-category: review
-  3-10-review-queue-one-list-of-everything-to-check: backlog
+  3-10-review-queue-one-list-of-everything-to-check: review
   3-11-receipt-photos-and-source-details-survive-edits: backlog
   3-12-retention-purge-and-tombstones: backlog
   3-13-recently-deleted-show-rejected-and-delete-permanently: backlog

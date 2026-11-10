@@ -54,7 +54,7 @@ const OPTIONS: ActivityOptions = {
   period: { start: '2026-11-01', end: '2026-11-30' },
 };
 
-async function mountActivity(rows: ActivityRow[], over: Partial<ActivityApi> = {}) {
+async function mountActivity(rows: ActivityRow[], over: Partial<ActivityApi> = {}, onReview?: (id: string) => void) {
   const load = jest.fn<Promise<ActivityData | null>, [number?, ActivityQuery?]>(async () => ({ currency: 'INR', locale: 'en-IN', today: '2026-11-08', days: groupByDay(rows), hasMore: false }));
   const ids = jest.fn(async () => ['a', 'b', 'c', 'not-loaded-1', 'not-loaded-2']);
   const bulkPreview = jest.fn(async (sel: readonly string[]) => ({ movable: sel.length - 1, wontChange: 1, fromCategoryId: 'cat_other' as string | null }));
@@ -69,7 +69,7 @@ async function mountActivity(rows: ActivityRow[], over: Partial<ActivityApi> = {
         <ThemeProvider>
           <ToastHost bottomOffset={0}>
             <SheetHost>
-              <ActivityScreen api={api} onAccounts={() => undefined} onProfile={() => undefined} onAdd={() => undefined} onOpen={() => undefined} />
+              <ActivityScreen api={api} onAccounts={() => undefined} onProfile={() => undefined} onAdd={() => undefined} onOpen={() => undefined} onReview={onReview} />
             </SheetHost>
           </ToastHost>
         </ThemeProvider>
@@ -141,5 +141,15 @@ describe('select many and move (Story 3.9)', () => {
     await press(m.r, 'bulk-cat-cat_transport');
     expect(texts(m.r)).toContain("Move 2 entries to Transport. Amounts don't change.");
     expect(has(m.r, 'bulk-wont-change')).toBe(false);
+  });
+
+
+  it('tapping a row that waits for a decision (Check or waiting) opens the review queue at it; a normal row does not', async () => {
+    const onReview = jest.fn();
+    const m = await mountActivity([row('a'), row('h', { held: true }), row('w', { waiting: true })], {}, onReview);
+    await press(m.r, 'activity-row-h');
+    await press(m.r, 'activity-row-w');
+    await press(m.r, 'activity-row-a');
+    expect(onReview.mock.calls).toEqual([['h'], ['w']]);
   });
 });

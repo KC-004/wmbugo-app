@@ -14,6 +14,7 @@ import { useOpenAdd, useOpenAddWith } from '../add/useOpenAdd';
 import { useOpenSplit } from '../activity/useOpenSplit';
 import { ActivityScreen } from '../activity/ActivityScreen';
 import { TransactionDetailScreen } from '../activity/TransactionDetailScreen';
+import { ReviewQueueScreen } from '../activity/ReviewQueueScreen';
 import { useReviewDot } from '../activity/reviewDot';
 import { useEntryActions } from '../activity/useEntryActions';
 import { HomeScreen } from '../home/HomeScreen';
@@ -25,7 +26,7 @@ import { ScreenHeader } from './ScreenHeader';
 import { TabBar, type TabRoute } from './TabBar';
 import { markTabFirstFrame } from './navTiming';
 
-type RootParams = { Tabs: undefined; Accounts: undefined; AccountDetail: { accountId: string }; TransactionDetail: { transactionId: string }; Settings: undefined };
+type RootParams = { Tabs: undefined; Accounts: undefined; AccountDetail: { accountId: string }; TransactionDetail: { transactionId: string }; ReviewQueue: { focusId?: string }; Settings: undefined };
 const RootStack = createNativeStackNavigator<RootParams>();
 const Tabs = createBottomTabNavigator();
 const TabStack = createNativeStackNavigator();
@@ -73,7 +74,7 @@ function ActivityTab() {
   const entry = useEntryActions();
   return (
     <TabFrame tab="Activity">
-      <ActivityScreen onAccounts={() => nav.navigate('Accounts')} onProfile={() => nav.navigate('Settings')} onAdd={openAdd} onOpen={entry.open} onDeleteRow={(r) => void entry.remove(r)} onRecategorise={(r) => void entry.recategorise(r)} />
+      <ActivityScreen onAccounts={() => nav.navigate('Accounts')} onProfile={() => nav.navigate('Settings')} onAdd={openAdd} onOpen={entry.open} onReview={entry.review} onDeleteRow={(r) => void entry.remove(r)} onRecategorise={(r) => void entry.recategorise(r)} />
     </TabFrame>
   );
 }
@@ -153,6 +154,18 @@ function AccountDetailRoute() {
   );
 }
 
+function ReviewQueueRoute() {
+  const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  const nav = useNavigation<{ goBack: () => void; navigate: (s: 'TransactionDetail', p: { transactionId: string }) => void }>();
+  const route = useRoute<RouteProp<RootParams, 'ReviewQueue'>>();
+  return (
+    <View style={[styles.fill, { backgroundColor: theme.color('bg-canvas'), paddingTop: insets.top }]}>
+      <ReviewQueueScreen focusId={route.params?.focusId} onBack={() => nav.goBack()} onEdit={(transactionId) => nav.navigate('TransactionDetail', { transactionId })} />
+    </View>
+  );
+}
+
 function TransactionDetailRoute() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -194,6 +207,7 @@ export function RootNavigator() {
             <RootStack.Screen name="Accounts" component={AccountsRoute} />
             <RootStack.Screen name="AccountDetail" component={AccountDetailRoute} />
             <RootStack.Screen name="TransactionDetail" component={TransactionDetailRoute} />
+            <RootStack.Screen name="ReviewQueue" component={ReviewQueueRoute} />
             <RootStack.Screen name="Settings" component={SettingsRoute} />
           </RootStack.Navigator>
         </SheetHost>
