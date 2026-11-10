@@ -6,7 +6,7 @@ export interface TimelineRow extends ActivityRow {
   readonly signedMinor: number;
 }
 
-const FILTER = "t2.removed_at IS NULL AND t2.status = 'confirmed' AND t2.event_type IN ('expense','income','transfer','refund','adjustment')";
+const FILTER = "t2.removed_at IS NULL AND t2.status IN ('confirmed','reversed') AND t2.event_type IN ('expense','income','transfer','refund','adjustment','reversal')";
 
 /**
  * The newest entries that touched one account, one page (Story 2.3). Params: account id, account id, the number of

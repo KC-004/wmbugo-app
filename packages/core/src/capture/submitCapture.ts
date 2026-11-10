@@ -1,6 +1,7 @@
 import { err, ok } from '../shared/result';
 import type { UseCase, WriterContext } from '../writer/ledgerWriter';
 import { createEntry, type ManualEntry, type RecordEntryError } from '../ledger/entryCommands';
+import { createRefund, type RefundError, type RefundInput } from '../ledger/refunds';
 import { createTransfer, type TransferError, type TransferInput } from '../ledger/transferCommands';
 import { matchItem, type CaptureItem } from './match';
 
@@ -10,10 +11,10 @@ import { matchItem, type CaptureItem } from './match';
  * rules. Manual entry from the Add sheet is the first source.
  */
 
-export type SubmitInput = { readonly submissionId: string; readonly sourceKind: 'manual' } & ({ readonly entry: ManualEntry; readonly copiedFrom?: string } | { readonly transfer: TransferInput });
+export type SubmitInput = { readonly submissionId: string; readonly sourceKind: 'manual' } & ({ readonly entry: ManualEntry; readonly copiedFrom?: string } | { readonly transfer: TransferInput } | { readonly refund: RefundInput });
 
 export type SubmitResult = 'RECORDED' | 'ALREADY_SUBMITTED' | 'POSSIBLE_DUPLICATE';
-export type SubmitError = RecordEntryError | TransferError | 'SUBMISSION_INVALID';
+export type SubmitError = RecordEntryError | TransferError | RefundError | 'SUBMISSION_INVALID';
 
 export interface Submitted {
   readonly transactionId: string;
@@ -70,6 +71,15 @@ export const SubmitCapture: UseCase<SubmitInput, Submitted, SubmitError> = {
       const fee = (await ctx.query('SELECT transaction_id FROM source_record WHERE fingerprint = ?', [`${fingerprint}:fee`]))[0];
       const acc = (await ctx.query("SELECT account_id FROM posting WHERE transaction_id = ? AND posting_kind = 'normal' ORDER BY signed_amount_minor LIMIT 1", [transactionId]))[0];
       return ok({ transactionId, accountId: acc ? String(acc[0]) : null, feeTransactionId: fee ? String(fee[0]) : null, result: 'ALREADY_SUBMITTED' });
+    }
+
+    if ('refund' in input) {
+      const f = await createRefund(ctx, input.refund);
+      if (!f.ok) return f;
+      await writeSource(ctx, f.value.transactionId, fingerprint);
+      ctx.emit('TransactionsChanged', { transactionIds: [f.value.transactionId] });
+      ctx.emit('CapturesSubmitted', { transactionIds: [f.value.transactionId] });
+      return ok({ transactionId: f.value.transactionId, accountId: f.value.accountId, feeTransactionId: null, result: 'RECORDED' });
     }
 
     if ('transfer' in input) {

@@ -33,7 +33,11 @@ export type EventName = keyof typeof EVENT_CATALOGUE;
 
 /** Payloads carry ids and field names only, never amounts or text. */
 export interface EventPayloads {
-  TransactionsChanged: { readonly transactionIds: readonly string[] };
+  /**
+   * `closedPeriodTouched`: the change reached an entry of a period that has ended (a reversal or its Undo). Budget threshold
+   * handlers never fire for such an event.
+   */
+  TransactionsChanged: { readonly transactionIds: readonly string[]; readonly closedPeriodTouched?: boolean };
   AccountsChanged: { readonly accountIds: readonly string[] };
   ProfileChanged: { readonly fields: readonly string[] };
   CapturesSubmitted: { readonly transactionIds: readonly string[] };

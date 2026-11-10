@@ -68,6 +68,8 @@ export const transaction = sqliteTable(
     created_at: integer('created_at').notNull(),
     updated_at: integer('updated_at').notNull(),
     reversed_by_id: text('reversed_by_id'),
+    // refund only: 'refund' (money back from a shop) or 'reimbursement' (someone paid you back); null otherwise.
+    recovery_kind: text('recovery_kind'),
   },
   (t) => [
     index('transaction_date_idx').on(t.local_date, t.id),

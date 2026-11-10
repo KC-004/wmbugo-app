@@ -215,17 +215,17 @@ describe('LIR-06 architecture: only SubmitCapture creates entries', () => {
       return statSync(p).isDirectory() ? walk(p) : /\.(ts|tsx)$/.test(p) && !/\.test\.tsx?$/.test(p) ? [p] : [];
     });
   const base = (p: string) => p.split(/[\\/]/).slice(-1)[0]!;
-  const allowedCallers = new Set(['submitCapture.ts', 'entryCommands.ts', 'transferCommands.ts']);
+  const allowedCallers = new Set(['submitCapture.ts', 'entryCommands.ts', 'transferCommands.ts', 'refunds.ts']);
 
   it('no core module other than SubmitCapture (and the files that define them) mentions the create commands', () => {
     const offenders = walk(join(__dirname, '..'))
       .filter((f) => !allowedCallers.has(base(f)) && !f.includes('testing'))
-      .filter((f) => /\b(createEntry|createTransfer)\b/.test(readFileSync(f, 'utf8')));
+      .filter((f) => /\b(createEntry|createTransfer|createRefund)\b/.test(readFileSync(f, 'utf8')));
     expect(offenders.map(base)).toEqual([]);
   });
 
   it('no app adapter or feature imports them, and the old use cases are gone', () => {
-    const offenders = walk(join(__dirname, '../../../../apps/mobile/src')).filter((f) => /\b(createEntry|createTransfer|RecordManualEntry|RecordTransfer)\b/.test(readFileSync(f, 'utf8')));
+    const offenders = walk(join(__dirname, '../../../../apps/mobile/src')).filter((f) => /\b(createEntry|createTransfer|createRefund|RecordManualEntry|RecordTransfer)\b/.test(readFileSync(f, 'utf8')));
     expect(offenders.map(base)).toEqual([]);
     const core = walk(join(__dirname, '..')).filter((f) => /\b(RecordManualEntry|RecordTransfer)\b/.test(readFileSync(f, 'utf8')) && !f.includes('testing'));
     expect(core.map(base)).toEqual([]);

@@ -1,0 +1,1 @@
+ALTER TABLE `transaction` ADD `recovery_kind` text;

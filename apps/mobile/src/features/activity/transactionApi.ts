@@ -4,6 +4,14 @@ import {
   mapCategoryRows,
   mapSplits,
   mapTransactionDetail,
+  mapRecoverySummary,
+  RECOVERY_SUMMARY_SQL,
+  REFUNDABLE_SQL,
+  ReverseTransaction,
+  SubmitCapture,
+  UndoReversal,
+  type RecoverySummary,
+  type RecoveryKind,
   SetSplits,
   SPLITS_SQL,
   type SplitRow,
@@ -29,6 +37,12 @@ export interface TransactionData {
   readonly splits: SplitView[];
   /** Categories a split row can choose (the entry's kind). */
   readonly categories: { id: string; name: string }[];
+  /** Refunds and reimbursements already linked to this expense. */
+  readonly recovery: RecoverySummary;
+  /** What can still be refunded (null when this is not a refundable expense). */
+  readonly refundableMinor: number | null;
+  /** The date the entry was reversed (reversed entries only). */
+  readonly reversedOn: string | null;
 }
 
 export type RemoveResult = { ok: true; value: { snapshot: TxSnapshot } } | { ok: false; code: string };
@@ -41,6 +55,10 @@ export interface TransactionApi {
   restore(snapshot: TxSnapshot): Promise<{ ok: boolean }>;
   /** Replaces the splits (and the amount, when given) in one balanced write. */
   setSplits(transactionId: string, splits: readonly SplitRow[], amountMinor?: number): Promise<{ ok: true; value: { snapshot: TxSnapshot } } | { ok: false; code: string }>;
+  /** A refund or reimbursement for this expense, dated now. */
+  refund(transactionId: string, amountMinor: number, recoveryKind: RecoveryKind): Promise<{ ok: true; value: { transactionId: string } } | { ok: false; code: string }>;
+  reverse(transactionId: string): Promise<{ ok: true; value: { snapshot: TxSnapshot; reversalId: string } } | { ok: false; code: string }>;
+  undoReverse(snapshot: TxSnapshot, reversalId: string): Promise<{ ok: boolean }>;
 }
 
 export const transactionKey = (id: string) => ['ledger', 'transaction', id] as const;
@@ -60,6 +78,9 @@ export const realTransactionApi: TransactionApi = {
       detail,
       splits: mapSplits(await db.query(SPLITS_SQL, [transactionId])),
       categories: mapCategoryRows(await db.query(CATEGORY_LIST_SQL)).filter((c) => c.kind === kind).map((c) => ({ id: c.id, name: c.name })),
+      recovery: mapRecoverySummary(await db.query(RECOVERY_SUMMARY_SQL, [transactionId])),
+      refundableMinor: detail.type === 'expense' ? await db.query(REFUNDABLE_SQL, [transactionId]).then((r) => (r[0] ? Number(r[0][0]) : null)) : null,
+      reversedOn: detail.status === 'reversed' ? await db.query('SELECT local_date FROM "transaction" WHERE id = (SELECT reversed_by_id FROM "transaction" WHERE id = ?)', [transactionId]).then((r) => (r[0] ? String(r[0][0]) : null)) : null,
     };
   },
   remove: (transactionId, kind) => getServices().writer.run(kind === 'delete' ? DeleteEntry : RejectEntry, { transactionId }, 'user'),
@@ -68,6 +89,12 @@ export const realTransactionApi: TransactionApi = {
     const r = await getServices().writer.run(SetSplits, { transactionId, splits, ...(amountMinor !== undefined ? { amountMinor } : {}) }, 'user');
     return r.ok ? { ok: true, value: { snapshot: r.value.snapshot } } : r;
   },
+  async refund(transactionId, amountMinor, recoveryKind) {
+    const r = await getServices().writer.run(SubmitCapture, { submissionId: getServices().newId(), sourceKind: 'manual', refund: { originalId: transactionId, amountMinor, recoveryKind } }, 'user');
+    return r.ok ? { ok: true, value: { transactionId: r.value.transactionId } } : r;
+  },
+  reverse: (transactionId) => getServices().writer.run(ReverseTransaction, { transactionId }, 'user'),
+  undoReverse: (snapshot, reversalId) => getServices().writer.run(UndoReversal, { snapshot, reversalId }, 'user'),
 };
 
 /** What the Add sheet opens with to edit this entry (type fixed). Only expenses, incomes and transfers can be edited. */

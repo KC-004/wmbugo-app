@@ -116,7 +116,7 @@ export function activityWhere(q: ActivityQuery, ctx: { exponent: number; nowMs: 
   const parts: string[] = [];
 
   // What can be listed at all: live entries (confirmed, waiting, reversed), plus recent rejected captures on request.
-  const live = "(t2.removed_at IS NULL AND t2.status IN ('confirmed','needs_review','reversed') AND t2.event_type IN ('expense','income','transfer','refund','adjustment'))";
+  const live = "(t2.removed_at IS NULL AND t2.status IN ('confirmed','needs_review','reversed') AND t2.event_type IN ('expense','income','transfer','refund','adjustment','reversal'))";
   if (q.showRejected) {
     parts.push(`(${live} OR (t2.status = 'excluded' AND t2.capture_resolution = 'rejected' AND t2.removed_at >= ? AND t2.event_type IN ('expense','income','transfer','refund')))`);
     params.push(ctx.nowMs - REJECTED_KEEP_DAYS * DAY_MS);

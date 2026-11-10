@@ -7,7 +7,9 @@ import {
   instantFromLocal,
   keypadKeyFromHardware,
   parseAmountInput,
+  REFUNDS_INCOME_CATEGORY_ID,
   toLocalDate,
+  type RefundableExpense,
   type KeypadKey,
   type PaymentMethod,
 } from '@wmbugo/core';
@@ -23,6 +25,7 @@ import { useTheme } from '../../shared/theme/ThemeProvider';
 import { textStyle } from '../../shared/theme/typography';
 import { Amount } from '../../shared/ui/Amount';
 import { Button } from '../../shared/ui/Button';
+import { Chip } from '../../shared/ui/Chip';
 import { OTHER_CATEGORY_ID } from '@wmbugo/core';
 import { realAddApi, type AddApi, type AddData, type AddKind } from './addApi';
 import { AccountChip, CategoryChips, DetailsPanel, KindSegments, TransferTo } from './AddParts';
@@ -218,6 +221,19 @@ export function AddSheet({
     if (next === 'transfer') announce(copy.add.transferSelected);
   };
 
+  // Income form, Refunds chip: the entry is a refund, optionally for one of the recent expenses (default Other).
+  const isRefund = kind === 'income' && categoryId === REFUNDS_INCOME_CATEGORY_ID && !edit && api.recordRefund !== undefined;
+  const [refundFor, setRefundFor] = useState<string | null>(null);
+  const [refundables, setRefundables] = useState<RefundableExpense[]>([]);
+  useEffect(() => {
+    if (!isRefund || !api.refundables) return;
+    let live = true;
+    void api.refundables().then((r) => live && setRefundables(r)).catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [isRefund, api]);
+
   const chooseCategory = (id: string) => {
     setCategoryId(id);
     setDraft({ categoryId: id });
@@ -313,7 +329,22 @@ export function AddSheet({
     const done = startSaveTiming(kind);
     try {
       submission.current ??= api.newSubmissionId();
-      const r = await api.record({
+      const chosen = refundables.find((x) => x.id === refundFor);
+      if (isRefund && chosen && parsed.value > chosen.leftMinor) {
+        setError('amount');
+        setSaveError(copy.refundFor.exceeds);
+        return;
+      }
+      const r = isRefund
+        ? await api.recordRefund!({
+            submissionId: submission.current,
+            amountMinor: parsed.value,
+            accountId: accountId ?? null,
+            ...(refundFor ? { originalId: refundFor } : {}),
+            ...(occurredAtMs !== undefined ? { occurredAtMs } : {}),
+            ...(note.trim() ? { note } : {}),
+          })
+        : await api.record({
         submissionId: submission.current,
         ...(preset?.copiedFrom ? { copiedFrom: preset.copiedFrom } : {}),
         kind,
@@ -472,6 +503,16 @@ export function AddSheet({
           onPick={chooseCategory}
         />
       )}
+
+      {isRefund ? (
+        <View testID="refund-for" style={styles.inline}>
+          <Text style={[textStyle('label'), ink]}>{copy.refundFor.label}</Text>
+          <Chip onGlass label={copy.refundFor.other} testID="refund-for-other" selected={refundFor === null} onPress={() => setRefundFor(null)} />
+          {refundables.map((x) => (
+            <Chip onGlass key={x.id} label={x.merchant || x.localDate} testID={`refund-for-${x.id}`} selected={refundFor === x.id} onPress={() => setRefundFor(x.id)} />
+          ))}
+        </View>
+      ) : null}
 
       <View style={styles.inline}>
       <Text style={[textStyle('label'), ink]}>{kind === 'transfer' ? copy.add.from : kind === 'income' ? copy.add.receivedIn : copy.add.paidFrom}</Text>

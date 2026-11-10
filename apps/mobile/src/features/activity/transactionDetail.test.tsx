@@ -25,7 +25,7 @@ const detail = (over: Partial<TransactionDetail> = {}): TransactionDetail => ({
   resolution: 'user_approved', removed: false, category: { id: 'cat_food', name: 'Food & Drinks', icon: 'ForkKnife', color: 'cat-rose' }, splitCount: 1,
   from: { id: 'a1', name: 'HDFC' }, to: null, sourceKind: 'manual', addedAtMs: Date.UTC(2026, 10, 7, 13, 12), timezoneId: 'Asia/Kolkata', openDuplicate: false, ...over,
 });
-const data = (d: TransactionDetail): TransactionData => ({ currency: 'INR', exponent: 2, locale: 'en-IN', detail: d, splits: [], categories: [{ id: 'cat_food', name: 'Food & Drinks' }] });
+const data = (d: TransactionDetail): TransactionData => ({ currency: 'INR', exponent: 2, locale: 'en-IN', detail: d, splits: [], categories: [{ id: 'cat_food', name: 'Food & Drinks' }], recovery: { refundedMinor: 0, reimbursedMinor: 0 }, refundableMinor: d.type === 'expense' ? d.amountMinor : null, reversedOn: null });
 
 function fakeApi(d: TransactionDetail | 'missing' = detail()) {
   const state = { d };
@@ -33,7 +33,7 @@ function fakeApi(d: TransactionDetail | 'missing' = detail()) {
   const remove = jest.fn<Promise<RemoveResult>, [string, 'delete' | 'reject']>(async () => ({ ok: true, value: { snapshot: { id: 't1' } as TxSnapshot } }));
   const restore = jest.fn<Promise<{ ok: boolean }>, [TxSnapshot]>(async () => ({ ok: true }));
   const setSplits = jest.fn<ReturnType<TransactionApi['setSplits']>, Parameters<TransactionApi['setSplits']>>(async () => ({ ok: true, value: { snapshot: { id: 't1' } as TxSnapshot } }));
-  const api: TransactionApi = { load, remove, restore, setSplits };
+  const api: TransactionApi = { load, remove, restore, setSplits, refund: jest.fn() as never, reverse: jest.fn() as never, undoReverse: jest.fn() as never };
   return { api, load, remove, restore, state };
 }
 
@@ -267,5 +267,73 @@ describe('rows open the entry and carry TalkBack actions', () => {
     expect(onRecat).toHaveBeenCalledWith(expect.objectContaining({ id: 'a' }));
     act(() => r.unmount());
     void Text;
+  });
+});
+
+describe('refunds, reimbursements and reversal on the detail (Story 3.8)', () => {
+  const apiWith = (over: Partial<TransactionApi>, extra: Partial<TransactionData> = {}, d: TransactionDetail = detail({ amountMinor: 150_000 })) => {
+    const f = fakeApi(d);
+    const load = jest.fn<Promise<TransactionData | 'missing' | null>, [string]>(async () => ({ ...data(d), ...extra }));
+    return { api: { ...f.api, load, ...over } as TransactionApi };
+  };
+
+  it('Record a refund opens the form with the refundable amount, saves, and toasts Refund saved with Undo', async () => {
+    const refund = jest.fn(async () => ({ ok: true as const, value: { transactionId: 'r1' } }));
+    const m = await mountDetail(detail({ amountMinor: 150_000 }), apiWith({ refund }));
+    await act(async () => fire(m.r, 'detail-refund'));
+    expect(host(m.r, 'refund-amount').props.value).toBe('1500');
+    await act(async () => fire(m.r, 'refund-amount', 'onChangeText', '1299'));
+    await act(async () => fire(m.r, 'refund-save'));
+    await settle();
+    expect(refund).toHaveBeenCalledWith('t1', 129_900, 'refund');
+    expect(texts(m.r)).toEqual(expect.arrayContaining(['Refund saved', 'Undo']));
+    m.unmount();
+  });
+
+  it('refusing more than is left shows "Error: only ₹1,500.00 is left to refund" and writes nothing', async () => {
+    const refund = jest.fn();
+    const m = await mountDetail(detail({ amountMinor: 150_000 }), apiWith({ refund: refund as never }));
+    await act(async () => fire(m.r, 'detail-refund'));
+    await act(async () => fire(m.r, 'refund-amount', 'onChangeText', '1600'));
+    await act(async () => fire(m.r, 'refund-save'));
+    expect(refund).not.toHaveBeenCalled();
+    expect(texts(m.r).join(' ')).toContain('Error: only ₹1,500.00 is left to refund');
+    m.unmount();
+  });
+
+  it('Got paid back records a reimbursement; the detail then reads You paid, Paid back and Your share', async () => {
+    const refund = jest.fn(async () => ({ ok: true as const, value: { transactionId: 'r2' } }));
+    const m = await mountDetail(detail({ amountMinor: 240_000 }), apiWith({ refund }, { recovery: { refundedMinor: 0, reimbursedMinor: 120_000 }, refundableMinor: 120_000 }, detail({ amountMinor: 240_000 })));
+    const joined = texts(m.r).join(' ');
+    expect(joined).toContain('You paid ₹2,400.00');
+    expect(joined).toContain('Paid back ₹1,200.00');
+    expect(joined).toContain('Your share ₹1,200.00');
+    await act(async () => fire(m.r, 'detail-paidback'));
+    await act(async () => fire(m.r, 'refund-save'));
+    await settle();
+    expect(refund).toHaveBeenCalledWith('t1', 120_000, 'reimbursement');
+    m.unmount();
+  });
+
+  it('Reverse toasts Reversed with Undo, shows its caption, and Undo hands the snapshot back', async () => {
+    const snapshot = { id: 't1' } as TxSnapshot;
+    const reverse = jest.fn(async () => ({ ok: true as const, value: { snapshot, reversalId: 'v1' } }));
+    const undoReverse = jest.fn(async () => ({ ok: true }));
+    const m = await mountDetail(detail(), apiWith({ reverse, undoReverse }));
+    expect(texts(m.r)).toContain('For a payment that failed or bounced');
+    await act(async () => fire(m.r, 'detail-reverse'));
+    await settle();
+    expect(texts(m.r)).toEqual(expect.arrayContaining(['Reversed', 'Undo']));
+    await act(async () => fire(m.r, 'toast-undo'));
+    await settle();
+    expect(undoReverse).toHaveBeenCalledWith(snapshot, 'v1');
+    m.unmount();
+  });
+
+  it('a reversed entry shows "Reversed on 8 Nov" and offers no refund or reverse', async () => {
+    const m = await mountDetail(detail({ status: 'reversed' }), apiWith({}, { reversedOn: '2026-11-08' }, detail({ status: 'reversed' })));
+    expect(texts(m.r).some((x) => x.startsWith('Reversed on ') && x.includes('8'))).toBe(true);
+    expect(has(m.r, 'detail-reverse') || has(m.r, 'detail-refund')).toBe(false);
+    m.unmount();
   });
 });

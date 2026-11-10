@@ -24,6 +24,9 @@ import {
   rankCategories,
   rankIsStale,
   RemoveEntry,
+  mapRefundable,
+  RECENT_REFUNDABLE_SQL,
+  type RefundableExpense,
   type AccountRow,
   type CategoryRow,
   type CurrencyCode,
@@ -77,6 +80,10 @@ export interface AddApi {
   keepBoth(transactionId: string): Promise<{ ok: boolean }>;
   merge(transactionId: string, categoryId?: string): Promise<{ ok: boolean; code?: string }>;
   undoResolution(transactionId: string): Promise<{ ok: boolean }>;
+  /** Income form, Refunds chip: recent expenses with something left to refund. */
+  refundables?(): Promise<RefundableExpense[]>;
+  /** Records a refund (linked to an expense when `originalId` is given, else unlinked into Other). */
+  recordRefund?(input: { submissionId: string; amountMinor: number; accountId: string | null; originalId?: string; occurredAtMs?: number; note?: string }): Promise<RecordResult>;
 }
 
 /** The quick-chip order is recalculated at most once a day, and only when a sheet opens. */
@@ -152,4 +159,11 @@ export const realAddApi: AddApi = {
   keepBoth: (transactionId) => getServices().writer.run(KeepBoth, { transactionId }, 'user'),
   merge: (transactionId, categoryId) => getServices().writer.run(MergeDuplicate, { transactionId, ...(categoryId ? { categoryId } : {}) }, 'user'),
   undoResolution: (transactionId) => getServices().writer.run(UndoDuplicateResolution, { transactionId }, 'user'),
+  async refundables() {
+    return mapRefundable(await getServices().db.query(RECENT_REFUNDABLE_SQL));
+  },
+  async recordRefund({ submissionId, accountId, ...refund }) {
+    const r = await getServices().writer.run(SubmitCapture, { submissionId, sourceKind: 'manual', refund: { ...refund, ...(accountId ? { accountId } : {}) } }, 'user');
+    return r.ok ? { ok: true, value: { transactionId: r.value.transactionId, accountId: r.value.accountId ?? '', result: r.value.result } } : r;
+  },
 };

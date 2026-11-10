@@ -41,7 +41,7 @@ export function homeAccounts(accounts: readonly AccountRow[]): HomeAccounts {
   };
 }
 
-export type ActivityKind = 'expense' | 'income' | 'transfer' | 'refund' | 'adjustment';
+export type ActivityKind = 'expense' | 'income' | 'transfer' | 'refund' | 'adjustment' | 'reversal';
 
 export interface ActivityRow {
   readonly id: string;
@@ -80,7 +80,7 @@ export interface ActivityRow {
 }
 
 /** The states of an Activity row (UX-DR29), most important first. */
-export type RowState = 'rejected' | 'reversed' | 'check' | 'currency' | 'waiting' | 'needs-category' | 'guessed' | 'refund' | 'transfer' | 'income' | 'expense' | 'adjustment';
+export type RowState = 'rejected' | 'reversed' | 'check' | 'currency' | 'waiting' | 'needs-category' | 'guessed' | 'refund' | 'transfer' | 'income' | 'expense' | 'adjustment' | 'reversal';
 
 export function rowState(r: ActivityRow): RowState {
   if (r.rejected) return 'rejected';
@@ -99,7 +99,7 @@ export const ACTIVITY_PAGE_SIZE = 100;
 // Everything the user can see and act on: confirmed entries, entries waiting for review (a possible duplicate included) and
 // reversed ones. Only confirmed entries count in any total; the rest are listed so they can be looked at.
 const ACTIVITY_FILTER =
-  "t2.removed_at IS NULL AND t2.status IN ('confirmed','needs_review','reversed') AND t2.event_type IN ('expense','income','transfer','refund','adjustment')";
+  "t2.removed_at IS NULL AND t2.status IN ('confirmed','needs_review','reversed') AND t2.event_type IN ('expense','income','transfer','refund','adjustment','reversal')";
 
 export interface ActivityFilter {
   /** Only entries that touch this account (both sides of a transfer). */

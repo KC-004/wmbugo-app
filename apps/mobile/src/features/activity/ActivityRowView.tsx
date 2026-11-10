@@ -13,7 +13,7 @@ import { textStyle } from '../../shared/theme/typography';
 import { Amount } from '../../shared/ui/Amount';
 import { categoryIcon } from '../add/categoryIcons';
 
-const KIND: Readonly<Record<ActivityRow['kind'], AmountKind>> = { expense: 'spent', income: 'income', refund: 'refund', transfer: 'transfer', adjustment: 'plain' };
+const KIND: Readonly<Record<ActivityRow['kind'], AmountKind>> = { expense: 'spent', income: 'income', refund: 'refund', transfer: 'transfer', adjustment: 'plain', reversal: 'plain' };
 
 /** Status tags under the subtitle (UX-DR30): small pills, not buttons, never separately focusable. */
 function tagsOf(row: ActivityRow): { text: string; spoken: string; tone?: 'warning' }[] {
@@ -72,7 +72,7 @@ export function ActivityRowView({
   const state = rowState(row);
   const adjustment = row.kind === 'adjustment';
   const up = (row.signedMinor ?? 0) >= 0;
-  const title = adjustment ? copy.activity.balanceAdjustment : (titleOverride ?? row.merchant ?? row.categoryName ?? copy.activity.transfer);
+  const title = adjustment ? copy.activity.balanceAdjustment : row.kind === 'reversal' ? (row.merchant ? copy.activity.reversalOf.replace('{merchant}', row.merchant) : copy.activity.reversalPlain) : (titleOverride ?? row.merchant ?? row.categoryName ?? copy.activity.transfer);
   const account = showAccount ? row.accountName : null;
   const kindWord = adjustment ? (up ? copy.activity.adjustedUp : copy.activity.adjustedDown) : row.kind === 'transfer' ? copy.activity.transfer : row.categoryName;
   const category = kindWord && row.splitCount && row.kind !== 'transfer' && !adjustment ? `${kindWord} + ${row.splitCount - 1} more` : kindWord;

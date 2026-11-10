@@ -195,8 +195,8 @@ describe('split entries elsewhere', () => {
     act(() => r.unmount());
     void groupByDay;
 
-    const load = jest.fn<Promise<TransactionData | 'missing' | null>, [string]>(async () => ({ currency: 'INR', exponent: 2, locale: 'en-IN', detail: detail(), splits, categories: CATS }));
-    const api: TransactionApi = { load, remove: jest.fn() as never, restore: jest.fn() as never, setSplits: jest.fn() as never };
+    const load = jest.fn<Promise<TransactionData | 'missing' | null>, [string]>(async () => ({ currency: 'INR', exponent: 2, locale: 'en-IN', detail: detail(), splits, categories: CATS, recovery: { refundedMinor: 0, reimbursedMinor: 0 }, refundableMinor: null, reversedOn: null }));
+    const api: TransactionApi = { load, remove: jest.fn() as never, restore: jest.fn() as never, setSplits: jest.fn() as never, refund: jest.fn() as never, reverse: jest.fn() as never, undoReverse: jest.fn() as never };
     const onSplit = jest.fn();
     const qc = createQueryClient();
     let d!: ReactTestRenderer;

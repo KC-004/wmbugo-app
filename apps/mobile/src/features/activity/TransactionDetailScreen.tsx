@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowsLeftRight, DotsThree } from 'phosphor-react-native';
-import { captureStateOf, captureStatusLabel, longDate, type TransactionDetail } from '@wmbugo/core';
+import { captureStateOf, captureStatusLabel, longDate, parseAmountInput, type RecoveryKind, type TransactionDetail } from '@wmbugo/core';
+import { minorToInput } from '../../shared/minorInput';
 import { amountLabel, type AmountKind } from '../../shared/a11y/labels';
 import { copy } from '../../shared/copy';
 import { EmptyState, ErrorBlock, Reveal, Skeleton } from '../../shared/feedback/Feedback';
@@ -73,6 +74,9 @@ export function TransactionDetailScreen({
   const q = useQuery({ queryKey: transactionKey(transactionId), queryFn: () => api.load(transactionId) });
   const [error, setError] = useState<string | null>(null);
   const busy = useRef(false);
+  const [refundKind, setRefundKind] = useState<RecoveryKind | null>(null);
+  const [refundText, setRefundText] = useState('');
+  const [leftError, setLeftError] = useState<number | null>(null);
   const ink = { color: theme.color('text-primary') };
   const muted = { color: theme.color('text-secondary') };
   const header = <ScreenHeader title={copy.detail.title} onBack={onBack} backTestID="detail-back" />;
@@ -136,6 +140,74 @@ export function TransactionDetailScreen({
     }
   };
 
+  const openRefund = (kind: RecoveryKind) => {
+    if (!data) return;
+    setError(null);
+    setLeftError(null);
+    setRefundKind(kind);
+    setRefundText(minorToInput(data.refundableMinor ?? 0, data.exponent));
+  };
+
+  const saveRefund = async () => {
+    if (!data || !d || !refundKind || busy.current) return;
+    const p = parseAmountInput(refundText, data.exponent);
+    if (!p.ok || p.value <= 0) return setError(copy.detail.refundFailed);
+    const left = data.refundableMinor ?? 0;
+    if (p.value > left) return setLeftError(left);
+    busy.current = true;
+    try {
+      const r = await api.refund(transactionId, p.value, refundKind).catch(() => ({ ok: false as const, code: 'FAILED' }));
+      if (!r.ok) return (r.code === 'EXCEEDS_REFUNDABLE' ? setLeftError(left) : setError(copy.detail.refundFailed));
+      const refundId = r.value.transactionId;
+      const kind = refundKind;
+      setRefundKind(null);
+      setError(null);
+      await refresh();
+      toast.show({
+        message: kind === 'refund' ? copy.detail.refundSaved : copy.detail.paidBackSaved,
+        undo: {
+          label: copy.common.undo,
+          onUndo: () =>
+            void api
+              .remove(refundId, 'delete')
+              .then(async () => {
+                await refresh();
+              })
+              .catch(() => toast.show({ message: copy.add.removeFailed })),
+        },
+      });
+    } finally {
+      busy.current = false;
+    }
+  };
+
+  const reverse = async () => {
+    if (busy.current) return;
+    busy.current = true;
+    try {
+      const r = await api.reverse(transactionId).catch(() => ({ ok: false as const, code: 'FAILED' }));
+      if (!r.ok) return setError(r.code === 'ALREADY_REVERSED' ? copy.detail.alreadyReversed : copy.detail.reverseFailed);
+      const { snapshot, reversalId } = r.value;
+      await refresh();
+      toast.show({
+        message: copy.detail.reversedToast,
+        undo: {
+          label: copy.common.undo,
+          onUndo: () =>
+            void api
+              .undoReverse(snapshot, reversalId)
+              .then(async (u) => {
+                await refresh();
+                if (!u.ok) toast.show({ message: copy.add.removeFailed });
+              })
+              .catch(() => toast.show({ message: copy.add.removeFailed })),
+        },
+      });
+    } finally {
+      busy.current = false;
+    }
+  };
+
   let body = null;
   if (d && data) {
     const captured = d.sourceKind !== 'manual';
@@ -182,6 +254,39 @@ export function TransactionDetailScreen({
             </View>
           ))}
 
+        {d.status === 'reversed' && data.reversedOn ? (
+          <Text testID="detail-reversed" style={[textStyle('body-medium'), ink]}>
+            {copy.detail.reversedOn.replace('{date}', longDate(data.reversedOn))}
+          </Text>
+        ) : null}
+
+        {d.type === 'expense' && (data.recovery.refundedMinor > 0 || data.recovery.reimbursedMinor > 0) ? (
+          <View testID="detail-recovery" style={styles.row}>
+            <View style={styles.splitLine}><Text style={[textStyle("body"), ink]}>{copy.detail.youPaid}</Text><Amount amountMinor={d.amountMinor} currency={data.currency} direction="neutral" locale={data.locale} /></View>
+            {data.recovery.refundedMinor > 0 ? <View style={styles.splitLine}><Text style={[textStyle("body"), ink]}>{copy.detail.refundedLine}</Text><Amount amountMinor={data.recovery.refundedMinor} currency={data.currency} direction="neutral" locale={data.locale} /></View> : null}
+            {data.recovery.reimbursedMinor > 0 ? <View style={styles.splitLine}><Text style={[textStyle("body"), ink]}>{copy.detail.paidBack}</Text><Amount amountMinor={data.recovery.reimbursedMinor} currency={data.currency} direction="neutral" locale={data.locale} /></View> : null}
+            {data.recovery.reimbursedMinor > 0 ? <View style={styles.splitLine}><Text style={[textStyle("body"), ink]}>{copy.detail.yourShare}</Text><Amount amountMinor={Math.max(0, d.amountMinor - data.recovery.refundedMinor - data.recovery.reimbursedMinor)} currency={data.currency} direction="neutral" locale={data.locale} /></View> : null}
+          </View>
+        ) : null}
+
+        {refundKind ? (
+          <View testID="refund-form" style={styles.row}>
+            <Text style={[textStyle('label'), muted]}>{refundKind === 'refund' ? copy.detail.refundAmount : copy.detail.paidBackAmount}</Text>
+            <TextInput
+              testID="refund-amount"
+              value={refundText}
+              onChangeText={setRefundText}
+              keyboardType="decimal-pad"
+              accessibilityLabel={refundKind === 'refund' ? copy.detail.refundAmount : copy.detail.paidBackAmount}
+              style={[textStyle('body'), ink, styles.input, { borderColor: theme.color('border-hairline') }]}
+            />
+            <View style={styles.actions}>
+              <Button label={copy.common.save} onPress={() => void saveRefund()} testID="refund-save" />
+              <Button label={copy.common.cancel} variant="text" onPress={() => { setRefundKind(null); setError(null); }} testID="refund-cancel" />
+            </View>
+          </View>
+        ) : null}
+
         {data.splits.length > 1 ? (
           <View testID="detail-splits" style={styles.row}>
             {data.splits.map((sp) => (
@@ -200,6 +305,14 @@ export function TransactionDetailScreen({
           </View>
         ) : null}
 
+        {leftError !== null ? (
+          <View testID="detail-error" accessibilityRole="alert" accessibilityLiveRegion="assertive" style={styles.splitLine}>
+            <Text style={[textStyle('body-medium'), ink]}>{copy.detail.exceedsA}</Text>
+            <Amount amountMinor={leftError} currency={data.currency} direction="neutral" locale={data.locale} />
+            <Text style={[textStyle('body-medium'), ink]}>{copy.detail.exceedsB.toLowerCase()}</Text>
+          </View>
+        ) : null}
+
         {error ? (
           <Text testID="detail-error" accessibilityRole="alert" accessibilityLiveRegion="assertive" style={[textStyle('body-medium'), ink]}>
             {error}
@@ -211,9 +324,13 @@ export function TransactionDetailScreen({
             {editSpecOf(d) ? <Button label={copy.detail.edit} variant="secondary" onPress={() => void edit()} testID="detail-edit" /> : null}
             {editSpecOf(d) ? <Button label={copy.detail.duplicate} variant="secondary" onPress={duplicate} testID="detail-duplicate" /> : null}
             {(d.type === 'expense' || d.type === 'income') && onSplit ? <Button label={copy.split.action} variant="secondary" onPress={() => onSplit(d.id)} testID="detail-split" /> : null}
+            {d.type === 'expense' && d.status === 'confirmed' && (data.refundableMinor ?? 0) > 0 && !refundKind ? <Button label={copy.detail.recordRefund} variant="secondary" onPress={() => openRefund('refund')} testID="detail-refund" /> : null}
+            {d.type === 'expense' && d.status === 'confirmed' && (data.refundableMinor ?? 0) > 0 && !refundKind ? <Button label={copy.detail.gotPaidBack} variant="secondary" onPress={() => openRefund('reimbursement')} testID="detail-paidback" /> : null}
+            {d.type === 'expense' && d.status === 'confirmed' ? <Button label={copy.detail.reverse} variant="secondary" onPress={() => void reverse()} testID="detail-reverse" /> : null}
             {['expense', 'income', 'transfer', 'refund'].includes(d.type) ? (
               <Button label={captured ? copy.detail.reject : copy.detail.delete} variant="text" onPress={() => void remove(captured ? 'reject' : 'delete')} testID={captured ? 'detail-reject' : 'detail-delete'} />
             ) : null}
+            {d.type === 'expense' && d.status === 'confirmed' ? <Text testID="detail-reverse-hint" style={[textStyle('label'), muted, styles.hint]}>{copy.detail.reverseHint}</Text> : null}
           </View>
         )}
       </ScrollView>
@@ -248,4 +365,6 @@ const styles = StyleSheet.create({
   value: { flexShrink: 1 },
   splitLine: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 40 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  hint: { width: '100%' },
+  input: { borderWidth: 1, borderRadius: radii.md, paddingHorizontal: 12, minHeight: 48 },
 });
