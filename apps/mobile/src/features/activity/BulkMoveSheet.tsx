@@ -43,7 +43,7 @@ export function BulkMoveSheet({
   const fromName = data?.fromCategoryId ? categories.find((c) => c.id === data.fromCategoryId)?.name : undefined;
   const line =
     picked && data && data.movable > 0
-      ? (fromName ? copy.bulk.previewFrom.replace('{from}', fromName) : copy.bulk.previewMixed).replace('{n}', String(data.movable)).replace('{to}', picked.name)
+      ? (fromName ? copy.bulk.previewFrom.replace('{from}', fromName) : copy.bulk.previewMixed).replace('{n}', String(data.movable)).replace('{entries}', data.movable === 1 ? 'entry' : 'entries').replace('{to}', picked.name)
       : null;
   const wont = data && data.wontChange > 0 ? (data.wontChange === 1 ? copy.bulk.wontChangeOne : copy.bulk.wontChangeMany.replace('{n}', String(data.wontChange))) : null;
 

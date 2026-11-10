@@ -124,7 +124,7 @@ describe('select many and move (Story 3.9)', () => {
     await press(m.r, 'bulk-cat-cat_transport');
     expect(m.bulkPreview).toHaveBeenCalledWith(['a', 'b', 'c', 'not-loaded-1', 'not-loaded-2'], 'cat_transport');
     const t = texts(m.r);
-    expect(t).toContain("Move 4 from Other to Transport. Amounts don't change.");
+    expect(t).toContain("Move 4 entries from Other to Transport. Amounts don't change.");
     expect(t).toContain("1 entry won't change: transfers, splits, refunds, entries still to check or entries that don't fit this category.");
     await press(m.r, 'bulk-confirm');
     expect(m.bulkMove).toHaveBeenCalledWith(['a', 'b', 'c', 'not-loaded-1', 'not-loaded-2'], 'cat_transport');
@@ -139,7 +139,7 @@ describe('select many and move (Story 3.9)', () => {
     await longPress(m.r, 'activity-row-a');
     await press(m.r, 'selection-move');
     await press(m.r, 'bulk-cat-cat_transport');
-    expect(texts(m.r)).toContain("Move 2 to Transport. Amounts don't change.");
+    expect(texts(m.r)).toContain("Move 2 entries to Transport. Amounts don't change.");
     expect(has(m.r, 'bulk-wont-change')).toBe(false);
   });
 });

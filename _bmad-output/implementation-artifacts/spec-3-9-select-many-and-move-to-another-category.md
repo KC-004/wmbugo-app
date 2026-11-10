@@ -19,7 +19,6 @@ Implements the epic's Story 3.9 acceptance criteria (see epics.md) and PRD TXN-0
 
 ## Deviation
 
-- The preview reads `Move 14 from Other to Transport.` (the count without the word "entries") to keep one template for the plural; the won't-change line has the epic's wording.
 - There is no `selected-background` colour token; selected rows use `bg-muted`.
 - Hardware Back handling is wired but not covered by a test.
 
