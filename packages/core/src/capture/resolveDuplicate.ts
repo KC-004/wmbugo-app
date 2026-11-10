@@ -1,4 +1,4 @@
-import { moveAttachments } from './attachments';
+import { moveAttachments, type DroppedAttachment } from './attachments';
 import { err, ok } from '../shared/result';
 import type { UseCase, WriterContext } from '../writer/ledgerWriter';
 import { restoreTx, snapshotTx, type TxSnapshot } from './snapshot';
@@ -18,13 +18,15 @@ export const SOURCE_AUTHORITY: Readonly<Record<string, number>> = { sms: 4, upi:
 
 export const TIP_CATEGORY_NAME = 'Tip / adjustment';
 
-export type ResolveError = 'NOT_A_DUPLICATE' | 'ALREADY_RESOLVED' | 'CATEGORY_REQUIRED' | 'CATEGORY_NOT_FOUND' | 'NOTHING_TO_UNDO';
+export type ResolveError = 'MATCH_REMOVED' | 'NOT_A_DUPLICATE' | 'ALREADY_RESOLVED' | 'CATEGORY_REQUIRED' | 'CATEGORY_NOT_FOUND' | 'NOTHING_TO_UNDO';
 
 interface Undo {
   kind: 'keep_both' | 'merge';
   txs: TxSnapshot[];
   /** Splits created by the merge (the tip split), removed again on Undo. */
   addedSplitIds?: string[];
+  /** Photos the merge dropped because the survivor already had the same image. */
+  droppedAttachments?: DroppedAttachment[];
 }
 
 async function openCandidate(ctx: WriterContext, transactionId: string): Promise<{ id: string; matched: string } | 'resolved' | null> {
@@ -76,6 +78,8 @@ export const MergeDuplicate: UseCase<{ transactionId: string; categoryId?: strin
 
     const heldId = input.transactionId;
     const confirmedId = c.matched;
+    // The entry it was held against was deleted since: merging would hide both. Keep both, or reject it.
+    if ((await ctx.query('SELECT 1 FROM "transaction" WHERE id = ? AND removed_at IS NULL', [confirmedId])).length === 0) return err('MATCH_REMOVED');
     const [heldAuth, confirmedAuth] = [await authority(ctx, heldId), await authority(ctx, confirmedId)];
     // Higher authority wins; between equals the already confirmed one does.
     const survivorId = heldAuth > confirmedAuth ? heldId : confirmedId;
@@ -124,7 +128,7 @@ export const MergeDuplicate: UseCase<{ transactionId: string; categoryId?: strin
 
     // Every source record follows the survivor; the other record is excluded and hidden everywhere.
     await ctx.execute('UPDATE source_record SET transaction_id = ? WHERE transaction_id = ?', [survivorId, otherId]);
-    await moveAttachments(ctx, otherId, survivorId);
+    undo.droppedAttachments = await moveAttachments(ctx, otherId, survivorId);
     await ctx.execute("UPDATE \"transaction\" SET status = 'confirmed', capture_resolution = 'user_approved', updated_at = ? WHERE id = ?", [now, survivorId]);
     await ctx.execute("UPDATE \"transaction\" SET status = 'excluded', removed_at = ?, removal_kind = 'excluded', updated_at = ? WHERE id = ?", [now, now, otherId]);
     await ctx.execute("UPDATE review_candidate SET status = 'resolved', resolved_at = ?, undo_json = ? WHERE id = ?", [now, JSON.stringify(undo), c.id]);
@@ -143,10 +147,15 @@ export const UndoDuplicateResolution: UseCase<{ transactionId: string }, void, R
     const r = rows[0];
     if (!r) return err('NOTHING_TO_UNDO');
     const undo = JSON.parse(String(r[1])) as Undo;
+    // An entry purged since (past its keeping period) cannot be put back.
+    for (const s of undo.txs) if ((await ctx.query('SELECT 1 FROM "transaction" WHERE id = ?', [s.id])).length === 0) return err('NOTHING_TO_UNDO');
     for (const id of undo.addedSplitIds ?? []) await ctx.execute('DELETE FROM split WHERE id = ?', [id]);
     // Clear every split first: a split the merge moved from one record to the other must not collide when it goes back.
     for (const s of undo.txs) await ctx.execute('DELETE FROM split WHERE transaction_id = ?', [s.id]);
     for (const s of undo.txs) await restoreTx(ctx, s);
+    for (const a of undo.droppedAttachments ?? []) {
+      await ctx.execute('INSERT OR IGNORE INTO attachment (id, transaction_id, kind, digest, size_bytes, created_at) VALUES (?, ?, ?, ?, ?, ?)', [a.id, a.transactionId, a.kind, a.digest, a.sizeBytes, a.createdAt]);
+    }
     await ctx.execute("UPDATE review_candidate SET status = 'open', resolved_at = NULL, undo_json = NULL WHERE id = ?", [String(r[0])]);
     for (const s of undo.txs) ctx.touch('transaction', s.id, { resolution: 'undone' });
     ctx.emit('TransactionsChanged', { transactionIds: undo.txs.map((s) => s.id) });

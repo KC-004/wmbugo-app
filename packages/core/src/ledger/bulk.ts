@@ -14,6 +14,7 @@ export interface BulkRow {
   readonly splitCount: number;
   /** The category of its only split (null when it has none or several). */
   readonly categoryId: string | null;
+  readonly needsCategory?: boolean;
 }
 
 /** What can be moved to a category of this kind: confirmed, live, single-category expenses/incomes of the same kind, not already there. */
@@ -50,7 +51,7 @@ export function classifyBulk(rows: readonly BulkRow[], target: { id: string; kin
 
 /** The columns `mapBulkRows` reads, for a list of ids (up to 500 per query). */
 export function bulkRowsSql(count: number): string {
-  return `SELECT t.id, t.event_type, t.status, t.removed_at IS NOT NULL, (SELECT COUNT(*) FROM split s WHERE s.transaction_id = t.id), (SELECT s.category_id FROM split s WHERE s.transaction_id = t.id ORDER BY s.id LIMIT 1) FROM "transaction" t WHERE t.id IN (${Array.from({ length: count }, () => '?').join(',')})`;
+  return `SELECT t.id, t.event_type, t.status, t.removed_at IS NOT NULL, (SELECT COUNT(*) FROM split s WHERE s.transaction_id = t.id), (SELECT s.category_id FROM split s WHERE s.transaction_id = t.id ORDER BY s.id LIMIT 1), t.needs_category FROM "transaction" t WHERE t.id IN (${Array.from({ length: count }, () => '?').join(',')})`;
 }
 
 export const BULK_CHUNK = 500;
@@ -63,6 +64,7 @@ export function mapBulkRows(rows: readonly (readonly unknown[])[]): BulkRow[] {
     removed: Number(r[3]) === 1,
     splitCount: Number(r[4]),
     categoryId: Number(r[4]) === 1 && r[5] !== null ? String(r[5]) : null,
+    needsCategory: Number(r[6]) === 1,
   }));
 }
 
@@ -72,7 +74,7 @@ export interface BulkMoved {
   readonly movedIds: string[];
   readonly skipped: number;
   /** Where each moved entry was, for Undo. */
-  readonly previous: { readonly id: string; readonly categoryId: string }[];
+  readonly previous: { readonly id: string; readonly categoryId: string; readonly needsCategory?: boolean }[];
 }
 
 async function rowsFor(ctx: WriterContext, ids: readonly string[]): Promise<BulkRow[]> {
@@ -131,12 +133,12 @@ export const BulkRecategorise: UseCase<{ transactionIds: readonly string[]; cate
       ctx.emit('TransactionsChanged', { transactionIds: movedIds });
       ctx.emit('CategoryAssigned', { transactionIds: movedIds });
     }
-    return ok({ movedIds, skipped: ids.length - movedIds.length, previous: moving.map((r) => ({ id: r.id, categoryId: r.categoryId! })) });
+    return ok({ movedIds, skipped: ids.length - movedIds.length, previous: moving.map((r) => ({ id: r.id, categoryId: r.categoryId!, needsCategory: r.needsCategory === true })) });
   },
 };
 
 /** Undo: every moved entry goes back to the category it had, in one step. */
-export const UndoBulkRecategorise: UseCase<{ previous: readonly { id: string; categoryId: string }[] }, { restored: number }, never> = {
+export const UndoBulkRecategorise: UseCase<{ previous: readonly { id: string; categoryId: string; needsCategory?: boolean }[] }, { restored: number }, never> = {
   name: 'UndoBulkRecategorise',
   async execute(ctx, input) {
     const now = ctx.nowMs();
@@ -147,7 +149,7 @@ export const UndoBulkRecategorise: UseCase<{ previous: readonly { id: string; ca
       // Only an entry that still has exactly one split can go back; one split since is left as the user made it.
       if (!row || row.removed || row.splitCount !== 1) continue;
       await ctx.execute('UPDATE split SET category_id = ? WHERE transaction_id = ?', [p.categoryId, p.id]);
-      await ctx.execute('UPDATE "transaction" SET updated_at = ? WHERE id = ?', [now, p.id]);
+      await ctx.execute('UPDATE "transaction" SET updated_at = ?, needs_category = ? WHERE id = ?', [now, p.needsCategory ? 1 : 0, p.id]);
       ctx.touch('transaction', p.id, { edited: true, fields: 'category', bulkUndo: true });
       restoredIds.push(p.id);
     }

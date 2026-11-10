@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { CategoryRow } from '@wmbugo/core';
 import { copy } from '../../shared/copy';
@@ -31,13 +31,17 @@ export function BulkMoveSheet({
   const [data, setData] = useState<BulkPreviewData | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
+  const latest = useRef(0);
   const ink = { color: theme.color('on-glass-primary') };
 
   const pick = (c: CategoryRow) => {
     setPicked(c);
     setData(null);
     setError(false);
-    void preview(c.id).then(setData).catch(() => setError(true));
+    const mine = ++latest.current;
+    void preview(c.id)
+      .then((d) => mine === latest.current && setData(d))
+      .catch(() => mine === latest.current && setError(true));
   };
 
   const fromName = data?.fromCategoryId ? categories.find((c) => c.id === data.fromCategoryId)?.name : undefined;

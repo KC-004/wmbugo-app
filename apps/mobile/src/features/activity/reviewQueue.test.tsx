@@ -46,7 +46,7 @@ const item = (id: string, over: Partial<ReviewItem> = {}): ReviewItem => ({ ...s
 function dataOf(items: ReviewItem[], needsCategory: ReviewSide[] = []): ReviewData {
   return {
     currency: 'INR', exponent: 2, locale: 'en-IN', items, needsCategory,
-    accounts: [{ id: 'a1', name: 'HDFC' }],
+    accounts: [{ id: 'a1', name: 'HDFC' }, { id: 'a2', name: 'Cash' }],
     categories: [
       { id: 'cat_food', name: 'Food & Drinks', kind: 'expense' },
       { id: 'cat_transport', name: 'Transport', kind: 'expense' },
@@ -155,5 +155,14 @@ describe('review queue screen (Story 3.10)', () => {
     const empty = await mountQueue(dataOf([]));
     expect(has(empty.r, 'review-empty')).toBe(true);
     expect(texts(empty.r)).toContain("You're all caught up · Smooth sailing");
+  });
+
+  it('a foreign charge is posted to the account the person picks, not the first one', async () => {
+    const fx = item('fx2', { foreign: { amountMinor: 500, currency: 'USD', exponent: 2 }, amountMinor: 0 });
+    const m = await mountQueue(dataOf([fx]));
+    await change(m.r, 'review-amount-fx2', '41');
+    await press(m.r, 'review-account-fx2-a2');
+    await press(m.r, 'review-confirm-fx2');
+    expect(m.confirmForeign).toHaveBeenCalledWith('fx2', 4100, 'a2');
   });
 });

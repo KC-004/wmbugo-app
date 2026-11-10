@@ -32,7 +32,7 @@ export const SetStartingBalance: UseCase<{ accountId: string; amountMinor: numbe
     const since = Number(
       (
         await ctx.query(
-          "SELECT COALESCE(SUM(p.signed_amount_minor), 0) FROM posting p JOIN \"transaction\" t ON t.id = p.transaction_id WHERE p.account_id = ? AND p.posting_kind <> 'opening_balance' AND t.removed_at IS NULL AND t.status = 'confirmed' AND (p.posting_kind <> 'normal' OR t.occurred_at_utc >= ?)",
+          "SELECT COALESCE(SUM(p.signed_amount_minor), 0) FROM posting p JOIN \"transaction\" t ON t.id = p.transaction_id WHERE p.account_id = ? AND p.posting_kind <> 'opening_balance' AND t.removed_at IS NULL AND t.status IN ('confirmed','reversed') AND (p.posting_kind <> 'normal' OR t.occurred_at_utc >= ?)",
           [input.accountId, openedAt],
         )
       )[0]?.[0] ?? 0,

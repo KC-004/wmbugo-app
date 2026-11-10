@@ -288,7 +288,7 @@ export function TransactionDetailScreen({
       ...(data.sources.length > 0 ? [] : [[copy.detail.source, captured ? `${d.sourceKind} · ${whenText(d.addedAtMs, d.timezoneId)}` : `${copy.detail.addedByYou} · ${whenText(d.addedAtMs, d.timezoneId)}`] as [string, string | null]]),
     ];
     body = (
-      <ScrollView contentContainerStyle={styles.pad}>
+      <ScrollView contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
         <View testID="detail-header" accessible accessibilityLabel={spoken} style={[styles.card, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
           <View style={[styles.chip, { backgroundColor: theme.color('bg-muted') }]}>
             <Icon icon={glyph} size={24} color={(d.category?.color as ColorName | undefined) ?? 'text-secondary'} />
@@ -407,7 +407,7 @@ export function TransactionDetailScreen({
             {(d.type === 'expense' || d.type === 'income') && onSplit ? <Button label={copy.split.action} variant="secondary" onPress={() => onSplit(d.id)} testID="detail-split" /> : null}
             {d.type === 'expense' && d.status === 'confirmed' && (data.refundableMinor ?? 0) > 0 && !refundKind ? <Button label={copy.detail.recordRefund} variant="secondary" onPress={() => openRefund('refund')} testID="detail-refund" /> : null}
             {d.type === 'expense' && d.status === 'confirmed' && (data.refundableMinor ?? 0) > 0 && !refundKind ? <Button label={copy.detail.gotPaidBack} variant="secondary" onPress={() => openRefund('reimbursement')} testID="detail-paidback" /> : null}
-            {d.type === 'expense' && d.status === 'confirmed' ? <Button label={copy.detail.reverse} variant="secondary" onPress={() => void reverse()} testID="detail-reverse" /> : null}
+            {d.type === 'expense' && d.status === 'confirmed' && !refundKind ? <Button label={copy.detail.reverse} variant="secondary" onPress={() => void reverse()} testID="detail-reverse" /> : null}
             {['expense', 'income', 'transfer', 'refund'].includes(d.type) ? (
               <Button label={captured ? copy.detail.reject : copy.detail.delete} variant="text" onPress={() => void remove(captured ? 'reject' : 'delete')} testID={captured ? 'detail-reject' : 'detail-delete'} />
             ) : null}

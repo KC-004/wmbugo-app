@@ -113,7 +113,13 @@ async function currentPeriodStart(ctx: WriterContext): Promise<string | null> {
   return periodFor(today.value, rule).start;
 }
 
-export type ReverseError = 'ENTRY_NOT_FOUND' | 'ENTRY_REMOVED' | 'NOT_REVERSIBLE' | 'ALREADY_REVERSED' | 'NO_PROFILE';
+export type ReverseError = 'ENTRY_NOT_FOUND' | 'ENTRY_REMOVED' | 'NOT_REVERSIBLE' | 'ALREADY_REVERSED' | 'HAS_REFUNDS' | 'NO_PROFILE';
+
+/** What has come back for an expense so far (live refunds and reimbursements linked to it). */
+export async function linkedRefundsMinor(ctx: Pick<WriterContext, 'query'>, originalId: string): Promise<number> {
+  const r = (await ctx.query("SELECT COALESCE(SUM(amount_minor), 0) FROM \"transaction\" WHERE refund_of_transaction_id = ? AND event_type = 'refund' AND removed_at IS NULL AND status = 'confirmed'", [originalId]))[0];
+  return r ? Number(r[0]) : 0;
+}
 
 /**
  * Reverse: for a payment that failed or bounced. Writes a \`reversal\` with the opposite posting on the same account,
@@ -129,6 +135,8 @@ export const ReverseTransaction: UseCase<{ transactionId: string }, { snapshot: 
     const row = (await ctx.query('SELECT event_type, reversed_by_id, timezone_id FROM "transaction" WHERE id = ?', [input.transactionId]))[0]!;
     if (row[1] !== null || snap.status === 'reversed') return err('ALREADY_REVERSED');
     if (String(row[0]) !== 'expense' || snap.status !== 'confirmed' || snap.postings.length !== 1) return err('NOT_REVERSIBLE');
+    // A refund is linked to this purchase: reversing it would credit that money twice. Remove the refund first.
+    if ((await linkedRefundsMinor(ctx, input.transactionId)) > 0) return err('HAS_REFUNDS');
     const original = snap.postings[0]!;
     const tz = await profileTimezone(ctx);
     if (tz === null) return err('NO_PROFILE');

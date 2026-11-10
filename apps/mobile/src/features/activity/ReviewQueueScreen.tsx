@@ -237,6 +237,7 @@ function ReviewCard({
   const theme = useTheme();
   const { fontScale } = useWindowDimensions();
   const [text, setText] = useState('');
+  const [accountId, setAccountId] = useState<string | null>(data.accounts[0]?.id ?? null);
   const captured = item.sourceKind !== 'manual';
   const removeLabel = captured ? copy.detail.reject : copy.detail.delete;
   const symbol = currencySymbol(data.currency, data.locale);
@@ -274,12 +275,18 @@ function ReviewCard({
           accessibilityLabel={copy.review.amountCharged.replace('{symbol}', symbol)}
           style={[textStyle('body'), styles.input, { color: theme.color('text-primary'), borderColor: theme.color('border-control') }]}
         />
+        <Text style={[textStyle('label'), { color: theme.color('text-secondary') }]}>{copy.review.chargedTo}</Text>
+        <View style={styles.chips}>
+          {data.accounts.map((a) => (
+            <Chip key={a.id} label={a.name} variant="account" testID={`review-account-${item.id}-${a.id}`} selected={accountId === a.id} onPress={() => setAccountId(a.id)} />
+          ))}
+        </View>
         <View style={styles.actions}>
           <Button
             label={copy.review.confirm}
             testID={`review-confirm-${item.id}`}
-            disabledReason={typed === null ? copy.review.enterAmount.replace('{symbol}', symbol) : data.accounts.length === 0 ? copy.review.noAccount : undefined}
-            onPress={() => typed !== null && data.accounts[0] && onConfirmForeign(typed, data.accounts[0].id)}
+            disabledReason={typed === null ? copy.review.enterAmount.replace('{symbol}', symbol) : accountId === null ? copy.review.noAccount : undefined}
+            onPress={() => typed !== null && accountId !== null && onConfirmForeign(typed, accountId)}
           />
           <Button label={removeLabel} variant="text" onPress={onRemove} testID={`review-remove-${item.id}`} />
         </View>

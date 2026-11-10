@@ -127,15 +127,19 @@ class ReceiptFilesModule(private val ctx: ReactApplicationContext) : ReactContex
         val key = deriveKey(keyHex)
         val dir = File(ctx.cacheDir, VIEW_DIR).also { it.mkdirs() }
         val out = File(dir, "$name.img")
+        val temp = File(dir, "$name.${System.nanoTime()}.part")
         FileInputStream(srcPath).use { input ->
           val iv = ByteArray(IV_BYTES)
           if (input.read(iv) != IV_BYTES) throw IllegalStateException("Corrupt file")
           val cipher = Cipher.getInstance("AES/GCM/NoPadding")
           cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(128, iv))
-          javax.crypto.CipherInputStream(input, cipher).use { plain -> FileOutputStream(out).use { plain.copyTo(it) } }
+          javax.crypto.CipherInputStream(input, cipher).use { plain -> FileOutputStream(temp).use { plain.copyTo(it) } }
         }
+        // Only a fully verified file (the GCM tag is checked at the end) becomes visible.
+        if (!temp.renameTo(out)) throw IllegalStateException("Cannot save the image")
         promise.resolve(out.absolutePath)
       } catch (e: Exception) {
+        File(ctx.cacheDir, VIEW_DIR).listFiles { f -> f.name.startsWith("$name.") && f.name.endsWith(".part") }?.forEach { it.delete() }
         promise.reject("E_DECRYPT", e.message, e)
       }
     }.start()

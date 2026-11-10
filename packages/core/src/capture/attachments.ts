@@ -87,10 +87,23 @@ export const RemoveAttachment: UseCase<{ attachmentId: string }, { transactionId
  * A merge carries every attachment of the merged-away entry to the survivor, deduplicated by digest (a photo the survivor
  * already has is dropped; its file becomes an orphan and is swept).
  */
-export async function moveAttachments(ctx: WriterContext, fromId: string, toId: string): Promise<void> {
+export interface DroppedAttachment {
+  readonly id: string;
+  readonly transactionId: string;
+  readonly kind: string;
+  readonly digest: string;
+  readonly sizeBytes: number;
+  readonly createdAt: number;
+}
+
+export async function moveAttachments(ctx: WriterContext, fromId: string, toId: string): Promise<DroppedAttachment[]> {
+  const dropped: DroppedAttachment[] = [];
   const mine = new Set((await ctx.query('SELECT digest FROM attachment WHERE transaction_id = ?', [toId])).map((r) => String(r[0])));
-  for (const r of await ctx.query('SELECT id, digest FROM attachment WHERE transaction_id = ?', [fromId])) {
-    if (mine.has(String(r[1]))) await ctx.execute('DELETE FROM attachment WHERE id = ?', [String(r[0])]);
-    else await ctx.execute('UPDATE attachment SET transaction_id = ? WHERE id = ?', [toId, String(r[0])]);
+  for (const r of await ctx.query('SELECT id, digest, kind, size_bytes, created_at FROM attachment WHERE transaction_id = ?', [fromId])) {
+    if (mine.has(String(r[1]))) {
+      dropped.push({ id: String(r[0]), transactionId: fromId, kind: String(r[2]), digest: String(r[1]), sizeBytes: Number(r[3]), createdAt: Number(r[4]) });
+      await ctx.execute('DELETE FROM attachment WHERE id = ?', [String(r[0])]);
+    } else await ctx.execute('UPDATE attachment SET transaction_id = ? WHERE id = ?', [toId, String(r[0])]);
   }
+  return dropped;
 }

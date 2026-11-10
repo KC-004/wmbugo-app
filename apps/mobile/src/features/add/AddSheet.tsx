@@ -373,6 +373,10 @@ export function AddSheet({
           },
         });
       done();
+      if (isRefund) {
+        setRefundFor(null);
+        void api.refundables?.().then(setRefundables).catch(() => undefined);
+      }
       setDraft({ typedText: '', categoryId: null });
       submission.current = null;
       if (another) {

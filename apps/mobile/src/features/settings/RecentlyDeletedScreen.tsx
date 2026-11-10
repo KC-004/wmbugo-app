@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { shortDate, type DeletedRow } from '@wmbugo/core';
@@ -24,7 +25,17 @@ export function RecentlyDeletedScreen({ api = realDeletedApi }: { api?: DeletedA
   const data = q.data ?? null;
   const refresh = () => invalidateForEvent(qc, 'TransactionsChanged');
 
+  const busy = useRef(false);
   const restore = async (row: DeletedRow) => {
+    if (busy.current) return;
+    busy.current = true;
+    try {
+      await restoreOnce(row);
+    } finally {
+      busy.current = false;
+    }
+  };
+  const restoreOnce = async (row: DeletedRow) => {
     const r = await api.restore(row.id, 'deleted').catch(() => ({ ok: false as const, code: 'FAILED' }));
     if (!r.ok) return toast.show({ message: copy.deleted.restoreFailed });
     const snapshot = r.value.snapshot;

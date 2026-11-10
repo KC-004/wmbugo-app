@@ -80,7 +80,7 @@ development_status:
   3-11-receipt-photos-and-source-details-survive-edits: review
   3-12-retention-purge-and-tombstones: review
   3-13-recently-deleted-show-rejected-and-delete-permanently: review
-  epic-3-retrospective: optional
+  epic-3-retrospective: done
 
   epic-4: backlog
   4-1-categories-screen-add-edit-reorder-icons-palette-colours-and: backlog

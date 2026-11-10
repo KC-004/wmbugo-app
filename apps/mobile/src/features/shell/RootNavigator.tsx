@@ -1,6 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
-import { DefaultTheme, NavigationContainer, useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import { DefaultTheme, NavigationContainer, useIsFocused, useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -72,9 +72,10 @@ function ActivityTab() {
   const nav = useNavigation<Nav>();
   const openAdd = useOpenAdd();
   const entry = useEntryActions();
+  const focused = useIsFocused();
   return (
     <TabFrame tab="Activity">
-      <ActivityScreen onAccounts={() => nav.navigate('Accounts')} onProfile={() => nav.navigate('Settings')} onAdd={openAdd} onOpen={entry.open} onReview={entry.review} onDeleteRow={(r) => void entry.remove(r)} onRecategorise={(r) => void entry.recategorise(r)} />
+      <ActivityScreen focused={focused} onAccounts={() => nav.navigate('Accounts')} onProfile={() => nav.navigate('Settings')} onAdd={openAdd} onOpen={entry.open} onReview={entry.review} onDeleteRow={(r) => void entry.remove(r)} onRecategorise={(r) => void entry.recategorise(r)} />
     </TabFrame>
   );
 }

@@ -314,6 +314,7 @@ export const copy = {
     amountCharged: 'Amount charged in {symbol}',
     enterAmount: 'Enter the amount in {symbol} to confirm',
     noAccount: 'Add an account to confirm',
+    chargedTo: 'Charged to',
     addCategory: 'Add a category',
     categorised: 'Category added',
     noMerchant: 'No merchant',

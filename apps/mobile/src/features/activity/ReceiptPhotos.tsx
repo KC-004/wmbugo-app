@@ -13,7 +13,7 @@ const THUMB = 72;
 
 /** A decrypted temporary copy, fetched when the thumbnail shows. */
 function usePhoto(id: string, path: ((id: string) => Promise<string>) | undefined): string | null {
-  const q = useQuery({ queryKey: ['ledger', 'photo', id], queryFn: () => (path ? path(id) : Promise.reject(new Error('no photos'))), staleTime: Infinity, gcTime: 0 });
+  const q = useQuery({ queryKey: ['ledger', 'photo', id], queryFn: () => (path ? path(id) : Promise.reject(new Error('no photos'))), staleTime: Infinity, gcTime: 0, enabled: id !== '' && path !== undefined });
   return q.data ?? null;
 }
 

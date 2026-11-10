@@ -90,7 +90,7 @@ describe('receipt attachments (Story 3.11)', () => {
     expect(mapSources(await db.query(SOURCES_SQL, [original.transactionId])).length).toBe(2);
     const u = await writer.run(UndoDuplicateResolution, { transactionId: dup.transactionId }, 'user');
     expect(u).toMatchObject({ ok: true });
-    expect((await list(dup.transactionId)).map((a) => a.id)).toEqual(['att-d2']);
+    expect((await list(dup.transactionId)).map((a) => a.id).sort()).toEqual(['att-d1', 'att-d2']);
     expect((await list(original.transactionId)).map((a) => a.id)).toEqual(['att-o']);
   });
 

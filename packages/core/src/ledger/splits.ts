@@ -1,3 +1,4 @@
+import { linkedRefundsMinor } from './refunds';
 import { err, ok } from '../shared/result';
 import type { UseCase } from '../writer/ledgerWriter';
 import { snapshotTx, type TxSnapshot } from '../capture/snapshot';
@@ -57,6 +58,7 @@ export type SetSplitsError =
   | 'ENTRY_REMOVED'
   | 'NOT_SPLITTABLE'
   | 'SPLITS_EMPTY'
+  | 'BELOW_REFUNDS'
   | 'SPLIT_AMOUNT_INVALID'
   | 'AMOUNT_INVALID'
   | 'CATEGORY_NOT_FOUND'
@@ -79,11 +81,12 @@ export const SetSplits: UseCase<
     if (!before) return err('ENTRY_NOT_FOUND');
     if (before.removedAt !== null) return err('ENTRY_REMOVED');
     const type = String((await ctx.query('SELECT event_type FROM "transaction" WHERE id = ?', [input.transactionId]))[0]![0]);
-    if ((type !== 'expense' && type !== 'income') || before.postings.length !== 1) return err('NOT_SPLITTABLE');
+    if ((type !== 'expense' && type !== 'income') || before.postings.length !== 1 || before.status === 'reversed') return err('NOT_SPLITTABLE');
     if (input.splits.length === 0) return err('SPLITS_EMPTY');
 
     const amount = input.amountMinor ?? before.amount;
     if (!Number.isSafeInteger(amount) || amount <= 0) return err('AMOUNT_INVALID');
+    if (type === 'expense' && amount < before.amount && amount < (await linkedRefundsMinor(ctx, input.transactionId))) return err('BELOW_REFUNDS');
     for (const s of input.splits) if (!Number.isSafeInteger(s.amountMinor) || s.amountMinor <= 0) return err('SPLIT_AMOUNT_INVALID');
     for (const id of new Set(input.splits.map((s) => s.categoryId))) {
       const c = (await ctx.query('SELECT kind FROM category WHERE id = ? AND archived = 0', [id]))[0];
@@ -98,6 +101,7 @@ export const SetSplits: UseCase<
       await ctx.execute('UPDATE posting SET signed_amount_minor = ? WHERE id = ?', [type === 'expense' ? -amount : amount, before.postings[0]!.id]);
     }
     await ctx.execute('DELETE FROM split WHERE transaction_id = ?', [input.transactionId]);
+    await ctx.execute('UPDATE "transaction" SET needs_category = 0 WHERE id = ?', [input.transactionId]);
     for (const s of input.splits) {
       await ctx.execute('INSERT INTO split (id, transaction_id, category_id, amount_minor, memo) VALUES (?, ?, ?, ?, ?)', [ctx.newId(), input.transactionId, s.categoryId, s.amountMinor, s.memo ?? null]);
     }

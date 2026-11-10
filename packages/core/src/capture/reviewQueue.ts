@@ -92,7 +92,8 @@ export const ApproveCapture: UseCase<{ transactionId: string }, { snapshot: TxSn
     const snap = await snapshotTx(ctx, input.transactionId);
     if (!snap || snap.removedAt !== null) return err('ENTRY_NOT_FOUND');
     if (snap.status !== 'needs_review') return err('NOT_PENDING');
-    const open = (await ctx.query("SELECT reason FROM review_candidate WHERE transaction_id = ? AND status = 'open'", [input.transactionId])).map((r) => String(r[0]));
+    // A duplicate candidate whose match was deleted or purged no longer blocks approving the entry.
+    const open = (await ctx.query("SELECT rc.reason FROM review_candidate rc LEFT JOIN \"transaction\" m ON m.id = rc.matched_transaction_id WHERE rc.transaction_id = ? AND rc.status = 'open' AND NOT (rc.reason = 'duplicate' AND (m.id IS NULL OR m.removed_at IS NOT NULL))", [input.transactionId])).map((r) => String(r[0]));
     if (open.includes('duplicate')) return err('USE_KEEP_OR_MERGE');
     if (open.includes('foreign_currency') || snap.postings.length === 0) return err('AMOUNT_NEEDED');
     const now = ctx.nowMs();

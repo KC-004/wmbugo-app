@@ -43,6 +43,8 @@ export interface ActivityOptions {
   readonly categories: CategoryRow[];
   readonly today: string;
   readonly period: { readonly start: string; readonly end: string };
+  /** The profile currency's decimals (amount filters are typed in major units). */
+  readonly exponent?: number;
 }
 
 export interface BulkPreviewResult {
@@ -91,6 +93,7 @@ export const realActivityApi: ActivityApi = {
       categories: mapCategoryRows(await db.query(CATEGORY_LIST_SQL)),
       today: today.value,
       period: { start: period.start, end: period.end },
+      exponent: p.exponent,
     };
   },
   async count(query) {

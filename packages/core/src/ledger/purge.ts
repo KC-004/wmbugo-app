@@ -85,6 +85,8 @@ async function purgeOne(ctx: WriterContext, id: string, out: Purged): Promise<vo
   await ctx.execute('UPDATE "transaction" SET reversed_by_id = NULL WHERE reversed_by_id = ?', [id]);
   await ctx.execute('DELETE FROM attachment WHERE transaction_id = ?', [id]);
   await ctx.execute('DELETE FROM review_candidate WHERE transaction_id = ?', [id]);
+  // A held duplicate whose match is gone has nothing left to be a duplicate of: it can be approved like any waiting entry.
+  await ctx.execute("UPDATE review_candidate SET status = 'resolved', resolved_at = ?, matched_transaction_id = NULL WHERE matched_transaction_id = ? AND status = 'open'", [ctx.nowMs(), id]);
   await ctx.execute('UPDATE review_candidate SET matched_transaction_id = NULL WHERE matched_transaction_id = ?', [id]);
   await ctx.execute('DELETE FROM source_record WHERE transaction_id = ?', [id]);
   await ctx.execute('DELETE FROM split WHERE transaction_id = ?', [id]);

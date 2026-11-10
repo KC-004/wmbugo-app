@@ -89,7 +89,7 @@ export const SubmitCapture: UseCase<SubmitInput, Submitted, SubmitError> = {
     if ('refund' in input) {
       const f = await createRefund(ctx, input.refund);
       if (!f.ok) return f;
-      await writeSource(ctx, f.value.transactionId, fingerprint);
+      await writeSource(ctx, f.value.transactionId, fingerprint, input.sourceKind, input.reference ?? null);
       ctx.emit('TransactionsChanged', { transactionIds: [f.value.transactionId] });
       ctx.emit('CapturesSubmitted', { transactionIds: [f.value.transactionId] });
       return ok({ transactionId: f.value.transactionId, accountId: f.value.accountId, feeTransactionId: null, result: 'RECORDED' });
@@ -98,8 +98,8 @@ export const SubmitCapture: UseCase<SubmitInput, Submitted, SubmitError> = {
     if ('transfer' in input) {
       const t = await createTransfer(ctx, input.transfer);
       if (!t.ok) return t;
-      await writeSource(ctx, t.value.transactionId, fingerprint);
-      if (t.value.feeTransactionId) await writeSource(ctx, t.value.feeTransactionId, `${fingerprint}:fee`);
+      await writeSource(ctx, t.value.transactionId, fingerprint, input.sourceKind, input.reference ?? null);
+      if (t.value.feeTransactionId) await writeSource(ctx, t.value.feeTransactionId, `${fingerprint}:fee`, input.sourceKind);
       ctx.emit('TransactionsChanged', { transactionIds: t.value.feeTransactionId ? [t.value.transactionId, t.value.feeTransactionId] : [t.value.transactionId] });
       ctx.emit('CapturesSubmitted', { transactionIds: [t.value.transactionId] });
       return ok({ transactionId: t.value.transactionId, accountId: input.transfer.fromAccountId, feeTransactionId: t.value.feeTransactionId, result: 'RECORDED' });

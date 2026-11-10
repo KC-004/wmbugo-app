@@ -100,6 +100,7 @@ export function ActivityScreen({
   onDeleteRow,
   onRecategorise,
   onReview,
+  focused = true,
 }: {
   api?: ActivityApi;
   onAccounts: () => void;
@@ -114,6 +115,8 @@ export function ActivityScreen({
   onRecategorise?: (row: ActivityRow) => void;
   /** Opens the review queue at an entry that waits for a decision (Check, waiting or currency). */
   onReview?: (transactionId: string) => void;
+  /** False while another tab or screen is in front: the Back handler of selection mode then steps aside. */
+  focused?: boolean;
 }) {
   const theme = useTheme();
   const sheet = useSheet();
@@ -148,14 +151,22 @@ export function ActivityScreen({
   const n = activeFilterCount(query);
   const resultCount = d?.days.reduce((c, day) => c + day.rows.length, 0) ?? 0;
 
+  // Selection belongs to what is on screen: leaving the tab or changing the filters ends it.
   useEffect(() => {
-    if (!selected) return;
+    if (!focused) setSelected(null);
+  }, [focused]);
+  useEffect(() => {
+    setSelected(null);
+  }, [JSON.stringify(query)]);
+
+  useEffect(() => {
+    if (!selected || !focused) return;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       setSelected(null);
       return true;
     });
     return () => sub.remove();
-  }, [selected !== null]);
+  }, [selected !== null, focused]);
 
   const toggle = (id: string) =>
     setSelected((cur) => {
@@ -232,7 +243,7 @@ export function ActivityScreen({
           initial={query}
           datePreset={filter.datePreset}
           options={o}
-          exponent={2}
+          exponent={o.exponent ?? 2}
           count={(x) => (api.count ? api.count({ ...x, ...search }) : Promise.resolve(0))}
           onApply={(next, preset) => {
             close();

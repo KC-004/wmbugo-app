@@ -34,7 +34,7 @@ export function daysLeft(removedAtMs: number, nowMs: number): number {
  * Rejected and merged-away entries are not here (rejected captures live behind Activity's Show rejected).
  */
 export const RECENTLY_DELETED_SQL =
-  "SELECT t.id, t.event_type, t.amount_minor, t.local_date, t.original_description, (SELECT c.name FROM split s JOIN category c ON c.id = s.category_id WHERE s.transaction_id = t.id ORDER BY s.amount_minor DESC, s.id LIMIT 1), (SELECT a.name FROM posting p JOIN account a ON a.id = p.account_id WHERE p.transaction_id = t.id ORDER BY p.signed_amount_minor LIMIT 1), t.removed_at FROM \"transaction\" t WHERE t.removal_kind = 'deleted' AND t.removed_at IS NOT NULL AND t.removed_at > ? AND t.event_type IN ('expense','income','transfer','refund') ORDER BY t.removed_at DESC, t.id DESC";
+  "SELECT t.id, t.event_type, t.amount_minor, t.local_date, t.original_description, (SELECT c.name FROM split s JOIN category c ON c.id = s.category_id WHERE s.transaction_id = t.id ORDER BY s.amount_minor DESC, s.id LIMIT 1), (SELECT a.name FROM posting p JOIN account a ON a.id = p.account_id WHERE p.transaction_id = t.id ORDER BY p.signed_amount_minor LIMIT 1), t.removed_at FROM \"transaction\" t WHERE t.removal_kind = 'deleted' AND t.status = 'excluded' AND t.removed_at IS NOT NULL AND t.removed_at > ? AND t.event_type IN ('expense','income','transfer','refund') ORDER BY t.removed_at DESC, t.id DESC";
 
 export const recentlyDeletedSince = (nowMs: number): number => nowMs - DELETED_KEEP_DAYS * DAY_MS;
 
@@ -77,8 +77,9 @@ export const RestoreDeleted: UseCase<{ transactionId: string }, { snapshot: TxSn
     if (snap.removedAt === null || String(row[0]) !== 'deleted') return err('NOT_DELETED');
     if (snap.removedAt <= ctx.nowMs() - DELETED_KEEP_DAYS * DAY_MS) return err('PAST_RETENTION');
     const open = (await ctx.query("SELECT 1 FROM review_candidate WHERE transaction_id = ? AND status = 'open'", [input.transactionId]))[0];
+    const reversed = (await ctx.query('SELECT 1 FROM "transaction" WHERE id = ? AND reversed_by_id IS NOT NULL', [input.transactionId]))[0];
     const now = ctx.nowMs();
-    await ctx.execute('UPDATE "transaction" SET removed_at = NULL, removal_kind = NULL, status = ?, updated_at = ? WHERE id = ?', [open ? 'needs_review' : 'confirmed', now, input.transactionId]);
+    await ctx.execute('UPDATE "transaction" SET removed_at = NULL, removal_kind = NULL, status = ?, updated_at = ? WHERE id = ?', [open ? 'needs_review' : reversed ? 'reversed' : 'confirmed', now, input.transactionId]);
     ctx.touch('transaction', input.transactionId, { restored: 'deleted' });
     ctx.emit('TransactionsChanged', { transactionIds: [input.transactionId] });
     return ok({ snapshot: snap });
@@ -94,7 +95,13 @@ export const RestoreRejected: UseCase<{ transactionId: string }, { snapshot: TxS
     const row = (await ctx.query('SELECT removal_kind FROM "transaction" WHERE id = ?', [input.transactionId]))[0]!;
     if (snap.removedAt === null || String(row[0]) !== 'rejected') return err('NOT_REJECTED');
     const now = ctx.nowMs();
-    await ctx.execute("UPDATE \"transaction\" SET removed_at = NULL, removal_kind = NULL, status = 'confirmed', capture_resolution = 'user_approved', updated_at = ? WHERE id = ?", [now, input.transactionId]);
+    // A capture that still needs a decision (an open candidate, or no posting yet) goes back to waiting, not to confirmed.
+    const waiting = snap.postings.length === 0 || (await ctx.query("SELECT 1 FROM review_candidate WHERE transaction_id = ? AND status = 'open'", [input.transactionId]))[0];
+    if (waiting) {
+      await ctx.execute("UPDATE \"transaction\" SET removed_at = NULL, removal_kind = NULL, status = 'needs_review', capture_resolution = NULL, updated_at = ? WHERE id = ?", [now, input.transactionId]);
+    } else {
+      await ctx.execute("UPDATE \"transaction\" SET removed_at = NULL, removal_kind = NULL, status = 'confirmed', capture_resolution = 'user_approved', updated_at = ? WHERE id = ?", [now, input.transactionId]);
+    }
     ctx.touch('transaction', input.transactionId, { restored: 'rejected' });
     ctx.emit('TransactionsChanged', { transactionIds: [input.transactionId] });
     ctx.emit('CapturesSubmitted', { transactionIds: [input.transactionId] });

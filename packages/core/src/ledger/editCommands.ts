@@ -1,3 +1,4 @@
+import { linkedRefundsMinor } from './refunds';
 import { toLocalDate } from '../shared/clock';
 import { err, ok } from '../shared/result';
 import type { UseCase, WriterContext } from '../writer/ledgerWriter';
@@ -25,6 +26,7 @@ export interface TransferEdit {
 }
 
 export type EditError =
+  | 'BELOW_REFUNDS'
   | 'ENTRY_NOT_FOUND'
   | 'ENTRY_REMOVED'
   | 'NOT_EDITABLE'
@@ -63,6 +65,8 @@ export const EditTransaction: UseCase<
     const before = await snapshotTx(ctx, input.transactionId);
     if (!before) return err('ENTRY_NOT_FOUND');
     if (before.removedAt !== null) return err('ENTRY_REMOVED');
+    // A reversed purchase and its reversal net to zero; editing either side would break that.
+    if (before.status === 'reversed') return err('NOT_EDITABLE');
     const type = String((await ctx.query('SELECT event_type FROM "transaction" WHERE id = ?', [input.transactionId]))[0]![0]);
     const now = ctx.nowMs();
     const changed: string[] = [];
@@ -142,6 +146,8 @@ export const EditTransaction: UseCase<
       const t = newTime(e.occurredAtMs);
       if (t === 'bad') return err('INSTANT_INVALID');
       const amount = a ?? before.amount;
+      // A purchase cannot be edited below what has already been refunded to it.
+      if (type === 'expense' && amount < before.amount && amount < (await linkedRefundsMinor(ctx, input.transactionId))) return err('BELOW_REFUNDS');
       const category = e.categoryId ?? split.category;
       const account = e.accountId ?? posting.account;
       await ctx.execute('UPDATE "transaction" SET amount_minor = ?, occurred_at_utc = ?, local_date = ?, original_description = ?, note = ?, payment_method = ?, updated_at = ? WHERE id = ?', [
@@ -156,6 +162,8 @@ export const EditTransaction: UseCase<
       ]);
       await ctx.execute('UPDATE posting SET account_id = ?, signed_amount_minor = ? WHERE id = ?', [account, type === 'expense' ? -amount : amount, posting.id]);
       if (!multi) await ctx.execute('UPDATE split SET category_id = ?, amount_minor = ? WHERE id = ?', [category, amount, split.id]);
+      // Choosing a category answers an "add a category" flag.
+      if (category !== split.category) await ctx.execute('UPDATE "transaction" SET needs_category = 0 WHERE id = ?', [input.transactionId]);
       if (a !== null && a !== before.amount) changed.push('amount');
       if (category !== split.category) changed.push('category');
       if (account !== posting.account) changed.push('account');
@@ -185,6 +193,8 @@ async function removable(ctx: WriterContext, id: string): Promise<{ snapshot: Tx
   const snapshot = await snapshotTx(ctx, id);
   if (!snapshot) return 'ENTRY_NOT_FOUND';
   if (snapshot.removedAt !== null) return 'ENTRY_REMOVED';
+  // A reversed purchase stays with its reversal until the reversal is undone.
+  if (snapshot.status === 'reversed') return 'NOT_REMOVABLE';
   const type = String((await ctx.query('SELECT event_type FROM "transaction" WHERE id = ?', [id]))[0]![0]);
   if (!['expense', 'income', 'transfer', 'refund'].includes(type)) return 'NOT_REMOVABLE';
   return { snapshot, kinds: await sourceKinds(ctx, id) };
