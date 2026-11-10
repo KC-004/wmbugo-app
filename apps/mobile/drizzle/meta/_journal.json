@@ -85,6 +85,13 @@
       "when": 1794316581416,
       "tag": "0011_flowery_bushwacker",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1794319257765,
+      "tag": "0012_category_seed_types",
+      "breakpoints": true
     }
   ]
 }

@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 11-08-2026 09:43
-last_updated: 11-08-2026 21:19
+last_updated: 11-10-2026 12:00
 project: wmbugo-app
 project_key: NOKEY
 tracking_system: file-system
@@ -82,8 +82,8 @@ development_status:
   3-13-recently-deleted-show-rejected-and-delete-permanently: review
   epic-3-retrospective: done
 
-  epic-4: backlog
-  4-1-categories-screen-add-edit-reorder-icons-palette-colours-and: backlog
+  epic-4: in-progress
+  4-1-categories-screen-add-edit-reorder-icons-palette-colours-and: review
   4-2-category-kinds-spending-income-or-both: backlog
   4-3-archive-and-merge-categories-with-a-remap-preview: backlog
   4-4-suggested-categories-are-always-overridable: backlog

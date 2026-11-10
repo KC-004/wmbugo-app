@@ -28,13 +28,14 @@ import { ScreenHeader } from '../shell/ScreenHeader';
 import { Chip } from '../../shared/ui/Chip';
 import { useFocusRing } from '../../shared/ui/FocusRing';
 import { RegionPicker } from '../onboarding/OnboardingFlow';
+import { CategoriesScreen } from '../categories/CategoriesScreen';
 import { RecentlyDeletedScreen } from './RecentlyDeletedScreen';
 import { realSettingsApi, SETTINGS_QUERY_KEY, type SettingsApi, type SettingsData } from './settingsApi';
 
-type Page = 'hub' | 'you' | 'appearance' | 'money' | 'data' | 'deleted';
+type Page = 'hub' | 'you' | 'appearance' | 'money' | 'categories' | 'data' | 'deleted';
 
 /** Where Back goes from each page. */
-const PARENT: Readonly<Record<Page, Page>> = { hub: 'hub', you: 'hub', appearance: 'you', money: 'you', data: 'hub', deleted: 'data' };
+const PARENT: Readonly<Record<Page, Page>> = { hub: 'hub', you: 'hub', appearance: 'you', money: 'you', categories: 'hub', data: 'hub', deleted: 'data' };
 
 const THEMES: readonly { v: ThemeChoice; label: string }[] = [
   { v: 'system', label: copy.settings.themeSystem },
@@ -96,7 +97,7 @@ export function SettingsScreen({ api = realSettingsApi, onBack }: { api?: Settin
   };
 
   const title =
-    page === 'hub' ? copy.nav.settings : page === 'you' ? copy.settings.you : page === 'appearance' ? copy.settings.appearance : page === 'money' ? copy.settings.moneyBasics : page === 'data' ? copy.deleted.data : copy.deleted.recentlyDeleted;
+    page === 'hub' ? copy.nav.settings : page === 'you' ? copy.settings.you : page === 'appearance' ? copy.settings.appearance : page === 'money' ? copy.settings.moneyBasics : page === 'categories' ? copy.categories.title : page === 'data' ? copy.deleted.data : copy.deleted.recentlyDeleted;
   const back = () => (page === 'hub' ? onBack() : setPage(PARENT[page]));
 
   return (
@@ -106,8 +107,16 @@ export function SettingsScreen({ api = realSettingsApi, onBack }: { api?: Settin
       {!d ? null : page === 'hub' ? (
         <>
           <Row testID="group-you" label={copy.settings.you} summary={youSummary(d.profile.payday, d.settings.theme)} onPress={() => setPage('you')} />
+          <Row
+            testID="group-money"
+            label={copy.categories.group}
+            summary={d.expenseCategoryCount === 1 ? copy.categories.summaryOne : copy.categories.summaryMany.replace('{n}', String(d.expenseCategoryCount))}
+            onPress={() => setPage('categories')}
+          />
           <Row testID="group-data" label={copy.deleted.data} summary={copy.deleted.dataSummary} onPress={() => setPage('data')} />
         </>
+      ) : page === 'categories' ? (
+        <CategoriesScreen />
       ) : page === 'data' ? (
         <Row testID="row-deleted" label={copy.deleted.recentlyDeleted} summary={copy.deleted.keptFor} onPress={() => setPage('deleted')} />
       ) : page === 'deleted' ? (

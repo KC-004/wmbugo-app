@@ -18,3 +18,4 @@ export * from './refunds';
 export * from './bulk';
 export * from './purge';
 export * from './recentlyDeleted';
+export * from './categoryCommands';

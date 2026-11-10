@@ -25,8 +25,8 @@ export const SEED_CATEGORIES: readonly SeedCategory[] = [
   { id: 'cat_education', name: 'Education', kind: 'expense', budgetType: 'need', icon: 'GraduationCap', color: 'cat-olive' },
   { id: 'cat_travel', name: 'Travel', kind: 'expense', budgetType: 'want', icon: 'Airplane', color: 'cat-emerald' },
   { id: 'cat_personal', name: 'Personal Care', kind: 'expense', budgetType: 'want', icon: 'Flower', color: 'cat-rose' },
-  { id: 'cat_family', name: 'Family', kind: 'expense', budgetType: 'need', icon: 'UsersThree', color: 'cat-stone' },
-  { id: 'cat_other', name: 'Other', kind: 'expense', budgetType: 'want', icon: 'DotsThree', color: 'cat-slate' },
+  { id: 'cat_family', name: 'Family', kind: 'expense', budgetType: null, icon: 'UsersThree', color: 'cat-stone' },
+  { id: 'cat_other', name: 'Other', kind: 'expense', budgetType: null, icon: 'DotsThree', color: 'cat-slate' },
   { id: 'cat_uncategorised', name: 'Uncategorised', kind: 'expense', budgetType: null, icon: 'Question', color: 'cat-slate' },
   { id: 'cat_in_salary', name: 'Salary', kind: 'income', budgetType: null, icon: 'Briefcase', color: 'cat-emerald' },
   { id: 'cat_in_freelance', name: 'Freelance', kind: 'income', budgetType: null, icon: 'Laptop', color: 'cat-cyan' },
@@ -46,10 +46,12 @@ export interface CategoryRow {
   readonly icon: string;
   readonly colorToken: string;
   readonly sortOrder: number;
+  /** The parent of a subcategory (one level only); null for a top-level category. */
+  readonly parentId: string | null;
 }
 
 export const CATEGORY_LIST_SQL =
-  'SELECT id, name, kind, budget_type, icon, color_token, sort_order FROM category WHERE archived = 0 ORDER BY sort_order, id';
+  'SELECT id, name, kind, budget_type, icon, color_token, sort_order, parent_id FROM category WHERE archived = 0 ORDER BY sort_order, id';
 
 export function mapCategoryRows(rows: readonly (readonly unknown[])[]): CategoryRow[] {
   return rows.map((r) => ({
@@ -60,6 +62,7 @@ export function mapCategoryRows(rows: readonly (readonly unknown[])[]): Category
     icon: String(r[4]),
     colorToken: String(r[5]),
     sortOrder: Number(r[6]),
+    parentId: r[7] === null || r[7] === undefined ? null : String(r[7]),
   }));
 }
 

@@ -34,6 +34,8 @@ export interface SettingsData {
   /** Any transaction (including an opening balance) exists, so the currency can no longer change. */
   readonly hasTransactions: boolean;
   readonly accounts: AccountRow[];
+  /** Active spending categories, Uncategorised included (the Money row's summary). */
+  readonly expenseCategoryCount: number;
 }
 
 export interface TimezoneAsk {
@@ -71,6 +73,7 @@ export const realSettingsApi: SettingsApi = {
       },
       hasTransactions: count > 0,
       accounts: mapAccountRows(await db.query(ACCOUNT_LIST_SQL)).filter((a) => a.status === 'active'),
+      expenseCategoryCount: Number((await db.query("SELECT COUNT(*) FROM category WHERE archived = 0 AND kind = 'expense'"))[0]![0]),
     };
   },
   changeSetting: (key, value) => getServices().writer.run(ChangeSetting, { key, value }, 'user'),

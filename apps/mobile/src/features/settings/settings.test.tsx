@@ -46,6 +46,7 @@ function data(over: Partial<SettingsData> = {}, settings: Partial<AppSettings> =
     profile: { region: findRegion('SG'), regionCode: 'SG', currency: 'SGD', locale: 'en-SG', timezoneId: 'Asia/Singapore', payday: { kind: 'first' } },
     hasTransactions: false,
     accounts: [],
+    expenseCategoryCount: 14,
     ...over,
   };
 }
@@ -94,6 +95,11 @@ async function open(d: SettingsData) {
 }
 
 describe('Settings hub', () => {
+  it('has a Money group whose summary counts the active spending categories and opens Categories', async () => {
+    const { r } = await open(data({ expenseCategoryCount: 14 }));
+    expect(host(r, 'group-money').props.accessibilityLabel).toBe('Money, 14 categories');
+  });
+
   it('lists the You and Data groups, with a live one-line summary in the You label', async () => {
     const { r } = await open(data({}, { theme: 'dark' }));
     expect(has(r, 'group-you') && has(r, 'group-data')).toBe(true);
