@@ -1,5 +1,6 @@
 import { err, ok } from '../shared/result';
 import type { UseCase, WriterContext } from '../writer/ledgerWriter';
+import { categoryFits } from './categories';
 
 /**
  * Select many and move them to another category (Story 3.9, TXN-010). Only the category of a confirmed, single-category
@@ -23,7 +24,7 @@ export function isMovable(row: BulkRow, target: { id: string; kind: string }): b
     !row.removed &&
     row.status === 'confirmed' &&
     row.splitCount === 1 &&
-    row.eventType === target.kind &&
+    categoryFits(target.kind, row.eventType) &&
     (row.eventType === 'expense' || row.eventType === 'income') &&
     row.categoryId !== target.id
   );

@@ -2,7 +2,7 @@ import { linkedRefundsMinor } from './refunds';
 import { err, ok } from '../shared/result';
 import type { UseCase } from '../writer/ledgerWriter';
 import { snapshotTx, type TxSnapshot } from '../capture/snapshot';
-import { UNCATEGORISED_ID } from './categories';
+import { categoryFits, UNCATEGORISED_ID } from './categories';
 
 /** Marks the split that holds what a receipt did not itemise (shown as a grey "Not itemised" row, counted as assigned). */
 export const NOT_ITEMISED_MEMO = 'not_itemised';
@@ -91,7 +91,7 @@ export const SetSplits: UseCase<
     for (const id of new Set(input.splits.map((s) => s.categoryId))) {
       const c = (await ctx.query('SELECT kind FROM category WHERE id = ? AND archived = 0', [id]))[0];
       if (!c) return err('CATEGORY_NOT_FOUND');
-      if (String(c[0]) !== type) return err('CATEGORY_KIND_MISMATCH');
+      if (!categoryFits(String(c[0]), type)) return err('CATEGORY_KIND_MISMATCH');
     }
     if (leftToAssign(amount, input.splits.map((s) => s.amountMinor)) !== 0) return err('SPLITS_DONT_SUM');
 

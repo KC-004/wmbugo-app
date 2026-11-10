@@ -83,7 +83,7 @@ export async function createRefund(ctx: WriterContext, input: RefundInput): Prom
     if (!input.accountId) return err('ACCOUNT_REQUIRED');
     accountId = input.accountId;
     categoryId = input.categoryId ?? OTHER_CATEGORY_ID;
-    const c = (await ctx.query("SELECT 1 FROM category WHERE id = ? AND kind = 'expense' AND archived = 0", [categoryId]))[0];
+    const c = (await ctx.query("SELECT 1 FROM category WHERE id = ? AND kind IN ('expense', 'mixed') AND archived = 0", [categoryId]))[0];
     if (!c) return err('CATEGORY_NOT_FOUND');
   }
   const acc = (await ctx.query('SELECT status FROM account WHERE id = ?', [accountId]))[0];

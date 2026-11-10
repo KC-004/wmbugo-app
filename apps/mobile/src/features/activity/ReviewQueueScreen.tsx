@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { parseAmountInput, sourceWords, type ReviewItem, type ReviewSide } from '@wmbugo/core';
+import { categoryFits, parseAmountInput, sourceWords, type ReviewItem, type ReviewSide } from '@wmbugo/core';
 import { announce } from '../../shared/a11y/announce';
 import { copy } from '../../shared/copy';
 import { currencySymbol } from '../../shared/currencySymbol';
@@ -309,7 +309,7 @@ function ReviewCard({
 function NeedsCategoryRow({ entry, data, onPick }: { entry: ReviewSide; data: ReviewData; onPick: (categoryId: string) => void }) {
   const theme = useTheme();
   const kindOf = entry.category === null ? 'expense' : (data.categories.find((c) => c.name === entry.category)?.kind ?? 'expense');
-  const choices = data.categories.filter((c) => c.kind === kindOf && c.id !== 'cat_uncategorised').slice(0, 8);
+  const choices = data.categories.filter((c) => categoryFits(c.kind, kindOf === 'mixed' ? 'expense' : kindOf) && c.id !== 'cat_uncategorised').slice(0, 8);
   return (
     <View testID={`review-cat-${entry.id}`} style={[styles.card, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
       <View style={styles.between}>

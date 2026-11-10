@@ -92,6 +92,13 @@
       "when": 1794319257765,
       "tag": "0012_category_seed_types",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1794320387522,
+      "tag": "0013_category_kind_mixed",
+      "breakpoints": true
     }
   ]
 }

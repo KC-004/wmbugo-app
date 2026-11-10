@@ -1,5 +1,6 @@
 import {
   ACCOUNT_LIST_SQL,
+  categoryFits,
   CATEGORY_LIST_SQL,
   CATEGORY_USE_SQL,
   LAST_ACCOUNT_FOR_CATEGORY_SQL,
@@ -104,7 +105,7 @@ export const realAddApi: AddApi = {
     const prof = await readProfile(db);
     if (!prof) return null;
 
-    const categories = mapCategoryRows(await db.query(CATEGORY_LIST_SQL)).filter((c) => c.kind === (kind === 'income' ? 'income' : 'expense'));
+    const categories = mapCategoryRows(await db.query(CATEGORY_LIST_SQL)).filter((c) => categoryFits(c.kind, kind === 'income' ? 'income' : 'expense'));
     const now = systemClock.nowMs();
     let cached = rankCache.get(kind);
     if (!cached || rankIsStale(cached.computedAt, now)) {

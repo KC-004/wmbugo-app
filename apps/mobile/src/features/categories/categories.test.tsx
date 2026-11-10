@@ -170,17 +170,58 @@ describe('Categories screen (Story 4.1)', () => {
     const f = fakeApi();
     const r = await mount(f.api);
     await press(r, 'category-down-cat_groceries');
-    expect(f.move).toHaveBeenCalledWith('cat_groceries', 'down');
+    expect(f.move).toHaveBeenCalledWith('cat_groceries', 'down', 'expense');
     expect(AccessibilityInfo.announceForAccessibility).toHaveBeenCalledWith('Groceries moved to position 3 of 20');
     await act(async () => host(r, 'category-row-cat_food').props.onAccessibilityAction({ nativeEvent: { actionName: 'moveDown' } }));
     await settle();
-    expect(f.move).toHaveBeenCalledWith('cat_food', 'down');
+    expect(f.move).toHaveBeenCalledWith('cat_food', 'down', 'expense');
   });
 
   it('the first category has no Move up and the last no Move down', async () => {
     const r = await mount(fakeApi().api);
     expect(has(r, 'category-up-cat_food')).toBe(false);
     expect(has(r, 'category-down-cat_food')).toBe(true);
+  });
+});
+
+describe('Category kinds (Story 4.2)', () => {
+  it('the sheet offers Used for on a top-level category; Type is hidden for Income and shown for Both', async () => {
+    const r = await mount(fakeApi().api);
+    await press(r, 'categories-segment-income');
+    await press(r, 'category-row-cat_in_freelance');
+    expect(has(r, 'category-used-mixed')).toBe(true);
+    expect(has(r, 'category-type-need')).toBe(false);
+    await press(r, 'category-used-mixed');
+    expect(has(r, 'category-type-need')).toBe(true);
+    await press(r, 'category-save');
+    expect(texts(r)).toContain('Saved');
+  });
+
+  it('a subcategory has no Used for of its own', async () => {
+    const sub = mapCategoryRows([['sub', 'Fuel', 'expense', 'need', 'GasPump', 'cat-sky', 99, 'cat_transport']]);
+    const r = await mount(fakeApi([...seedRows(), ...sub]).api);
+    await press(r, 'category-row-sub');
+    expect(has(r, 'category-used-mixed')).toBe(false);
+  });
+
+  it('a Both category is listed in both segments, with its own caption in each', async () => {
+    const rows = seedRows().map((c) => (c.id === 'cat_in_freelance' ? { ...c, kind: 'mixed' as const } : c));
+    const r = await mount(fakeApi(rows).api);
+    expect(host(r, 'category-row-cat_in_freelance').props.accessibilityLabel).toBe('Freelance, Not classified · Also income');
+    await press(r, 'categories-segment-income');
+    expect(host(r, 'category-row-cat_in_freelance').props.accessibilityLabel).toBe('Freelance, Also spending');
+  });
+
+  it('shows the count when entries block a kind change, and keeps the sheet open', async () => {
+    const f = fakeApi();
+    f.save.mockResolvedValueOnce({ ok: false, code: 'KIND_IN_USE:income:3' });
+    const r = await mount(f.api);
+    await press(r, 'categories-segment-income');
+    await press(r, 'category-row-cat_in_freelance');
+    await press(r, 'category-used-expense');
+    await press(r, 'category-save');
+    expect(texts(r)).toContain('3 income entries use this category. Move them to another category first.');
+    expect(has(r, 'category-sheet')).toBe(true);
   });
 });
 

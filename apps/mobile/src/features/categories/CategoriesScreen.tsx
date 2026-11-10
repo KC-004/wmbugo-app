@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { AccessibilityInfo, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CaretDown, CaretUp } from 'phosphor-react-native';
-import { budgetTypeCaption, UNCATEGORISED_ID, type CategoryKind, type CategoryRow } from '@wmbugo/core';
+import { budgetTypeCaption, UNCATEGORISED_ID, type CategoryRow } from '@wmbugo/core';
 import { controlA11y } from '../../shared/a11y/labels';
 import { copy } from '../../shared/copy';
 import { useSheet } from '../../shared/feedback/SheetHost';
@@ -32,8 +32,9 @@ interface Line {
 }
 
 /** Top-level categories of a kind in their order, each followed by its subcategories (indented by the row). */
-export function linesFor(rows: readonly CategoryRow[], kind: CategoryKind): Line[] {
-  const tops = rows.filter((r) => r.kind === kind && r.parentId === null);
+export function linesFor(rows: readonly CategoryRow[], segment: 'expense' | 'income'): Line[] {
+  // A Both category is listed in both segments.
+  const tops = rows.filter((r) => (r.kind === segment || r.kind === 'mixed') && r.parentId === null);
   const lines: Line[] = [];
   for (const top of tops) {
     lines.push({ row: top, parent: null, siblings: tops });
@@ -53,7 +54,7 @@ export function CategoriesScreen({ api = realCategoriesApi }: { api?: Categories
   const qc = useQueryClient();
   const sheet = useSheet();
   const toast = useToast();
-  const [kind, setKind] = useState<CategoryKind>('expense');
+  const [segment, setSegment] = useState<'expense' | 'income'>('expense');
   const q = useQuery({ queryKey: CATEGORIES_QUERY_KEY, queryFn: () => api.load() });
   const rows = q.data?.rows ?? null;
 
@@ -81,7 +82,7 @@ export function CategoriesScreen({ api = realCategoriesApi }: { api?: Categories
   };
 
   const move = async (line: Line, direction: 'up' | 'down') => {
-    const r = await api.move(line.row.id, direction);
+    const r = await api.move(line.row.id, direction, segment);
     if (!r.ok) return;
     await invalidateForEvent(qc, 'CategoriesChanged');
     AccessibilityInfo.announceForAccessibility(copy.categories.moved.replace('{name}', line.row.name).replace('{n}', String(r.value.position)).replace('{of}', String(r.value.of)));
@@ -89,20 +90,22 @@ export function CategoriesScreen({ api = realCategoriesApi }: { api?: Categories
 
   if (q.isError) return <Text style={[textStyle('body'), { color: theme.color('semantic-warning') }]}>{copy.categories.loadError}</Text>;
   if (!rows) return null;
-  const lines = linesFor(rows, kind);
+  const lines = linesFor(rows, segment);
 
   return (
     <View style={styles.gap} testID="categories-screen">
       <View style={styles.segments} accessibilityRole="radiogroup">
-        <Chip role="radio" variant="period" label={copy.categories.spending} testID="categories-segment-expense" selected={kind === 'expense'} onPress={() => setKind('expense')} />
-        <Chip role="radio" variant="period" label={copy.categories.income} testID="categories-segment-income" selected={kind === 'income'} onPress={() => setKind('income')} />
+        <Chip role="radio" variant="period" label={copy.categories.spending} testID="categories-segment-expense" selected={segment === 'expense'} onPress={() => setSegment('expense')} />
+        <Chip role="radio" variant="period" label={copy.categories.income} testID="categories-segment-income" selected={segment === 'income'} onPress={() => setSegment('income')} />
       </View>
-      <Button label={copy.categories.add} variant="secondary" testID="categories-add" onPress={() => open({ mode: 'add', kind })} />
+      <Button label={copy.categories.add} variant="secondary" testID="categories-add" onPress={() => open({ mode: 'add', kind: segment })} />
       {lines.map((line) => {
         const { row, parent, siblings } = line;
         const system = row.id === UNCATEGORISED_ID;
         const i = siblings.findIndex((s) => s.id === row.id);
-        const caption = row.kind === 'expense' ? CAPTION[budgetTypeCaption(row.budgetType)] : null;
+        const typeCaption = segment === 'expense' ? CAPTION[budgetTypeCaption(row.budgetType)] : null;
+        const also = row.kind === 'mixed' ? (segment === 'expense' ? copy.categories.alsoIncome : copy.categories.alsoSpending) : null;
+        const caption = [typeCaption, also].filter(Boolean).join(' · ') || null;
         const spoken = [row.name, parent ? copy.categories.subcategoryOf.replace('{parent}', parent.name) : null, caption].filter(Boolean).join(', ');
         return (
           <View key={row.id} style={[styles.line, parent && styles.indent]}>
@@ -128,7 +131,7 @@ export function CategoriesScreen({ api = realCategoriesApi }: { api?: Categories
           </View>
         );
       })}
-      {kind === 'expense' ? <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{copy.categories.systemNote}</Text> : null}
+      {segment === 'expense' ? <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{copy.categories.systemNote}</Text> : null}
     </View>
   );
 }

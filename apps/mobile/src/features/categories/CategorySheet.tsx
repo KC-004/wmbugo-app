@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type ComponentRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Check } from 'phosphor-react-native';
-import { CATEGORY_COLOURS, CATEGORY_NAME_MAX, UNCATEGORISED_ID, type BudgetType, type CategoryKind, type CategoryRow } from '@wmbugo/core';
+import { CATEGORY_COLOURS, CATEGORY_NAME_MAX, parseKindInUse, UNCATEGORISED_ID, type BudgetType, type CategoryKind, type CategoryRow } from '@wmbugo/core';
 import { controlA11y } from '../../shared/a11y/labels';
 import { copy } from '../../shared/copy';
 import { Icon } from '../../shared/theme/Icon';
@@ -15,6 +15,12 @@ import { categoryIcon, searchIcons } from '../add/categoryIcons';
 import type { SaveOutcome } from './categoriesApi';
 
 export type CategorySheetMode = { readonly mode: 'add'; readonly kind: CategoryKind } | { readonly mode: 'edit'; readonly row: CategoryRow };
+
+function kindInUseText(side: 'income' | 'spending', n: number): string {
+  const c = copy.categories;
+  if (side === 'income') return n === 1 ? c.inUseIncomeOne : c.inUseIncomeMany.replace('{n}', String(n));
+  return n === 1 ? c.inUseSpendingOne : c.inUseSpendingMany.replace('{n}', String(n));
+}
 
 /** `cat-olive` is read as "Olive". */
 export const colourName = (token: string): string => token.replace(/^cat-/, '').replace(/^./, (c) => c.toUpperCase());
@@ -39,7 +45,7 @@ export function CategorySheet({
 }) {
   const theme = useTheme();
   const editing = start.mode === 'edit' ? start.row : null;
-  const kind: CategoryKind = editing ? editing.kind : start.mode === 'add' ? start.kind : 'expense';
+  const [usedFor, setUsedFor] = useState<CategoryKind>(editing ? editing.kind : start.mode === 'add' ? start.kind : 'expense');
   const [name, setName] = useState(editing?.name ?? '');
   const [icon, setIcon] = useState(editing?.icon ?? 'DotsThree');
   const [colour, setColour] = useState(editing?.colorToken ?? 'cat-sky');
@@ -55,7 +61,10 @@ export function CategorySheet({
 
   const parents = useMemo(() => categories.filter((c) => c.kind === 'expense' && c.parentId === null && c.id !== UNCATEGORISED_ID), [categories]);
   const icons = useMemo(() => searchIcons(query), [query]);
-  const isSpending = kind === 'expense';
+  // A subcategory (existing, or being added under a parent) follows its parent's kind and has no Used for of its own.
+  const isSub = editing ? editing.parentId !== null : parentId !== null;
+  const kind: CategoryKind = usedFor;
+  const isSpending = kind !== 'income';
   const canPickParent = isSpending && editing === null;
 
   const pickParent = (id: string | null) => {
@@ -83,9 +92,11 @@ export function CategorySheet({
       return;
     }
     const trimmed = name.trim();
+    const inUse = parseKindInUse(r.code);
     if (r.code === 'NAME_REQUIRED') setError({ field: 'name', text: copy.categories.nameRequired });
     else if (r.code === 'NAME_TOO_LONG') setError({ field: 'name', text: copy.categories.nameTooLong });
     else if (r.code === 'NAME_TAKEN') setError({ field: 'name', text: copy.categories.nameTaken.replace('{name}', trimmed) });
+    else if (inUse) setError({ field: 'form', text: kindInUseText(inUse.side, inUse.count) });
     else setError({ field: 'form', text: `${copy.categories.saveFailed} ${copy.errors.nothingSaved}` });
     if (r.code === 'NAME_REQUIRED' || r.code === 'NAME_TOO_LONG' || r.code === 'NAME_TAKEN') nameRef.current?.focus();
   };
@@ -112,6 +123,17 @@ export function CategorySheet({
             {error.text}
           </Text>
         ) : null}
+
+        {isSub ? null : (
+          <>
+            <Text style={[textStyle('label'), ink]}>{copy.categories.usedFor}</Text>
+            <View style={styles.row} accessibilityRole="radiogroup" accessibilityLabel={copy.categories.usedFor}>
+              <Chip onGlass role="radio" label={copy.categories.usedSpending} testID="category-used-expense" selected={usedFor === 'expense'} onPress={() => { setUsedFor('expense'); setError(null); }} />
+              <Chip onGlass role="radio" label={copy.categories.usedIncome} testID="category-used-income" selected={usedFor === 'income'} onPress={() => { setUsedFor('income'); setType(null); setParentId(null); setError(null); }} />
+              <Chip onGlass role="radio" label={copy.categories.usedBoth} testID="category-used-mixed" selected={usedFor === 'mixed'} onPress={() => { setUsedFor('mixed'); setError(null); }} />
+            </View>
+          </>
+        )}
 
         <Text style={[textStyle('label'), ink]}>{copy.categories.icon}</Text>
         <TextInput

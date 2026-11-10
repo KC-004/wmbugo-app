@@ -1,5 +1,6 @@
 import {
   DeleteEntry,
+  categoryFits,
   CATEGORY_LIST_SQL,
   mapCategoryRows,
   mapSplits,
@@ -102,7 +103,7 @@ export const realTransactionApi: TransactionApi = {
       locale: p.locale,
       detail,
       splits: mapSplits(await db.query(SPLITS_SQL, [transactionId])),
-      categories: mapCategoryRows(await db.query(CATEGORY_LIST_SQL)).filter((c) => c.kind === kind).map((c) => ({ id: c.id, name: c.name })),
+      categories: mapCategoryRows(await db.query(CATEGORY_LIST_SQL)).filter((c) => categoryFits(c.kind, kind)).map((c) => ({ id: c.id, name: c.name })),
       recovery: mapRecoverySummary(await db.query(RECOVERY_SUMMARY_SQL, [transactionId])),
       refundableMinor: detail.type === 'expense' ? await db.query(REFUNDABLE_SQL, [transactionId]).then((r) => (r[0] ? Number(r[0][0]) : null)) : null,
       removalKind: await db.query('SELECT removal_kind FROM "transaction" WHERE id = ?', [transactionId]).then((r) => (r[0] && (r[0][0] === 'deleted' || r[0][0] === 'rejected') ? (r[0][0] as 'deleted' | 'rejected') : null)),

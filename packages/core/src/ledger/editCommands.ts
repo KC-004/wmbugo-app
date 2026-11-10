@@ -1,4 +1,5 @@
 import { linkedRefundsMinor } from './refunds';
+import { categoryFits } from './categories';
 import { toLocalDate } from '../shared/clock';
 import { err, ok } from '../shared/result';
 import type { UseCase, WriterContext } from '../writer/ledgerWriter';
@@ -136,7 +137,7 @@ export const EditTransaction: UseCase<
       if (e.categoryId !== undefined && e.categoryId !== split.category) {
         const c = (await ctx.query('SELECT kind FROM category WHERE id = ? AND archived = 0', [e.categoryId]))[0];
         if (!c) return err('CATEGORY_NOT_FOUND');
-        if (String(c[0]) !== type) return err('CATEGORY_KIND_MISMATCH');
+        if (!categoryFits(String(c[0]), type)) return err('CATEGORY_KIND_MISMATCH');
       }
       if (e.accountId !== undefined && e.accountId !== posting.account) {
         const st = await activeAccount(ctx, e.accountId);

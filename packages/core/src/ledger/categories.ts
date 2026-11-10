@@ -1,4 +1,14 @@
-export type CategoryKind = 'expense' | 'income';
+export type CategoryKind = 'expense' | 'income' | 'mixed';
+
+/** An expense entry takes expense and mixed categories; an income entry takes income and mixed ones (CAT-003). */
+export const categoryFits = (categoryKind: string, entryType: string): boolean =>
+  categoryKind === 'mixed' ? entryType === 'expense' || entryType === 'income' : categoryKind === entryType;
+
+/** Two kinds share a picker (and so a name space) when either is mixed or they are equal. */
+export const kindsOverlap = (a: string, b: string): boolean => a === 'mixed' || b === 'mixed' || a === b;
+
+/** The kinds a picker or segment for this entry type lists. */
+export const kindsFor = (entryType: 'expense' | 'income'): readonly CategoryKind[] => [entryType, 'mixed'];
 export type BudgetType = 'need' | 'want';
 
 export interface SeedCategory {

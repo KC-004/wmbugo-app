@@ -1,6 +1,6 @@
 import { err, ok } from '../shared/result';
 import type { UseCase, WriterContext } from '../writer/ledgerWriter';
-import { UNCATEGORISED_ID, type BudgetType, type CategoryKind } from './categories';
+import { kindsOverlap, UNCATEGORISED_ID, type BudgetType, type CategoryKind } from './categories';
 
 /** The 12 categorical colours of the design system (DESIGN.md `cat-*`). There is no free colour entry. */
 export const CATEGORY_COLOURS = [
@@ -27,7 +27,7 @@ export interface SaveCategoryInput {
   /** Present when editing an existing category. */
   readonly id?: string;
   readonly name: string;
-  /** Used when adding a top-level category; a subcategory takes its parent's kind and an edit keeps the kind. */
+  /** What it is used for (Story 4.2). Ignored for a subcategory, which always takes its parent's kind. */
   readonly kind: CategoryKind;
   /** A Phosphor icon name from the app's grid. */
   readonly icon: string;
@@ -46,7 +46,24 @@ export type SaveCategoryError =
   | 'TYPE_INVALID'
   | 'PARENT_INVALID'
   | 'CATEGORY_NOT_FOUND'
-  | 'CATEGORY_READONLY';
+  | 'CATEGORY_READONLY'
+  | KindInUse;
+
+type Side = 'income' | 'spending';
+
+/** A kind change refused because entries of the side being left use the category, e.g. `KIND_IN_USE:income:3`. */
+export type KindInUse = `KIND_IN_USE:${Side}:${number}`;
+
+export function parseKindInUse(code: string): { side: Side; count: number } | null {
+  const m = /^KIND_IN_USE:(income|spending):(\d+)$/.exec(code);
+  return m ? { side: m[1] as Side, count: Number(m[2]) } : null;
+}
+
+const SIDES: Readonly<Record<CategoryKind, readonly Side[]>> = { expense: ['spending'], income: ['income'], mixed: ['spending', 'income'] };
+
+/** Entries (this category and its subcategories) of one side. Params: category id twice. */
+const USE_BY_SIDE_SQL = (side: Side) =>
+  `SELECT COUNT(DISTINCT s.transaction_id) FROM split s JOIN "transaction" t ON t.id = s.transaction_id JOIN category c ON c.id = s.category_id WHERE (c.id = ? OR c.parent_id = ?) AND t.event_type ${side === 'income' ? "= 'income'" : "IN ('expense', 'refund')"}`;
 
 interface Existing {
   readonly id: string;
@@ -93,26 +110,39 @@ export const SaveCategory: UseCase<SaveCategoryInput, { categoryId: string }, Sa
       if (current.id === UNCATEGORISED_ID) return err('CATEGORY_READONLY');
     }
 
-    let kind: CategoryKind = current?.kind ?? input.kind;
+    // A top-level category may change what it is used for; a subcategory always follows its parent.
+    let kind: CategoryKind = current ? (current.parentId === null ? input.kind : current.kind) : input.kind;
+    if (kind !== 'expense' && kind !== 'income' && kind !== 'mixed') return err('TYPE_INVALID');
     let parentId: string | null = current?.parentId ?? null;
     if (!current && input.parentId) {
       const parent = all.find((c) => c.id === input.parentId);
       // One level only, and only under a top-level, active spending category.
-      if (!parent || parent.parentId !== null || parent.archived || parent.kind !== 'expense') return err('PARENT_INVALID');
+      if (!parent || parent.parentId !== null || parent.archived || parent.kind === 'income') return err('PARENT_INVALID');
       parentId = parent.id;
       kind = parent.kind;
     }
     if (kind === 'income' && input.budgetType !== null) return err('TYPE_INVALID');
     if (input.budgetType !== null && input.budgetType !== 'need' && input.budgetType !== 'want') return err('TYPE_INVALID');
 
-    if (all.some((c) => !c.archived && c.kind === kind && c.id !== current?.id && sameCategoryName(c.name, name.value))) return err('NAME_TAKEN');
+    if (all.some((c) => !c.archived && kindsOverlap(c.kind, kind) && c.id !== current?.id && sameCategoryName(c.name, name.value))) return err('NAME_TAKEN');
 
     const at = ctx.nowMs();
     if (current) {
-      await ctx.execute('UPDATE category SET name = ?, icon = ?, color_token = ?, budget_type = ? WHERE id = ?', [name.value, input.icon, input.colour, input.budgetType, current.id]);
+      if (kind !== current.kind) {
+        // Leaving a side is allowed only when no entry of that side uses the category (or its subcategories).
+        for (const side of SIDES[current.kind].filter((s) => !SIDES[kind].includes(s))) {
+          const n = Number((await ctx.query(USE_BY_SIDE_SQL(side), [current.id, current.id]))[0]![0]);
+          if (n > 0) return err(`KIND_IN_USE:${side}:${n}`);
+        }
+      }
+      await ctx.execute('UPDATE category SET name = ?, kind = ?, icon = ?, color_token = ?, budget_type = ? WHERE id = ?', [name.value, kind, input.icon, input.colour, input.budgetType, current.id]);
+      if (kind !== current.kind) {
+        // Subcategories follow their parent in the same transaction; an income-only parent has no types.
+        await ctx.execute(kind === 'income' ? 'UPDATE category SET kind = ?, budget_type = NULL WHERE parent_id = ?' : 'UPDATE category SET kind = ? WHERE parent_id = ?', [kind, current.id]);
+      }
       ctx.touch('category', current.id, {
-        before: { label: current.name, icon: current.icon, colour: current.colour, type: current.budgetType },
-        after: { label: name.value, icon: input.icon, colour: input.colour, type: input.budgetType },
+        before: { label: current.name, icon: current.icon, colour: current.colour, type: current.budgetType, usedFor: current.kind },
+        after: { label: name.value, icon: input.icon, colour: input.colour, type: input.budgetType, usedFor: kind },
       });
       ctx.emit('CategoriesChanged', { categoryIds: [current.id] });
       return ok({ categoryId: current.id });
@@ -140,7 +170,7 @@ export interface MoveResult {
  * Moves a category one place up or down among its siblings (the top-level categories of its kind, or the subcategories
  * of its parent). Subcategories travel with their parent because they are ordered inside it.
  */
-export const MoveCategory: UseCase<{ categoryId: string; direction: 'up' | 'down' }, MoveResult, 'CATEGORY_NOT_FOUND' | 'CATEGORY_READONLY' | 'AT_EDGE'> = {
+export const MoveCategory: UseCase<{ categoryId: string; direction: 'up' | 'down'; segment?: 'expense' | 'income' }, MoveResult, 'CATEGORY_NOT_FOUND' | 'CATEGORY_READONLY' | 'AT_EDGE'> = {
   name: 'MoveCategory',
   async execute(ctx, input) {
     const rows = await ctx.query('SELECT id, kind, parent_id, sort_order FROM category WHERE archived = 0 ORDER BY sort_order, id');
@@ -148,8 +178,11 @@ export const MoveCategory: UseCase<{ categoryId: string; direction: 'up' | 'down
     const me = list.find((c) => c.id === input.categoryId);
     if (!me) return err('CATEGORY_NOT_FOUND');
     if (me.id === UNCATEGORISED_ID) return err('CATEGORY_READONLY');
-    const siblings = list.filter((c) => c.kind === me.kind && c.parent === me.parent);
+    // A Both category shows in the Spending and the Income list, so it moves within the list the user is looking at.
+    const segment = input.segment ?? (me.kind === 'income' ? 'income' : 'expense');
+    const siblings = list.filter((c) => c.parent === me.parent && (me.parent !== null ? c.kind === me.kind : c.kind === segment || c.kind === 'mixed'));
     const i = siblings.findIndex((c) => c.id === me.id);
+    if (i < 0) return err('CATEGORY_NOT_FOUND');
     const j = i + (input.direction === 'up' ? -1 : 1);
     if (j < 0 || j >= siblings.length) return err('AT_EDGE');
     // Reuse the same set of order numbers in the new sequence, so no other category's place changes.

@@ -3,6 +3,7 @@ import { err, ok } from '../shared/result';
 import type { Invariant, UseCase, WriterContext } from '../writer/ledgerWriter';
 import type { Result } from '../shared/result';
 import { insertAccount, profileTimezone } from './accountCommands';
+import { categoryFits } from './categories';
 
 export type EntryKind = 'expense' | 'income';
 
@@ -88,7 +89,7 @@ if (tz === null) return err('NO_PROFILE');
 
 const cat = (await ctx.query('SELECT kind FROM category WHERE id = ? AND archived = 0', [input.categoryId]))[0];
 if (!cat) return err('CATEGORY_NOT_FOUND');
-if (String(cat[0]) !== input.kind) return err('CATEGORY_KIND_MISMATCH');
+if (!categoryFits(String(cat[0]), input.kind)) return err('CATEGORY_KIND_MISMATCH');
 
 const at = input.occurredAtMs ?? ctx.nowMs();
 const date = toLocalDate(at, tz);

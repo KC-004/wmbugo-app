@@ -10,7 +10,9 @@ import { LedgerWriter } from '../writer/ledgerWriter';
 import { AddAccount, openingBalanceShape } from './accountCommands';
 import { entryShape } from './entryCommands';
 import { CATEGORY_LIST_SQL, mapCategoryRows } from './categories';
-import { CATEGORY_COLOURS, MoveCategory, SaveCategory, SPENDING_BY_BUDGET_TYPE_SQL, spendingByBudgetType, validateCategoryName, type SaveCategoryInput } from './categoryCommands';
+import { BulkRecategorise } from './bulk';
+import { SetSplits } from './splits';
+import { CATEGORY_COLOURS, parseKindInUse, MoveCategory, SaveCategory, SPENDING_BY_BUDGET_TYPE_SQL, spendingByBudgetType, validateCategoryName, type SaveCategoryInput } from './categoryCommands';
 
 async function setup() {
   const db = new NodeSqliteDatabase().applyRealMigrations();
@@ -157,5 +159,73 @@ describe('spendingByBudgetType', () => {
       }),
       { numRuns: 8 },
     );
+  });
+});
+
+describe('Category kinds (Story 4.2)', () => {
+  const freelance: SaveCategoryInput = { id: 'cat_in_freelance', name: 'Freelance', kind: 'income', icon: 'Laptop', colour: 'cat-cyan', budgetType: null };
+  const at = Date.UTC(2026, 10, 8, 9, 0, 0);
+
+  it('a Both category takes expense and income entries; the wrong kind is CATEGORY_KIND_MISMATCH and writes nothing', async () => {
+    const { db, writer, accountId } = await setup();
+    const rec = (kind: 'expense' | 'income', categoryId: string) => recordEntry(writer, { kind, amountMinor: 10_000, categoryId, accountId, merchant: 'X', occurredAtMs: at });
+    expect(await rec('expense', 'cat_in_freelance')).toMatchObject({ ok: false, code: 'CATEGORY_KIND_MISMATCH' });
+    expect(await rec('income', 'cat_food')).toMatchObject({ ok: false, code: 'CATEGORY_KIND_MISMATCH' });
+    expect((await writer.run(SaveCategory, { ...freelance, kind: 'mixed' }, 'user')).ok).toBe(true);
+    expect((await rec('expense', 'cat_in_freelance')).ok).toBe(true);
+    expect((await rec('income', 'cat_in_freelance')).ok).toBe(true);
+    expect(Number((await db.query('SELECT COUNT(*) FROM "transaction" WHERE event_type IN (\'expense\',\'income\')'))[0]![0])).toBe(2);
+  });
+
+  it('SetSplits and BulkRecategorise enforce the kind; bulk counts entries that do not fit as won\'t change', async () => {
+    const { db, writer, accountId } = await setup();
+    const inc = await recordEntry(writer, { kind: 'income', amountMinor: 50_000, categoryId: 'cat_in_salary', accountId, merchant: 'Acme', occurredAtMs: at });
+    const exp = await recordEntry(writer, { kind: 'expense', amountMinor: 20_000, categoryId: 'cat_food', accountId, merchant: 'Cafe', occurredAtMs: at });
+    if (!inc.ok || !exp.ok) throw new Error('setup');
+    expect(await writer.run(SetSplits, { transactionId: inc.value.transactionId, splits: [{ categoryId: 'cat_food', amountMinor: 50_000 }] }, 'user')).toMatchObject({ ok: false, code: 'CATEGORY_KIND_MISMATCH' });
+    const bulk = await writer.run(BulkRecategorise, { transactionIds: [inc.value.transactionId, exp.value.transactionId], categoryId: 'cat_transport' }, 'user');
+    expect(bulk).toMatchObject({ ok: true, value: { skipped: 1 } });
+    expect(String((await db.query('SELECT category_id FROM split WHERE transaction_id = ?', [inc.value.transactionId]))[0]![0])).toBe('cat_in_salary');
+  });
+
+  it('switching a Both category to one kind is blocked while entries of the other kind use it, and allowed when none do', async () => {
+    const { writer, accountId } = await setup();
+    await writer.run(SaveCategory, { ...freelance, kind: 'mixed' }, 'user');
+    for (let i = 0; i < 3; i++) await recordEntry(writer, { kind: 'income', amountMinor: 10_000 + i, categoryId: 'cat_in_freelance', accountId, merchant: 'Client', occurredAtMs: at + i });
+    const blocked = await writer.run(SaveCategory, { ...freelance, kind: 'expense' }, 'user');
+    expect(blocked).toMatchObject({ ok: false, code: 'KIND_IN_USE:income:3' });
+    expect(parseKindInUse('KIND_IN_USE:income:3')).toEqual({ side: 'income', count: 3 });
+    // No spending entries: leaving the spending side is fine.
+    expect((await writer.run(SaveCategory, { ...freelance, kind: 'income' }, 'user')).ok).toBe(true);
+  });
+
+  it('a pure spending category with spending entries cannot become income', async () => {
+    const { writer, accountId } = await setup();
+    await recordEntry(writer, { kind: 'expense', amountMinor: 10_000, categoryId: 'cat_travel', accountId, merchant: 'Hotel', occurredAtMs: at });
+    expect(await writer.run(SaveCategory, { id: 'cat_travel', name: 'Travel', kind: 'income', icon: 'Airplane', colour: 'cat-emerald', budgetType: null }, 'user')).toMatchObject({ ok: false, code: 'KIND_IN_USE:spending:1' });
+  });
+
+  it('subcategories follow their parent kind in the same transaction', async () => {
+    const { writer, cats } = await setup();
+    const sub = await writer.run(SaveCategory, { name: 'Fuel', kind: 'expense', icon: 'GasPump', colour: 'cat-sky', budgetType: 'need', parentId: 'cat_transport' }, 'user');
+    if (!sub.ok) throw new Error('sub');
+    const t = (await cats()).find((c) => c.id === 'cat_transport')!;
+    expect((await writer.run(SaveCategory, { id: t.id, name: t.name, kind: 'mixed', icon: t.icon, colour: t.colorToken, budgetType: t.budgetType }, 'user')).ok).toBe(true);
+    expect((await cats()).find((c) => c.id === sub.value.categoryId)!.kind).toBe('mixed');
+  });
+
+  it('a Both category shares the name space of both kinds', async () => {
+    const { writer } = await setup();
+    await writer.run(SaveCategory, { ...freelance, kind: 'mixed' }, 'user');
+    expect(await writer.run(SaveCategory, { name: 'freelance', kind: 'expense', icon: 'Car', colour: 'cat-sky', budgetType: null }, 'user')).toMatchObject({ ok: false, code: 'NAME_TAKEN' });
+  });
+
+  it('MoveCategory moves a Both category inside the list the user is looking at', async () => {
+    const { writer, cats } = await setup();
+    await writer.run(SaveCategory, { ...freelance, kind: 'mixed' }, 'user');
+    const r = await writer.run(MoveCategory, { categoryId: 'cat_in_freelance', direction: 'up', segment: 'income' }, 'user');
+    expect(r).toMatchObject({ ok: true, value: { position: 1, of: 6 } });
+    expect((await cats()).filter((c) => c.kind !== 'expense' && c.parentId === null)[0]!.id).toBe('cat_in_freelance');
+    expect(await writer.run(MoveCategory, { categoryId: 'cat_food', direction: 'up', segment: 'income' }, 'user')).toMatchObject({ ok: false, code: 'CATEGORY_NOT_FOUND' });
   });
 });

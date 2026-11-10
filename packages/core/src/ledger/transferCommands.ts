@@ -64,7 +64,7 @@ for (const id of [input.fromAccountId, input.toAccountId]) {
   if (String(a[0]) !== 'active') return err('ACCOUNT_ARCHIVED');
 }
 if (input.fee) {
-  const c = (await ctx.query("SELECT 1 FROM category WHERE id = ? AND kind = 'expense' AND archived = 0", [input.fee.categoryId]))[0];
+  const c = (await ctx.query("SELECT 1 FROM category WHERE id = ? AND kind IN ('expense', 'mixed') AND archived = 0", [input.fee.categoryId]))[0];
   if (!c) return err('CATEGORY_NOT_FOUND');
 }
 

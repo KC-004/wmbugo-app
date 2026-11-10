@@ -137,7 +137,7 @@ export const category = sqliteTable(
   },
   (t) => [
     index('category_parent_order_idx').on(t.parent_id, t.sort_order),
-    check('category_kind_check', sql`${t.kind} IN ('expense','income')`),
+    check('category_kind_check', sql`${t.kind} IN ('expense','income','mixed')`),
     check('category_budget_type_check', sql`${t.budget_type} IS NULL OR ${t.budget_type} IN ('need','want')`),
     check('category_archived_check', sql`${t.archived} IN (0,1)`),
   ],
