@@ -60,6 +60,9 @@ export function captureStateOfResult(code: SubmitResult): CaptureState {
       return 'recorded';
     case 'POSSIBLE_DUPLICATE':
       return 'possible_duplicate';
+    case 'SKIPPED_PREVIOUSLY_REJECTED':
+    case 'SKIPPED_PREVIOUSLY_DELETED':
+      return 'rejected';
   }
 }
 

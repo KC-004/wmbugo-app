@@ -75,3 +75,21 @@ export const attachment = sqliteTable(
     check('attachment_kind_check', sql`${t.kind} IN ('receipt')`),
   ],
 );
+
+/**
+ * What wmbugo remembers about an entry after it is purged (Story 3.12): only a salted hash of its duplicate fingerprint,
+ * the outcome and the purge date. No amount, merchant or text.
+ */
+export const tombstone = sqliteTable(
+  'tombstone',
+  {
+    id: text('id').primaryKey(),
+    fingerprint_hash: text('fingerprint_hash').notNull(),
+    outcome: text('outcome').notNull(),
+    purged_at: integer('purged_at').notNull(),
+  },
+  (t) => [
+    index('tombstone_hash_idx').on(t.fingerprint_hash),
+    check('tombstone_outcome_check', sql`${t.outcome} IN ('deleted','rejected')`),
+  ],
+);

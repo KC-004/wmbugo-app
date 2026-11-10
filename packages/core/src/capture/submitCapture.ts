@@ -3,6 +3,9 @@ import type { UseCase, WriterContext } from '../writer/ledgerWriter';
 import { createEntry, type ManualEntry, type RecordEntryError } from '../ledger/entryCommands';
 import { createRefund, type RefundError, type RefundInput } from '../ledger/refunds';
 import { createTransfer, type TransferError, type TransferInput } from '../ledger/transferCommands';
+import { profileTimezone } from '../ledger/accountCommands';
+import { tombstoneFor } from '../ledger/purge';
+import { toLocalDate } from '../shared/clock';
 import { matchItem, type CaptureItem } from './match';
 
 /**
@@ -11,9 +14,18 @@ import { matchItem, type CaptureItem } from './match';
  * rules. Manual entry from the Add sheet is the first source.
  */
 
-export type SubmitInput = { readonly submissionId: string; readonly sourceKind: 'manual' } & ({ readonly entry: ManualEntry; readonly copiedFrom?: string } | { readonly transfer: TransferInput } | { readonly refund: RefundInput });
+export type CaptureSourceKind = 'manual' | 'upi' | 'sms' | 'receipt' | 'csv' | 'notification' | 'share';
 
-export type SubmitResult = 'RECORDED' | 'ALREADY_SUBMITTED' | 'POSSIBLE_DUPLICATE';
+export type SubmitInput = {
+  readonly submissionId: string;
+  readonly sourceKind: CaptureSourceKind;
+  /** The source's own reference (bank reference, UPI id); part of the duplicate fingerprint. */
+  readonly reference?: string;
+  /** Import anyway: a tombstone does not suppress this submission (Epic 9's per-row Import anyway). */
+  readonly ignoreTombstone?: boolean;
+} & ({ readonly entry: ManualEntry; readonly copiedFrom?: string } | { readonly transfer: TransferInput } | { readonly refund: RefundInput });
+
+export type SubmitResult = 'RECORDED' | 'ALREADY_SUBMITTED' | 'POSSIBLE_DUPLICATE' | 'SKIPPED_PREVIOUSLY_REJECTED' | 'SKIPPED_PREVIOUSLY_DELETED';
 export type SubmitError = RecordEntryError | TransferError | RefundError | 'SUBMISSION_INVALID';
 
 export interface Submitted {
@@ -48,12 +60,13 @@ async function candidates(ctx: WriterContext, amountMinor: number, localDate: st
   }));
 }
 
-async function writeSource(ctx: WriterContext, transactionId: string, fingerprint: string): Promise<void> {
-  await ctx.execute('INSERT INTO source_record (id, transaction_id, source_kind, fingerprint, reference, created_at) VALUES (?, ?, ?, ?, NULL, ?)', [
+async function writeSource(ctx: WriterContext, transactionId: string, fingerprint: string, kind: CaptureSourceKind = 'manual', reference: string | null = null): Promise<void> {
+  await ctx.execute('INSERT INTO source_record (id, transaction_id, source_kind, fingerprint, reference, created_at) VALUES (?, ?, ?, ?, ?, ?)', [
     ctx.newId(),
     transactionId,
-    'manual',
+    kind,
     fingerprint,
+    reference,
     ctx.nowMs(),
   ]);
 }
@@ -93,6 +106,15 @@ export const SubmitCapture: UseCase<SubmitInput, Submitted, SubmitError> = {
     }
 
     const e = input.entry;
+    // A non-manual entry that matches a tombstone (rejected or deleted before) is skipped and nothing is written. Manual entries never are.
+    if (input.sourceKind !== 'manual' && !input.ignoreTombstone) {
+      const tz = await profileTimezone(ctx);
+      const date = tz === null ? null : toLocalDate(e.occurredAtMs ?? ctx.nowMs(), tz);
+      if (date?.ok) {
+        const hit = await tombstoneFor(ctx, { reference: input.reference ?? null, direction: e.kind === 'income' ? 'credit' : 'debit', eventType: e.kind, amountMinor: e.amountMinor, localDate: date.value, merchant: e.merchant ?? null });
+        if (hit) return ok({ transactionId: '', accountId: null, feeTransactionId: null, result: hit === 'rejected' ? 'SKIPPED_PREVIOUSLY_REJECTED' : 'SKIPPED_PREVIOUSLY_DELETED' });
+      }
+    }
     const created = await createEntry(ctx, e, async (facts) => {
       if (facts.newAccount || facts.accountId === null) return { status: 'confirmed' };
       const item: CaptureItem = {
@@ -115,7 +137,7 @@ export const SubmitCapture: UseCase<SubmitInput, Submitted, SubmitError> = {
     });
     if (!created.ok) return created;
     const c = created.value;
-    await writeSource(ctx, c.transactionId, fingerprint);
+    await writeSource(ctx, c.transactionId, fingerprint, input.sourceKind, input.reference ?? null);
     if (c.duplicateOf) {
       await ctx.execute("INSERT INTO review_candidate (id, transaction_id, matched_transaction_id, reason, status, created_at) VALUES (?, ?, ?, 'duplicate', 'open', ?)", [
         ctx.newId(),
