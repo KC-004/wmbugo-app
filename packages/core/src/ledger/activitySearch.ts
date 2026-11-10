@@ -201,3 +201,9 @@ export function activityCountQuery(q: ActivityQuery, ctx: { exponent: number; no
   const { where, params } = activityWhere(q, ctx);
   return { sql: `SELECT COUNT(*) FROM "transaction" t2 WHERE ${where}`, params };
 }
+
+/** The ids of every entry that matches (Select all: the whole filtered set, loaded or not). */
+export function activityIdsQuery(q: ActivityQuery, ctx: { exponent: number; nowMs: number }): { sql: string; params: SqlParam[] } {
+  const { where, params } = activityWhere(q, ctx);
+  return { sql: `SELECT t2.id FROM "transaction" t2 WHERE ${where} ORDER BY t2.local_date DESC, t2.occurred_at_utc DESC, t2.id DESC`, params };
+}

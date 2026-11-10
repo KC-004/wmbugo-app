@@ -1,6 +1,6 @@
-import { FlatList, Pressable, SectionList, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { BackHandler, FlatList, Pressable, SectionList, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, FunnelSimple, MagnifyingGlass, X } from 'phosphor-react-native';
 import {
   ACTIVITY_PAGE_SIZE,
@@ -16,6 +16,8 @@ import {
 } from '@wmbugo/core';
 import { amountLabel } from '../../shared/a11y/labels';
 import { announce } from '../../shared/a11y/announce';
+import { invalidateForEvent } from '../../shared/queryClient';
+import { useToast } from '../../shared/feedback/ToastHost';
 import { copy } from '../../shared/copy';
 import { EmptyState, ErrorBlock, Reveal, Skeleton } from '../../shared/feedback/Feedback';
 import { useSheet } from '../../shared/feedback/SheetHost';
@@ -31,6 +33,7 @@ import { realAddApi, type AddApi } from '../add/addApi';
 import { ActivityFilterSheet } from './ActivityFilterSheet';
 import { ActivityRowView } from './ActivityRowView';
 import { HeldRowActions } from './HeldRowActions';
+import { BulkMoveSheet } from './BulkMoveSheet';
 import { ACTIVITY_QUERY_KEY, realActivityApi, type ActivityApi, type ActivityOptions } from './activityApi';
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -111,6 +114,10 @@ export function ActivityScreen({
 }) {
   const theme = useTheme();
   const sheet = useSheet();
+  const toast = useToast();
+  const qc = useQueryClient();
+  // Selection mode (Story 3.9): null when off.
+  const [selected, setSelected] = useState<Set<string> | null>(null);
   const filter = useUiStore((s) => s.activityFilter);
   const setFilter = useUiStore((s) => s.setActivityFilter);
   const query = filter.query;
@@ -137,6 +144,66 @@ export function ActivityScreen({
   const flat = isFlatSort(query);
   const n = activeFilterCount(query);
   const resultCount = d?.days.reduce((c, day) => c + day.rows.length, 0) ?? 0;
+
+  useEffect(() => {
+    if (!selected) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      setSelected(null);
+      return true;
+    });
+    return () => sub.remove();
+  }, [selected !== null]);
+
+  const toggle = (id: string) =>
+    setSelected((cur) => {
+      const next = new Set(cur ?? []);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const selectAll = async () => {
+    const all = api.ids ? await api.ids(query) : (d?.days.flatMap((day) => day.rows.map((r) => r.id)) ?? []);
+    setSelected(new Set(all));
+    announce(copy.bulk.selected.replace('{n}', String(all.length)));
+  };
+
+  const openMove = () => {
+    const ids = [...(selected ?? [])];
+    const cats = (options.data?.categories ?? []).filter((c) => c.id !== 'cat_uncategorised');
+    if (ids.length === 0 || !api.bulkPreview || !api.bulkMove) return;
+    sheet.open({
+      id: 'bulk-move',
+      title: copy.bulk.moveTo.replace('{n}', String(ids.length)),
+      body: (close) => (
+        <BulkMoveSheet
+          categories={cats}
+          preview={(categoryId) => api.bulkPreview!(ids, categoryId)}
+          close={close}
+          onConfirm={async (categoryId, toName) => {
+            const r = await api.bulkMove!(ids, categoryId).catch(() => ({ ok: false as const, code: 'FAILED' }));
+            if (!r.ok) return false;
+            const previous = r.value.previous;
+            await invalidateForEvent(qc, 'TransactionsChanged');
+            setSelected(null);
+            toast.show({
+              message: copy.bulk.moved.replace('{n}', String(r.value.movedIds.length)).replace('{to}', toName),
+              undo: {
+                label: copy.common.undo,
+                onUndo: () =>
+                  void api.bulkUndo!(previous)
+                    .then(async () => {
+                      await invalidateForEvent(qc, 'TransactionsChanged');
+                    })
+                    .catch(() => toast.show({ message: copy.add.removeFailed })),
+              },
+            });
+            return true;
+          }}
+        />
+      ),
+    });
+  };
 
   const clearAll = () => {
     setText('');
@@ -179,7 +246,20 @@ export function ActivityScreen({
     void (api.count ? api.count(next) : Promise.resolve(0)).then((count) => announce(`${copy.activity.filterRemoved}. ${count} ${(count === 1 ? copy.activity.result : copy.activity.results).toLowerCase()}`));
   };
 
-  const header = searching ? (
+  const selectionBar = selected ? (
+    <View testID="selection-bar" style={[styles.selectionBar, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
+      <IconButton label={copy.bulk.cancel} onPress={() => setSelected(null)} testID="selection-cancel">
+        <Icon icon={X} />
+      </IconButton>
+      <Text testID="selection-count" accessibilityLiveRegion="polite" style={[textStyle('title-sm'), { color: theme.color('text-primary') }, styles.flex]}>
+        {copy.bulk.selected.replace('{n}', String(selected.size))}
+      </Text>
+      <Button label={copy.bulk.selectAll} variant="text" onPress={() => void selectAll()} testID="selection-all" />
+      <Button label={copy.bulk.moveTo.replace('{n}', String(selected.size))} onPress={openMove} disabledReason={selected.size === 0 ? copy.bulk.selectSome : undefined} testID="selection-move" />
+    </View>
+  ) : null;
+
+  const header = selectionBar ?? (searching ? (
     <View style={styles.searchRow}>
       <IconButton label={copy.nav.back} onPress={closeSearch} testID="search-back">
         <Icon icon={ArrowLeft} />
@@ -203,12 +283,15 @@ export function ActivityScreen({
       onAccounts={onAccounts}
       onProfile={onProfile}
       actions={
-        <IconButton label={copy.activity.searchLabel} onPress={() => setSearching(true)} testID="header-search">
-          <Icon icon={MagnifyingGlass} />
-        </IconButton>
+        <View style={styles.headerActions}>
+          {api.bulkMove ? <Button label={copy.bulk.select} variant="text" onPress={() => setSelected(new Set())} testID="header-select" /> : null}
+          <IconButton label={copy.activity.searchLabel} onPress={() => setSearching(true)} testID="header-search">
+            <Icon icon={MagnifyingGlass} />
+          </IconButton>
+        </View>
       }
     />
-  );
+  ));
 
   const onAccent = theme.scheme === 'dark' ? theme.color('bg-canvas') : theme.color('bg-surface');
   const chipsRow = (
@@ -249,7 +332,9 @@ export function ActivityScreen({
       locale={data.locale}
       showDate={showDate}
       footer={item.held ? <HeldRowActions transactionId={item.id} api={duplicateApi} /> : undefined}
-      onPress={onOpen ? () => onOpen(item.id) : undefined}
+      onPress={selected ? () => toggle(item.id) : onOpen ? () => onOpen(item.id) : undefined}
+      onLongPress={api.bulkMove && !selected && item.kind !== 'adjustment' ? () => setSelected(new Set([item.id])) : undefined}
+      selection={selected ? { selected: selected.has(item.id) } : undefined}
       actions={onDeleteRow && onRecategorise && item.kind !== 'adjustment' ? [{ name: 'recategorise', label: copy.detail.recategorise }, { name: 'delete', label: item.captured ? copy.detail.reject : copy.detail.delete }] : undefined}
       onAction={(name) => (name === 'delete' ? onDeleteRow?.(item) : onRecategorise?.(item))}
     />
@@ -339,5 +424,8 @@ const styles = StyleSheet.create({
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, paddingHorizontal: 16, minHeight: 48 },
   filtersBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 48, paddingRight: 4 },
   activeChip: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 48, paddingHorizontal: 12, borderRadius: radii.full },
+  flex: { flex: 1 },
+  headerActions: { flexDirection: 'row', alignItems: 'center' },
+  selectionBar: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: radii.md, paddingHorizontal: 4 },
   noMatches: { padding: 16, gap: 12, alignItems: 'flex-start' },
 });

@@ -3,6 +3,7 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { groupByDay, type ActivityRow } from '@wmbugo/core';
 import { SheetHost } from '../../shared/feedback/SheetHost';
+import { ToastHost } from '../../shared/feedback/ToastHost';
 import { MemorySeenStore } from '../../shared/feedback/tooltipController';
 import { createQueryClient } from '../../shared/queryClient';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
@@ -50,7 +51,7 @@ function mount(node: React.ReactElement) {
     r = create(
       <QueryClientProvider client={qc}>
         <ThemeProvider>
-          <SheetHost>{node}</SheetHost>
+          <ToastHost bottomOffset={0}><SheetHost>{node}</SheetHost></ToastHost>
         </ThemeProvider>
       </QueryClientProvider>,
     );
