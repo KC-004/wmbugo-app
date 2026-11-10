@@ -17,3 +17,4 @@ export * from './splits';
 export * from './refunds';
 export * from './bulk';
 export * from './purge';
+export * from './recentlyDeleted';

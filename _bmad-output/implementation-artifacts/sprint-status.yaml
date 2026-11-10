@@ -79,7 +79,7 @@ development_status:
   3-10-review-queue-one-list-of-everything-to-check: review
   3-11-receipt-photos-and-source-details-survive-edits: review
   3-12-retention-purge-and-tombstones: review
-  3-13-recently-deleted-show-rejected-and-delete-permanently: backlog
+  3-13-recently-deleted-show-rejected-and-delete-permanently: review
   epic-3-retrospective: optional
 
   epic-4: backlog

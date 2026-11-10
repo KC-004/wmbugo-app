@@ -94,9 +94,9 @@ async function open(d: SettingsData) {
 }
 
 describe('Settings hub', () => {
-  it('lists only the You group, with a live one-line summary in its label', async () => {
+  it('lists the You and Data groups, with a live one-line summary in the You label', async () => {
     const { r } = await open(data({}, { theme: 'dark' }));
-    expect(has(r, 'group-you')).toBe(true);
+    expect(has(r, 'group-you') && has(r, 'group-data')).toBe(true);
     expect(host(r, 'group-you').props.accessibilityLabel).toBe('You, Payday 1st · Dark');
     expect(texts(r).join(' ')).not.toMatch(/budgets|insights|reminders/i);
   });

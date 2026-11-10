@@ -28,9 +28,13 @@ import { ScreenHeader } from '../shell/ScreenHeader';
 import { Chip } from '../../shared/ui/Chip';
 import { useFocusRing } from '../../shared/ui/FocusRing';
 import { RegionPicker } from '../onboarding/OnboardingFlow';
+import { RecentlyDeletedScreen } from './RecentlyDeletedScreen';
 import { realSettingsApi, SETTINGS_QUERY_KEY, type SettingsApi, type SettingsData } from './settingsApi';
 
-type Page = 'hub' | 'you' | 'appearance' | 'money';
+type Page = 'hub' | 'you' | 'appearance' | 'money' | 'data' | 'deleted';
+
+/** Where Back goes from each page. */
+const PARENT: Readonly<Record<Page, Page>> = { hub: 'hub', you: 'hub', appearance: 'you', money: 'you', data: 'hub', deleted: 'data' };
 
 const THEMES: readonly { v: ThemeChoice; label: string }[] = [
   { v: 'system', label: copy.settings.themeSystem },
@@ -77,7 +81,7 @@ export function SettingsScreen({ api = realSettingsApi, onBack }: { api?: Settin
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (page === 'hub') return false;
-      setPage(page === 'you' ? 'hub' : 'you');
+      setPage(PARENT[page]);
       return true;
     });
     return () => sub.remove();
@@ -91,15 +95,23 @@ export function SettingsScreen({ api = realSettingsApi, onBack }: { api?: Settin
     await refresh();
   };
 
-  const title = page === 'hub' ? copy.nav.settings : page === 'you' ? copy.settings.you : page === 'appearance' ? copy.settings.appearance : copy.settings.moneyBasics;
-  const back = () => (page === 'hub' ? onBack() : setPage(page === 'you' ? 'hub' : 'you'));
+  const title =
+    page === 'hub' ? copy.nav.settings : page === 'you' ? copy.settings.you : page === 'appearance' ? copy.settings.appearance : page === 'money' ? copy.settings.moneyBasics : page === 'data' ? copy.deleted.data : copy.deleted.recentlyDeleted;
+  const back = () => (page === 'hub' ? onBack() : setPage(PARENT[page]));
 
   return (
     <View style={styles.fill}>
       <ScreenHeader title={title} onBack={back} backTestID="settings-back" />
       <ScrollView contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
       {!d ? null : page === 'hub' ? (
-        <Row testID="group-you" label={copy.settings.you} summary={youSummary(d.profile.payday, d.settings.theme)} onPress={() => setPage('you')} />
+        <>
+          <Row testID="group-you" label={copy.settings.you} summary={youSummary(d.profile.payday, d.settings.theme)} onPress={() => setPage('you')} />
+          <Row testID="group-data" label={copy.deleted.data} summary={copy.deleted.dataSummary} onPress={() => setPage('data')} />
+        </>
+      ) : page === 'data' ? (
+        <Row testID="row-deleted" label={copy.deleted.recentlyDeleted} summary={copy.deleted.keptFor} onPress={() => setPage('deleted')} />
+      ) : page === 'deleted' ? (
+        <RecentlyDeletedScreen />
       ) : page === 'you' ? (
         <>
           <Row testID="row-appearance" label={copy.settings.appearance} summary={THEMES.find((t) => t.v === d.settings.theme)!.label} onPress={() => setPage('appearance')} />

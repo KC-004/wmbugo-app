@@ -19,3 +19,20 @@ interaction states that apply. Use the shared feedback components; do not invent
 
 Also required for every screen: sentence-case copy from `copy.ts`, money only through `<Amount>`, colours only from theme
 tokens, 48dp controls, TalkBack labels with role and state, and the state set above covered by tests.
+
+## Destructive actions and their tier (Epic 3)
+
+Every destructive action is either reversible with an Undo toast, or irreversible behind a confirm sheet that states the
+consequence in plain words and then passes the shared re-authentication guard (`shared/reauth.ts`, a no-op until app lock
+exists in Epic 8).
+
+| Action | Tier | Where |
+|--------|------|-------|
+| Delete, Reject · Not mine | reversible, Undo toast | detail, Activity row, review queue |
+| Merge, Keep both | reversible, Undo toast | duplicate choices, review queue |
+| Reverse (failed payment), Record a refund | reversible, Undo toast | detail |
+| Split, Recategorise, Move N to… (bulk) | reversible, Undo toast | detail, Activity |
+| Approve, Confirm amount (review queue) | reversible, Undo toast | review queue |
+| Restore (deleted entry, rejected capture) | reversible, Undo toast | Recently deleted, detail |
+| Remove photo | confirm sheet | detail |
+| Delete permanently | confirm sheet and re-authentication guard | Recently deleted, detail |

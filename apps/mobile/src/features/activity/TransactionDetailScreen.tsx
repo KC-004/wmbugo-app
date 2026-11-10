@@ -23,6 +23,8 @@ import type { AddPreset, EditSpec } from '../add/AddSheet';
 import { realAddApi, type AddApi } from '../add/addApi';
 import { HeldRowActions } from './HeldRowActions';
 import { ReceiptPhotos } from './ReceiptPhotos';
+import { usePermanentDelete } from './usePermanentDelete';
+import { realDeletedApi, type DeletedApi } from './deletedApi';
 
 const TYPE_LABEL: Readonly<Record<TransactionDetail['type'], string>> = {
   expense: copy.detail.typeExpense,
@@ -66,6 +68,7 @@ export function TransactionDetailScreen({
   onSplit,
   api = realTransactionApi,
   duplicateApi = realAddApi,
+  deletedApi = realDeletedApi,
 }: {
   transactionId: string;
   onBack: () => void;
@@ -75,10 +78,13 @@ export function TransactionDetailScreen({
   onSplit?: (transactionId: string) => void;
   api?: TransactionApi;
   duplicateApi?: Pick<AddApi, 'duplicateInfo' | 'keepBoth' | 'merge' | 'undoResolution'>;
+  /** Delete permanently (confirm sheet facts and the purge). */
+  deletedApi?: Pick<DeletedApi, 'purgeFacts' | 'purge'>;
 }) {
   const theme = useTheme();
   const toast = useToast();
   const qc = useQueryClient();
+  const purge = usePermanentDelete(deletedApi);
   const q = useQuery({ queryKey: transactionKey(transactionId), queryFn: () => api.load(transactionId) });
   const [error, setError] = useState<string | null>(null);
   const busy = useRef(false);
@@ -183,6 +189,23 @@ export function TransactionDetailScreen({
               })
               .catch(() => toast.show({ message: copy.add.removeFailed })),
         },
+      });
+    } finally {
+      busy.current = false;
+    }
+  };
+
+  const restoreRemoved = async () => {
+    if (!api.restoreRemoved || !data || !data.removalKind || busy.current) return;
+    busy.current = true;
+    try {
+      const r = await api.restoreRemoved(transactionId, data.removalKind).catch(() => ({ ok: false as const, code: 'FAILED' }));
+      if (!r.ok) return setError(copy.deleted.restoreFailed);
+      const snapshot = r.value.snapshot;
+      await refresh();
+      toast.show({
+        message: copy.deleted.restored,
+        undo: { label: copy.common.undo, onUndo: () => void api.restore(snapshot).then(refresh).catch(() => toast.show({ message: copy.add.removeFailed })) },
       });
     } finally {
       busy.current = false;
@@ -364,6 +387,13 @@ export function TransactionDetailScreen({
           <Text testID="detail-error" accessibilityRole="alert" accessibilityLiveRegion="assertive" style={[textStyle('body-medium'), ink]}>
             {error}
           </Text>
+        ) : null}
+
+        {d.removed && data.removalKind ? (
+          <View style={styles.actions}>
+            {api.restoreRemoved ? <Button label={copy.deleted.restore} variant="secondary" onPress={() => void restoreRemoved()} testID="detail-restore" /> : null}
+            <Button label={copy.deleted.deletePermanently} variant="text" onPress={() => purge(transactionId, onBack)} testID="detail-purge" />
+          </View>
         ) : null}
 
         {d.removed ? null : (

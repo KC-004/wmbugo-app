@@ -5,6 +5,8 @@ import {
   mapSplits,
   mapTransactionDetail,
   mapRecoverySummary,
+  RestoreDeleted,
+  RestoreRejected,
   AddAttachment,
   ATTACHMENTS_SQL,
   mapAttachments,
@@ -52,6 +54,8 @@ export interface TransactionData {
   readonly refundableMinor: number | null;
   /** The date the entry was reversed (reversed entries only). */
   readonly reversedOn: string | null;
+  /** How a removed entry was removed: 'deleted' (manual) or 'rejected' (captured); null while it is live. */
+  readonly removalKind: 'deleted' | 'rejected' | null;
   /** Receipt photos, oldest first. */
   readonly attachments: Attachment[];
   /** Every source with its kind and time. */
@@ -72,6 +76,8 @@ export interface TransactionApi {
   refund(transactionId: string, amountMinor: number, recoveryKind: RecoveryKind): Promise<{ ok: true; value: { transactionId: string } } | { ok: false; code: string }>;
   reverse(transactionId: string): Promise<{ ok: true; value: { snapshot: TxSnapshot; reversalId: string } } | { ok: false; code: string }>;
   undoReverse(snapshot: TxSnapshot, reversalId: string): Promise<{ ok: boolean }>;
+  /** Restore a removed entry (deleted manual entry, or rejected capture). Returns the entry as it was, for Undo. */
+  restoreRemoved?(transactionId: string, kind: 'deleted' | 'rejected'): Promise<{ ok: true; value: { snapshot: TxSnapshot } } | { ok: false; code: string }>;
   /** Opens the picker, encrypts the chosen image, then records it. */
   addPhoto?(transactionId: string): Promise<'added' | 'duplicate' | 'cancelled' | 'failed'>;
   /** Deletes the row, then the file. */
@@ -99,6 +105,7 @@ export const realTransactionApi: TransactionApi = {
       categories: mapCategoryRows(await db.query(CATEGORY_LIST_SQL)).filter((c) => c.kind === kind).map((c) => ({ id: c.id, name: c.name })),
       recovery: mapRecoverySummary(await db.query(RECOVERY_SUMMARY_SQL, [transactionId])),
       refundableMinor: detail.type === 'expense' ? await db.query(REFUNDABLE_SQL, [transactionId]).then((r) => (r[0] ? Number(r[0][0]) : null)) : null,
+      removalKind: await db.query('SELECT removal_kind FROM "transaction" WHERE id = ?', [transactionId]).then((r) => (r[0] && (r[0][0] === 'deleted' || r[0][0] === 'rejected') ? (r[0][0] as 'deleted' | 'rejected') : null)),
       attachments: mapAttachments(await db.query(ATTACHMENTS_SQL, [transactionId])),
       sources: mapSources(await db.query(SOURCES_SQL, [transactionId])),
       reversedOn: detail.status === 'reversed' ? await db.query('SELECT local_date FROM "transaction" WHERE id = (SELECT reversed_by_id FROM "transaction" WHERE id = ?)', [transactionId]).then((r) => (r[0] ? String(r[0][0]) : null)) : null,
@@ -116,6 +123,7 @@ export const realTransactionApi: TransactionApi = {
   },
   reverse: (transactionId) => getServices().writer.run(ReverseTransaction, { transactionId }, 'user'),
   undoReverse: (snapshot, reversalId) => getServices().writer.run(UndoReversal, { snapshot, reversalId }, 'user'),
+  restoreRemoved: (transactionId, kind) => getServices().writer.run(kind === 'deleted' ? RestoreDeleted : RestoreRejected, { transactionId }, 'user'),
   // The photo adapter pulls in native file modules, so it is loaded when first used.
   addPhoto: async (id) => (await lazyPhotos()).addPhoto(id),
   removePhoto: async (id) => (await lazyPhotos()).removePhoto(id),

@@ -25,7 +25,7 @@ const detail = (over: Partial<TransactionDetail> = {}): TransactionDetail => ({
   resolution: 'user_approved', removed: false, category: { id: 'cat_food', name: 'Food & Drinks', icon: 'ForkKnife', color: 'cat-rose' }, splitCount: 1,
   from: { id: 'a1', name: 'HDFC' }, to: null, sourceKind: 'manual', addedAtMs: Date.UTC(2026, 10, 7, 13, 12), timezoneId: 'Asia/Kolkata', openDuplicate: false, ...over,
 });
-const data = (d: TransactionDetail): TransactionData => ({ currency: 'INR', exponent: 2, locale: 'en-IN', detail: d, splits: [], categories: [{ id: 'cat_food', name: 'Food & Drinks' }], recovery: { refundedMinor: 0, reimbursedMinor: 0 }, refundableMinor: d.type === 'expense' ? d.amountMinor : null, reversedOn: null, attachments: [], sources: [] });
+const data = (d: TransactionDetail): TransactionData => ({ currency: 'INR', exponent: 2, locale: 'en-IN', detail: d, splits: [], categories: [{ id: 'cat_food', name: 'Food & Drinks' }], recovery: { refundedMinor: 0, reimbursedMinor: 0 }, refundableMinor: d.type === 'expense' ? d.amountMinor : null, reversedOn: null, removalKind: null, attachments: [], sources: [] });
 
 function fakeApi(d: TransactionDetail | 'missing' = detail()) {
   const state = { d };
@@ -37,7 +37,7 @@ function fakeApi(d: TransactionDetail | 'missing' = detail()) {
   return { api, load, remove, restore, state };
 }
 
-async function mountDetail(d: TransactionDetail | 'missing', over: { api?: TransactionApi; duplicateApi?: Parameters<typeof TransactionDetailScreen>[0]['duplicateApi'] } = {}) {
+async function mountDetail(d: TransactionDetail | 'missing', over: { api?: TransactionApi; duplicateApi?: Parameters<typeof TransactionDetailScreen>[0]['duplicateApi']; deletedApi?: Parameters<typeof TransactionDetailScreen>[0]['deletedApi'] } = {}) {
   const f = fakeApi(d);
   const qc = createQueryClient();
   const onBack = jest.fn();
@@ -50,7 +50,7 @@ async function mountDetail(d: TransactionDetail | 'missing', over: { api?: Trans
         <ThemeProvider>
           <ToastHost bottomOffset={0}>
             <SheetHost>
-              <TransactionDetailScreen transactionId="t1" onBack={onBack} onEdit={onEdit} onDuplicate={onDuplicate} api={over.api ?? f.api} duplicateApi={over.duplicateApi} />
+              <TransactionDetailScreen transactionId="t1" onBack={onBack} onEdit={onEdit} onDuplicate={onDuplicate} api={over.api ?? f.api} duplicateApi={over.duplicateApi} deletedApi={over.deletedApi ?? { purgeFacts: async () => ({ isTransfer: false, hasRefund: false }), purge: async () => ({ ok: true }) }} />
             </SheetHost>
           </ToastHost>
         </ThemeProvider>
@@ -399,6 +399,38 @@ describe('receipt photos and sources on the detail (Story 3.11)', () => {
     expect(t.some((x) => x.startsWith('Bank SMS · 7 Nov'))).toBe(true);
     expect(t.some((x) => x.startsWith('CSV import · 7 Nov'))).toBe(true);
     expect(t).toContain('As recorded: SWIGGY*BLR 8821');
+    m.unmount();
+  });
+});
+
+describe('restoring and permanently deleting from the detail (Story 3.13)', () => {
+  const removed = (kind: 'deleted' | 'rejected') => {
+    const d = detail({ removed: true, sourceKind: kind === 'rejected' ? 'sms' : 'manual', status: 'excluded' });
+    const f = fakeApi(d);
+    const load = jest.fn<Promise<TransactionData | 'missing' | null>, [string]>(async () => ({ ...data(d), removalKind: kind }));
+    const snapshot = { id: 't1' } as TxSnapshot;
+    const restoreRemoved = jest.fn(async () => ({ ok: true as const, value: { snapshot } }));
+    return { api: { ...f.api, load, restoreRemoved } as TransactionApi, restoreRemoved, restore: f.restore };
+  };
+
+  it('a rejected capture offers Restore (toast Restored · Undo) and Delete permanently', async () => {
+    const x = removed('rejected');
+    const m = await mountDetail(detail({ removed: true, sourceKind: 'sms', status: 'excluded' }), { api: x.api });
+    expect(has(m.r, 'detail-restore') && has(m.r, 'detail-purge')).toBe(true);
+    expect(has(m.r, 'detail-edit')).toBe(false);
+    await act(async () => fire(m.r, 'detail-restore'));
+    await settle();
+    expect(x.restoreRemoved).toHaveBeenCalledWith('t1', 'rejected');
+    expect(texts(m.r)).toEqual(expect.arrayContaining(['Restored', 'Undo']));
+    m.unmount();
+  });
+
+  it('Delete permanently on the detail opens the confirm sheet first', async () => {
+    const x = removed('deleted');
+    const m = await mountDetail(detail({ removed: true, status: 'excluded' }), { api: x.api });
+    await act(async () => fire(m.r, 'detail-purge'));
+    await settle();
+    expect(texts(m.r)).toContain("Delete this entry permanently? This can't be undone.");
     m.unmount();
   });
 });
