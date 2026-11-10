@@ -52,3 +52,26 @@ export const reviewCandidate = sqliteTable(
     check('review_candidate_status_check', sql`${t.status} IN ('open','resolved')`),
   ],
 );
+
+/**
+ * A photo attached to an entry (Story 3.11). The image itself is an encrypted file in app-private storage named by
+ * the attachment id; this row is what keeps it. Unique per entry and digest, so the same photo cannot attach twice.
+ */
+export const attachment = sqliteTable(
+  'attachment',
+  {
+    id: text('id').primaryKey(),
+    transaction_id: text('transaction_id')
+      .notNull()
+      .references(() => transaction.id),
+    kind: text('kind').notNull().default('receipt'),
+    digest: text('digest').notNull(),
+    size_bytes: integer('size_bytes').notNull(),
+    created_at: integer('created_at').notNull(),
+  },
+  (t) => [
+    uniqueIndex('attachment_tx_digest_idx').on(t.transaction_id, t.digest),
+    index('attachment_tx_idx').on(t.transaction_id),
+    check('attachment_kind_check', sql`${t.kind} IN ('receipt')`),
+  ],
+);

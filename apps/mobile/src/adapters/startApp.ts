@@ -1,5 +1,6 @@
 import {
   createFileLogSink,
+  ATTACHMENT_IDS_SQL,
   createIdGenerator,
   searchIndexer,
   createRedactingLogger,
@@ -21,6 +22,7 @@ import { setNavTimingSink } from '../features/shell/navTiming';
 import { invalidationHandlers, queryClient } from '../shared/queryClient';
 import { BENCH_TRIGGER, runSaveBenchmark } from './benchmark';
 import { keychainKeyStore } from './storage/keychainKeyStore';
+import { realReceiptFiles } from './files/receiptFiles';
 import { opSqliteOpener } from './storage/opSqliteOpener';
 import { secureRandom } from './storage/secureRandom';
 
@@ -131,6 +133,13 @@ async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
   setNavTimingSink((e) => log.debug('nav.tab', { tab: e.tab, durationMs: e.durationMs }));
   // Save timings (NFR-04): kind and duration only.
   setSaveTimingSink((e) => log.debug('save.entry', { kind: e.kind, durationMs: e.durationMs }));
+  // Receipt photos: delete files no attachment row refers to (a kill between the file write and the row commit), and any
+  // decrypted copies left in the cache.
+  void started.value.db
+    .query(ATTACHMENT_IDS_SQL)
+    .then((rows) => realReceiptFiles.sweep(new Set(rows.map((r) => String(r[0])))))
+    .then(() => realReceiptFiles.clearViewCache())
+    .catch(() => undefined);
   // Events committed before the app was last killed are delivered now, without holding up the first screen.
   void dispatcher.deliverPending().catch(() => undefined);
   // NFR-04 benchmark: only when the trigger file was placed in the private directory (debuggable builds via run-as).

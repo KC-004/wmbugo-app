@@ -25,7 +25,7 @@ const detail = (over: Partial<TransactionDetail> = {}): TransactionDetail => ({
   resolution: 'user_approved', removed: false, category: { id: 'cat_food', name: 'Food & Drinks', icon: 'ForkKnife', color: 'cat-rose' }, splitCount: 1,
   from: { id: 'a1', name: 'HDFC' }, to: null, sourceKind: 'manual', addedAtMs: Date.UTC(2026, 10, 7, 13, 12), timezoneId: 'Asia/Kolkata', openDuplicate: false, ...over,
 });
-const data = (d: TransactionDetail): TransactionData => ({ currency: 'INR', exponent: 2, locale: 'en-IN', detail: d, splits: [], categories: [{ id: 'cat_food', name: 'Food & Drinks' }], recovery: { refundedMinor: 0, reimbursedMinor: 0 }, refundableMinor: d.type === 'expense' ? d.amountMinor : null, reversedOn: null });
+const data = (d: TransactionDetail): TransactionData => ({ currency: 'INR', exponent: 2, locale: 'en-IN', detail: d, splits: [], categories: [{ id: 'cat_food', name: 'Food & Drinks' }], recovery: { refundedMinor: 0, reimbursedMinor: 0 }, refundableMinor: d.type === 'expense' ? d.amountMinor : null, reversedOn: null, attachments: [], sources: [] });
 
 function fakeApi(d: TransactionDetail | 'missing' = detail()) {
   const state = { d };
@@ -334,6 +334,71 @@ describe('refunds, reimbursements and reversal on the detail (Story 3.8)', () =>
     const m = await mountDetail(detail({ status: 'reversed' }), apiWith({}, { reversedOn: '2026-11-08' }, detail({ status: 'reversed' })));
     expect(texts(m.r).some((x) => x.startsWith('Reversed on ') && x.includes('8'))).toBe(true);
     expect(has(m.r, 'detail-reverse') || has(m.r, 'detail-refund')).toBe(false);
+    m.unmount();
+  });
+});
+
+describe('receipt photos and sources on the detail (Story 3.11)', () => {
+  const photo = { id: 'att-1', transactionId: 't1', kind: 'receipt', digest: 'a'.repeat(64), sizeBytes: 1200, createdAt: 0 };
+  const apiWith = (over: Partial<TransactionApi>, extra: Partial<TransactionData> = {}) => {
+    const d = detail();
+    const f = fakeApi(d);
+    const load = jest.fn<Promise<TransactionData | 'missing' | null>, [string]>(async () => ({ ...data(d), ...extra }));
+    return { api: { ...f.api, load, ...over } as TransactionApi };
+  };
+
+  it('Add receipt photo records the photo and toasts Photo added; a duplicate says This photo is already attached', async () => {
+    const addPhoto = jest.fn<ReturnType<NonNullable<TransactionApi['addPhoto']>>, [string]>(async () => 'added');
+    const m = await mountDetail(detail(), apiWith({ addPhoto }));
+    await act(async () => fire(m.r, 'photo-add'));
+    await settle();
+    expect(addPhoto).toHaveBeenCalledWith('t1');
+    expect(texts(m.r)).toContain('Photo added');
+    addPhoto.mockResolvedValueOnce('duplicate');
+    await act(async () => fire(m.r, 'photo-add'));
+    await settle();
+    expect(texts(m.r)).toContain('This photo is already attached');
+    addPhoto.mockResolvedValueOnce('cancelled');
+    await act(async () => fire(m.r, 'photo-add'));
+    await settle();
+    m.unmount();
+  });
+
+  it('a thumbnail opens the full-screen viewer; Remove photo asks first, then removes only the photo', async () => {
+    const removePhoto = jest.fn(async () => ({ ok: true }));
+    const m = await mountDetail(detail(), apiWith({ removePhoto, photoPath: async () => '/cache/att-1.img', addPhoto: async () => 'cancelled' }, { attachments: [photo] }));
+    expect(has(m.r, 'photo-att-1')).toBe(true);
+    await act(async () => fire(m.r, 'photo-att-1'));
+    await settle();
+    expect(has(m.r, 'photo-viewer')).toBe(true);
+    await act(async () => fire(m.r, 'photo-remove'));
+    await settle();
+    expect(texts(m.r)).toContain('Remove this photo? It will be deleted from this phone.');
+    expect(removePhoto).not.toHaveBeenCalled();
+    await act(async () => fire(m.r, 'remove-photo-confirm'));
+    await settle();
+    expect(removePhoto).toHaveBeenCalledWith('att-1');
+    expect(texts(m.r)).toContain('Photo removed');
+    m.unmount();
+  });
+
+  it('the Source section lists every source with its kind and time, and the original text stays read-only as As recorded', async () => {
+    const at = Date.UTC(2026, 10, 7, 15, 42);
+    const m = await mountDetail(
+      detail(),
+      apiWith({}, {
+        sources: [
+          { kind: 'manual', atMs: at, reference: null },
+          { kind: 'sms', atMs: at, reference: 'SWIGGY*BLR 8821' },
+          { kind: 'csv', atMs: at, reference: null },
+        ],
+      }),
+    );
+    const t = texts(m.r);
+    expect(t.filter((x) => x.startsWith('Added by you · 7 Nov'))).toHaveLength(1);
+    expect(t.some((x) => x.startsWith('Bank SMS · 7 Nov'))).toBe(true);
+    expect(t.some((x) => x.startsWith('CSV import · 7 Nov'))).toBe(true);
+    expect(t).toContain('As recorded: SWIGGY*BLR 8821');
     m.unmount();
   });
 });

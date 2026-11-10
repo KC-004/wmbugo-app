@@ -22,6 +22,7 @@ import { duplicatePresetOf, editSpecOf, realTransactionApi, transactionKey, type
 import type { AddPreset, EditSpec } from '../add/AddSheet';
 import { realAddApi, type AddApi } from '../add/addApi';
 import { HeldRowActions } from './HeldRowActions';
+import { ReceiptPhotos } from './ReceiptPhotos';
 
 const TYPE_LABEL: Readonly<Record<TransactionDetail['type'], string>> = {
   expense: copy.detail.typeExpense,
@@ -34,6 +35,13 @@ const TYPE_LABEL: Readonly<Record<TransactionDetail['type'], string>> = {
 };
 const AMOUNT_KIND: Readonly<Partial<Record<TransactionDetail['type'], AmountKind>>> = { expense: 'spent', income: 'income', transfer: 'transfer', refund: 'refund' };
 const PAYMENT_LABEL: Readonly<Record<string, string>> = { upi: copy.add.payUpi, card: copy.add.payCard, cash: copy.add.payCash, bank_transfer: copy.add.payBank, other: copy.add.payOther };
+
+/** "Added by you · 7 Nov, 9:12 pm", "Bank SMS · 7 Nov, 9:12 pm", "Receipt", "CSV import". */
+function sourceLine(kind: string, when: string): string {
+  const name =
+    kind === 'manual' ? copy.detail.addedByYou : kind === 'sms' ? copy.review.bankSms : kind === 'upi' ? copy.photo.sourceUpi : kind === 'receipt' ? copy.review.receipt : kind === 'csv' ? copy.review.csvImport : kind === 'notification' ? copy.photo.sourceNotification : copy.photo.sourceShare;
+  return `${name} · ${when}`;
+}
 
 /** "7 Nov, 9:12 pm" in the entry's own time zone. */
 function whenText(ms: number, tz: string): string {
@@ -181,6 +189,29 @@ export function TransactionDetailScreen({
     }
   };
 
+  const addPhoto = async () => {
+    if (!api.addPhoto || busy.current) return;
+    busy.current = true;
+    try {
+      const r = await api.addPhoto(transactionId);
+      if (r === 'added') {
+        await refresh();
+        toast.show({ message: copy.photo.added });
+      } else if (r === 'duplicate') toast.show({ message: copy.photo.alreadyAttached });
+      else if (r === 'failed') setError(copy.photo.failed);
+    } finally {
+      busy.current = false;
+    }
+  };
+
+  const removePhoto = async (attachmentId: string) => {
+    if (!api.removePhoto) return;
+    const r = await api.removePhoto(attachmentId).catch(() => ({ ok: false }));
+    if (!r.ok) return setError(copy.photo.removeFailed);
+    await refresh();
+    toast.show({ message: copy.photo.removed });
+  };
+
   const reverse = async () => {
     if (busy.current) return;
     busy.current = true;
@@ -231,7 +262,7 @@ export function TransactionDetailScreen({
       [copy.detail.note, d.note],
       [copy.detail.payment, d.paymentMethod ? (PAYMENT_LABEL[d.paymentMethod] ?? d.paymentMethod) : null],
       [copy.detail.status, copy.capture[captureStatusLabel(state)]],
-      [copy.detail.source, captured ? `${d.sourceKind} · ${whenText(d.addedAtMs, d.timezoneId)}` : `${copy.detail.addedByYou} · ${whenText(d.addedAtMs, d.timezoneId)}`],
+      ...(data.sources.length > 0 ? [] : [[copy.detail.source, captured ? `${d.sourceKind} · ${whenText(d.addedAtMs, d.timezoneId)}` : `${copy.detail.addedByYou} · ${whenText(d.addedAtMs, d.timezoneId)}`] as [string, string | null]]),
     ];
     body = (
       <ScrollView contentContainerStyle={styles.pad}>
@@ -253,6 +284,22 @@ export function TransactionDetailScreen({
               <Text style={[textStyle('body'), ink, styles.value]}>{value}</Text>
             </View>
           ))}
+
+        {data.sources.length > 0 ? (
+          <View testID="detail-sources" style={styles.row}>
+            <Text style={[textStyle('label'), muted]}>{copy.detail.source}</Text>
+            {data.sources.map((src, i) => (
+              <Text key={i} style={[textStyle('body'), ink]}>
+                {sourceLine(src.kind, whenText(src.atMs, d.timezoneId))}
+              </Text>
+            ))}
+            {data.sources.find((src) => src.kind !== 'manual' && src.reference) ? (
+              <Text testID="detail-as-recorded" style={[textStyle('caption'), muted]}>
+                {copy.photo.asRecorded.replace('{text}', data.sources.find((src) => src.kind !== 'manual' && src.reference)!.reference!)}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
 
         {d.status === 'reversed' && data.reversedOn ? (
           <Text testID="detail-reversed" style={[textStyle('body-medium'), ink]}>
@@ -318,6 +365,10 @@ export function TransactionDetailScreen({
             {error}
           </Text>
         ) : null}
+
+        {d.removed ? null : (
+          <ReceiptPhotos photos={data.attachments} photoPath={api.photoPath} onAdd={api.addPhoto ? () => void addPhoto() : undefined} onRemove={api.removePhoto ? removePhoto : undefined} />
+        )}
 
         {d.removed ? null : (
           <View style={styles.actions}>

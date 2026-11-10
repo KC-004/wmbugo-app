@@ -71,6 +71,13 @@
       "when": 1794165803316,
       "tag": "0009_true_invaders",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1794315752767,
+      "tag": "0010_late_hobgoblin",
+      "breakpoints": true
     }
   ]
 }

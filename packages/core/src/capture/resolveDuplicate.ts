@@ -1,3 +1,4 @@
+import { moveAttachments } from './attachments';
 import { err, ok } from '../shared/result';
 import type { UseCase, WriterContext } from '../writer/ledgerWriter';
 import { restoreTx, snapshotTx, type TxSnapshot } from './snapshot';
@@ -123,6 +124,7 @@ export const MergeDuplicate: UseCase<{ transactionId: string; categoryId?: strin
 
     // Every source record follows the survivor; the other record is excluded and hidden everywhere.
     await ctx.execute('UPDATE source_record SET transaction_id = ? WHERE transaction_id = ?', [survivorId, otherId]);
+    await moveAttachments(ctx, otherId, survivorId);
     await ctx.execute("UPDATE \"transaction\" SET status = 'confirmed', capture_resolution = 'user_approved', updated_at = ? WHERE id = ?", [now, survivorId]);
     await ctx.execute("UPDATE \"transaction\" SET status = 'excluded', removed_at = ?, removal_kind = 'excluded', updated_at = ? WHERE id = ?", [now, now, otherId]);
     await ctx.execute("UPDATE review_candidate SET status = 'resolved', resolved_at = ?, undo_json = ? WHERE id = ?", [now, JSON.stringify(undo), c.id]);

@@ -5,6 +5,14 @@ import {
   mapSplits,
   mapTransactionDetail,
   mapRecoverySummary,
+  AddAttachment,
+  ATTACHMENTS_SQL,
+  mapAttachments,
+  mapSources,
+  RemoveAttachment,
+  SOURCES_SQL,
+  type Attachment,
+  type SourceLine,
   RECOVERY_SUMMARY_SQL,
   REFUNDABLE_SQL,
   ReverseTransaction,
@@ -26,6 +34,7 @@ import {
 } from '@wmbugo/core';
 import { getServices } from '../../adapters/startApp';
 import { readProfile } from '../../adapters/readProfile';
+import type { ReceiptFiles } from '../../adapters/files/receiptFiles';
 import type { AddPreset, EditSpec } from '../add/AddSheet';
 
 export interface TransactionData {
@@ -43,6 +52,10 @@ export interface TransactionData {
   readonly refundableMinor: number | null;
   /** The date the entry was reversed (reversed entries only). */
   readonly reversedOn: string | null;
+  /** Receipt photos, oldest first. */
+  readonly attachments: Attachment[];
+  /** Every source with its kind and time. */
+  readonly sources: SourceLine[];
 }
 
 export type RemoveResult = { ok: true; value: { snapshot: TxSnapshot } } | { ok: false; code: string };
@@ -59,6 +72,12 @@ export interface TransactionApi {
   refund(transactionId: string, amountMinor: number, recoveryKind: RecoveryKind): Promise<{ ok: true; value: { transactionId: string } } | { ok: false; code: string }>;
   reverse(transactionId: string): Promise<{ ok: true; value: { snapshot: TxSnapshot; reversalId: string } } | { ok: false; code: string }>;
   undoReverse(snapshot: TxSnapshot, reversalId: string): Promise<{ ok: boolean }>;
+  /** Opens the picker, encrypts the chosen image, then records it. */
+  addPhoto?(transactionId: string): Promise<'added' | 'duplicate' | 'cancelled' | 'failed'>;
+  /** Deletes the row, then the file. */
+  removePhoto?(attachmentId: string): Promise<{ ok: boolean }>;
+  /** A plain temporary path to show the photo. */
+  photoPath?(attachmentId: string): Promise<string>;
 }
 
 export const transactionKey = (id: string) => ['ledger', 'transaction', id] as const;
@@ -80,6 +99,8 @@ export const realTransactionApi: TransactionApi = {
       categories: mapCategoryRows(await db.query(CATEGORY_LIST_SQL)).filter((c) => c.kind === kind).map((c) => ({ id: c.id, name: c.name })),
       recovery: mapRecoverySummary(await db.query(RECOVERY_SUMMARY_SQL, [transactionId])),
       refundableMinor: detail.type === 'expense' ? await db.query(REFUNDABLE_SQL, [transactionId]).then((r) => (r[0] ? Number(r[0][0]) : null)) : null,
+      attachments: mapAttachments(await db.query(ATTACHMENTS_SQL, [transactionId])),
+      sources: mapSources(await db.query(SOURCES_SQL, [transactionId])),
       reversedOn: detail.status === 'reversed' ? await db.query('SELECT local_date FROM "transaction" WHERE id = (SELECT reversed_by_id FROM "transaction" WHERE id = ?)', [transactionId]).then((r) => (r[0] ? String(r[0][0]) : null)) : null,
     };
   },
@@ -95,7 +116,50 @@ export const realTransactionApi: TransactionApi = {
   },
   reverse: (transactionId) => getServices().writer.run(ReverseTransaction, { transactionId }, 'user'),
   undoReverse: (snapshot, reversalId) => getServices().writer.run(UndoReversal, { snapshot, reversalId }, 'user'),
+  // The photo adapter pulls in native file modules, so it is loaded when first used.
+  addPhoto: async (id) => (await lazyPhotos()).addPhoto(id),
+  removePhoto: async (id) => (await lazyPhotos()).removePhoto(id),
+  photoPath: async (id) => (await lazyPhotos()).photoPath(id),
 };
+
+async function lazyPhotos() {
+  const { realReceiptFiles } = await import('../../adapters/files/receiptFiles');
+  return photoApi(realReceiptFiles);
+}
+
+/** Receipt photos: the file is written encrypted BEFORE the row commits; a duplicate or failure removes the file again. */
+export function photoApi(files: ReceiptFiles): Required<Pick<TransactionApi, 'addPhoto' | 'removePhoto' | 'photoPath'>> {
+  return {
+    async addPhoto(transactionId) {
+      let uri: string | null;
+      try {
+        uri = await files.pick();
+      } catch {
+        return 'failed';
+      }
+      if (uri === null) return 'cancelled';
+      const attachmentId = getServices().newId();
+      try {
+        const { digest, size } = await files.importPhoto(uri, attachmentId);
+        const r = await getServices().writer.run(AddAttachment, { transactionId, attachmentId, digest, sizeBytes: Math.max(1, Math.round(size)) }, 'user');
+        if (r.ok) return 'added';
+        await files.remove(attachmentId).catch(() => undefined);
+        return r.code === 'ALREADY_ATTACHED' ? 'duplicate' : 'failed';
+      } catch {
+        await files.remove(attachmentId).catch(() => undefined);
+        return 'failed';
+      }
+    },
+    async removePhoto(attachmentId) {
+      const r = await getServices().writer.run(RemoveAttachment, { attachmentId }, 'user');
+      if (!r.ok) return { ok: false };
+      // The row is gone and committed: now the file.
+      await files.remove(attachmentId).catch(() => undefined);
+      return { ok: true };
+    },
+    photoPath: (attachmentId) => files.viewPath(attachmentId),
+  };
+}
 
 /** What the Add sheet opens with to edit this entry (type fixed). Only expenses, incomes and transfers can be edited. */
 export function editSpecOf(d: TransactionDetail): EditSpec | null {

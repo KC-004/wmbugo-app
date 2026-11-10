@@ -21,6 +21,8 @@ export interface TxSnapshot {
   readonly postings: readonly { id: string; account: string; direction: string; signed: number; kind: string }[];
   readonly splits: readonly { id: string; category: string; amount: number; memo: string | null }[];
   readonly sources: readonly string[];
+  /** Attachment ids (receipt photos), so a merge can be undone exactly. */
+  readonly attachments: readonly string[];
 }
 
 const s = (v: unknown): string | null => (v === null || v === undefined ? null : String(v));
@@ -36,6 +38,7 @@ export async function snapshotTx(ctx: WriterContext, id: string): Promise<TxSnap
   const postings = await ctx.query('SELECT id, account_id, direction, signed_amount_minor, posting_kind FROM posting WHERE transaction_id = ? ORDER BY id', [id]);
   const splits = await ctx.query('SELECT id, category_id, amount_minor, memo FROM split WHERE transaction_id = ? ORDER BY id', [id]);
   const sources = await ctx.query('SELECT id FROM source_record WHERE transaction_id = ? ORDER BY id', [id]);
+  const attachments = await ctx.query('SELECT id FROM attachment WHERE transaction_id = ? ORDER BY id', [id]);
   return {
     id,
     status: String(t[0]),
@@ -53,6 +56,7 @@ export async function snapshotTx(ctx: WriterContext, id: string): Promise<TxSnap
     postings: postings.map((p) => ({ id: String(p[0]), account: String(p[1]), direction: String(p[2]), signed: Number(p[3]), kind: String(p[4]) })),
     splits: splits.map((x) => ({ id: String(x[0]), category: String(x[1]), amount: Number(x[2]), memo: s(x[3]) })),
     sources: sources.map((x) => String(x[0])),
+    attachments: attachments.map((x) => String(x[0])),
   };
 }
 
@@ -71,4 +75,5 @@ export async function restoreTx(ctx: WriterContext, snap: TxSnapshot): Promise<v
     await ctx.execute('INSERT INTO split (id, transaction_id, category_id, amount_minor, memo) VALUES (?, ?, ?, ?, ?)', [sp.id, snap.id, sp.category, sp.amount, sp.memo]);
   }
   for (const src of snap.sources) await ctx.execute('UPDATE source_record SET transaction_id = ? WHERE id = ?', [snap.id, src]);
+  for (const att of snap.attachments) await ctx.execute('UPDATE attachment SET transaction_id = ? WHERE id = ?', [snap.id, att]);
 }
