@@ -127,6 +127,13 @@
       "when": 1794506091226,
       "tag": "0017_budget_ended_after",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1794507111376,
+      "tag": "0018_category_guess_backfill_apply",
+      "breakpoints": true
     }
   ]
 }

@@ -40,6 +40,11 @@ describe('loadMigrations', () => {
     expect(r.ok && r.value[0]!.checksum).toBe(sha256Hex(SQL1));
   });
 
+  it('a migration that is only a comment has no statement to run (drizzle\'s empty custom migration), and mixed ones keep theirs', () => {
+    const r = loadMigrations({ journal: { entries: [{ idx: 0, tag: 'a' }, { idx: 1, tag: 'b' }] }, migrations: { m0000: '-- Custom SQL migration file, put your code below! --', m0001: '-- note\nUPDATE `t` SET `x` = 1;--> statement-breakpoint\n-- only a comment' } });
+    expect(r.ok && r.value.map((m) => m.statements)).toEqual([[], ['-- note\nUPDATE `t` SET `x` = 1;']]);
+  });
+
   it('rejects gaps, missing SQL and empty SQL', () => {
     expect(loadMigrations({ journal: { entries: [{ idx: 1, tag: 'x' }] }, migrations: { m0001: 'A' } })).toEqual({ ok: false, code: 'MIGRATION_BUNDLE_INVALID' });
     expect(loadMigrations({ journal: { entries: [{ idx: 0, tag: 'x' }] }, migrations: {} })).toEqual({ ok: false, code: 'MIGRATION_BUNDLE_INVALID' });

@@ -44,7 +44,8 @@ export function loadMigrations(bundle: BundledMigrations): Result<Migration[], '
       statements: sql
         .split(BREAKPOINT)
         .map((s) => s.trim())
-        .filter((s) => s !== ''),
+        // A statement that is only comments (drizzle's empty custom migration) has nothing to run.
+        .filter((s) => s !== '' && s.split('\n').some((line) => line.trim() !== '' && !line.trim().startsWith('--'))),
       checksum: sha256Hex(normalizeSql(sql)),
       // Databases made before line endings were normalised recorded the hash of the raw text, whichever endings it had.
       alsoAccepts: [sha256Hex(sql), sha256Hex(normalizeSql(sql).replace(/\n/g, '\r\n'))],
