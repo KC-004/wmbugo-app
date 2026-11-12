@@ -73,3 +73,21 @@ export const budget_period = sqliteTable(
   (t) => [primaryKey({ columns: [t.budget_id, t.start_date] }), check('budget_period_shortened_check', sql`${t.shortened} IN (0,1)`)],
 );
 
+
+/**
+ * One row per budget alert level that has been crossed in a period (Story 4.9). The unique key means a level is recorded
+ * once per period, so it can fire at most once, even if spending drops and rises again. A muted budget still records its
+ * crossings, so turning alerts back on never fires old ones.
+ */
+export const budget_alert_fired = sqliteTable(
+  'budget_alert_fired',
+  {
+    budget_id: text('budget_id')
+      .notNull()
+      .references(() => budget.id),
+    period_start: text('period_start').notNull(),
+    threshold_pct: integer('threshold_pct').notNull(),
+    fired_at: integer('fired_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.budget_id, t.period_start, t.threshold_pct] }), check('budget_alert_threshold_check', sql`${t.threshold_pct} > 0`)],
+);

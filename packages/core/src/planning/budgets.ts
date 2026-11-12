@@ -17,6 +17,8 @@ export interface BudgetDef {
   readonly template?: string | null;
   /** The end date of the last period this budget runs (its only category was archived or merged). */
   readonly endedAfter?: string | null;
+  /** Alerts are off: crossings are still recorded but nothing is posted (Story 4.9). */
+  readonly muted?: boolean;
   readonly scope: BudgetScope;
   /** Top-level category ids (scope `category`); a subcategory rolls into its parent. */
   readonly categoryIds: readonly string[];

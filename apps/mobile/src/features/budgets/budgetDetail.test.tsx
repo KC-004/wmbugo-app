@@ -46,7 +46,7 @@ const status = (used: number, target: number, today = '2026-11-15', period: { st
 
 const entry = (id: string, over: Partial<BudgetDetail['entries'][number]> = {}): BudgetDetail['entries'][number] => ({ id, kind: 'expense', amountMinor: 1_200_000, localDate: '2026-11-03', merchant: 'Swiggy', categoryName: 'Food & Drinks', categoryIcon: 'ForkKnife', categoryColor: 'cat-rose', accountName: 'HDFC', ...over });
 const detail = (over: Partial<BudgetDetail> = {}): BudgetDetail => ({
-  id: 'b1', name: 'Overall', scope: 'overall', period: NOV, periodLabel: '1–30 Nov', isCurrent: true, canGoBack: true, canGoForward: false, previousStart: '2026-10-01', nextStart: null,
+  id: 'b1', name: 'Overall', scope: 'overall', period: NOV, periodLabel: '1–30 Nov', isCurrent: true, back: 0, canGoBack: true, canGoForward: false, previousStart: '2026-10-01', nextStart: null,
   usedMinor: 2_000_000, targetMinor: 5_000_000, refundSurplusMinor: 0, status: status(2_000_000, 5_000_000), breakdown: [{ categoryId: 'cat_food', name: 'Food & Drinks', amountMinor: 1_200_000 }, { categoryId: 'cat_groceries', name: 'Groceries', amountMinor: 800_000 }],
   entries: [entry('t1'), entry('t2', { amountMinor: 800_000, localDate: '2026-11-10', merchant: 'BigBasket', categoryName: 'Groceries' })], today: '2026-11-15', ...over,
 });
@@ -156,7 +156,7 @@ describe('Budget detail (SCR-15, Story 4.7)', () => {
 });
 
 describe('the period switcher', () => {
-  const oct = detail({ period: OCT, periodLabel: '1–31 Oct', isCurrent: false, canGoBack: false, canGoForward: true, previousStart: '2026-09-01', nextStart: '2026-11-01', usedMinor: 700_000, targetMinor: 5_000_000, status: status(700_000, 5_000_000, '2026-11-15', OCT), entries: [entry('o1', { localDate: '2026-10-12', amountMinor: 700_000 })] });
+  const oct = detail({ period: OCT, periodLabel: '1–31 Oct', isCurrent: false, back: 1, canGoBack: false, canGoForward: true, previousStart: '2026-09-01', nextStart: '2026-11-01', usedMinor: 700_000, targetMinor: 5_000_000, status: status(700_000, 5_000_000, '2026-11-15', OCT), entries: [entry('o1', { localDate: '2026-10-12', amountMinor: 700_000 })] });
 
   it('› is disabled on the current period; ‹ Oct goes back and shows October with its own figures; the next button then returns', async () => {
     const f = fakeApi({ 0: detail(), 1: oct });
@@ -173,6 +173,33 @@ describe('the period switcher', () => {
     expect(host(r, 'budget-period-back').props.accessibilityState).toMatchObject({ disabled: true });
     await press(r, 'budget-period-forward');
     expect(texts(r)).toContain('1–30 Nov · 16 days left');
+  });
+});
+
+describe('opening from a notification (Story 4.9)', () => {
+  it('a period start opens that period of the budget', async () => {
+    const oct = detail({ period: OCT, periodLabel: '1–31 Oct', isCurrent: false, back: 1, canGoForward: true, nextStart: '2026-11-01', status: status(700_000, 5_000_000, '2026-11-15', OCT) });
+    const f = fakeApi({ 0: detail(), 1: oct });
+    f.loadDetail.mockImplementation(async (_id, back) => ({ detail: typeof back === 'string' ? oct : detail(), currency: 'INR', locale: 'en-IN', exponent: 2 }));
+    const qc = createQueryClient();
+    let r!: ReactTestRenderer;
+    await act(async () => {
+      r = create(
+        <QueryClientProvider client={qc}>
+          <ThemeProvider>
+            <ToastHost bottomOffset={0}>
+              <SheetHost>
+                <BudgetDetailScreen budgetId="b1" periodStart="2026-10-01" onBack={() => undefined} onOpenEntry={() => undefined} api={f.api} />
+              </SheetHost>
+            </ToastHost>
+          </ThemeProvider>
+        </QueryClientProvider>,
+      );
+    });
+    live.push(r);
+    await settle();
+    expect(f.loadDetail).toHaveBeenCalledWith('b1', '2026-10-01');
+    expect(texts(r)).toContain('1–31 Oct');
   });
 });
 

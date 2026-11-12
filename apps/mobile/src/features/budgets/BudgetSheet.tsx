@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type ComponentRef } from 'react';
-import { AccessibilityInfo, findNodeHandle, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { AccessibilityInfo, findNodeHandle, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { ALERT_LEVELS, DEFAULT_ALERT_LEVELS, dayMonthLabel, parseAmountInput, parseOverallExists, type SaveBudgetInput } from '@wmbugo/core';
 import { copy } from '../../shared/copy';
 import { minorToInput } from '../../shared/minorInput';
@@ -52,6 +52,7 @@ export function BudgetSheet({
   const [to, setTo] = useState(editing?.period.customEnd ?? '');
   const [limit, setLimit] = useState(editing ? minorToInput(editing.targetMinor, data.exponent) : '');
   const [levels, setLevels] = useState<number[]>(editing?.alertThresholds ? [...editing.alertThresholds] : [...DEFAULT_ALERT_LEVELS]);
+  const [alertsOn, setAlertsOn] = useState(editing ? editing.muted !== true : true);
   const [targetFrom, setTargetFrom] = useState<'this_period' | 'next_period'>('this_period');
   const [error, setError] = useState<FieldError | null>(null);
   const [overallId, setOverallId] = useState<string | null>(null);
@@ -109,6 +110,7 @@ export function BudgetSheet({
         ...(periodRule === 'custom' && !overall ? { customStart: from.trim(), customEnd: to.trim() } : {}),
         targetMinor: amount.value,
         alertLevels: levels,
+        muted: !alertsOn,
         ...(editing && amount.value !== editing.targetMinor ? { targetFrom } : {}),
       });
     } catch {
@@ -218,6 +220,10 @@ export function BudgetSheet({
           </>
         ) : null}
 
+        <View style={styles.alertsRow}>
+          <Text accessibilityRole="header" style={[textStyle('label'), ink, styles.alertsLabel]}>{b.alertsFor}</Text>
+          <Switch testID="budget-alerts-switch" accessibilityLabel={b.alertsFor} value={alertsOn} onValueChange={setAlertsOn} />
+        </View>
         <Text accessibilityRole="header" style={[textStyle('label'), ink]}>{b.alertAt}</Text>
         <View style={styles.row}>
           {ALERT_LEVELS.map((l) => (
@@ -238,4 +244,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, minHeight: layout.touchMin },
   half: { flex: 1, minWidth: 140 },
+  alertsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: layout.touchMin },
+  alertsLabel: { flexShrink: 1 },
 });

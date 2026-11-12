@@ -1,6 +1,8 @@
 import {
   createFileLogSink,
   ATTACHMENT_IDS_SQL,
+  budgetAlertHandlers,
+  EvaluateBudgetAlerts,
   RebuildBudgetPeriods,
   RunDailyPurge,
   createIdGenerator,
@@ -16,7 +18,7 @@ import {
   type SetUpProfileInput,
   type SqlDatabase,
 } from '@wmbugo/core';
-import type { Clock, HandlerMap, Logger, Result, StartupErrorCode, StartupOk } from '@wmbugo/core';
+import type { Clock, EventHandler, HandlerMap, Logger, Result, StartupErrorCode, StartupOk } from '@wmbugo/core';
 import migrations from '../../drizzle/migrations';
 import { ensureDir, PRIVATE_DIR, rnFileStore } from './files/rnFileStore';
 import { setSaveTimingSink } from '../features/add/saveTiming';
@@ -24,6 +26,7 @@ import { setNavTimingSink } from '../features/shell/navTiming';
 import { invalidationHandlers, queryClient } from '../shared/queryClient';
 import { BENCH_TRIGGER, runSaveBenchmark } from './benchmark';
 import { keychainKeyStore } from './storage/keychainKeyStore';
+import { appNotifier } from './notifier';
 import { realReceiptFiles } from './files/receiptFiles';
 import { appStateScheduler } from './appStateScheduler';
 import { opSqliteOpener } from './storage/opSqliteOpener';
@@ -102,9 +105,22 @@ export function startApp(): Promise<Result<StartupOk, StartupErrorCode>> {
   return starting;
 }
 
-/** The invalidation handlers plus one more for `ProfileChanged`. */
-function withBudgetRebuild(handlers: HandlerMap, rebuild: () => Promise<void>): HandlerMap {
-  return { ...handlers, ProfileChanged: [...(handlers.ProfileChanged ?? []), () => rebuild().catch(() => undefined)] };
+/** The invalidation handlers plus planning's: rebuild the budget periods on `ProfileChanged`, and the alert handlers (Story 4.9). */
+function withBudgetHandlers(handlers: HandlerMap, rebuild: () => Promise<void>, alerts: ReturnType<typeof budgetAlertHandlers>): HandlerMap {
+  const guard = (h: EventHandler): EventHandler => async (e) => {
+    try {
+      await h(e);
+    } catch {
+      // A failed alert check or post is retried by the next change; it never blocks the invalidation of screens.
+    }
+  };
+  return {
+    ...handlers,
+    ProfileChanged: [...(handlers.ProfileChanged ?? []), () => rebuild().catch(() => undefined)],
+    TransactionsChanged: [...(handlers.TransactionsChanged ?? []), ...alerts.TransactionsChanged.map(guard)],
+    BudgetsChanged: [...(handlers.BudgetsChanged ?? []), ...alerts.BudgetsChanged.map(guard)],
+    BudgetThresholdCrossed: [...(handlers.BudgetThresholdCrossed ?? []), ...alerts.BudgetThresholdCrossed.map(guard)],
+  };
 }
 
 async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
@@ -123,14 +139,22 @@ async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
     db: started.value.db,
     clock: systemClock,
     logger: log,
-    handlers: withBudgetRebuild(invalidationHandlers(queryClient), async () => {
+    handlers: withBudgetHandlers(invalidationHandlers(queryClient), async () => {
       // Payday, the period mode or the first day of the week changed: the derived budget periods are rebuilt from the period
       // service (Story 4.5). A failure is logged and the cache is rebuilt on the next change; no entry is touched either way.
       const w = services?.writer;
       if (!w) return;
       const r = await w.run(RebuildBudgetPeriods, {}, 'system');
       if (!r.ok) log.warn('budget.rebuild_failed', { code: r.code });
-    }),
+    }, budgetAlertHandlers({
+      // A change re-checks the current period; the crossing posts through the notifier port (Story 4.9).
+      evaluate: async () => {
+        const w = services?.writer;
+        if (w) await w.run(EvaluateBudgetAlerts, {}, 'system');
+      },
+      notifier: appNotifier,
+      db: started.value.db,
+    })),
   });
   const newId = createIdGenerator(systemClock, secureRandom);
   const writer = new LedgerWriter({

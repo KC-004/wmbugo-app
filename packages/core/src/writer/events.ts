@@ -30,6 +30,7 @@ export const EVENT_CATALOGUE = {
   CategoryAssigned: { areas: ['learning', 'insights', 'budgets'] },
   CategoriesChanged: { areas: ['ledger', 'budgets', 'insights', 'home'] },
   BudgetsChanged: { areas: ['budgets', 'home', 'plan'] },
+  BudgetThresholdCrossed: { areas: ['notifications'] },
 } as const satisfies Record<string, EventSpec>;
 
 export type EventName = keyof typeof EVENT_CATALOGUE;
@@ -54,6 +55,8 @@ export interface EventPayloads {
   CategoriesChanged: { readonly categoryIds: readonly string[] };
   /** Budget ids only: the budget list, Home and Plan refresh. */
   BudgetsChanged: { readonly budgetIds: readonly string[] };
+  /** The highest alert level a budget crossed in a period (Story 4.9): ids and the percentage only, never an amount. */
+  BudgetThresholdCrossed: { readonly budgetId: string; readonly periodStart: string; readonly thresholdPct: number };
 }
 
 // Compile-time check: the catalogue and the payload map list exactly the same events.

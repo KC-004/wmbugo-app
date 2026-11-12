@@ -239,7 +239,7 @@ describe('Budgets list (SCR-14, Story 4.6)', () => {
     await press(r, 'budget-period-monthly');
     await type(r, 'budget-limit', '6000');
     await press(r, 'budget-save');
-    expect(f.save).toHaveBeenCalledWith({ scope: 'category', categoryIds: ['cat_groceries'], accountIds: null, periodRule: 'monthly', targetMinor: 600_000, alertLevels: [75, 90, 100] });
+    expect(f.save).toHaveBeenCalledWith({ scope: 'category', categoryIds: ['cat_groceries'], accountIds: null, periodRule: 'monthly', targetMinor: 600_000, alertLevels: [75, 90, 100], muted: false });
     expect(has(r, 'budget-sheet')).toBe(false);
     expect(texts(r)).toContain('Budget saved');
     await press(r, 'toast-undo');
@@ -295,5 +295,93 @@ describe('Budgets list (SCR-14, Story 4.6)', () => {
     await type(r, 'budget-limit', '6000');
     await press(r, 'budget-save');
     expect(texts(r)).toContain('Could not save this budget. Nothing was saved.');
+  });
+});
+
+describe('alerts in the editor and the first-time ask (Story 4.9)', () => {
+  const toggleAlerts = async (r: ReactTestRenderer, on: boolean) => {
+    await act(async () => r.root.findAll((n) => n.props.testID === 'budget-alerts-switch' && typeof n.props.onValueChange === 'function')[0]!.props.onValueChange(on));
+    await settle();
+  };
+  const fill = async (r: ReactTestRenderer) => {
+    await press(r, 'budget-category-cat_groceries');
+    await type(r, 'budget-limit', '6000');
+  };
+  const withAsk = (ask: boolean) => {
+    const f = fakeApi();
+    const shouldAskForAlerts = jest.fn(async () => ask);
+    const answerAlertAsk = jest.fn<Promise<void>, [boolean]>(async () => undefined);
+    return { ...f, api: { ...f.api, shouldAskForAlerts, answerAlertAsk } as BudgetsApi, shouldAskForAlerts, answerAlertAsk };
+  };
+
+  it('Alerts for this budget is on by default, and turning it off saves the budget muted', async () => {
+    const f = fakeApi();
+    const r = await mountNode(<BudgetsScreen api={f.api} />);
+    await press(r, 'budgets-add');
+    expect(host(r, 'budget-alerts-switch').props.value).toBe(true);
+    await fill(r);
+    await toggleAlerts(r, false);
+    await press(r, 'budget-save');
+    expect(f.save).toHaveBeenCalledWith(expect.objectContaining({ muted: true, alertLevels: [75, 90, 100] }));
+  });
+
+  it('with alerts on it saves unmuted; deselecting every Alert me at chip sends no level (the budget is muted by the save)', async () => {
+    const f = fakeApi();
+    const r = await mountNode(<BudgetsScreen api={f.api} />);
+    await press(r, 'budgets-add');
+    await fill(r);
+    await press(r, 'budget-save');
+    expect(f.save).toHaveBeenLastCalledWith(expect.objectContaining({ muted: false }));
+    await press(r, 'budgets-add');
+    await fill(r);
+    for (const l of [75, 90, 100]) await press(r, `budget-alert-${l}`);
+    await press(r, 'budget-save');
+    expect(f.save).toHaveBeenLastCalledWith(expect.objectContaining({ alertLevels: [] }));
+  });
+
+  it('the first budget saved with alerts on offers Get a heads-up near your limits? once; Allow notifications answers yes', async () => {
+    const f = withAsk(true);
+    const r = await mountNode(<BudgetsScreen api={f.api} />);
+    await press(r, 'budgets-add');
+    await fill(r);
+    await press(r, 'budget-save');
+    await act(async () => new Promise((res) => setTimeout(res, 10)));
+    await settle();
+    expect(texts(r)).toContain('Get a heads-up near your limits?');
+    expect(f.answerAlertAsk).not.toHaveBeenCalled();
+    await press(r, 'alert-ask-allow');
+    expect(f.answerAlertAsk).toHaveBeenCalledWith(true);
+    expect(has(r, 'alert-ask')).toBe(false);
+  });
+
+  it('Not now answers no and asks nothing more', async () => {
+    const f = withAsk(true);
+    const r = await mountNode(<BudgetsScreen api={f.api} />);
+    await press(r, 'budgets-add');
+    await fill(r);
+    await press(r, 'budget-save');
+    await act(async () => new Promise((res) => setTimeout(res, 10)));
+    await settle();
+    await press(r, 'alert-ask-later');
+    expect(f.answerAlertAsk).toHaveBeenCalledWith(false);
+  });
+
+  it('is not offered when it was asked before, the notifier is not available, or the budget is muted', async () => {
+    const never = withAsk(false);
+    const a = await mountNode(<BudgetsScreen api={never.api} />);
+    await press(a, 'budgets-add');
+    await fill(a);
+    await press(a, 'budget-save');
+    await act(async () => new Promise((res) => setTimeout(res, 10)));
+    expect(has(a, 'alert-ask')).toBe(false);
+    const muted = withAsk(true);
+    const b = await mountNode(<BudgetsScreen api={muted.api} />);
+    await press(b, 'budgets-add');
+    await fill(b);
+    await toggleAlerts(b, false);
+    await press(b, 'budget-save');
+    await act(async () => new Promise((res) => setTimeout(res, 10)));
+    expect(has(b, 'alert-ask')).toBe(false);
+    expect(muted.shouldAskForAlerts).not.toHaveBeenCalled();
   });
 });

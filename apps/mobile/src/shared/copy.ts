@@ -429,6 +429,11 @@ export const copy = {
     backToBudgets: 'Back to budgets',
     deleteFailed: 'Could not delete this budget. Nothing was changed.',
     noNextPeriod: 'A one-off range has no next period.',
+    alertsFor: 'Alerts for this budget',
+    askTitle: 'Get a heads-up near your limits?',
+    askBody: 'wmbugo can tell you when a budget gets close. The message never shows an amount.',
+    askAllow: 'Allow notifications',
+    askNotNow: 'Not now',
   },
   deleted: {
     data: 'Data',

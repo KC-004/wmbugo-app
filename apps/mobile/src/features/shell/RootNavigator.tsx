@@ -19,6 +19,7 @@ import { useReviewDot } from '../activity/reviewDot';
 import { useEntryActions } from '../activity/useEntryActions';
 import { HomeScreen } from '../home/HomeScreen';
 import { BudgetsScreen } from '../budgets/BudgetsScreen';
+import { appNotifier } from '../../adapters/notifier';
 import { BudgetDetailScreen } from '../budgets/BudgetDetailScreen';
 import { SettingsScreen } from '../settings/SettingsScreen';
 import { AccountDetailScreen } from '../accounts/AccountDetailScreen';
@@ -28,7 +29,7 @@ import { ScreenHeader } from './ScreenHeader';
 import { TabBar, type TabRoute } from './TabBar';
 import { markTabFirstFrame } from './navTiming';
 
-type RootParams = { Tabs: undefined; BudgetDetail: { budgetId: string }; Accounts: undefined; AccountDetail: { accountId: string }; TransactionDetail: { transactionId: string }; ReviewQueue: { focusId?: string }; Settings: undefined };
+type RootParams = { Tabs: undefined; BudgetDetail: { budgetId: string; periodStart?: string }; Accounts: undefined; AccountDetail: { accountId: string }; TransactionDetail: { transactionId: string }; ReviewQueue: { focusId?: string }; Settings: undefined };
 const RootStack = createNativeStackNavigator<RootParams>();
 const Tabs = createBottomTabNavigator();
 const TabStack = createNativeStackNavigator();
@@ -111,6 +112,15 @@ const PlanStack = stackOf('PlanRoot', PlanTab);
 
 function TabsWithAdd() {
   const opener: AddButtonRef = useRef(null);
+  const root = useNavigation<Nav>();
+  // Tapping a budget alert opens that budget and period (Story 4.9). Nothing is subscribed while no notifier is available.
+  useEffect(
+    () =>
+      appNotifier.onOpen((data) => {
+        if (data.screen === 'BudgetDetail' && data.budgetId) root.navigate('BudgetDetail', { budgetId: data.budgetId, ...(data.periodStart ? { periodStart: data.periodStart } : {}) });
+      }),
+    [root],
+  );
   const { width } = useWindowDimensions();
   const nav = navLayout(width);
   const onAdd = useOpenAdd(opener);
@@ -189,7 +199,7 @@ function BudgetDetailRoute() {
   const route = useRoute<RouteProp<RootParams, 'BudgetDetail'>>();
   return (
     <View style={[styles.fill, { backgroundColor: theme.color('bg-canvas'), paddingTop: insets.top }]}>
-      <BudgetDetailScreen budgetId={route.params.budgetId} onBack={() => nav.goBack()} onOpenEntry={(transactionId) => nav.navigate('TransactionDetail', { transactionId })} />
+      <BudgetDetailScreen budgetId={route.params.budgetId} {...(route.params.periodStart ? { periodStart: route.params.periodStart } : {})} onBack={() => nav.goBack()} onOpenEntry={(transactionId) => nav.navigate('TransactionDetail', { transactionId })} />
     </View>
   );
 }

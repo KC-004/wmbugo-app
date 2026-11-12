@@ -21,7 +21,7 @@ import { ScreenHeader } from '../shell/ScreenHeader';
 import { BudgetSheet } from './BudgetSheet';
 import { BUDGETS_QUERY_KEY, realBudgetsApi, type BudgetDetailData, type BudgetsApi } from './budgetsApi';
 
-export const budgetDetailKey = (id: string, back: number) => ['budgets', 'detail', id, back] as const;
+export const budgetDetailKey = (id: string, back: number | string) => ['budgets', 'detail', id, back] as const;
 
 /** A budget entry as an Activity row: an expense reads as spending, a refund as money back. */
 export const entryAsRow = (e: BudgetEntry, accountName: string | null = e.accountName): ActivityRow => ({
@@ -56,12 +56,12 @@ function TemplateAmount({ template, amountMinor, data, direction = 'neutral', te
  * up and a switcher to earlier periods (never a future one). Edit changes the limit from this period or the next; Delete
  * is soft and can be undone. Every figure comes from the entries' dates and the target version that period had.
  */
-export function BudgetDetailScreen({ budgetId, onBack, onOpenEntry, api = realBudgetsApi }: { budgetId: string; onBack: () => void; onOpenEntry: (transactionId: string) => void; api?: BudgetsApi }) {
+export function BudgetDetailScreen({ budgetId, periodStart, onBack, onOpenEntry, api = realBudgetsApi }: { budgetId: string; /** A tapped notification opens the period it was about. */ periodStart?: string; onBack: () => void; onOpenEntry: (transactionId: string) => void; api?: BudgetsApi }) {
   const theme = useTheme();
   const qc = useQueryClient();
   const sheet = useSheet();
   const toast = useToast();
-  const [back, setBack] = useState(0);
+  const [back, setBack] = useState<number | string>(periodStart ?? 0);
   const q = useQuery({ queryKey: budgetDetailKey(budgetId, back), queryFn: () => api.loadDetail(budgetId, back) });
   const header = <ScreenHeader title={copy.budgets.detailTitle} onBack={onBack} backTestID="budget-detail-back" />;
 
@@ -178,7 +178,7 @@ export function BudgetDetailScreen({ budgetId, onBack, onOpenEntry, api = realBu
             testID="budget-period-back"
             {...controlA11y({ label: copy.budgets.previousPeriod.replace('{month}', prevMonth), role: 'button', disabled: !d.canGoBack })}
             disabled={!d.canGoBack}
-            onPress={() => setBack((n) => n + 1)}
+            onPress={() => setBack(d.back + 1)}
             style={[styles.switchBtn, { opacity: d.canGoBack ? 1 : 0.4 }]}>
             <Icon icon={CaretLeft} size={18} color="text-secondary" />
             <Text style={[textStyle('label'), muted]}>{prevMonth}</Text>
@@ -190,7 +190,7 @@ export function BudgetDetailScreen({ budgetId, onBack, onOpenEntry, api = realBu
             testID="budget-period-forward"
             {...controlA11y({ label: copy.budgets.nextPeriod.replace('{month}', nextMonth), role: 'button', disabled: !d.canGoForward })}
             disabled={!d.canGoForward}
-            onPress={() => setBack((n) => Math.max(0, n - 1))}
+            onPress={() => setBack(Math.max(0, d.back - 1))}
             style={[styles.switchBtn, { opacity: d.canGoForward ? 1 : 0.4 }]}>
             <Text style={[textStyle('label'), muted]}>{nextMonth}</Text>
             <Icon icon={CaretRight} size={18} color="text-secondary" />

@@ -22,6 +22,8 @@ export interface SaveBudgetInput {
   readonly customEnd?: string | null;
   readonly targetMinor: number;
   readonly alertLevels: readonly number[];
+  /** `Alerts for this budget` is off. With no alert level chosen the budget is muted too (Story 4.9). */
+  readonly muted?: boolean;
   /** Editing the limit: from the period now running (default) or from the next one (Story 4.7, BDG-007). */
   readonly targetFrom?: 'this_period' | 'next_period';
 }
@@ -121,19 +123,20 @@ export const SaveBudget: UseCase<SaveBudgetInput, { budgetId: string; created: b
 
     const accountIds = input.accountIds && input.accountIds.length > 0 ? JSON.stringify(dedupe(input.accountIds)) : null;
     const alertRule = JSON.stringify(levels);
+    const muted = input.muted === true || levels.length === 0 ? 1 : 0;
     const custom = periodRule === 'custom';
     const id = existing ? input.id! : ctx.newId();
     const name = nameFor(input.scope, names);
     const scopeCategoryIds = JSON.stringify(input.scope === 'category' ? categoryIds : []);
     if (existing) {
       await ctx.execute(
-        'UPDATE budget SET name = ?, scope = ?, scope_category_ids = ?, account_ids = ?, period_rule = ?, custom_start = ?, custom_end = ?, alert_rule = ? WHERE id = ?',
-        [name, input.scope, scopeCategoryIds, accountIds, periodRule, custom ? input.customStart! : null, custom ? input.customEnd! : null, alertRule, id],
+        'UPDATE budget SET name = ?, scope = ?, scope_category_ids = ?, account_ids = ?, period_rule = ?, custom_start = ?, custom_end = ?, alert_rule = ?, muted = ? WHERE id = ?',
+        [name, input.scope, scopeCategoryIds, accountIds, periodRule, custom ? input.customStart! : null, custom ? input.customEnd! : null, alertRule, muted, id],
       );
     } else {
       await ctx.execute(
-        'INSERT INTO budget (id, name, scope, scope_category_ids, account_ids, period_rule, custom_start, custom_end, alert_rule, muted, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)',
-        [id, name, input.scope, scopeCategoryIds, accountIds, periodRule, custom ? input.customStart! : null, custom ? input.customEnd! : null, alertRule, ctx.nowMs()],
+        'INSERT INTO budget (id, name, scope, scope_category_ids, account_ids, period_rule, custom_start, custom_end, alert_rule, muted, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [id, name, input.scope, scopeCategoryIds, accountIds, periodRule, custom ? input.customStart! : null, custom ? input.customEnd! : null, alertRule, muted, ctx.nowMs()],
       );
     }
 

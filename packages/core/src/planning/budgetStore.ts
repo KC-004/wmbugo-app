@@ -9,7 +9,7 @@ import { periodsToCache, targetForPeriod, type BudgetDef, type Querier, type Tar
 
 /** Active budgets (not removed), oldest first. Columns are read by `mapBudgets`. */
 export const BUDGETS_SQL =
-  'SELECT id, scope, scope_category_ids, scope_budget_type, account_ids, period_rule, custom_start, custom_end, alert_rule, name, template, ended_after FROM budget WHERE removed_at IS NULL ORDER BY created_at, id';
+  'SELECT id, scope, scope_category_ids, scope_budget_type, account_ids, period_rule, custom_start, custom_end, alert_rule, name, template, ended_after, muted FROM budget WHERE removed_at IS NULL ORDER BY created_at, id';
 
 const jsonArray = (v: unknown): string[] => {
   try {
@@ -39,6 +39,7 @@ export function mapBudgets(rows: readonly (readonly unknown[])[]): BudgetDef[] {
       name: String(r[9] ?? ''),
       template: r[10] === null || r[10] === undefined ? null : String(r[10]),
       endedAfter: r[11] === null || r[11] === undefined ? null : String(r[11]),
+      muted: Number(r[12]) === 1,
       scope: String(r[1]) as BudgetDef['scope'],
       categoryIds: jsonArray(r[2]),
       budgetType: r[3] === null || r[3] === undefined ? null : (String(r[3]) as 'need' | 'want'),

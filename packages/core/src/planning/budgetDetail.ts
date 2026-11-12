@@ -33,6 +33,8 @@ export interface BudgetDetail {
   readonly periodLabel: string;
   /** The period is the one running today (the switcher cannot go forward from it). */
   readonly isCurrent: boolean;
+  /** How many periods before the current one this is (0 for the current period). */
+  readonly back: number;
   readonly canGoBack: boolean;
   readonly canGoForward: boolean;
   /** `Oct`-style neighbours for the switcher, as the period start dates. */
@@ -60,7 +62,7 @@ const s = (v: unknown) => (v === null || v === undefined ? null : String(v));
  * derived from the entries' own dates and the target version that period had, so an earlier period always shows what it
  * showed then (BDG-005). Returns 'missing' when the budget was deleted, null when there is no profile.
  */
-export async function loadBudgetDetail(q: Querier, budgetId: string, back: number, nowMs: number): Promise<BudgetDetail | 'missing' | null> {
+export async function loadBudgetDetail(q: Querier, budgetId: string, backOrStart: number | string, nowMs: number): Promise<BudgetDetail | 'missing' | null> {
   const read = await readPeriodProfile(q);
   if (!read) return null;
   const today = toLocalDate(nowMs, read.timezoneId);
@@ -73,11 +75,20 @@ export async function loadBudgetDetail(q: Querier, budgetId: string, back: numbe
   let period: Period | null = budgetPeriodFor(budget.period, today.value, read.profile) ?? (budget.period.rule === 'custom' && budget.period.customStart && budget.period.customEnd ? customPeriod(budget.period.customStart, budget.period.customEnd) : null);
   const running = period;
   const chain: Period[] = period ? [period] : [];
-  for (let i = 0; i < back && period; i++) {
+  // A period start (a tapped notification) finds how many periods back it is; a number is that many periods back.
+  const wanted = typeof backOrStart === 'string' ? backOrStart : null;
+  const steps = typeof backOrStart === 'number' ? backOrStart : 0;
+  let back = 0;
+  while (period && (wanted !== null ? period.start !== wanted : back < steps)) {
+    if (wanted !== null && period.start < wanted) return 'missing';
     period = previousPeriod(period, read.profile);
+    back += 1;
     if (period) chain.push(period);
+    if (back > 60) return 'missing';
   }
   if (!period || !running) return 'missing';
+  // A period from before the budget's first target is not one of its periods.
+  if (wanted !== null && period.end < firstEffective) return 'missing';
 
   const before = previousPeriod(period, read.profile);
   const target = periodTarget(budget, versions, period) ?? versions[0]?.targetMinor ?? 0;
@@ -117,6 +128,7 @@ export async function loadBudgetDetail(q: Querier, budgetId: string, back: numbe
     period,
     periodLabel: periodTitle(period),
     isCurrent: back === 0,
+    back,
     canGoBack: before !== null && before.end >= firstEffective,
     canGoForward: back > 0,
     previousStart: before?.start ?? null,

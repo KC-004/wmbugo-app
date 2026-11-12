@@ -21,6 +21,8 @@ import {
 } from '@wmbugo/core';
 import { getServices, systemClock } from '../../adapters/startApp';
 import { readProfile } from '../../adapters/readProfile';
+import { appNotifier } from '../../adapters/notifier';
+import { promptStateSeenStore } from '../home/homeApi';
 
 export interface BudgetsData {
   readonly list: BudgetList;
@@ -53,13 +55,20 @@ export interface BudgetsApi {
   readForEdit(id: string): Promise<EditableBudget | null>;
   save(input: SaveBudgetInput): Promise<SaveBudgetOutcome>;
   /** One budget for a period: `back` is how many periods before the current one. 'missing' when it was deleted. */
-  loadDetail(id: string, back: number): Promise<BudgetDetailData | 'missing' | null>;
+  loadDetail(id: string, back: number | string): Promise<BudgetDetailData | 'missing' | null>;
   remove(id: string): Promise<{ ok: boolean }>;
   restore(id: string): Promise<{ ok: boolean }>;
+  /** Whether to offer the one-time notification ask: the notifier can post, permission was never asked, and this ask was never shown. */
+  shouldAskForAlerts?(): Promise<boolean>;
+  /** Records the ask as answered (never repeated) and, for Allow, shows the system prompt. */
+  answerAlertAsk?(allow: boolean): Promise<void>;
   undo(value: { budgetId: string; created: boolean; snapshot: BudgetSnapshot }): Promise<{ ok: boolean }>;
 }
 
 export const BUDGETS_QUERY_KEY = ['budgets', 'list'] as const;
+
+/** The prompt_state key of the one-time ask; recorded for Allow and for Not now, so it never repeats. */
+export const ALERT_ASK_KEY = 'budgets.alerts-ask';
 
 export const realBudgetsApi: BudgetsApi = {
   async load() {
@@ -86,6 +95,15 @@ export const realBudgetsApi: BudgetsApi = {
     const detail = await loadBudgetDetail(db, id, back, systemClock.nowMs());
     if (detail === null || detail === 'missing') return detail;
     return { detail, currency: p.currency, locale: p.locale, exponent: p.exponent };
+  },
+  async shouldAskForAlerts() {
+    if (!appNotifier.available) return false;
+    if ((await appNotifier.permission()) !== 'undetermined') return false;
+    return !(await promptStateSeenStore.hasSeen(ALERT_ASK_KEY));
+  },
+  async answerAlertAsk(allow) {
+    await promptStateSeenStore.markSeen(ALERT_ASK_KEY);
+    if (allow) await appNotifier.requestPermission();
   },
   remove: (id) => getServices().writer.run(RemoveBudget, { budgetId: id }, 'user'),
   restore: (id) => getServices().writer.run(RestoreBudget, { budgetId: id }, 'user'),

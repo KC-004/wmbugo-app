@@ -10,6 +10,7 @@ import { useTheme } from '../../shared/theme/ThemeProvider';
 import { radii } from '../../shared/theme/tokens';
 import { textStyle } from '../../shared/theme/typography';
 import { Button } from '../../shared/ui/Button';
+import { AlertAskSheet } from './AlertAskSheet';
 import { BudgetSheet, type BudgetSheetMode } from './BudgetSheet';
 import { BUDGETS_QUERY_KEY, realBudgetsApi, type BudgetsApi, type BudgetsData } from './budgetsApi';
 import { LimitBar } from '../../shared/ui/LimitBar';
@@ -47,6 +48,13 @@ export function BudgetsScreen({ api = realBudgetsApi, onUseTemplate, onOpen }: {
             if (r.ok) {
               await invalidateForEvent(qc, 'BudgetsChanged');
               const saved = r.value;
+              // The first budget saved with alerts on offers the notification ask, once. The editor closes itself after this returns,
+              // so the ask opens just after.
+              if (saved.created && !input.muted && input.alertLevels.length > 0) {
+                void api.shouldAskForAlerts?.().then((ask) => {
+                  if (ask) setTimeout(() => openAsk(), 0);
+                });
+              }
               toast.show({
                 message: copy.budgets.saved,
                 undo: {
@@ -65,6 +73,13 @@ export function BudgetsScreen({ api = realBudgetsApi, onUseTemplate, onOpen }: {
       ),
     });
   };
+
+  const openAsk = () =>
+    sheet.open({
+      id: 'budget-alert-ask',
+      title: copy.budgets.askTitle,
+      body: (close) => <AlertAskSheet close={close} onAnswer={(allow) => void api.answerAlertAsk?.(allow).catch(() => undefined)} />,
+    });
 
   const edit = async (id: string, d: BudgetsData) => {
     const budget = await api.readForEdit(id).catch(() => null);
