@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react';
-import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import { ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { DefaultTheme, NavigationContainer, useIsFocused, useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -18,6 +18,7 @@ import { ReviewQueueScreen } from '../activity/ReviewQueueScreen';
 import { useReviewDot } from '../activity/reviewDot';
 import { useEntryActions } from '../activity/useEntryActions';
 import { HomeScreen } from '../home/HomeScreen';
+import { BudgetsScreen } from '../budgets/BudgetsScreen';
 import { SettingsScreen } from '../settings/SettingsScreen';
 import { AccountDetailScreen } from '../accounts/AccountDetailScreen';
 import { AccountsScreen } from '../accounts/AccountsScreen';
@@ -59,6 +60,19 @@ function HeaderOnly({ title, tab }: { title: string; tab: TabRoute }) {
   );
 }
 
+/** Plan shows the budget list (SCR-14) until the Plan hub arrives in Epic 6. */
+function PlanTab() {
+  const nav = useNavigation<Nav>();
+  return (
+    <TabFrame tab="Plan">
+      <ScreenHeader title={copy.nav.plan} onAccounts={() => nav.navigate('Accounts')} onProfile={() => nav.navigate('Settings')} />
+      <ScrollView contentContainerStyle={styles.planScroll} keyboardShouldPersistTaps="handled">
+        <BudgetsScreen />
+      </ScrollView>
+    </TabFrame>
+  );
+}
+
 function HomeTab() {
   const nav = useNavigation<Nav>();
   return (
@@ -92,7 +106,7 @@ const stackOf = (name: string, Screen: () => ReactNode) =>
 const HomeStack = stackOf('HomeRoot', HomeTab);
 const ActivityStack = stackOf('ActivityRoot', ActivityTab);
 const InsightsStack = stackOf('InsightsRoot', () => <HeaderOnly title={copy.nav.insights} tab="Insights" />);
-const PlanStack = stackOf('PlanRoot', () => <HeaderOnly title={copy.nav.plan} tab="Plan" />);
+const PlanStack = stackOf('PlanRoot', PlanTab);
 
 function TabsWithAdd() {
   const opener: AddButtonRef = useRef(null);
@@ -222,4 +236,5 @@ const styles = StyleSheet.create({
   screen: { flex: 1, alignItems: 'center' },
   column: { width: '100%' },
   pad: { padding: 16 },
+  planScroll: { padding: 16, paddingBottom: 120 },
 });

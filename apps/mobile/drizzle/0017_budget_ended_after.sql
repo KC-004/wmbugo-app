@@ -1,0 +1,1 @@
+ALTER TABLE `budget` ADD `ended_after` text;

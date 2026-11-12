@@ -7,6 +7,7 @@
 export type QueryArea =
   | 'ledger'
   | 'budgets'
+  | 'plan'
   | 'insights'
   | 'home'
   | 'widget'
@@ -28,6 +29,7 @@ export const EVENT_CATALOGUE = {
   CapturesRejected: { areas: ['captures', 'ledger', 'home', 'widget'] },
   CategoryAssigned: { areas: ['learning', 'insights', 'budgets'] },
   CategoriesChanged: { areas: ['ledger', 'budgets', 'insights', 'home'] },
+  BudgetsChanged: { areas: ['budgets', 'home', 'plan'] },
 } as const satisfies Record<string, EventSpec>;
 
 export type EventName = keyof typeof EVENT_CATALOGUE;
@@ -50,6 +52,8 @@ export interface EventPayloads {
   CategoryAssigned: { readonly transactionIds: readonly string[]; readonly previousCategoryId?: string | null; readonly wasGuessed?: boolean };
   /** Category ids only: pickers, Activity, budgets and insights refresh. */
   CategoriesChanged: { readonly categoryIds: readonly string[] };
+  /** Budget ids only: the budget list, Home and Plan refresh. */
+  BudgetsChanged: { readonly budgetIds: readonly string[] };
 }
 
 // Compile-time check: the catalogue and the payload map list exactly the same events.

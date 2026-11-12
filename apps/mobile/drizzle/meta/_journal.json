@@ -120,6 +120,13 @@
       "when": 1794505865870,
       "tag": "0016_category_guess_backfill",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1794506091226,
+      "tag": "0017_budget_ended_after",
+      "breakpoints": true
     }
   ]
 }

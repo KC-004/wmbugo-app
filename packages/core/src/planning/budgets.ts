@@ -11,6 +11,12 @@ export type BudgetScope = 'overall' | 'category' | 'budget_type' | 'savings';
 
 export interface BudgetDef {
   readonly id: string;
+  /** What the list shows; absent in tests that only count. */
+  readonly name?: string;
+  /** `fifty_thirty_twenty` for the one-tap split (Story 4.10). */
+  readonly template?: string | null;
+  /** The end date of the last period this budget runs (its only category was archived or merged). */
+  readonly endedAfter?: string | null;
   readonly scope: BudgetScope;
   /** Top-level category ids (scope `category`); a subcategory rolls into its parent. */
   readonly categoryIds: readonly string[];

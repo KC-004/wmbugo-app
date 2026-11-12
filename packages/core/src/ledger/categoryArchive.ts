@@ -2,6 +2,7 @@ import { err, ok } from '../shared/result';
 import type { UseCase, WriterContext } from '../writer/ledgerWriter';
 import { categoryFits, UNCATEGORISED_ID, type BudgetType, type CategoryKind } from './categories';
 import { sameCategoryName } from './categoryCommands';
+import { budgetsEndingWith, endBudgets, reopenBudgets } from '../planning/budgetStore';
 
 /** `Uncategorised` and `Other` are system fallbacks: no archive, merge or delete (CAT-004). */
 export const OTHER_ID = 'cat_other';
@@ -66,6 +67,8 @@ export interface RemapPreview {
   readonly splits: number;
   readonly isSystem: boolean;
   readonly archived: boolean;
+  /** Names of the budgets whose only category this is: they end after the current period (Story 4.6). */
+  readonly endingBudgets: readonly string[];
 }
 
 /** The numbers behind the archive preview and the delete confirmation. Reads only. */
@@ -77,7 +80,8 @@ export async function previewCategory(ctx: Pick<WriterContext, 'query'>, categor
   const ids = family.map((c) => c.id);
   const live = Number((await ctx.query(`SELECT COUNT(DISTINCT t.id) FROM split s JOIN "transaction" t ON t.id = s.transaction_id WHERE s.category_id IN (${marks(ids.length)}) AND t.removed_at IS NULL`, ids))[0]![0]);
   const splits = Number((await ctx.query(`SELECT COUNT(*) FROM split WHERE category_id IN (${marks(ids.length)})`, ids))[0]![0]);
-  return { name: me.name, entries: live, subcategories: family.length - 1, splits, isSystem: isSystemCategory(me.id), archived: me.archived };
+  const ending = await budgetsEndingWith(ctx, ids);
+  return { name: me.name, entries: live, subcategories: family.length - 1, splits, isSystem: isSystemCategory(me.id), archived: me.archived, endingBudgets: ending.map((b) => b.name) };
 }
 
 export interface RemapEntry {
@@ -120,6 +124,8 @@ export const ArchiveCategory: UseCase<{ categoryId: string }, { archivedIds: str
     await ctx.execute(`UPDATE category SET archived = 1 WHERE id IN (${marks(ids.length)})`, ids);
     ctx.touch('category', me.id, { archived: true, label: me.name, subcategories: ids.length - 1 });
     ctx.emit('CategoriesChanged', { categoryIds: ids });
+    const ended = await endBudgets(ctx, ids);
+    if (ended.length > 0) ctx.emit('BudgetsChanged', { budgetIds: ended });
     return ok({ archivedIds: ids });
   },
 };
@@ -148,6 +154,8 @@ export const RestoreCategory: UseCase<{ categoryId: string; ids?: readonly strin
     await ctx.execute(`UPDATE category SET archived = 0 WHERE id IN (${marks(ids.length)})`, ids);
     ctx.touch('category', me.id, { restored: true, label: me.name });
     ctx.emit('CategoriesChanged', { categoryIds: ids });
+    const reopened = await reopenBudgets(ctx, ids);
+    if (reopened.length > 0) ctx.emit('BudgetsChanged', { budgetIds: reopened });
     return ok({ restoredIds: ids });
   },
 };
@@ -267,6 +275,8 @@ export const MergeCategory: UseCase<{ fromId: string; intoId: string }, MergeRes
       ctx.emit('CategoryAssigned', { transactionIds: txIds });
     }
     ctx.emit('CategoriesChanged', { categoryIds: [...archived, target!.id] });
+    const ended = await endBudgets(ctx, archived);
+    if (ended.length > 0) ctx.emit('BudgetsChanged', { budgetIds: ended });
     return ok({ movedSplits: splits.length, movedEntries: txIds.length, previous: splits.map((s) => ({ splitId: s.id, categoryId: s.categoryId })), archivedIds: archived, targetId: target!.id });
   },
 };
@@ -303,6 +313,8 @@ export const UndoMergeCategory: UseCase<{ previous: readonly { splitId: string; 
       ctx.emit('CategoryAssigned', { transactionIds: [...txIds] });
     }
     ctx.emit('CategoriesChanged', { categoryIds: [...input.archivedIds, input.targetId] });
+    const reopened = await reopenBudgets(ctx, input.archivedIds);
+    if (reopened.length > 0) ctx.emit('BudgetsChanged', { budgetIds: reopened });
     return ok({ restored });
   },
 };

@@ -161,6 +161,20 @@ export function daysBetween(from: string, to: string): number {
 /** The inclusive number of days in a period. */
 export const periodDays = (p: { readonly start: string; readonly end: string }): number => daysBetween(p.start, p.end) + 1;
 
+/** `1–30 Nov` for one month, `25 Oct–24 Nov` across two. */
+export function periodRangeLabel(start: string, end: string): string {
+  const s = parse(start);
+  const e = parse(end);
+  return s.m === e.m && s.y === e.y ? `${s.d}–${e.d} ${MONTHS[e.m - 1]}` : `${s.d} ${MONTHS[s.m - 1]}–${e.d} ${MONTHS[e.m - 1]}`;
+}
+
+/** A real calendar date written YYYY-MM-DD (not 2026-02-31). */
+export function isLocalDate(s: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const { y, m, d } = parse(s);
+  return m >= 1 && m <= 12 && d >= 1 && d <= daysIn(y, m);
+}
+
 /** The calendar month a local date is in. */
 export function calendarMonthFor(localDate: string): Period {
   const { y, m } = parse(localDate);

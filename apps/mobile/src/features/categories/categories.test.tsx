@@ -63,13 +63,14 @@ function fakeApi(initial = seedRows()) {
     return { ok: true as const, value: { position: j + 1, of: next.length } };
   });
   const used = new Map<string, number>();
+  const ending = { names: [] as string[] };
   const closed = { archived: [] as CategoryRow[] };
   const preview = jest.fn(async (id: string) => {
     const row = state.rows.find((c) => c.id === id);
     if (!row) return null;
     const subs = state.rows.filter((c) => c.parentId === id).length;
     const n = used.get(id) ?? 0;
-    return { name: row.name, entries: n, subcategories: subs, splits: n, isSystem: id === 'cat_other' || id === 'cat_uncategorised', archived: false };
+    return { name: row.name, entries: n, subcategories: subs, splits: n, isSystem: id === 'cat_other' || id === 'cat_uncategorised', archived: false, endingBudgets: ending.names };
   });
   const entries = jest.fn(async (id: string, limit: number, offset: number) => {
     const n = used.get(id) ?? 0;
@@ -103,7 +104,7 @@ function fakeApi(initial = seedRows()) {
   });
   const undoRemove = jest.fn(async () => ({ ok: true as const, value: { categoryId: 'x' } }));
   const api: CategoriesApi = { load: async () => ({ rows: state.rows, archived: closed.archived }), save, move, preview, entries, archive, restore, merge, undoMerge, remove, undoRemove };
-  return { api, save, move, state, used, closed, preview, entries, archive, restore, merge, undoMerge, remove, undoRemove };
+  return { api, save, move, state, used, ending, closed, preview, entries, archive, restore, merge, undoMerge, remove, undoRemove };
 }
 
 async function mount(api: CategoriesApi) {
@@ -386,6 +387,19 @@ describe('Archive, merge and delete (Story 4.3)', () => {
     expect(has(r, 'archive-keep')).toBe(false);
     expect(has(r, 'archive-target-s1')).toBe(false);
     expect(has(r, 'archive-target-cat_groceries')).toBe(true);
+  });
+
+  it('the archive and merge previews say which budget ends after this period (Story 4.6)', async () => {
+    const f = fakeApi();
+    f.used.set('cat_transport', 3);
+    f.ending.names.push('Transport');
+    const r = await mount(f.api);
+    await press(r, 'category-row-cat_transport');
+    await press(r, 'category-archive');
+    expect(texts(r)).toContain('The Transport budget ends after this period.');
+    await press(r, 'archive-move');
+    await press(r, 'archive-target-cat_travel');
+    expect(texts(r)).toContain('The Transport budget ends after this period.');
   });
 
   it('shows no Archive, Merge or Delete for Other or Uncategorised', async () => {

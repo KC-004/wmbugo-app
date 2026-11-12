@@ -139,6 +139,12 @@ export function ArchiveSheet({
       <ScrollView style={styles.scroll} contentContainerStyle={styles.gap} keyboardShouldPersistTaps="handled">
         <Text testID="archive-usage" style={[textStyle('body-medium'), ink]}>{usageLine(preview)}</Text>
 
+        {preview.endingBudgets.length > 0 ? (
+          <Text testID="archive-budget-ends" style={[textStyle('body'), ink]}>
+            {preview.endingBudgets.map((n) => copy.budgets.endsAfter.replace('{name}', n)).join(' ')}
+          </Text>
+        ) : null}
+
         {mode === 'archive' ? (
           <View style={styles.row} accessibilityRole="radiogroup">
             <Chip onGlass role="radio" label={copy.categories.keepThem.replace('{name}', row.name)} testID="archive-keep" selected={!moving} onPress={() => { setMoving(false); setTarget(null); setError(null); }} />

@@ -28,6 +28,8 @@ export const budget = sqliteTable(
     /** JSON alert thresholds; null means the default (75% and 100%). */
     alert_rule: text('alert_rule'),
     muted: integer('muted').notNull().default(0),
+    /** The end date of the last period this budget runs: set when its only category is archived or merged (Story 4.3 and 4.6). */
+    ended_after: text('ended_after'),
     created_at: integer('created_at').notNull(),
     removed_at: integer('removed_at'),
   },
