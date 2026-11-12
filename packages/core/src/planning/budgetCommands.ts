@@ -40,6 +40,7 @@ export type SaveBudgetError =
   | 'CATEGORY_NOT_FOUND'
   | 'ACCOUNT_NOT_FOUND'
   | 'BUDGET_NOT_FOUND'
+  | 'BUDGET_NOT_EDITABLE'
   | 'NO_NEXT_PERIOD'
   | 'NO_PROFILE'
   | OverallExists;
@@ -58,6 +59,8 @@ interface BudgetRow {
   readonly customEnd: string | null;
   readonly alertRule: string | null;
   readonly endedAfter: string | null;
+  /** So Undo of an edit puts the mute switch back too. */
+  readonly muted: boolean;
 }
 
 /** What Undo needs to put one budget back as it was. */
@@ -68,10 +71,10 @@ export interface BudgetSnapshot {
 }
 
 async function readRow(ctx: WriterContext, id: string): Promise<BudgetRow | null> {
-  const r = (await ctx.query('SELECT name, scope, scope_category_ids, account_ids, period_rule, custom_start, custom_end, alert_rule, ended_after FROM budget WHERE id = ? AND removed_at IS NULL', [id]))[0];
+  const r = (await ctx.query('SELECT name, scope, scope_category_ids, account_ids, period_rule, custom_start, custom_end, alert_rule, ended_after, muted FROM budget WHERE id = ? AND removed_at IS NULL', [id]))[0];
   if (!r) return null;
   const s = (v: unknown) => (v === null || v === undefined ? null : String(v));
-  return { name: String(r[0]), scope: String(r[1]), categoryIds: String(r[2]), accountIds: s(r[3]), periodRule: String(r[4]), customStart: s(r[5]), customEnd: s(r[6]), alertRule: s(r[7]), endedAfter: s(r[8]) };
+  return { name: String(r[0]), scope: String(r[1]), categoryIds: String(r[2]), accountIds: s(r[3]), periodRule: String(r[4]), customStart: s(r[5]), customEnd: s(r[6]), alertRule: s(r[7]), endedAfter: s(r[8]), muted: Number(r[9]) === 1 };
 }
 
 const dedupe = <T,>(xs: readonly T[]): T[] => [...new Set(xs)];
@@ -105,6 +108,8 @@ export const SaveBudget: UseCase<SaveBudgetInput, { budgetId: string; created: b
 
     const existing = input.id !== undefined ? await readRow(ctx, input.id) : null;
     if (input.id !== undefined && !existing) return err('BUDGET_NOT_FOUND');
+    // The Needs, Wants and Savings budgets are edited together with `Edit targets`; this editor would turn one into another kind.
+    if (existing && existing.scope !== 'overall' && existing.scope !== 'category') return err('BUDGET_NOT_EDITABLE');
     if (input.scope === 'overall') {
       const other = (await ctx.query("SELECT id FROM budget WHERE scope = 'overall' AND removed_at IS NULL AND id <> ?", [input.id ?? '']))[0];
       if (other) return err(`OVERALL_EXISTS:${String(other[0])}`);
@@ -162,7 +167,7 @@ export const SaveBudget: UseCase<SaveBudgetInput, { budgetId: string; created: b
 
     ctx.touch('budget', id, { ...(existing ? { edited: true } : { added: true }), label: name, scope: input.scope, period: periodRule });
     ctx.emit('BudgetsChanged', { budgetIds: [id] });
-    return ok({ budgetId: id, created: !existing, snapshot: existing ? { row: existing, addedVersion } : { row: { name, scope: input.scope, categoryIds: scopeCategoryIds, accountIds, periodRule, customStart: null, customEnd: null, alertRule, endedAfter: null }, addedVersion } });
+    return ok({ budgetId: id, created: !existing, snapshot: existing ? { row: existing, addedVersion } : { row: { name, scope: input.scope, categoryIds: scopeCategoryIds, accountIds, periodRule, customStart: null, customEnd: null, alertRule, endedAfter: null, muted: muted === 1 }, addedVersion } });
   },
 };
 
@@ -176,8 +181,8 @@ export const UndoSaveBudget: UseCase<{ budgetId: string; created: boolean; snaps
       await ctx.execute('DELETE FROM budget_period WHERE budget_id = ?', [input.budgetId]);
     } else {
       const r = input.snapshot.row;
-      await ctx.execute('UPDATE budget SET name = ?, scope = ?, scope_category_ids = ?, account_ids = ?, period_rule = ?, custom_start = ?, custom_end = ?, alert_rule = ?, ended_after = ? WHERE id = ?', [
-        r.name, r.scope, r.categoryIds, r.accountIds, r.periodRule, r.customStart, r.customEnd, r.alertRule, r.endedAfter, input.budgetId,
+      await ctx.execute('UPDATE budget SET name = ?, scope = ?, scope_category_ids = ?, account_ids = ?, period_rule = ?, custom_start = ?, custom_end = ?, alert_rule = ?, ended_after = ?, muted = ? WHERE id = ?', [
+        r.name, r.scope, r.categoryIds, r.accountIds, r.periodRule, r.customStart, r.customEnd, r.alertRule, r.endedAfter, r.muted ? 1 : 0, input.budgetId,
       ]);
       if (input.snapshot.addedVersion !== null) await ctx.execute('DELETE FROM budget_target_version WHERE budget_id = ? AND version = ?', [input.budgetId, input.snapshot.addedVersion]);
       const rebuilt = await rebuildPeriods(ctx, [input.budgetId]);
@@ -213,11 +218,13 @@ export async function readBudgetForEdit(q: Pick<WriterContext, 'query'>, id: str
  * Deletes a budget (Story 4.7): it is soft-removed with audit and `BudgetsChanged` and leaves the list. Its targets and
  * period rows are kept, so Undo brings it back with its history. No entry is touched.
  */
-export const RemoveBudget: UseCase<{ budgetId: string }, { budgetId: string }, 'BUDGET_NOT_FOUND'> = {
+export const RemoveBudget: UseCase<{ budgetId: string }, { budgetId: string }, 'BUDGET_NOT_FOUND' | 'TEMPLATE_BUDGET'> = {
   name: 'RemoveBudget',
   async execute(ctx, input) {
     const row = await readRow(ctx, input.budgetId);
     if (!row) return err('BUDGET_NOT_FOUND');
+    // One of the three 50/30/20 budgets cannot go alone; the set is undone together.
+    if (row.scope !== 'overall' && row.scope !== 'category') return err('TEMPLATE_BUDGET');
     await ctx.execute('UPDATE budget SET removed_at = ? WHERE id = ?', [ctx.nowMs(), input.budgetId]);
     ctx.touch('budget', input.budgetId, { removed: true, label: row.name });
     ctx.emit('BudgetsChanged', { budgetIds: [input.budgetId] });

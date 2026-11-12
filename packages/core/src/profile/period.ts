@@ -100,7 +100,9 @@ export function periodFor(localDate: string, rule: PaydayRule): Period {
 }
 
 /** The first payday on or after a date. */
-export function nextPaydayOnOrAfter(date: string, rule: Exclude<PaydayRuleBase, { kind: 'none' }>): string {
+export function nextPaydayOnOrAfter(date: string, payday: PaydayRuleBase): string {
+  // Not salaried counts by calendar month: the next period starts on the 1st.
+  const rule: Exclude<PaydayRuleBase, { kind: 'none' }> = payday.kind === 'none' ? { kind: 'first' } : payday;
   const { y, m } = parse(date);
   for (let by = 0; by < 3; by++) {
     const s = shiftMonth(y, m, by);
@@ -126,7 +128,7 @@ const withoutTransitions = (r: PaydayRule): PaydayRuleBase => (r.kind === 'day' 
  * after its normal end, at its normal end and the days up to the new payday are one shortened cycle. No cycle is ever
  * longer than a normal one, and the past stays as it was.
  */
-export function planPaydayChange(today: string, current: PaydayRule, next: Exclude<PaydayRuleBase, { kind: 'none' }>): PaydayChangePlan {
+export function planPaydayChange(today: string, current: PaydayRule, next: PaydayRuleBase): PaydayChangePlan {
   const cur = periodFor(today, current);
   const newPayday = nextPaydayOnOrAfter(today, next);
   const previous = withoutTransitions(current);

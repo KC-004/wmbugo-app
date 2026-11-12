@@ -205,3 +205,23 @@ describe('every date is in exactly one period, whatever the payday changes (Stor
     );
   });
 });
+
+describe('changing to Not salaried keeps the past (Epic 4 review)', () => {
+  it('payday on the 25th, changed to Not salaried on 10 Nov: the cycle ends on 24 Nov, 25 to 30 Nov is a shortened cycle, calendar months follow, and earlier periods do not move', async () => {
+    const { change, rule } = await setup(day(11, 10), { kind: 'day', day: 25 });
+    const oct = periodFor('2026-10-10', await rule());
+    const nov = periodFor('2026-11-10', await rule());
+    expect([oct.start, oct.end, nov.start, nov.end]).toEqual(['2026-09-25', '2026-10-24', '2026-10-25', '2026-11-24']);
+    expect((await change({ kind: 'none' })).ok).toBe(true);
+    const after = await rule();
+    expect(periodFor('2026-10-10', after)).toMatchObject({ start: '2026-09-25', end: '2026-10-24' });
+    expect(periodFor('2026-11-10', after)).toMatchObject({ start: '2026-10-25', end: '2026-11-24' });
+    expect(periodFor('2026-11-27', after)).toMatchObject({ start: '2026-11-25', end: '2026-11-30', shortened: true });
+    expect(periodFor('2026-12-15', after)).toMatchObject({ start: '2026-12-01', end: '2026-12-31' });
+  });
+
+  it('the confirmation preview does not ask for Not salaried', async () => {
+    const { db } = await setup(day(11, 10));
+    expect(await previewPaydayChange(db, { kind: 'none' }, day(11, 10))).toBeNull();
+  });
+});

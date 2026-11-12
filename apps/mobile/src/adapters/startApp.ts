@@ -18,7 +18,7 @@ import {
   type SetUpProfileInput,
   type SqlDatabase,
 } from '@wmbugo/core';
-import type { Clock, EventHandler, HandlerMap, Logger, Result, StartupErrorCode, StartupOk } from '@wmbugo/core';
+import type { Clock, Logger, Result, StartupErrorCode, StartupOk } from '@wmbugo/core';
 import migrations from '../../drizzle/migrations';
 import { ensureDir, PRIVATE_DIR, rnFileStore } from './files/rnFileStore';
 import { setSaveTimingSink } from '../features/add/saveTiming';
@@ -27,6 +27,7 @@ import { invalidationHandlers, queryClient } from '../shared/queryClient';
 import { BENCH_TRIGGER, runSaveBenchmark } from './benchmark';
 import { keychainKeyStore } from './storage/keychainKeyStore';
 import { appNotifier } from './notifier';
+import { withBudgetHandlers } from './budgetHandlers';
 import { realReceiptFiles } from './files/receiptFiles';
 import { appStateScheduler } from './appStateScheduler';
 import { opSqliteOpener } from './storage/opSqliteOpener';
@@ -105,24 +106,6 @@ export function startApp(): Promise<Result<StartupOk, StartupErrorCode>> {
   return starting;
 }
 
-/** The invalidation handlers plus planning's: rebuild the budget periods on `ProfileChanged`, and the alert handlers (Story 4.9). */
-function withBudgetHandlers(handlers: HandlerMap, rebuild: () => Promise<void>, alerts: ReturnType<typeof budgetAlertHandlers>): HandlerMap {
-  const guard = (h: EventHandler): EventHandler => async (e) => {
-    try {
-      await h(e);
-    } catch {
-      // A failed alert check or post is retried by the next change; it never blocks the invalidation of screens.
-    }
-  };
-  return {
-    ...handlers,
-    ProfileChanged: [...(handlers.ProfileChanged ?? []), () => rebuild().catch(() => undefined)],
-    TransactionsChanged: [...(handlers.TransactionsChanged ?? []), ...alerts.TransactionsChanged.map(guard)],
-    BudgetsChanged: [...(handlers.BudgetsChanged ?? []), ...alerts.BudgetsChanged.map(guard)],
-    BudgetThresholdCrossed: [...(handlers.BudgetThresholdCrossed ?? []), ...alerts.BudgetThresholdCrossed.map(guard)],
-  };
-}
-
 async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
   const log = await getLogger();
   const started = await startStorage({
@@ -154,7 +137,7 @@ async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
       },
       notifier: appNotifier,
       db: started.value.db,
-    })),
+    }), log),
   });
   const newId = createIdGenerator(systemClock, secureRandom);
   const writer = new LedgerWriter({

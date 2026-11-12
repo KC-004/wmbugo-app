@@ -27,7 +27,7 @@ export interface BudgetDef {
   /** Only entries posted on these accounts count; null means every account. */
   readonly accountIds: readonly string[] | null;
   readonly period: BudgetPeriodRule;
-  /** Alert thresholds in percent, lowest first; empty means the default (75, 100). */
+  /** Alert thresholds in percent, lowest first; empty means the default (75, 90, 100). */
   readonly alertThresholds?: readonly number[];
 }
 

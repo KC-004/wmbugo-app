@@ -431,6 +431,7 @@ export const copy = {
     noNextPeriod: 'A one-off range has no next period.',
     alertsFor: 'Alerts for this budget',
     notClassified: 'Not classified',
+    templateManaged: 'Needs, Wants and Savings are changed together with Edit targets on the Plan tab.',
     sortIt: 'Sort it',
     targetReached: 'Target reached',
     toGo: '{amount} to go',

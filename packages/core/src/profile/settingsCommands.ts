@@ -86,7 +86,8 @@ export const ChangeProfile: UseCase<ProfileChange, void, ChangeProfileError> = {
       // to the new payday are one shortened cycle, and every earlier period keeps its dates.
       const read = await readPaydayRule(ctx);
       const next: PaydayRuleBase = input.payday.kind === 'day' ? { kind: 'day', day: input.payday.day } : { kind: input.payday.kind };
-      if (read && next.kind !== 'none' && !samePayday(read.rule, next)) {
+      // Also a change to Not salaried: its calendar months start on the 1st, and the pay-cycle periods before stay as they were.
+      if (read && !samePayday(read.rule, next)) {
         const today = toLocalDate(ctx.nowMs(), read.timezoneId);
         if (today.ok) {
           const plan = planPaydayChange(today.value, read.rule, next);

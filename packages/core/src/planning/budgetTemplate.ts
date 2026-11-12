@@ -128,7 +128,9 @@ export const ChangeTemplateTargets: UseCase<{ targets: TemplateTargets; /** The 
       ctx.touch('budget', b.id, { edited: true, label: b.name ?? '', template: TEMPLATE_503020 });
       changedIds.push(b.id);
     }
+    let incomeUpdated = false;
     if (input.incomeMinor !== undefined && Number.isSafeInteger(input.incomeMinor) && input.incomeMinor > 0) {
+      incomeUpdated = true;
       await ctx.execute('UPDATE budget SET template_income_minor = ? WHERE template = ? AND removed_at IS NULL', [input.incomeMinor, TEMPLATE_503020]);
       for (const b of budgets) if (!changedIds.includes(b.id)) ctx.touch('budget', b.id, { incomeUpdated: true, template: TEMPLATE_503020 });
     }
@@ -137,6 +139,8 @@ export const ChangeTemplateTargets: UseCase<{ targets: TemplateTargets; /** The 
       if (typeof rebuilt === 'string') return err(rebuilt);
       ctx.emit('BudgetsChanged', { budgetIds: changedIds });
     }
+    // Only the income changed: screens still refresh (the income card is answered by this).
+    if (changedIds.length === 0 && incomeUpdated) ctx.emit('BudgetsChanged', { budgetIds: budgets.map((b) => b.id) });
     return ok({ changed: changedIds.length });
   },
 };
@@ -196,7 +200,12 @@ export async function loadTemplateState(q: Querier, nowMs: number): Promise<Temp
   let rough: number | null = null;
   if (yes) {
     const row = (await q.query('SELECT value_json FROM settings WHERE key = ?', [SETTING_ROUGH_INCOME]))[0];
-    const v = row ? Number(JSON.parse(String(row[0]))) : NaN;
+    let v = NaN;
+    try {
+      v = row ? Number(JSON.parse(String(row[0]))) : NaN;
+    } catch {
+      // An unreadable stored figure is no figure: the sheet starts empty instead of the Plan tab failing.
+    }
     rough = Number.isSafeInteger(v) && v > 0 ? v : null;
   }
   const salary = await lastPeriodSalaryMinor(q, nowMs);

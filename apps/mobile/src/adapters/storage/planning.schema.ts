@@ -27,7 +27,7 @@ export const budget = sqliteTable(
     template: text('template'),
     /** The income a 50/30/20 template was made from (Story 4.10), in minor units; null for any other budget. */
     template_income_minor: integer('template_income_minor'),
-    /** JSON alert thresholds; null means the default (75% and 100%). */
+    /** JSON alert thresholds; null means the default (75%, 90% and 100%). */
     alert_rule: text('alert_rule'),
     muted: integer('muted').notNull().default(0),
     /** The end date of the last period this budget runs: set when its only category is archived or merged (Story 4.3 and 4.6). */

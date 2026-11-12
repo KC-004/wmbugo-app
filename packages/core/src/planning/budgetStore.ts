@@ -71,8 +71,13 @@ export type RebuildError = 'NO_PROFILE' | 'DATE_INVALID';
  * length, but only for a budget that follows the default period. Weekly, monthly and custom budgets keep their own periods.
  */
 export function periodTarget(budget: BudgetDef, versions: readonly TargetVersion[], period: Period): number | null {
-  const base = targetForPeriod(versions, period.start);
-  if (base === null) return null;
+  let base = targetForPeriod(versions, period.start);
+  if (base === null) {
+    // A period that starts before the first limit but contains it (the period rule changed mid-period) uses that first limit.
+    const first = versions.reduce<TargetVersion | null>((m, v) => (m === null || v.effectiveFrom < m.effectiveFrom ? v : m), null);
+    if (first === null || period.end < first.effectiveFrom) return null;
+    base = first.targetMinor;
+  }
   return period.shortened && budget.period.rule === 'default' && period.normalDays ? prorateTarget(base, periodDays(period), period.normalDays) : base;
 }
 

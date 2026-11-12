@@ -243,10 +243,14 @@ export function BudgetDetailScreen({ budgetId, periodStart, onBack, onOpenEntry,
           </View>
         )}
 
-        <View style={styles.actions}>
-          <Button label={copy.budgets.edit} variant="secondary" testID="budget-edit" onPress={() => void edit()} />
-          <Button label={copy.budgets.delete} variant="text" testID="budget-delete" onPress={remove} />
-        </View>
+        {d.scope === 'overall' || d.scope === 'category' ? (
+          <View style={styles.actions}>
+            <Button label={copy.budgets.edit} variant="secondary" testID="budget-edit" onPress={() => void edit()} />
+            <Button label={copy.budgets.delete} variant="text" testID="budget-delete" onPress={remove} />
+          </View>
+        ) : (
+          <Text testID="budget-template-managed" style={[textStyle('caption'), muted]}>{copy.budgets.templateManaged}</Text>
+        )}
       </ScrollView>
     </View>
   );

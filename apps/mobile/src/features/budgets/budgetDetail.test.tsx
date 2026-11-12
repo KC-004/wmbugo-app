@@ -293,3 +293,19 @@ describe('drilling into Needs, Wants and Savings (Story 4.11)', () => {
     expect(texts(r).join('|')).not.toMatch(/Over by/);
   });
 });
+
+describe('the 50/30/20 budgets are changed together, not one by one (Epic 4 review)', () => {
+  it('a Needs, Wants or Savings budget shows no Edit or Delete, and says where to change it', async () => {
+    const needs = detail({ name: 'Needs', scope: 'budget_type', budgetType: 'need' });
+    const a = await mount(fakeApi({ 0: needs }).api);
+    expect(has(a.r, 'budget-edit')).toBe(false);
+    expect(has(a.r, 'budget-delete')).toBe(false);
+    expect(texts(a.r)).toContain('Needs, Wants and Savings are changed together with Edit targets on the Plan tab.');
+    const savings = detail({ name: 'Savings', scope: 'savings', breakdown: null });
+    const b = await mount(fakeApi({ 0: savings }).api);
+    expect(has(b.r, 'budget-edit')).toBe(false);
+    // Overall and category budgets keep both.
+    const c = await mount(fakeApi({ 0: detail() }).api);
+    expect(has(c.r, 'budget-edit') && has(c.r, 'budget-delete')).toBe(true);
+  });
+});
