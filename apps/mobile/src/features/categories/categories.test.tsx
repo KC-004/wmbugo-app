@@ -62,8 +62,48 @@ function fakeApi(initial = seedRows()) {
     state.rows = next;
     return { ok: true as const, value: { position: j + 1, of: next.length } };
   });
-  const api: CategoriesApi = { load: async () => ({ rows: state.rows }), save, move };
-  return { api, save, move, state };
+  const used = new Map<string, number>();
+  const closed = { archived: [] as CategoryRow[] };
+  const preview = jest.fn(async (id: string) => {
+    const row = state.rows.find((c) => c.id === id);
+    if (!row) return null;
+    const subs = state.rows.filter((c) => c.parentId === id).length;
+    const n = used.get(id) ?? 0;
+    return { name: row.name, entries: n, subcategories: subs, splits: n, isSystem: id === 'cat_other' || id === 'cat_uncategorised', archived: false };
+  });
+  const entries = jest.fn(async (id: string, limit: number, offset: number) => {
+    const n = used.get(id) ?? 0;
+    const all = Array.from({ length: n }, (_, i) => ({ id: `e_${i}`, localDate: `2026-11-0${(i % 9) + 1}`, merchant: `Pump ${i}`, amountMinor: 10_000 + i, type: 'expense' }));
+    return { rows: all.slice(offset, offset + limit), currency: 'INR' as const, locale: 'en-IN' };
+  });
+  const archive = jest.fn(async (id: string) => {
+    const row = state.rows.find((c) => c.id === id)!;
+    state.rows = state.rows.filter((c) => c.id !== id && c.parentId !== id);
+    closed.archived.push(row);
+    return { ok: true as const, value: { archivedIds: [id] } };
+  });
+  const restore = jest.fn(async (id: string) => {
+    const row = closed.archived.find((c) => c.id === id);
+    if (!row) return { ok: false as const, code: 'NOT_ARCHIVED' };
+    closed.archived = closed.archived.filter((c) => c.id !== id);
+    state.rows = [...state.rows, row];
+    return { ok: true as const, value: { restoredIds: [id] } };
+  });
+  const merge = jest.fn(async (fromId: string, intoId: string) => {
+    const row = state.rows.find((c) => c.id === fromId)!;
+    state.rows = state.rows.filter((c) => c.id !== fromId);
+    closed.archived.push(row);
+    return { ok: true as const, value: { movedSplits: used.get(fromId) ?? 0, movedEntries: used.get(fromId) ?? 0, previous: [], archivedIds: [fromId], targetId: intoId } };
+  });
+  const undoMerge = jest.fn(async () => ({ ok: true as const, value: { restored: 0 } }));
+  const remove = jest.fn(async (id: string) => {
+    const row = state.rows.find((c) => c.id === id)!;
+    state.rows = state.rows.filter((c) => c.id !== id);
+    return { ok: true as const, value: { deleted: { id, parentId: row.parentId, name: row.name, kind: row.kind, budgetType: row.budgetType, icon: row.icon, colour: row.colorToken, sortOrder: row.sortOrder, archived: false } } };
+  });
+  const undoRemove = jest.fn(async () => ({ ok: true as const, value: { categoryId: 'x' } }));
+  const api: CategoriesApi = { load: async () => ({ rows: state.rows, archived: closed.archived }), save, move, preview, entries, archive, restore, merge, undoMerge, remove, undoRemove };
+  return { api, save, move, state, used, closed, preview, entries, archive, restore, merge, undoMerge, remove, undoRemove };
 }
 
 async function mount(api: CategoriesApi) {
@@ -230,6 +270,131 @@ describe('linesFor', () => {
     const rows = [...seedRows(), ...mapCategoryRows([['sub', 'Fuel', 'expense', 'need', 'GasPump', 'cat-sky', 99, 'cat_transport']])];
     const names = linesFor(rows, 'expense').map((l) => l.row.name);
     expect(names.indexOf('Fuel')).toBe(names.indexOf('Transport') + 1);
+  });
+});
+
+describe('Archive, merge and delete (Story 4.3)', () => {
+  const sub = (id: string, name: string, parentId: string): CategoryRow => ({ id, name, kind: 'expense', budgetType: 'need', icon: 'Car', colorToken: 'cat-sky', sortOrder: 99, parentId });
+
+  it('Archive reads how many entries use the category, lists them in pages, offers no Delete, and archives with Undo', async () => {
+    const f = fakeApi();
+    f.used.set('cat_transport', 40);
+    const r = await mount(f.api);
+    await press(r, 'category-row-cat_transport');
+    expect(has(r, 'category-archive')).toBe(true);
+    expect(has(r, 'category-merge')).toBe(true);
+    expect(has(r, 'category-delete')).toBe(false);
+    await press(r, 'category-archive');
+    expect(has(r, 'category-sheet')).toBe(false);
+    expect(texts(r)).toContain('40 entries use Transport.');
+    expect(host(r, 'archive-keep').props.accessibilityState).toMatchObject({ selected: true });
+    expect(r.root.findAll((n) => typeof n.type === 'string' && /^archive-entry-/.test(String(n.props.testID)))).toHaveLength(20);
+    await press(r, 'archive-more');
+    expect(r.root.findAll((n) => typeof n.type === 'string' && /^archive-entry-/.test(String(n.props.testID)))).toHaveLength(40);
+    expect(has(r, 'archive-more')).toBe(false);
+    await press(r, 'archive-go');
+    expect(f.archive).toHaveBeenCalledWith('cat_transport');
+    expect(has(r, 'archive-sheet')).toBe(false);
+    expect(has(r, 'category-row-cat_transport')).toBe(false);
+    expect(texts(r)).toContain('Archived Transport');
+    expect(texts(r)).toContain('Archived (1)');
+    await press(r, 'toast-undo');
+    expect(f.restore).toHaveBeenCalledWith('cat_transport');
+    expect(has(r, 'category-row-cat_transport')).toBe(true);
+  });
+
+  it('the Archived section is collapsed, then lists the category with Restore', async () => {
+    const f = fakeApi();
+    const r = await mount(f.api);
+    await press(r, 'category-row-cat_education');
+    await press(r, 'category-archive');
+    await press(r, 'archive-go');
+    expect(has(r, 'archived-category-cat_education')).toBe(false);
+    await press(r, 'categories-archived-toggle');
+    expect(has(r, 'archived-category-cat_education')).toBe(true);
+    await press(r, 'archived-restore-cat_education');
+    expect(f.restore).toHaveBeenCalledWith('cat_education');
+    expect(texts(r)).toContain('Restored Education');
+    expect(has(r, 'category-row-cat_education')).toBe(true);
+  });
+
+  it('counts a parent with its subcategories', async () => {
+    const f = fakeApi();
+    f.state.rows = [...f.state.rows, sub('s1', 'Petrol', 'cat_transport'), sub('s2', 'Taxi', 'cat_transport')];
+    f.used.set('cat_transport', 52);
+    const r = await mount(f.api);
+    await press(r, 'category-row-cat_transport');
+    await press(r, 'category-archive');
+    expect(texts(r)).toContain('52 entries use Transport and its 2 subcategories.');
+  });
+
+  it('a category nothing uses offers Delete with the confirmation and a toast with Undo', async () => {
+    const f = fakeApi();
+    const r = await mount(f.api);
+    await press(r, 'category-row-cat_education');
+    expect(has(r, 'category-delete')).toBe(true);
+    await press(r, 'category-delete');
+    expect(texts(r)).toContain('Delete Education? No entries use it.');
+    await press(r, 'archive-delete');
+    expect(f.remove).toHaveBeenCalledWith('cat_education');
+    expect(texts(r)).toContain('Deleted Education');
+    expect(has(r, 'category-row-cat_education')).toBe(false);
+    await press(r, 'toast-undo');
+    expect(f.undoRemove).toHaveBeenCalled();
+  });
+
+  it('Cancel on the delete confirmation changes nothing', async () => {
+    const f = fakeApi();
+    const r = await mount(f.api);
+    await press(r, 'category-row-cat_education');
+    await press(r, 'category-delete');
+    await press(r, 'archive-cancel');
+    expect(f.remove).not.toHaveBeenCalled();
+    expect(has(r, 'archive-sheet')).toBe(false);
+  });
+
+  it('Move them to another category previews the move, names the type change, and Confirm merges with Undo', async () => {
+    const f = fakeApi();
+    f.used.set('cat_transport', 40);
+    const r = await mount(f.api);
+    await press(r, 'category-row-cat_transport');
+    await press(r, 'category-archive');
+    await press(r, 'archive-move');
+    // Not itself, not Uncategorised; a Want category is a target.
+    expect(has(r, 'archive-target-cat_transport')).toBe(false);
+    expect(has(r, 'archive-target-cat_uncategorised')).toBe(false);
+    expect(has(r, 'archive-target-cat_travel')).toBe(true);
+    expect(host(r, 'archive-confirm').props.accessibilityState).toMatchObject({ disabled: true });
+    await press(r, 'archive-target-cat_travel');
+    expect(texts(r)).toContain("Move 40 entries from Transport to Travel. Amounts don't change. Totals for past periods stay the same.");
+    expect(texts(r)).toContain('Transport is a Need and Travel is a Want, so these entries count as Wants from now on, in every period.');
+    expect(f.merge).not.toHaveBeenCalled();
+    await press(r, 'archive-confirm');
+    expect(f.merge).toHaveBeenCalledWith('cat_transport', 'cat_travel');
+    expect(texts(r)).toContain('Moved 40 to Travel');
+    await press(r, 'toast-undo');
+    expect(f.undoMerge).toHaveBeenCalled();
+  });
+
+  it('Merge into… goes straight to the targets and leaves a subcategory out of its own parent’s list', async () => {
+    const f = fakeApi();
+    f.state.rows = [...f.state.rows, sub('s1', 'Petrol', 'cat_transport')];
+    f.used.set('cat_transport', 3);
+    const r = await mount(f.api);
+    await press(r, 'category-row-cat_transport');
+    await press(r, 'category-merge');
+    expect(has(r, 'archive-keep')).toBe(false);
+    expect(has(r, 'archive-target-s1')).toBe(false);
+    expect(has(r, 'archive-target-cat_groceries')).toBe(true);
+  });
+
+  it('shows no Archive, Merge or Delete for Other or Uncategorised', async () => {
+    const f = fakeApi();
+    const r = await mount(f.api);
+    await press(r, 'category-row-cat_other');
+    expect(has(r, 'category-sheet')).toBe(true);
+    expect(has(r, 'category-actions')).toBe(false);
+    expect(host(r, 'category-row-cat_uncategorised').props.onPress).toBeUndefined();
   });
 });
 

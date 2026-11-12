@@ -14,6 +14,8 @@ import {
   mapSources,
   RemoveAttachment,
   SOURCES_SQL,
+  ORIGINAL_CATEGORIES_SQL,
+  mapOriginalCategories,
   type Attachment,
   type SourceLine,
   RECOVERY_SUMMARY_SQL,
@@ -61,6 +63,8 @@ export interface TransactionData {
   readonly attachments: Attachment[];
   /** Every source with its kind and time. */
   readonly sources: SourceLine[];
+  /** Names of the categories this entry was merged away from (Story 4.3), oldest first. Shown as `Originally Fuel`. */
+  readonly originalCategories?: string[];
 }
 
 export type RemoveResult = { ok: true; value: { snapshot: TxSnapshot } } | { ok: false; code: string };
@@ -109,6 +113,7 @@ export const realTransactionApi: TransactionApi = {
       removalKind: await db.query('SELECT removal_kind FROM "transaction" WHERE id = ?', [transactionId]).then((r) => (r[0] && (r[0][0] === 'deleted' || r[0][0] === 'rejected') ? (r[0][0] as 'deleted' | 'rejected') : null)),
       attachments: mapAttachments(await db.query(ATTACHMENTS_SQL, [transactionId])),
       sources: mapSources(await db.query(SOURCES_SQL, [transactionId])),
+      originalCategories: mapOriginalCategories(await db.query(ORIGINAL_CATEGORIES_SQL, [transactionId])),
       reversedOn: detail.status === 'reversed' ? await db.query('SELECT local_date FROM "transaction" WHERE id = (SELECT reversed_by_id FROM "transaction" WHERE id = ?)', [transactionId]).then((r) => (r[0] ? String(r[0][0]) : null)) : null,
     };
   },

@@ -150,6 +150,16 @@ export function ActivityFilterSheet({
             ))}
           </>,
         )}
+        {(options.archivedCategories?.length ?? 0) > 0
+          ? section(
+              copy.activity.archivedCategories,
+              <>
+                {options.archivedCategories!.map((c) => (
+                  <Chip key={c.id} onGlass label={c.name} variant="quick-category" testID={`filter-category-${c.id}`} selected={q.categoryIds?.includes(c.id) ?? false} onPress={() => setQ((v) => ({ ...v, categoryIds: toggle(v.categoryIds, c.id) }))} />
+                ))}
+              </>,
+            )
+          : null}
         {section(
           copy.activity.filterType,
           <>

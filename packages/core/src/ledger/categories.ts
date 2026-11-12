@@ -63,6 +63,10 @@ export interface CategoryRow {
 export const CATEGORY_LIST_SQL =
   'SELECT id, name, kind, budget_type, icon, color_token, sort_order, parent_id FROM category WHERE archived = 0 ORDER BY sort_order, id';
 
+/** Archived categories (Story 4.3): hidden from pickers, kept on their entries, listed under Archived. */
+export const ARCHIVED_CATEGORY_LIST_SQL =
+  'SELECT id, name, kind, budget_type, icon, color_token, sort_order, parent_id FROM category WHERE archived = 1 ORDER BY sort_order, id';
+
 export function mapCategoryRows(rows: readonly (readonly unknown[])[]): CategoryRow[] {
   return rows.map((r) => ({
     id: String(r[0]),

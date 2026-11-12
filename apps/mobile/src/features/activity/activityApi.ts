@@ -10,6 +10,7 @@ import {
   mapBulkRows,
   UndoBulkRecategorise,
   activityQuery,
+  ARCHIVED_CATEGORY_LIST_SQL,
   CATEGORY_LIST_SQL,
   groupByDay,
   mapAccountRows,
@@ -41,6 +42,8 @@ export interface ActivityData {
 export interface ActivityOptions {
   readonly accounts: AccountRow[];
   readonly categories: CategoryRow[];
+  /** Archived categories stay filterable (Story 4.3), under Archived. */
+  readonly archivedCategories?: CategoryRow[];
   readonly today: string;
   readonly period: { readonly start: string; readonly end: string };
   /** The profile currency's decimals (amount filters are typed in major units). */
@@ -91,6 +94,7 @@ export const realActivityApi: ActivityApi = {
     return {
       accounts: mapAccountRows(await db.query(ACCOUNT_LIST_SQL)),
       categories: mapCategoryRows(await db.query(CATEGORY_LIST_SQL)),
+      archivedCategories: mapCategoryRows(await db.query(ARCHIVED_CATEGORY_LIST_SQL)),
       today: today.value,
       period: { start: period.start, end: period.end },
       exponent: p.exponent,

@@ -324,6 +324,16 @@ export function TransactionDetailScreen({
           </View>
         ) : null}
 
+        {(data.originalCategories ?? []).length > 0 ? (
+          <View testID="detail-originally" style={styles.row}>
+            {(data.originalCategories ?? []).map((name, i) => (
+              <Text key={i} style={[textStyle('caption'), muted]}>
+                {copy.detail.originally.replace('{name}', name)}
+              </Text>
+            ))}
+          </View>
+        ) : null}
+
         {d.status === 'reversed' && data.reversedOn ? (
           <Text testID="detail-reversed" style={[textStyle('body-medium'), ink]}>
             {copy.detail.reversedOn.replace('{date}', longDate(data.reversedOn))}

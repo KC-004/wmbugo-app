@@ -403,6 +403,23 @@ describe('receipt photos and sources on the detail (Story 3.11)', () => {
   });
 });
 
+describe('merged categories (Story 4.3)', () => {
+  it('an entry moved by a merge says where it was; one never merged says nothing', async () => {
+    const apiWith = (extra: Partial<TransactionData>) => {
+      const d = detail();
+      const f = fakeApi(d);
+      const load = jest.fn<Promise<TransactionData | 'missing' | null>, [string]>(async () => ({ ...data(d), ...extra }));
+      return { api: { ...f.api, load } as TransactionApi };
+    };
+    const a = await mountDetail(detail(), apiWith({ originalCategories: ['Fuel'] }));
+    expect(texts(a.r)).toContain('Originally Fuel');
+    a.unmount();
+    const b = await mountDetail(detail(), apiWith({}));
+    expect(has(b.r, 'detail-originally')).toBe(false);
+    b.unmount();
+  });
+});
+
 describe('restoring and permanently deleting from the detail (Story 3.13)', () => {
   const removed = (kind: 'deleted' | 'rejected') => {
     const d = detail({ removed: true, sourceKind: kind === 'rejected' ? 'sms' : 'manual', status: 'excluded' });

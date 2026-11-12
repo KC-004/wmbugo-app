@@ -12,6 +12,7 @@ import { textStyle } from '../../shared/theme/typography';
 import { Button } from '../../shared/ui/Button';
 import { Chip } from '../../shared/ui/Chip';
 import { categoryIcon, searchIcons } from '../add/categoryIcons';
+import type { ArchiveMode } from './ArchiveSheet';
 import type { SaveOutcome } from './categoriesApi';
 
 export type CategorySheetMode = { readonly mode: 'add'; readonly kind: CategoryKind } | { readonly mode: 'edit'; readonly row: CategoryRow };
@@ -36,11 +37,14 @@ export function CategorySheet({
   start,
   categories,
   onSave,
+  actions,
   close,
 }: {
   start: CategorySheetMode;
   categories: readonly CategoryRow[];
   onSave: (input: { id?: string; name: string; kind: CategoryKind; icon: string; colour: string; budgetType: BudgetType | null; parentId: string | null }) => Promise<SaveOutcome>;
+  /** Archive / Merge into… / Delete for an existing category; Delete only when nothing uses it. */
+  actions?: { readonly canDelete: boolean; readonly onAction: (action: ArchiveMode) => void };
   close: () => void;
 }) {
   const theme = useTheme();
@@ -195,6 +199,13 @@ export function CategorySheet({
               ))}
             </View>
           </>
+        ) : null}
+        {editing && actions ? (
+          <View testID="category-actions" style={styles.row}>
+            <Button label={copy.categories.archive} variant="text" onGlass testID="category-archive" onPress={() => actions.onAction('archive')} />
+            <Button label={copy.categories.mergeInto} variant="text" onGlass testID="category-merge" onPress={() => actions.onAction('merge')} />
+            {actions.canDelete ? <Button label={copy.categories.delete} variant="text" onGlass testID="category-delete" onPress={() => actions.onAction('delete')} /> : null}
+          </View>
         ) : null}
       </ScrollView>
       <Button label={copy.categories.save} testID="category-save" onPress={() => void submit()} />

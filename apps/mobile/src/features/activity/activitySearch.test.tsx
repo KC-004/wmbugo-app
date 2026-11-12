@@ -50,6 +50,7 @@ const OPTIONS: ActivityOptions = {
     { id: 'a2', name: 'Old SBI', type: 'bank', icon: 'Bank', colorToken: 'cat-indigo', sortOrder: 1, status: 'archived', balanceNotSet: false, postingsMinor: 0 },
   ],
   categories: [{ id: 'cat_food', name: 'Food & Drinks', kind: 'expense', budgetType: 'need', icon: 'ForkKnife', color: 'cat-rose', sortOrder: 0 } as never],
+  archivedCategories: [{ id: 'cat_fuel', name: 'Fuel', kind: 'expense', budgetType: 'need', icon: 'GasPump', color: 'cat-olive', sortOrder: 1 } as never],
   today: '2026-11-08',
   period: { start: '2026-11-01', end: '2026-11-30' },
 };
@@ -161,7 +162,7 @@ describe('the filter sheet (Story 3.6)', () => {
     await settle();
     expect(has(m.r, 'filter-sheet')).toBe(true);
     const t = texts(m.r);
-    expect(t).toEqual(expect.arrayContaining(['Date', 'This period', 'Last 7 days', 'Last 30 days', 'Custom range', 'Accounts', 'Archived', 'Old SBI', 'Categories', 'Type', 'Expense', 'Income', 'Transfer', 'Refund', 'Status', 'Waiting for you', 'Possible duplicate', 'Needs a category', 'Guessed', 'Reversed', 'Amount', 'Show rejected', 'Rejected captures from the last 90 days', 'Sort', 'Newest first', 'Oldest first', 'Highest amount', 'Merchant A–Z', 'Reset', 'Show 3 results']));
+    expect(t).toEqual(expect.arrayContaining(['Date', 'This period', 'Last 7 days', 'Last 30 days', 'Custom range', 'Accounts', 'Archived', 'Old SBI', 'Categories', 'Archived categories', 'Fuel', 'Type', 'Expense', 'Income', 'Transfer', 'Refund', 'Status', 'Waiting for you', 'Possible duplicate', 'Needs a category', 'Guessed', 'Reversed', 'Amount', 'Show rejected', 'Rejected captures from the last 90 days', 'Sort', 'Newest first', 'Oldest first', 'Highest amount', 'Merchant A–Z', 'Reset', 'Show 3 results']));
   });
 
   it('applying returns to Activity with the chosen filters as chips; the preset means the right dates', async () => {
