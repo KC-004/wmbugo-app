@@ -6,3 +6,4 @@ export * from './promptState';
 export * from './settings';
 export * from './settingsCommands';
 export * from './timezone';
+export * from './paydayChange';

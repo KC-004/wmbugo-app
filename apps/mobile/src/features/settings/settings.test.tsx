@@ -172,6 +172,62 @@ describe('Money basics', () => {
     expect(changeProfile).toHaveBeenCalledWith({ payday: { kind: 'last_day' } });
   });
 
+  describe('a payday change that cuts the current cycle short (Story 4.8)', () => {
+    const plan = { cycleEnd: '2026-11-24', shortened: { start: '2026-11-01', end: '2026-11-24' }, transition: { start: '2026-11-01', end: '2026-11-24', previous: { kind: 'first' as const }, normalDays: 30 } };
+    const withPreview = async (p: typeof plan | null) => {
+      const o = await open(data());
+      const previewPayday = jest.fn(async () => p);
+      (o.api as { previewPayday?: unknown }).previewPayday = previewPayday;
+      act(() => fire(o.r, 'group-you'));
+      act(() => fire(o.r, 'row-money'));
+      await settle();
+      return { ...o, previewPayday };
+    };
+
+    it('asks first with the end of the cycle and the adjusted budgets; Cancel changes nothing', async () => {
+      const { r, changeProfile } = await withPreview(plan);
+      act(() => fire(r, 'payday-other'));
+      act(() => fire(r, 'payday-day', 'onChangeText', '25'));
+      await act(async () => fire(r, 'payday-day-save'));
+      await settle();
+      expect(texts(r)).toContain('Your current cycle will end on 24 Nov. Budgets for 1–24 Nov are adjusted to match.');
+      expect(changeProfile).not.toHaveBeenCalled();
+      await act(async () => fire(r, 'payday-confirm-cancel'));
+      expect(has(r, 'payday-confirm')).toBe(false);
+      expect(changeProfile).not.toHaveBeenCalled();
+    });
+
+    it('Change payday confirms and saves it', async () => {
+      const { r, changeProfile } = await withPreview(plan);
+      act(() => fire(r, 'payday-other'));
+      act(() => fire(r, 'payday-day', 'onChangeText', '25'));
+      await act(async () => fire(r, 'payday-day-save'));
+      await settle();
+      await act(async () => fire(r, 'payday-confirm-yes'));
+      expect(changeProfile).toHaveBeenCalledWith({ payday: { kind: 'day', day: 25 } });
+      expect(has(r, 'payday-confirm')).toBe(false);
+    });
+
+    it('with no shortened cycle only the cycle end is said, and with no plan it saves at once', async () => {
+      const a = await withPreview({ ...plan, shortened: null as never });
+      await act(async () => fire(a.r, 'payday-last_day'));
+      await settle();
+      expect(texts(a.r)).toContain('Your current cycle will end on 24 Nov.');
+      const b = await withPreview(null);
+      await act(async () => fire(b.r, 'payday-last_day'));
+      await settle();
+      expect(b.changeProfile).toHaveBeenCalledWith({ payday: { kind: 'last_day' } });
+    });
+
+    it('Not salaried never asks', async () => {
+      const { r, changeProfile, previewPayday } = await withPreview(plan);
+      await act(async () => fire(r, 'payday-none'));
+      await settle();
+      expect(previewPayday).not.toHaveBeenCalled();
+      expect(changeProfile).toHaveBeenCalledWith({ payday: { kind: 'none' } });
+    });
+  });
+
   it('Other payday needs a day from 1 to 31', async () => {
     const { r, changeProfile } = await toMoney(data());
     act(() => fire(r, 'payday-other'));

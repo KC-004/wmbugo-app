@@ -1,12 +1,27 @@
 import { err, ok, type Result } from '../shared/result';
 
-/** When the user is paid; it decides the default budgeting period (AD-7, owned by the profile module). */
-export type PaydayRule =
+/** The payday rule itself: when the user is paid. */
+export type PaydayRuleBase =
   | { readonly kind: 'first' }
   | { readonly kind: 'last_day' }
   | { readonly kind: 'last_working_day' }
   | { readonly kind: 'day'; readonly day: number }
   | { readonly kind: 'none' };
+
+/**
+ * A payday change mid-cycle (Story 4.8). Dates before `start` belong to the earlier rule, `start` to `end` is one shortened
+ * cycle (empty when `end` is before `start`), and dates after `end` follow the new rule. It is kept for good, so past
+ * periods never move. `normalDays` is the length of the normal cycle the shortened one is cut from, for pro-rating.
+ */
+export interface PaydayTransition {
+  readonly start: string;
+  readonly end: string;
+  readonly previous: PaydayRuleBase;
+  readonly normalDays: number;
+}
+
+/** When the user is paid; it decides the default budgeting period (AD-7, owned by the profile module). */
+export type PaydayRule = PaydayRuleBase & { readonly transitions?: readonly PaydayTransition[] };
 
 export type PaydayChoice = 'first' | 'last_day' | 'last_working_day' | 'other' | 'none';
 

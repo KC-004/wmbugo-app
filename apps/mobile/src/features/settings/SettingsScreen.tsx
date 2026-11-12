@@ -3,14 +3,17 @@ import { BackHandler, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CaretRight } from 'phosphor-react-native';
 import {
+  dayMonthLabel,
   detectRegion,
   effectiveLocale,
   paydayFromChoice,
   paydaySummary,
+  periodRangeLabel,
   youSummary,
   type FirstDay,
   type NumberFormat,
   type PaydayChoice,
+  type PaydayRule,
   type PeriodMode,
   type Region,
   type ThemeChoice,
@@ -207,6 +210,7 @@ function Money({
   const [day, setDay] = useState(d.profile.payday.kind === 'day' ? String(d.profile.payday.day) : '');
   const [otherOpen, setOtherOpen] = useState(d.profile.payday.kind === 'day');
   const [dayError, setDayError] = useState(false);
+  const [confirmPayday, setConfirmPayday] = useState<{ rule: PaydayRule; text: string } | null>(null);
   const ink = { color: theme.color('text-primary') };
   const muted = { color: theme.color('text-secondary') };
 
@@ -215,6 +219,15 @@ function Money({
     const r = await api.changeProfile(c);
     if (!r.ok) setMessage(r.code === 'CURRENCY_LOCKED' ? copy.settings.currencyLocked : copy.settings.saveError);
     await refresh();
+  };
+
+  /** A payday change that cuts the current cycle short asks first (Story 4.8); anything else saves at once. */
+  const requestPayday = async (rule: PaydayRule) => {
+    setMessage(null);
+    const plan = rule.kind === 'none' ? null : await api.previewPayday?.(rule).catch(() => null);
+    if (!plan) return void change({ payday: rule });
+    const text = copy.settings.paydayCycleEnds.replace('{end}', dayMonthLabel(plan.cycleEnd)) + (plan.shortened ? ` ${copy.settings.paydayBudgetsAdjusted.replace('{range}', periodRangeLabel(plan.shortened.start, plan.shortened.end))}` : '');
+    setConfirmPayday({ rule, text });
   };
 
   if (picking) {
@@ -265,11 +278,26 @@ function Money({
               }
               setOtherOpen(false);
               const rule = paydayFromChoice(p.v);
-              if (rule.ok) void change({ payday: rule.value });
+              if (rule.ok) void requestPayday(rule.value);
             }}
           />
         ))}
       </Group>
+      {confirmPayday ? (
+        <View testID="payday-confirm" style={styles.gap}>
+          <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={[textStyle('body'), ink]}>{confirmPayday.text}</Text>
+          <Button
+            label={copy.settings.paydayChange}
+            testID="payday-confirm-yes"
+            onPress={() => {
+              const rule = confirmPayday.rule;
+              setConfirmPayday(null);
+              void change({ payday: rule });
+            }}
+          />
+          <Button label={copy.common.cancel} variant="text" testID="payday-confirm-cancel" onPress={() => setConfirmPayday(null)} />
+        </View>
+      ) : null}
       {otherOpen ? (
         <View style={styles.gap}>
           <TextInput
@@ -300,7 +328,7 @@ function Money({
                 setDayError(true);
                 return;
               }
-              void change({ payday: rule.value });
+              void requestPayday(rule.value);
             }}
           />
         </View>

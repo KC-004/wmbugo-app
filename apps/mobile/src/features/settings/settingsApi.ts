@@ -3,6 +3,8 @@ import {
   AnswerTimezonePrompt,
   ApplyPendingTimezone,
   ChangeProfile,
+  previewPaydayChange,
+  type PaydayChangePlan,
   ChangeSetting,
   findRegion,
   mapAccountRows,
@@ -46,6 +48,8 @@ export interface SettingsApi {
   load(): Promise<SettingsData | null>;
   changeSetting(key: string, value: unknown): Promise<{ ok: boolean; code?: string }>;
   changeProfile(change: ProfileChange): Promise<{ ok: boolean; code?: string }>;
+  /** What a payday change would do today (Story 4.8): the cycle end and the shortened cycle. null when nothing is cut short. Read only. */
+  previewPayday?(rule: PaydayRule): Promise<PaydayChangePlan | null>;
   /** Tracks the device zone, applies a pending switch, and says whether to ask. */
   timezoneCheck(): Promise<TimezoneAsk | null>;
   answerTimezone(use: boolean, deviceTz: string): Promise<{ ok: boolean }>;
@@ -78,6 +82,7 @@ export const realSettingsApi: SettingsApi = {
   },
   changeSetting: (key, value) => getServices().writer.run(ChangeSetting, { key, value }, 'user'),
   changeProfile: (change) => getServices().writer.run(ChangeProfile, change, 'user'),
+  previewPayday: (rule) => previewPaydayChange(getServices().db, rule, systemClock.nowMs()),
   async timezoneCheck() {
     const { db, writer } = getServices();
     const deviceTz = systemClock.timezoneId();

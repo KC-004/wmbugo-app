@@ -1,7 +1,7 @@
 import { toLocalDate } from '../shared/clock';
-import { budgetPeriodFor, customPeriod, periodRangeLabel, type Period } from '../profile/period';
-import { budgetFigures, budgetStatus, DEFAULT_NEARING_PERCENT, targetForPeriod, type BudgetDef, type BudgetStatus, type Querier } from './budgets';
-import { BUDGETS_SQL, mapBudgets, mapTargetVersions, readPeriodProfile, TARGET_VERSIONS_SQL } from './budgetStore';
+import { budgetPeriodFor, customPeriod, periodTitle, type Period } from '../profile/period';
+import { budgetFigures, budgetStatus, DEFAULT_NEARING_PERCENT, type BudgetDef, type BudgetStatus, type Querier } from './budgets';
+import { BUDGETS_SQL, mapBudgets, mapTargetVersions, periodTarget, readPeriodProfile, TARGET_VERSIONS_SQL } from './budgetStore';
 
 export type BudgetGroup = 'overall' | 'fifty_thirty_twenty' | 'categories';
 
@@ -30,7 +30,7 @@ export interface BudgetList {
 }
 
 const labelFor = (rule: BudgetDef['period']['rule'], p: Period): string => {
-  const range = periodRangeLabel(p.start, p.end);
+  const range = periodTitle(p);
   return rule === 'weekly' ? `Weekly · ${range}` : rule === 'custom' ? `Custom · ${range}` : range;
 };
 
@@ -51,7 +51,7 @@ export async function loadBudgetList(q: Querier, nowMs: number): Promise<BudgetL
     const period = budgetPeriodFor(b.period, today.value, read.profile) ?? (b.period.rule === 'custom' && b.period.customStart && b.period.customEnd ? customPeriod(b.period.customStart, b.period.customEnd) : null);
     if (!period) continue;
     const versions = mapTargetVersions(await q.query(TARGET_VERSIONS_SQL, [b.id]));
-    const target = targetForPeriod(versions, period.start) ?? versions[0]?.targetMinor ?? 0;
+    const target = periodTarget(b, versions, period) ?? versions[0]?.targetMinor ?? 0;
     const figures = await budgetFigures(q, b, period);
     const status = budgetStatus({ usedMinor: figures.usedMinor, targetMinor: target, period, today: today.value, nearingPercent: b.alertThresholds?.[0] ?? DEFAULT_NEARING_PERCENT });
     const group: BudgetGroup = b.scope === 'overall' ? 'overall' : b.template === 'fifty_thirty_twenty' ? 'fifty_thirty_twenty' : 'categories';

@@ -124,7 +124,7 @@ describe('changing the limit keeps history (Story 4.7, BDG-007)', () => {
     expect(await versions(db, id)).toEqual([['1', '5000000', '2026-10-01'], ['2', '4500000', '2026-11-01']]);
     expect((await detail(db, id)).status.remainingMinor).toBe(2_500_000);
     expect((await detail(db, id, 1)).targetMinor).toBe(5_000_000);
-    expect((await db.query('SELECT start_date, target_minor FROM budget_period WHERE budget_id = ? ORDER BY start_date', [id])).map((r) => r.map(String))).toEqual([['2026-10-01', '5000000'], ['2026-11-01', '4500000']]);
+    expect((await db.query('SELECT start_date, target_minor FROM budget_period WHERE budget_id = ? ORDER BY start_date', [id])).map((r) => r.map(String))).toEqual([['2026-10-01', '5000000'], ['2026-11-01', '4500000'], ['2026-12-01', '4500000']]);
   });
 
   it('From next period: this period stays at ₹50,000 and ₹45,000 applies from 1 December', async () => {

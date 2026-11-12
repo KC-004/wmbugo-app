@@ -1,7 +1,8 @@
 import { err, ok } from '../shared/result';
 import { toLocalDate } from '../shared/clock';
 import type { UseCase, WriterContext } from '../writer/ledgerWriter';
-import { budgetPeriodFor, paydayRuleFromRow } from '../profile/period';
+import { budgetPeriodFor, periodDays, prorateTarget, type Period } from '../profile/period';
+import { readPaydayRule } from '../profile/paydayChange';
 import { SETTINGS_SQL, parseSettings, periodRule } from '../profile/settings';
 import type { PeriodProfile } from '../profile/period';
 import { periodsToCache, targetForPeriod, type BudgetDef, type Querier, type TargetVersion } from './budgets';
@@ -56,14 +57,23 @@ export const mapTargetVersions = (rows: readonly (readonly unknown[])[]): Target
 
 /** What the period service needs, read the same way everywhere: payday rule, period mode and first day of the week. */
 export async function readPeriodProfile(q: Querier): Promise<{ profile: PeriodProfile; timezoneId: string } | null> {
-  const p = (await q.query('SELECT payday_rule, payday_day, timezone_id FROM profile LIMIT 1'))[0];
-  if (!p) return null;
+  const read = await readPaydayRule(q);
+  if (!read) return null;
   const settings = parseSettings(await q.query(SETTINGS_SQL));
-  const rule = periodRule(paydayRuleFromRow(p[0] === null ? null : String(p[0]), p[1] === null ? null : Number(p[1])), settings.periodMode);
-  return { profile: { rule, firstDay: settings.firstDay }, timezoneId: String(p[2]) };
+  return { profile: { rule: periodRule(read.rule, settings.periodMode), firstDay: settings.firstDay }, timezoneId: read.timezoneId };
 }
 
 export type RebuildError = 'NO_PROFILE' | 'DATE_INVALID';
+
+/**
+ * The target a period has: the version in force from its start, and for a shortened pay cycle (Story 4.8) pro-rated to its
+ * length, but only for a budget that follows the default period. Weekly, monthly and custom budgets keep their own periods.
+ */
+export function periodTarget(budget: BudgetDef, versions: readonly TargetVersion[], period: Period): number | null {
+  const base = targetForPeriod(versions, period.start);
+  if (base === null) return null;
+  return period.shortened && budget.period.rule === 'default' && period.normalDays ? prorateTarget(base, periodDays(period), period.normalDays) : base;
+}
 
 /** Rebuilds the cached periods of some budgets (or all) from the period service and their target versions. */
 export async function rebuildPeriods(ctx: WriterContext, only?: readonly string[]): Promise<RebuildError | { budgets: number; periods: number }> {
@@ -79,9 +89,9 @@ export async function rebuildPeriods(ctx: WriterContext, only?: readonly string[
     if (versions.length === 0) continue;
     const first = versions.reduce((m, v) => (v.effectiveFrom < m ? v.effectiveFrom : m), versions[0]!.effectiveFrom);
     for (const p of periodsToCache(b, first, today.value, read.profile)) {
-      const target = targetForPeriod(versions, p.start);
+      const target = periodTarget(b, versions, p);
       if (target === null) continue;
-      await ctx.execute('INSERT INTO budget_period (budget_id, start_date, end_date, target_minor, shortened) VALUES (?, ?, ?, ?, 0)', [b.id, p.start, p.end, target]);
+      await ctx.execute('INSERT INTO budget_period (budget_id, start_date, end_date, target_minor, shortened) VALUES (?, ?, ?, ?, ?)', [b.id, p.start, p.end, target, p.shortened && b.period.rule === 'default' ? 1 : 0]);
       periods += 1;
     }
   }

@@ -266,6 +266,7 @@ describe('periods across a boundary and RebuildBudgetPeriods (Story 4.5, BDG-005
       ['2026-09-01', '2026-09-30', 5_000_000],
       ['2026-10-01', '2026-10-31', 5_000_000],
       ['2026-11-01', '2026-11-30', 4_500_000],
+      ['2026-12-01', '2026-12-31', 4_500_000],
     ]);
   });
 
@@ -281,9 +282,10 @@ describe('periods across a boundary and RebuildBudgetPeriods (Story 4.5, BDG-005
     await db.query('DELETE FROM audit_event');
     expect((await writer.run(RebuildBudgetPeriods, {}, 'system')).ok).toBe(true);
     // Today (12 Nov) now sits in the cycle that began on 25 Oct; each period keeps the target version it had.
-    expect((await periods(db)).slice(-2)).toEqual([
+    expect((await periods(db)).slice(-3)).toEqual([
       ['2026-09-25', '2026-10-24', 5_000_000],
       ['2026-10-25', '2026-11-24', 5_000_000],
+      ['2026-11-25', '2026-12-24', 4_500_000],
     ]);
     expect(await fingerprint()).toBe(before);
     const kinds = (await db.query('SELECT DISTINCT entity_kind FROM audit_event')).map((r) => String(r[0]));
@@ -312,7 +314,7 @@ describe('periods across a boundary and RebuildBudgetPeriods (Story 4.5, BDG-005
     const custom: BudgetDef = { id: 'c', scope: 'overall', categoryIds: [], budgetType: null, accountIds: null, period: { rule: 'custom', customStart: '2026-11-01', customEnd: '2026-11-10' } };
     expect(periodsToCache(custom, '2026-11-01', '2026-11-05', profile)).toEqual([customPeriod('2026-11-01', '2026-11-10')]);
     const monthly: BudgetDef = { ...custom, period: { rule: 'monthly' } };
-    expect(periodsToCache(monthly, '2000-01-01', '2026-11-12', profile)).toHaveLength(36);
+    expect(periodsToCache(monthly, '2000-01-01', '2026-11-12', profile)).toHaveLength(37); // the next period plus the cap of 36
   });
 });
 

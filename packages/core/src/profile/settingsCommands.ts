@@ -2,9 +2,12 @@ import { toLocalDate } from '../shared/clock';
 import { getCurrency } from '../shared/currency';
 import { err, ok } from '../shared/result';
 import type { UseCase, WriterContext } from '../writer/ledgerWriter';
-import { isValidPayday, type PaydayRule } from './payday';
+import { isValidPayday, type PaydayRule, type PaydayRuleBase } from './payday';
+import { parsePaydayTransitions, readPaydayRule, samePayday, SETTING_PAYDAY_TRANSITIONS } from './paydayChange';
+import { planPaydayChange } from './period';
+import { rebuildPeriods } from '../planning/budgetStore';
 import type { Region } from './regions';
-import { SETTING_DEFAULT_ACCOUNT, validateSetting } from './settings';
+import { SETTING_DEFAULT_ACCOUNT, SETTINGS_SQL, validateSetting } from './settings';
 import { nextLocalDate, offsetMinutes, PROMPT_TIMEZONE, SETTING_TZ_MISMATCH_SINCE, SETTING_TZ_PENDING, TIMEZONE_GAP_MINUTES } from './timezone';
 
 async function upsertSetting(ctx: WriterContext, key: string, value: unknown): Promise<void> {
@@ -79,6 +82,17 @@ export const ChangeProfile: UseCase<ProfileChange, void, ChangeProfileError> = {
       fields.push('region', 'currency');
     }
     if (input.payday) {
+      // A change to another pay cycle mid-cycle is remembered for good (Story 4.8): the current cycle ends cleanly, the days up
+      // to the new payday are one shortened cycle, and every earlier period keeps its dates.
+      const read = await readPaydayRule(ctx);
+      const next: PaydayRuleBase = input.payday.kind === 'day' ? { kind: 'day', day: input.payday.day } : { kind: input.payday.kind };
+      if (read && next.kind !== 'none' && !samePayday(read.rule, next)) {
+        const today = toLocalDate(ctx.nowMs(), read.timezoneId);
+        if (today.ok) {
+          const plan = planPaydayChange(today.value, read.rule, next);
+          await upsertSetting(ctx, SETTING_PAYDAY_TRANSITIONS, [...parsePaydayTransitions(await ctx.query(SETTINGS_SQL)), plan.transition]);
+        }
+      }
       await ctx.execute('UPDATE profile SET payday_rule = ?, payday_day = ? WHERE id = ?', [input.payday.kind, input.payday.kind === 'day' ? input.payday.day : null, String(p[0])]);
       fields.push('payday');
     }
@@ -88,6 +102,8 @@ export const ChangeProfile: UseCase<ProfileChange, void, ChangeProfileError> = {
       await ctx.execute('DELETE FROM settings WHERE key = ?', [SETTING_TZ_PENDING]);
       fields.push('timezone');
     }
+    // The derived budget periods are rebuilt in the same transaction, with shortened cycles pro-rated; no entry is touched.
+    if (fields.includes('payday')) await rebuildPeriods(ctx);
     ctx.touch('profile', String(p[0]), { fields: fields.join(',') });
     ctx.emit('ProfileChanged', { fields });
     return ok(undefined);

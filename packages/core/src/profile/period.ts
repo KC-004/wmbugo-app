@@ -1,10 +1,14 @@
-import type { PaydayRule } from './payday';
+import type { PaydayRule, PaydayRuleBase, PaydayTransition } from './payday';
 
 /** An inclusive range of local dates (YYYY-MM-DD) in the profile timezone. */
 export interface Period {
   readonly start: string;
   readonly end: string;
   readonly kind: 'calendar_month' | 'pay_cycle' | 'week' | 'custom';
+  /** A pay cycle cut short by a payday change (Story 4.8): its budgets are pro-rated and it reads `Shortened cycle`. */
+  readonly shortened?: boolean;
+  /** For a shortened cycle: the length of the normal cycle it is cut from (the pro-rating base). */
+  readonly normalDays?: number;
 }
 
 interface Ymd {
@@ -62,7 +66,7 @@ export function previousDay(date: string): string {
  * The period a local date belongs to. Not salaried: the calendar month. Otherwise the pay cycle: from the
  * latest payday on or before the date up to the day before the next one. Every date is in exactly one period.
  */
-export function periodFor(localDate: string, rule: PaydayRule): Period {
+function basePeriodFor(localDate: string, rule: PaydayRuleBase): Period {
   const { y, m } = parse(localDate);
   if (rule.kind === 'none') {
     return { start: fmt({ y, m, d: 1 }), end: fmt({ y, m, d: daysIn(y, m) }), kind: 'calendar_month' };
@@ -79,6 +83,69 @@ export function periodFor(localDate: string, rule: PaydayRule): Period {
     return paydayInMonth(s.y, s.m, rule);
   })();
   return { start: paydays[startIdx]!, end: previousDay(next), kind: 'pay_cycle' };
+}
+
+/**
+ * The period a local date belongs to, following any payday changes (Story 4.8). Dates before a change use the rule that
+ * was in force, the shortened cycle is one period, and later dates use the new rule, so every date is in exactly one
+ * period and past periods never move.
+ */
+export function periodFor(localDate: string, rule: PaydayRule): Period {
+  const ts = rule.transitions;
+  const last = ts?.[ts.length - 1];
+  if (!ts || !last) return basePeriodFor(localDate, rule);
+  if (localDate >= last.start && localDate <= last.end) return { start: last.start, end: last.end, kind: 'pay_cycle', shortened: true, normalDays: last.normalDays };
+  if (localDate > last.end) return basePeriodFor(localDate, rule);
+  return periodFor(localDate, { ...last.previous, transitions: ts.slice(0, -1) });
+}
+
+/** The first payday on or after a date. */
+export function nextPaydayOnOrAfter(date: string, rule: Exclude<PaydayRuleBase, { kind: 'none' }>): string {
+  const { y, m } = parse(date);
+  for (let by = 0; by < 3; by++) {
+    const s = shiftMonth(y, m, by);
+    const p = paydayInMonth(s.y, s.m, rule);
+    if (p >= date) return p;
+  }
+  const s = shiftMonth(y, m, 3);
+  return paydayInMonth(s.y, s.m, rule);
+}
+
+export interface PaydayChangePlan {
+  readonly transition: PaydayTransition;
+  /** The last day of the cycle that ends because of the change (`Your current cycle will end on 24 Nov`). */
+  readonly cycleEnd: string;
+  /** The shortened cycle, or null when the change falls exactly on a cycle boundary. */
+  readonly shortened: { readonly start: string; readonly end: string } | null;
+}
+
+const withoutTransitions = (r: PaydayRule): PaydayRuleBase => (r.kind === 'day' ? { kind: 'day', day: r.day } : { kind: r.kind });
+
+/**
+ * What changing payday to `next` does today. The current cycle ends the day before the new payday falls, or, when that is
+ * after its normal end, at its normal end and the days up to the new payday are one shortened cycle. No cycle is ever
+ * longer than a normal one, and the past stays as it was.
+ */
+export function planPaydayChange(today: string, current: PaydayRule, next: Exclude<PaydayRuleBase, { kind: 'none' }>): PaydayChangePlan {
+  const cur = periodFor(today, current);
+  const newPayday = nextPaydayOnOrAfter(today, next);
+  const previous = withoutTransitions(current);
+  const normalDaysAt = (date: string) => periodDays(basePeriodFor(date, previous));
+  if (newPayday <= cur.end) {
+    const end = previousDay(newPayday);
+    if (end < cur.start) return { transition: { start: newPayday, end, previous, normalDays: normalDaysAt(cur.start) }, cycleEnd: cur.end, shortened: null };
+    return { transition: { start: cur.start, end, previous, normalDays: normalDaysAt(cur.start) }, cycleEnd: end, shortened: { start: cur.start, end } };
+  }
+  const start = addDays(cur.end, 1);
+  const end = previousDay(newPayday);
+  if (end < start) return { transition: { start: newPayday, end, previous, normalDays: normalDaysAt(start) }, cycleEnd: cur.end, shortened: null };
+  return { transition: { start, end, previous, normalDays: normalDaysAt(start) }, cycleEnd: cur.end, shortened: { start, end } };
+}
+
+/** A target pro-rated to a shortened cycle: target × days ÷ normal days, rounded half up to the minor unit. */
+export function prorateTarget(targetMinor: number, days: number, normalDays: number): number {
+  if (normalDays <= 0) return targetMinor;
+  return Math.floor((targetMinor * days * 2 + normalDays) / (2 * normalDays));
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -107,6 +174,7 @@ export function dayHeading(date: string, today: string): string {
 
 /** The scope label under "Spent this period": "This month" or "1 Nov to 30 Nov". */
 export function periodLabel(period: Period, today: string): string {
+  if (period.shortened) return periodTitle(period);
   const { y: ty, m: tm } = parse(today);
   const s = parse(period.start);
   const e = parse(period.end);
@@ -166,6 +234,9 @@ export function dayMonthLabel(date: string): string {
   const { m, d } = parse(date);
   return `${d} ${MONTHS[m - 1]}`;
 }
+
+/** The label of a period: `1–24 Nov`, and `1–24 Nov · Shortened cycle` for a shortened pay cycle. */
+export const periodTitle = (p: { readonly start: string; readonly end: string; readonly shortened?: boolean }): string => `${periodRangeLabel(p.start, p.end)}${p.shortened ? ' · Shortened cycle' : ''}`;
 
 /** `1–30 Nov` for one month, `25 Oct–24 Nov` across two. */
 export function periodRangeLabel(start: string, end: string): string {

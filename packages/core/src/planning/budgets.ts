@@ -1,5 +1,5 @@
 import type { SqlParam } from '../ports/storage';
-import { budgetPeriodFor, daysBetween, previousPeriod, type BudgetPeriodRule, type Period, type PeriodProfile } from '../profile/period';
+import { addDays, budgetPeriodFor, daysBetween, previousPeriod, type BudgetPeriodRule, type Period, type PeriodProfile } from '../profile/period';
 
 /**
  * Budgets are lasting rules measured over a period (Story 4.5, BDG-001/003/005/006). Nothing here stores a running total:
@@ -200,8 +200,8 @@ export const currentPeriod = (budget: BudgetDef, today: string, profile: PeriodP
 export const MAX_CACHED_PERIODS = 36;
 
 /**
- * The periods to cache for a budget: the current one and the earlier ones back to the period that holds its first target.
- * Every period comes from the period service; a custom range is its single range.
+ * The periods to cache for a budget: the next one, the current one and the earlier ones back to the period that holds its
+ * first target. Every period comes from the period service; a custom range is its single range.
  */
 export function periodsToCache(budget: BudgetDef, firstEffective: string, today: string, profile: PeriodProfile): Period[] {
   if (budget.period.rule === 'custom') {
@@ -210,9 +210,10 @@ export function periodsToCache(budget: BudgetDef, firstEffective: string, today:
   }
   const current = budgetPeriodFor(budget.period, today, profile);
   if (!current) return [];
-  const out: Period[] = [current];
+  const next = budgetPeriodFor(budget.period, addDays(current.end, 1), profile);
+  const out: Period[] = next ? [next, current] : [current];
   let p: Period | null = current;
-  while (out.length < MAX_CACHED_PERIODS && p !== null && p.start > firstEffective) {
+  while (out.length < MAX_CACHED_PERIODS + 1 && p !== null && p.start > firstEffective) {
     p = previousPeriod(p, profile);
     if (p) out.push(p);
   }

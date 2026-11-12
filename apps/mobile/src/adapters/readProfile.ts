@@ -3,6 +3,7 @@ import {
   getCurrency,
   parseSettings,
   paydayRuleFromRow,
+  paydayWithHistory,
   SETTINGS_SQL,
   type AppSettings,
   type CurrencyCode,
@@ -32,7 +33,8 @@ export async function readProfile(db: SqlDatabase): Promise<ProfileInfo | null> 
   if (!p) return null;
   const cur = getCurrency(String(p[1]));
   if (!cur.ok) return null;
-  const settings = parseSettings(await db.query(SETTINGS_SQL));
+  const settingsRows = await db.query(SETTINGS_SQL);
+  const settings = parseSettings(settingsRows);
   return {
     regionCode: String(p[0]),
     currency: cur.value.code,
@@ -40,7 +42,8 @@ export async function readProfile(db: SqlDatabase): Promise<ProfileInfo | null> 
     locale: effectiveLocale(String(p[3]), settings.numberFormat),
     regionLocale: String(p[3]),
     timezoneId: String(p[4]),
-    payday: paydayRuleFromRow(p[5] === null ? null : String(p[5]), p[6] === null ? null : Number(p[6])),
+    // The payday rule with the history of its changes, so every screen asks the period service the same question (Story 4.8).
+    payday: paydayWithHistory(paydayRuleFromRow(p[5] === null ? null : String(p[5]), p[6] === null ? null : Number(p[6])), settingsRows),
     settings,
   };
 }

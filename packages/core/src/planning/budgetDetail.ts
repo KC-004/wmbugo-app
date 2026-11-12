@@ -1,7 +1,7 @@
 import { toLocalDate } from '../shared/clock';
-import { budgetPeriodFor, customPeriod, dayMonthLabel, periodRangeLabel, previousPeriod, type Period } from '../profile/period';
-import { budgetNets, budgetScopeClause, budgetStatus, DEFAULT_NEARING_PERCENT, figuresFromNets, targetForPeriod, type BudgetDef, type BudgetStatus, type Querier } from './budgets';
-import { BUDGETS_SQL, mapBudgets, mapTargetVersions, readPeriodProfile, TARGET_VERSIONS_SQL } from './budgetStore';
+import { budgetPeriodFor, customPeriod, dayMonthLabel, periodTitle, previousPeriod, type Period } from '../profile/period';
+import { budgetNets, budgetScopeClause, budgetStatus, DEFAULT_NEARING_PERCENT, figuresFromNets, type BudgetDef, type BudgetStatus, type Querier } from './budgets';
+import { BUDGETS_SQL, mapBudgets, mapTargetVersions, periodTarget, readPeriodProfile, TARGET_VERSIONS_SQL } from './budgetStore';
 
 /** One entry that makes up a budget in a period: what its in-scope splits add up to, a refund as money back. */
 export interface BudgetEntry {
@@ -80,7 +80,7 @@ export async function loadBudgetDetail(q: Querier, budgetId: string, back: numbe
   if (!period || !running) return 'missing';
 
   const before = previousPeriod(period, read.profile);
-  const target = targetForPeriod(versions, period.start) ?? versions[0]?.targetMinor ?? 0;
+  const target = periodTarget(budget, versions, period) ?? versions[0]?.targetMinor ?? 0;
   const nets = await budgetNets(q, budget, period);
   const figures = figuresFromNets(nets);
   const status = budgetStatus({ usedMinor: figures.usedMinor, targetMinor: target, period, today: today.value, nearingPercent: budget.alertThresholds?.[0] ?? DEFAULT_NEARING_PERCENT });
@@ -115,7 +115,7 @@ export async function loadBudgetDetail(q: Querier, budgetId: string, back: numbe
     name: budget.name ?? '',
     scope: budget.scope,
     period,
-    periodLabel: periodRangeLabel(period.start, period.end),
+    periodLabel: periodTitle(period),
     isCurrent: back === 0,
     canGoBack: before !== null && before.end >= firstEffective,
     canGoForward: back > 0,

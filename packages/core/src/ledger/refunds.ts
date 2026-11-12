@@ -2,7 +2,8 @@ import { toLocalDate } from '../shared/clock';
 import { err, ok, type Result } from '../shared/result';
 import type { UseCase, WriterContext } from '../writer/ledgerWriter';
 import { restoreTx, snapshotTx, type TxSnapshot } from '../capture/snapshot';
-import { paydayRuleFromRow, periodFor } from '../profile/period';
+import { periodFor } from '../profile/period';
+import { readPaydayRule } from '../profile/paydayChange';
 import { parseSettings, periodRule, SETTINGS_SQL } from '../profile/settings';
 import { profileTimezone } from './accountCommands';
 import { MAX_NOTE_LENGTH } from './entryCommands';
@@ -104,13 +105,12 @@ export async function createRefund(ctx: WriterContext, input: RefundInput): Prom
 
 /** The first local date of the period that is running now (anything earlier is a closed period). */
 async function currentPeriodStart(ctx: WriterContext): Promise<string | null> {
-  const p = (await ctx.query('SELECT payday_rule, payday_day, timezone_id FROM profile LIMIT 1'))[0];
-  if (!p) return null;
-  const today = toLocalDate(ctx.nowMs(), String(p[2]));
+  const read = await readPaydayRule(ctx);
+  if (!read) return null;
+  const today = toLocalDate(ctx.nowMs(), read.timezoneId);
   if (!today.ok) return null;
   const settings = parseSettings(await ctx.query(SETTINGS_SQL));
-  const rule = periodRule(paydayRuleFromRow(p[0] === null ? null : String(p[0]), p[1] === null ? null : Number(p[1])), settings.periodMode);
-  return periodFor(today.value, rule).start;
+  return periodFor(today.value, periodRule(read.rule, settings.periodMode)).start;
 }
 
 export type ReverseError = 'ENTRY_NOT_FOUND' | 'ENTRY_REMOVED' | 'NOT_REVERSIBLE' | 'ALREADY_REVERSED' | 'HAS_REFUNDS' | 'NO_PROFILE';

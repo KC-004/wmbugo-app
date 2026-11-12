@@ -52,7 +52,7 @@ describe('SaveBudget (Story 4.6)', () => {
     expect(Number((await db.query("SELECT COUNT(*) FROM audit_event WHERE kind = 'SaveBudget' AND entity_id = ?", [r.value.budgetId]))[0]![0])).toBe(1);
     expect(await events()).toContain('BudgetsChanged');
     // The derived period cache is built in the same transaction.
-    expect((await db.query('SELECT start_date, end_date, target_minor FROM budget_period WHERE budget_id = ?', [r.value.budgetId])).map((x) => x.map(String))).toEqual([['2026-11-01', '2026-11-30', '600000']]);
+    expect((await db.query('SELECT start_date, end_date, target_minor FROM budget_period WHERE budget_id = ? ORDER BY start_date', [r.value.budgetId])).map((x) => x.map(String))).toEqual([['2026-11-01', '2026-11-30', '600000'], ['2026-12-01', '2026-12-31', '600000']]);
   });
 
   it('refuses an empty or zero limit, no category chosen, and an end date before the start, and writes nothing', async () => {
