@@ -123,7 +123,11 @@ export const MergeDuplicate: UseCase<{ transactionId: string; categoryId?: strin
         if (!k) return err('CATEGORY_NOT_FOUND');
         category = input.categoryId;
       }
-      if (category && category !== a && survivor.splits.length === 1) await ctx.execute('UPDATE split SET category_id = ? WHERE transaction_id = ?', [category, survivorId]);
+      if (category && category !== a && survivor.splits.length === 1) {
+        await ctx.execute('UPDATE split SET category_id = ? WHERE transaction_id = ?', [category, survivorId]);
+        // The category is replaced only by the user's explicit choice, which is then theirs (Story 4.4).
+        await ctx.execute("UPDATE \"transaction\" SET category_guessed = 0, category_set_by = 'user' WHERE id = ?", [survivorId]);
+      }
     }
 
     // Every source record follows the survivor; the other record is excluded and hidden everywhere.

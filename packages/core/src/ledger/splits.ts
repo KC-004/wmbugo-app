@@ -101,14 +101,16 @@ export const SetSplits: UseCase<
       await ctx.execute('UPDATE posting SET signed_amount_minor = ? WHERE id = ?', [type === 'expense' ? -amount : amount, before.postings[0]!.id]);
     }
     await ctx.execute('DELETE FROM split WHERE transaction_id = ?', [input.transactionId]);
-    await ctx.execute('UPDATE "transaction" SET needs_category = 0 WHERE id = ?', [input.transactionId]);
+    const sameSet = JSON.stringify([...before.splits].map((x) => [x.category, x.amount]).sort()) === JSON.stringify(input.splits.map((x) => [x.categoryId, x.amountMinor]).sort());
+    // Categorising the splits is the user's word: a guess is cleared and no automatic step replaces it (Story 4.4).
+    if (sameSet) await ctx.execute('UPDATE "transaction" SET needs_category = 0 WHERE id = ?', [input.transactionId]);
+    else await ctx.execute("UPDATE \"transaction\" SET needs_category = 0, category_guessed = 0, category_set_by = 'user' WHERE id = ?", [input.transactionId]);
     for (const s of input.splits) {
       await ctx.execute('INSERT INTO split (id, transaction_id, category_id, amount_minor, memo) VALUES (?, ?, ?, ?, ?)', [ctx.newId(), input.transactionId, s.categoryId, s.amountMinor, s.memo ?? null]);
     }
-    const sameSet = JSON.stringify([...before.splits].map((x) => [x.category, x.amount]).sort()) === JSON.stringify(input.splits.map((x) => [x.categoryId, x.amountMinor]).sort());
     ctx.touch('transaction', input.transactionId, { splits: input.splits.length, ...(amount !== before.amount ? { amountChanged: true } : {}) });
     ctx.emit('TransactionsChanged', { transactionIds: [input.transactionId] });
-    if (!sameSet) ctx.emit('CategoryAssigned', { transactionIds: [input.transactionId] });
+    if (!sameSet) ctx.emit('CategoryAssigned', { transactionIds: [input.transactionId], previousCategoryId: before.splits.length === 1 ? before.splits[0]!.category : null, wasGuessed: before.categoryGuessed === 1 });
     return ok({ snapshot: before, categoryChanged: !sameSet });
   },
 };

@@ -403,6 +403,92 @@ describe('receipt photos and sources on the detail (Story 3.11)', () => {
   });
 });
 
+describe('suggested categories are always overridable (Story 4.4)', () => {
+  const press = async (r: ReactTestRenderer, id: string) => {
+    await act(async () => fire(r, id));
+    await settle();
+  };
+  const CATS = [{ id: 'cat_food', name: 'Food & Drinks' }, { id: 'cat_groceries', name: 'Groceries' }];
+  function guessed(over: Partial<TransactionDetail> = {}, extra: Partial<TransactionData> = {}) {
+    const d = detail({ sourceKind: 'sms', resolution: 'auto_approved', categoryGuessed: true, ...over });
+    const f = fakeApi(d);
+    const snapshot = { id: 't1', categoryGuessed: 1, categorySetBy: 'suggester' } as TxSnapshot;
+    const setCategory = jest.fn<Promise<{ ok: true; value: { snapshot: TxSnapshot } }>, [string, string]>(async () => ({ ok: true, value: { snapshot } }));
+    const confirmCategory = jest.fn<Promise<{ ok: true }>, [string]>(async () => ({ ok: true }));
+    const load = jest.fn<Promise<TransactionData | 'missing' | null>, [string]>(async () => ({ ...data(d), categories: CATS, ...extra }));
+    return { api: { ...f.api, load, setCategory, confirmCategory } as TransactionApi, setCategory, confirmCategory, restore: f.restore, d };
+  }
+
+  it('Looks right shows next to the category of a guess, and the Status row says the category was guessed', async () => {
+    const g = guessed();
+    const m = await mountDetail(g.d, { api: g.api });
+    expect(has(m.r, 'detail-looks-right')).toBe(true);
+    expect(texts(m.r)).toContain('Looks right');
+    m.unmount();
+  });
+
+  it('taps the Category row, picks Groceries: the entry saves with the toast Saved and Undo puts the guess back', async () => {
+    const g = guessed();
+    const m = await mountDetail(g.d, { api: g.api });
+    await press(m.r, 'detail-category');
+    expect(has(m.r, 'category-picker')).toBe(true);
+    await press(m.r, 'pick-category-cat_groceries');
+    expect(g.setCategory).toHaveBeenCalledWith('t1', 'cat_groceries');
+    expect(texts(m.r)).toContain('Saved');
+    await press(m.r, 'toast-undo');
+    expect(g.restore).toHaveBeenCalledWith(expect.objectContaining({ id: 't1', categoryGuessed: 1 }));
+    m.unmount();
+  });
+
+  it('choosing the category it already has changes nothing', async () => {
+    const g = guessed();
+    const m = await mountDetail(g.d, { api: g.api });
+    await press(m.r, 'detail-category');
+    await press(m.r, 'pick-category-cat_food');
+    expect(g.setCategory).not.toHaveBeenCalled();
+    m.unmount();
+  });
+
+  it('Looks right keeps the category and saves the confirmation', async () => {
+    const g = guessed();
+    const m = await mountDetail(g.d, { api: g.api });
+    await press(m.r, 'detail-looks-right');
+    expect(g.confirmCategory).toHaveBeenCalledWith('t1');
+    expect(g.setCategory).not.toHaveBeenCalled();
+    expect(texts(m.r)).toContain('Saved');
+    m.unmount();
+  });
+
+  it('an entry whose category was never a guess has no Looks right, but the category can still be changed', async () => {
+    const g = guessed({ categoryGuessed: false, sourceKind: 'manual', resolution: 'user_approved' });
+    const m = await mountDetail(g.d, { api: g.api });
+    expect(has(m.r, 'detail-looks-right')).toBe(false);
+    expect(has(m.r, 'detail-category')).toBe(true);
+    m.unmount();
+  });
+
+  it('a removed entry and a split entry have no tappable category', async () => {
+    const removed = guessed({ removed: true });
+    const a = await mountDetail(removed.d, { api: removed.api });
+    expect(has(a.r, 'detail-category')).toBe(false);
+    a.unmount();
+    const split = guessed({}, { splits: [{ id: 's1', categoryId: 'cat_food', categoryName: 'Food & Drinks', icon: 'ForkKnife', color: 'cat-rose', amountMinor: 20000, memo: null }, { id: 's2', categoryId: 'cat_groceries', categoryName: 'Groceries', icon: 'ShoppingCart', color: 'cat-lime', amountMinor: 25000, memo: null }] as never });
+    const b = await mountDetail(split.d, { api: split.api });
+    expect(has(b.r, 'detail-category')).toBe(false);
+    b.unmount();
+  });
+
+  it('a failed save says nothing was changed and keeps the page', async () => {
+    const g = guessed();
+    const failing = { ...g.api, setCategory: jest.fn(async () => ({ ok: false as const, code: 'WRITE_FAILED' })) } as TransactionApi;
+    const m = await mountDetail(g.d, { api: failing });
+    await press(m.r, 'detail-category');
+    await press(m.r, 'pick-category-cat_groceries');
+    expect(texts(m.r)).toContain('Could not save the category. Nothing was changed.');
+    m.unmount();
+  });
+});
+
 describe('merged categories (Story 4.3)', () => {
   it('an entry moved by a merge says where it was; one never merged says nothing', async () => {
     const apiWith = (extra: Partial<TransactionData>) => {

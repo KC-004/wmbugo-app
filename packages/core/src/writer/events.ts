@@ -43,7 +43,11 @@ export interface EventPayloads {
   ProfileChanged: { readonly fields: readonly string[] };
   CapturesSubmitted: { readonly transactionIds: readonly string[] };
   CapturesRejected: { readonly transactionIds: readonly string[] };
-  CategoryAssigned: { readonly transactionIds: readonly string[] };
+  /**
+   * `previousCategoryId` and `wasGuessed` are the learning-from-corrections hook (Story 4.4): the category the entry had and
+   * whether it was a guess nobody had confirmed. Confirming a guess (`Looks right`) carries the same category for both.
+   */
+  CategoryAssigned: { readonly transactionIds: readonly string[]; readonly previousCategoryId?: string | null; readonly wasGuessed?: boolean };
   /** Category ids only: pickers, Activity, budgets and insights refresh. */
   CategoriesChanged: { readonly categoryIds: readonly string[] };
 }

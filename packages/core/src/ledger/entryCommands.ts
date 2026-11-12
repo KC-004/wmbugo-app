@@ -79,6 +79,8 @@ export async function createEntry(
   ctx: WriterContext,
   input: ManualEntry,
   classify?: (facts: EntryFacts) => Promise<EntryClassification>,
+  /** Who chose the category: the user (default), or a suggester whose guess the user has not confirmed (Story 4.4). */
+  category: { readonly guessed: boolean; readonly setBy: 'user' | 'suggester' | null } = { guessed: false, setBy: 'user' },
 ): Promise<Result<CreatedEntry, RecordEntryError>> {
 if (!Number.isSafeInteger(input.amountMinor)) return err('AMOUNT_INVALID');
 if (input.amountMinor <= 0) return err('AMOUNT_REQUIRED');
@@ -115,7 +117,7 @@ const cls: EntryClassification = classify
   ? await classify({ accountId, localDate: date.value, occurredAtMs: at, timezoneId: tz, newAccount: createdAccount })
   : { status: 'confirmed' };
 await ctx.execute(
-  "INSERT INTO \"transaction\" (id, event_type, status, amount_minor, occurred_at_utc, local_date, timezone_id, original_description, note, payment_method, capture_resolution, tags_json, needs_category, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', 0, ?, ?)",
+  "INSERT INTO \"transaction\" (id, event_type, status, amount_minor, occurred_at_utc, local_date, timezone_id, original_description, note, payment_method, capture_resolution, tags_json, needs_category, category_guessed, category_set_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', 0, ?, ?, ?, ?)",
   [
     transactionId,
     input.kind,
@@ -127,7 +129,9 @@ await ctx.execute(
     clean(input.merchant, MAX_MERCHANT_LENGTH),
     clean(input.note, MAX_NOTE_LENGTH),
     input.paymentMethod ?? null,
-    cls.status === 'confirmed' ? 'user_approved' : null,
+    cls.status === 'confirmed' ? (category.guessed ? 'auto_approved' : 'user_approved') : null,
+    category.guessed ? 1 : 0,
+    category.setBy,
     now,
     now,
   ],

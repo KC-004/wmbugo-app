@@ -18,6 +18,9 @@ export interface TxSnapshot {
   readonly note: string | null;
   readonly paymentMethod: string | null;
   readonly needsCategory: number;
+  /** Story 4.4: a suggester's category the user has not confirmed (0/1), and who set the category last. */
+  readonly categoryGuessed?: number;
+  readonly categorySetBy?: string | null;
   readonly postings: readonly { id: string; account: string; direction: string; signed: number; kind: string }[];
   readonly splits: readonly { id: string; category: string; amount: number; memo: string | null }[];
   readonly sources: readonly string[];
@@ -30,7 +33,7 @@ const s = (v: unknown): string | null => (v === null || v === undefined ? null :
 export async function snapshotTx(ctx: WriterContext, id: string): Promise<TxSnapshot | null> {
   const t = (
     await ctx.query(
-      'SELECT status, capture_resolution, removed_at, removal_kind, amount_minor, occurred_at_utc, local_date, timezone_id, original_description, note, payment_method, needs_category FROM "transaction" WHERE id = ?',
+      'SELECT status, capture_resolution, removed_at, removal_kind, amount_minor, occurred_at_utc, local_date, timezone_id, original_description, note, payment_method, needs_category, category_guessed, category_set_by FROM "transaction" WHERE id = ?',
       [id],
     )
   )[0];
@@ -53,6 +56,8 @@ export async function snapshotTx(ctx: WriterContext, id: string): Promise<TxSnap
     note: s(t[9]),
     paymentMethod: s(t[10]),
     needsCategory: Number(t[11]),
+    categoryGuessed: Number(t[12]),
+    categorySetBy: s(t[13]),
     postings: postings.map((p) => ({ id: String(p[0]), account: String(p[1]), direction: String(p[2]), signed: Number(p[3]), kind: String(p[4]) })),
     splits: splits.map((x) => ({ id: String(x[0]), category: String(x[1]), amount: Number(x[2]), memo: s(x[3]) })),
     sources: sources.map((x) => String(x[0])),
@@ -63,8 +68,8 @@ export async function snapshotTx(ctx: WriterContext, id: string): Promise<TxSnap
 /** Writes a snapshot back over the live rows: the transaction fields, its postings, its splits and its source links. */
 export async function restoreTx(ctx: WriterContext, snap: TxSnapshot): Promise<void> {
   await ctx.execute(
-    'UPDATE "transaction" SET status = ?, capture_resolution = ?, removed_at = ?, removal_kind = ?, amount_minor = ?, occurred_at_utc = ?, local_date = ?, timezone_id = ?, original_description = ?, note = ?, payment_method = ?, needs_category = ?, updated_at = ? WHERE id = ?',
-    [snap.status, snap.resolution, snap.removedAt, snap.removalKind, snap.amount, snap.occurredAt, snap.localDate, snap.timezoneId, snap.description, snap.note, snap.paymentMethod, snap.needsCategory, ctx.nowMs(), snap.id],
+    'UPDATE "transaction" SET status = ?, capture_resolution = ?, removed_at = ?, removal_kind = ?, amount_minor = ?, occurred_at_utc = ?, local_date = ?, timezone_id = ?, original_description = ?, note = ?, payment_method = ?, needs_category = ?, category_guessed = ?, category_set_by = ?, updated_at = ? WHERE id = ?',
+    [snap.status, snap.resolution, snap.removedAt, snap.removalKind, snap.amount, snap.occurredAt, snap.localDate, snap.timezoneId, snap.description, snap.note, snap.paymentMethod, snap.needsCategory, snap.categoryGuessed ?? 0, snap.categorySetBy ?? null, ctx.nowMs(), snap.id],
   );
   await ctx.execute('DELETE FROM posting WHERE transaction_id = ?', [snap.id]);
   for (const p of snap.postings) {

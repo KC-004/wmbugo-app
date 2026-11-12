@@ -100,6 +100,12 @@ describe('Settings hub', () => {
     expect(host(r, 'group-money').props.accessibilityLabel).toBe('Money, 14 categories');
   });
 
+  it('shows no rules entry in Money: the rule editor is Phase 2 (Story 4.4)', async () => {
+    const { r } = await open(data({ expenseCategoryCount: 14 }));
+    expect(texts(r).join(' ')).not.toMatch(/\brules?\b/i);
+    expect(r.root.findAll((n) => typeof n.type === 'string' && /rule/i.test(String(n.props.testID ?? ''))).length).toBe(0);
+  });
+
   it('lists the You and Data groups, with a live one-line summary in the You label', async () => {
     const { r } = await open(data({}, { theme: 'dark' }));
     expect(has(r, 'group-you') && has(r, 'group-data')).toBe(true);

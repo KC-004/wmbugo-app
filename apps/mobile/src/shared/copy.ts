@@ -212,6 +212,10 @@ export const copy = {
   detail: {
     title: 'Entry',
     originally: 'Originally {name}',
+    chooseCategory: 'Choose a category',
+    changeCategory: 'Change category',
+    looksRight: 'Looks right',
+    categorySaveFailed: 'Could not save the category. Nothing was changed.',
     type: 'Type',
     date: 'Date',
     account: 'Account',

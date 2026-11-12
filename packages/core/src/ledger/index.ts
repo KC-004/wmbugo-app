@@ -20,3 +20,4 @@ export * from './purge';
 export * from './recentlyDeleted';
 export * from './categoryCommands';
 export * from './categoryArchive';
+export * from './categoryGuess';

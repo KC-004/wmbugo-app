@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowsLeftRight, DotsThree } from 'phosphor-react-native';
 import { captureStateOf, captureStatusLabel, longDate, parseAmountInput, type RecoveryKind, type TransactionDetail } from '@wmbugo/core';
@@ -7,6 +7,7 @@ import { minorToInput } from '../../shared/minorInput';
 import { amountLabel, type AmountKind } from '../../shared/a11y/labels';
 import { copy } from '../../shared/copy';
 import { EmptyState, ErrorBlock, Reveal, Skeleton } from '../../shared/feedback/Feedback';
+import { useSheet } from '../../shared/feedback/SheetHost';
 import { useToast } from '../../shared/feedback/ToastHost';
 import { invalidateForEvent } from '../../shared/queryClient';
 import { Icon } from '../../shared/theme/Icon';
@@ -22,6 +23,7 @@ import { duplicatePresetOf, editSpecOf, realTransactionApi, transactionKey, type
 import type { AddPreset, EditSpec } from '../add/AddSheet';
 import { realAddApi, type AddApi } from '../add/addApi';
 import { HeldRowActions } from './HeldRowActions';
+import { CategoryPickerSheet } from './CategoryPickerSheet';
 import { ReceiptPhotos } from './ReceiptPhotos';
 import { usePermanentDelete } from './usePermanentDelete';
 import { realDeletedApi, type DeletedApi } from './deletedApi';
@@ -83,6 +85,7 @@ export function TransactionDetailScreen({
 }) {
   const theme = useTheme();
   const toast = useToast();
+  const sheet = useSheet();
   const qc = useQueryClient();
   const purge = usePermanentDelete(deletedApi);
   const q = useQuery({ queryKey: transactionKey(transactionId), queryFn: () => api.load(transactionId) });
@@ -116,6 +119,48 @@ export function TransactionDetailScreen({
     if (!now || now.removed) return setError(copy.detail.removedError);
     const spec = editSpecOf(now);
     if (spec) onEdit(spec);
+  };
+
+  /** The category row: pick another category for this one entry (Story 4.4). Saving clears a guess; Undo puts it back. */
+  const saveCategory = async (categoryId: string) => {
+    if (!api.setCategory) return;
+    const r = await api.setCategory(transactionId, categoryId).catch(() => ({ ok: false as const, code: 'FAILED' }));
+    if (!r.ok) {
+      setError(r.code === 'ENTRY_REMOVED' ? copy.detail.removedError : copy.detail.categorySaveFailed);
+      return;
+    }
+    const snapshot = r.value.snapshot;
+    await refresh();
+    toast.show({
+      message: copy.common.saved,
+      undo: { label: copy.common.undo, onUndo: () => void api.restore(snapshot).then(refresh).catch(() => toast.show({ message: copy.add.removeFailed })) },
+    });
+  };
+
+  const pickCategory = () => {
+    if (!d || !data) return;
+    sheet.open({
+      id: 'pick-category',
+      title: copy.detail.changeCategory,
+      body: (close) => <CategoryPickerSheet categories={data.categories} currentId={d.category?.id ?? null} close={close} onPick={saveCategory} />,
+    });
+  };
+
+  /** `Looks right`: the guessed category stays; the guess flag clears. */
+  const looksRight = async () => {
+    if (!api.confirmCategory || busy.current) return;
+    busy.current = true;
+    try {
+      const r = await api.confirmCategory(transactionId).catch(() => ({ ok: false as const, code: 'FAILED' }));
+      if (!r.ok) {
+        setError(r.code === 'ENTRY_REMOVED' ? copy.detail.removedError : copy.detail.categorySaveFailed);
+        return;
+      }
+      await refresh();
+      toast.show({ message: copy.common.saved });
+    } finally {
+      busy.current = false;
+    }
   };
 
   const duplicate = () => {
@@ -272,10 +317,13 @@ export function TransactionDetailScreen({
       status: d.status as 'draft' | 'needs_review' | 'confirmed' | 'excluded' | 'reversed',
       resolution: d.resolution as 'user_approved' | 'auto_approved' | 'auto_linked' | 'rejected' | null,
       needsCategory: false,
+      categoryGuessed: d.categoryGuessed === true,
       openDuplicate: d.openDuplicate,
     });
     const spoken = [title, amountLabel({ amountMinor: d.amountMinor, currency: data.currency, locale: data.locale, kind: AMOUNT_KIND[d.type] ?? 'plain', inline: true }), d.category?.name, accountText].filter(Boolean).join(', ');
     const glyph = d.type === 'transfer' ? ArrowsLeftRight : d.category ? categoryIcon(d.category.icon) : DotsThree;
+    // A single-category expense or income that is live can have its category picked here (a split entry changes in Split).
+    const canPickCategory = !!api.setCategory && !d.removed && (d.type === 'expense' || d.type === 'income') && d.status !== 'reversed' && data.splits.length <= 1;
     const rows: [string, string | null][] = [
       [copy.detail.type, TYPE_LABEL[d.type]],
       [copy.detail.date, `${longDate(d.localDate)}, ${whenText(d.occurredAtMs, d.timezoneId).split(', ')[1] ?? ''}`],
@@ -301,12 +349,22 @@ export function TransactionDetailScreen({
 
         {rows
           .filter(([, v]) => v !== null && v !== '')
-          .map(([label, value]) => (
-            <View key={label} testID={`detail-row-${label}`} accessible accessibilityLabel={`${label}, ${value}`} style={styles.row}>
-              <Text style={[textStyle('label'), muted]}>{label}</Text>
-              <Text style={[textStyle('body'), ink, styles.value]}>{value}</Text>
-            </View>
-          ))}
+          .map(([label, value]) =>
+            label === copy.detail.category && canPickCategory ? (
+              <View key={label}>
+                <Pressable testID="detail-category" accessibilityRole="button" accessibilityLabel={`${label}, ${value}. ${copy.detail.changeCategory}`} onPress={pickCategory} style={styles.row}>
+                  <Text style={[textStyle('label'), muted]}>{label}</Text>
+                  <Text style={[textStyle('body'), ink, styles.value]}>{value}</Text>
+                </Pressable>
+                {d.categoryGuessed ? <Button label={copy.detail.looksRight} variant="text" testID="detail-looks-right" onPress={() => void looksRight()} /> : null}
+              </View>
+            ) : (
+              <View key={label} testID={`detail-row-${label}`} accessible accessibilityLabel={`${label}, ${value}`} style={styles.row}>
+                <Text style={[textStyle('label'), muted]}>{label}</Text>
+                <Text style={[textStyle('body'), ink, styles.value]}>{value}</Text>
+              </View>
+            ),
+          )}
 
         {data.sources.length > 0 ? (
           <View testID="detail-sources" style={styles.row}>

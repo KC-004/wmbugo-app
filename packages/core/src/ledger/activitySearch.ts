@@ -104,7 +104,7 @@ const STATUS_SQL: Readonly<Record<ActivityStatusFilter, string>> = {
   waiting: "(t2.status = 'needs_review' AND NOT EXISTS (SELECT 1 FROM review_candidate rc WHERE rc.transaction_id = t2.id AND rc.reason = 'duplicate' AND rc.status = 'open'))",
   check: "(t2.status = 'needs_review' AND EXISTS (SELECT 1 FROM review_candidate rc WHERE rc.transaction_id = t2.id AND rc.reason = 'duplicate' AND rc.status = 'open'))",
   'needs-category': '(t2.needs_category = 1)',
-  guessed: "(t2.capture_resolution = 'auto_approved' AND t2.needs_category = 0)",
+  guessed: '(t2.category_guessed = 1)',
   reversed: "(t2.status = 'reversed')",
 };
 
@@ -190,7 +190,7 @@ export function activityQuery(q: ActivityQuery, limit: number, ctx: { exponent: 
   const sql =
     'SELECT t.id, t.event_type, t.amount_minor, t.local_date, t.original_description, c.name, c.icon, c.color_token, a.name, (p.posting_kind = \'normal\' AND a.opening_effective_at IS NOT NULL AND t.occurred_at_utc < a.opening_effective_at), p.signed_amount_minor, t.status, (SELECT 1 FROM source_record sr WHERE sr.transaction_id = t.id AND sr.source_kind <> \'manual\' LIMIT 1), t.needs_category, t.capture_resolution, t.foreign_currency, t.foreign_amount_minor, (SELECT 1 FROM review_candidate rc WHERE rc.transaction_id = t.id AND rc.reason = \'duplicate\' AND rc.status = \'open\' LIMIT 1), ' +
     matched +
-    ', (SELECT COUNT(*) FROM split sc WHERE sc.transaction_id = t.id) FROM "transaction" t LEFT JOIN split s ON s.transaction_id = t.id LEFT JOIN category c ON c.id = s.category_id LEFT JOIN posting p ON p.transaction_id = t.id LEFT JOIN account a ON a.id = p.account_id WHERE t.id IN (SELECT t2.id FROM "transaction" t2 WHERE ' +
+    ', (SELECT COUNT(*) FROM split sc WHERE sc.transaction_id = t.id), t.category_guessed FROM "transaction" t LEFT JOIN split s ON s.transaction_id = t.id LEFT JOIN category c ON c.id = s.category_id LEFT JOIN posting p ON p.transaction_id = t.id LEFT JOIN account a ON a.id = p.account_id WHERE t.id IN (SELECT t2.id FROM "transaction" t2 WHERE ' +
     where +
     ` ORDER BY ${order.inner} LIMIT ?) ORDER BY ${order.outer}, p.signed_amount_minor ASC, s.amount_minor DESC`;
   return { sql, params: [...(cats > 0 ? q.categoryIds! : []), ...whereParams, limit] };

@@ -67,7 +67,7 @@ export interface ActivityRow {
   readonly reversed?: boolean;
   /** The category was never set ("add category"). */
   readonly needsCategory?: boolean;
-  /** Approved automatically with a guessed category ("guessed"). */
+  /** The category was suggested and the user has not confirmed or changed it ("guessed", Story 4.4). */
   readonly guessed?: boolean;
   /** A foreign amount (waiting for its currency to be settled): "USD 12.99". */
   readonly foreign?: { readonly currency: string; readonly amountMinor: number };
@@ -114,7 +114,7 @@ export interface ActivityFilter {
 export function activitySql(filter: ActivityFilter = {}): string {
   const byAccount = filter.accountId ? ' AND EXISTS (SELECT 1 FROM posting pf WHERE pf.transaction_id = t2.id AND pf.account_id = ?)' : '';
   return (
-    'SELECT t.id, t.event_type, t.amount_minor, t.local_date, t.original_description, c.name, c.icon, c.color_token, a.name, (p.posting_kind = \'normal\' AND a.opening_effective_at IS NOT NULL AND t.occurred_at_utc < a.opening_effective_at), p.signed_amount_minor, t.status, (SELECT 1 FROM source_record sr WHERE sr.transaction_id = t.id AND sr.source_kind <> \'manual\' LIMIT 1), t.needs_category, t.capture_resolution, t.foreign_currency, t.foreign_amount_minor, (SELECT 1 FROM review_candidate rc WHERE rc.transaction_id = t.id AND rc.reason = \'duplicate\' AND rc.status = \'open\' LIMIT 1), NULL, (SELECT COUNT(*) FROM split sc WHERE sc.transaction_id = t.id) FROM "transaction" t LEFT JOIN split s ON s.transaction_id = t.id LEFT JOIN category c ON c.id = s.category_id LEFT JOIN posting p ON p.transaction_id = t.id LEFT JOIN account a ON a.id = p.account_id WHERE t.id IN (SELECT t2.id FROM "transaction" t2 WHERE ' +
+    'SELECT t.id, t.event_type, t.amount_minor, t.local_date, t.original_description, c.name, c.icon, c.color_token, a.name, (p.posting_kind = \'normal\' AND a.opening_effective_at IS NOT NULL AND t.occurred_at_utc < a.opening_effective_at), p.signed_amount_minor, t.status, (SELECT 1 FROM source_record sr WHERE sr.transaction_id = t.id AND sr.source_kind <> \'manual\' LIMIT 1), t.needs_category, t.capture_resolution, t.foreign_currency, t.foreign_amount_minor, (SELECT 1 FROM review_candidate rc WHERE rc.transaction_id = t.id AND rc.reason = \'duplicate\' AND rc.status = \'open\' LIMIT 1), NULL, (SELECT COUNT(*) FROM split sc WHERE sc.transaction_id = t.id), t.category_guessed FROM "transaction" t LEFT JOIN split s ON s.transaction_id = t.id LEFT JOIN category c ON c.id = s.category_id LEFT JOIN posting p ON p.transaction_id = t.id LEFT JOIN account a ON a.id = p.account_id WHERE t.id IN (SELECT t2.id FROM "transaction" t2 WHERE ' +
     ACTIVITY_FILTER +
     byAccount +
     ' ORDER BY t2.local_date DESC, t2.occurred_at_utc DESC, t2.id DESC LIMIT ?) ORDER BY t.local_date DESC, t.occurred_at_utc DESC, t.id DESC, p.signed_amount_minor ASC, s.amount_minor DESC'
@@ -170,7 +170,7 @@ export function mapActivityRows(rows: readonly (readonly unknown[])[]): Activity
       ...(String(r[11]) === 'reversed' ? { reversed: true } : {}),
       ...(Number(r[12]) === 1 ? { captured: true } : {}),
       ...(Number(r[13]) === 1 ? { needsCategory: true } : {}),
-      ...(String(r[14]) === 'auto_approved' && Number(r[13]) !== 1 ? { guessed: true } : {}),
+      ...(Number(r[20]) === 1 ? { guessed: true } : {}),
       ...(r[15] !== null && r[15] !== undefined ? { foreign: { currency: String(r[15]), amountMinor: Number(r[16]) } } : {}),
       ...(String(r[11]) === 'excluded' && String(r[14]) === 'rejected' ? { rejected: true } : {}),
       ...(r[18] !== null && r[18] !== undefined ? { matchedMinor: Number(r[18]) } : {}),

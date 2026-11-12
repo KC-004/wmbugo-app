@@ -112,7 +112,7 @@ describe('row states (UX-DR29)', () => {
     const a = await add('HDFC', 'bank', 1_000_000);
     raw({ id: 'nc', type: 'expense', status: 'confirmed', amount: 1000, account: a, direction: 'out' });
     db.raw.exec("UPDATE \"transaction\" SET needs_category = 1 WHERE id = 'nc'");
-    raw({ id: 'g', type: 'expense', status: 'confirmed', amount: 2000, account: a, direction: 'out', extra: "capture_resolution='auto_approved'" });
+    raw({ id: 'g', type: 'expense', status: 'confirmed', amount: 2000, account: a, direction: 'out', extra: 'category_guessed=1' });
     raw({ id: 'fx', type: 'expense', status: 'needs_review', amount: 3000, account: a, direction: 'out' });
     db.raw.exec("UPDATE \"transaction\" SET foreign_currency = 'USD', foreign_amount_minor = 1299, foreign_currency_exponent = 2 WHERE id = 'fx'");
     const states = Object.fromEntries((await rows()).map((r) => [r.id, rowState(r)]));

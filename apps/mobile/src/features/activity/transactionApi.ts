@@ -7,6 +7,8 @@ import {
   mapTransactionDetail,
   mapRecoverySummary,
   RestoreDeleted,
+  ConfirmCategory,
+  EditTransaction,
   RestoreRejected,
   AddAttachment,
   ATTACHMENTS_SQL,
@@ -75,6 +77,10 @@ export interface TransactionApi {
   /** Delete a manual entry, or reject a captured one (Reject · Not mine). */
   remove(transactionId: string, kind: 'delete' | 'reject'): Promise<RemoveResult>;
   restore(snapshot: TxSnapshot): Promise<{ ok: boolean }>;
+  /** Picks a category for one entry (EditTransaction): a guess is cleared and the category is the user's. Returns the entry as it was, for Undo. */
+  setCategory?(transactionId: string, categoryId: string): Promise<{ ok: true; value: { snapshot: TxSnapshot } } | { ok: false; code: string }>;
+  /** `Looks right`: confirms a guessed category without changing it. */
+  confirmCategory?(transactionId: string): Promise<{ ok: true } | { ok: false; code: string }>;
   /** Replaces the splits (and the amount, when given) in one balanced write. */
   setSplits(transactionId: string, splits: readonly SplitRow[], amountMinor?: number): Promise<{ ok: true; value: { snapshot: TxSnapshot } } | { ok: false; code: string }>;
   /** A refund or reimbursement for this expense, dated now. */
@@ -119,6 +125,14 @@ export const realTransactionApi: TransactionApi = {
   },
   remove: (transactionId, kind) => getServices().writer.run(kind === 'delete' ? DeleteEntry : RejectEntry, { transactionId }, 'user'),
   restore: (snapshot) => getServices().writer.run(RestoreTransaction, { snapshot }, 'user'),
+  async setCategory(transactionId, categoryId) {
+    const r = await getServices().writer.run(EditTransaction, { transactionId, entry: { categoryId } }, 'user');
+    return r.ok ? { ok: true, value: { snapshot: r.value.snapshot } } : r;
+  },
+  async confirmCategory(transactionId) {
+    const r = await getServices().writer.run(ConfirmCategory, { transactionId }, 'user');
+    return r.ok ? { ok: true } : r;
+  },
   async setSplits(transactionId, splits, amountMinor) {
     const r = await getServices().writer.run(SetSplits, { transactionId, splits, ...(amountMinor !== undefined ? { amountMinor } : {}) }, 'user');
     return r.ok ? { ok: true, value: { snapshot: r.value.snapshot } } : r;

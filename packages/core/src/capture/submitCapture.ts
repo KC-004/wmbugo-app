@@ -6,6 +6,8 @@ import { createTransfer, type TransferError, type TransferInput } from '../ledge
 import { profileTimezone } from '../ledger/accountCommands';
 import { tombstoneFor } from '../ledger/purge';
 import { toLocalDate } from '../shared/clock';
+import { categoryFits, UNCATEGORISED_ID } from '../ledger/categories';
+import { noSuggester, type CategorySuggester } from '../ports/categorySuggester';
 import { matchItem, type CaptureItem } from './match';
 
 /**
@@ -71,9 +73,15 @@ async function writeSource(ctx: WriterContext, transactionId: string, fingerprin
   ]);
 }
 
-export const SubmitCapture: UseCase<SubmitInput, Submitted, SubmitError> = {
+/**
+ * The pipeline with its category suggester (Story 4.4). The suggester is asked only for a captured entry that arrived with no
+ * category (Uncategorised): a manual save never gets a suggestion, and a suggestion is written as a guess the user can
+ * confirm or change (`category_guessed`). The default `SubmitCapture` has the suggester that returns nothing.
+ */
+export const createSubmitCapture = (deps: { readonly suggester?: CategorySuggester } = {}): UseCase<SubmitInput, Submitted, SubmitError> => ({
   name: 'SubmitCapture',
   async execute(ctx, input) {
+    const suggester = deps.suggester ?? noSuggester;
     if (typeof input.submissionId !== 'string' || input.submissionId.trim() === '') return err('SUBMISSION_INVALID');
     const fingerprint = input.submissionId;
 
@@ -115,7 +123,21 @@ export const SubmitCapture: UseCase<SubmitInput, Submitted, SubmitError> = {
         if (hit) return ok({ transactionId: '', accountId: null, feeTransactionId: null, result: hit === 'rejected' ? 'SKIPPED_PREVIOUSLY_REJECTED' : 'SKIPPED_PREVIOUSLY_DELETED' });
       }
     }
-    const created = await createEntry(ctx, e, async (facts) => {
+    // Who chose the category: a manual entry's is the user's. A captured entry with none is asked of the suggester.
+    let entry = e;
+    let category: { guessed: boolean; setBy: 'user' | 'suggester' | null } = { guessed: false, setBy: input.sourceKind === 'manual' ? 'user' : e.categoryId === UNCATEGORISED_ID ? null : 'user' };
+    if (input.sourceKind !== 'manual' && e.categoryId === UNCATEGORISED_ID) {
+      const guess = await suggester.suggest({ kind: e.kind, merchant: e.merchant ?? null, amountMinor: e.amountMinor, accountId: e.accountId, sourceKind: input.sourceKind });
+      if (guess) {
+        // A suggestion for a category that is gone, archived or the wrong kind is ignored, never written.
+        const k = (await ctx.query('SELECT kind FROM category WHERE id = ? AND archived = 0', [guess.categoryId]))[0];
+        if (k && categoryFits(String(k[0]), e.kind)) {
+          entry = { ...e, categoryId: guess.categoryId };
+          category = { guessed: true, setBy: 'suggester' };
+        }
+      }
+    }
+    const created = await createEntry(ctx, entry, async (facts) => {
       if (facts.newAccount || facts.accountId === null) return { status: 'confirmed' };
       const item: CaptureItem = {
         id: 'new',
@@ -134,7 +156,7 @@ export const SubmitCapture: UseCase<SubmitInput, Submitted, SubmitError> = {
       const outcome = matchItem(item, near, { ownedAccountIds: new Set([facts.accountId]) });
       // Saved, never blocked: a possible duplicate waits for review and counts in nothing until it is confirmed.
       return outcome.kind === 'possible_duplicate_of' || outcome.kind === 'duplicate_of' ? { status: 'needs_review', duplicateOf: outcome.id } : { status: 'confirmed' };
-    });
+    }, category);
     if (!created.ok) return created;
     const c = created.value;
     await writeSource(ctx, c.transactionId, fingerprint, input.sourceKind, input.reference ?? null);
@@ -157,4 +179,6 @@ export const SubmitCapture: UseCase<SubmitInput, Submitted, SubmitError> = {
       ...(c.duplicateOf ? { matchedTransactionId: c.duplicateOf } : {}),
     });
   },
-};
+});
+
+export const SubmitCapture: UseCase<SubmitInput, Submitted, SubmitError> = createSubmitCapture();

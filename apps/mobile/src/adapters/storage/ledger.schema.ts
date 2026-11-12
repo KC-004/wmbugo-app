@@ -60,6 +60,10 @@ export const transaction = sqliteTable(
     tags_json: text('tags_json').notNull().default('[]'),
     capture_resolution: text('capture_resolution'),
     needs_category: integer('needs_category').notNull().default(0),
+    /** The category was filled in by a suggester and the user has not confirmed or changed it (Story 4.4). */
+    category_guessed: integer('category_guessed').notNull().default(0),
+    /** Who last set the category: 'user' or 'suggester'. A user-set category is never replaced by an automatic step. */
+    category_set_by: text('category_set_by'),
     foreign_amount_minor: integer('foreign_amount_minor'),
     foreign_currency: text('foreign_currency'),
     foreign_currency_exponent: integer('foreign_currency_exponent'),
