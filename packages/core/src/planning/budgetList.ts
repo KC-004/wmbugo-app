@@ -2,6 +2,7 @@ import { toLocalDate } from '../shared/clock';
 import { budgetPeriodFor, customPeriod, periodTitle, type Period } from '../profile/period';
 import { budgetFigures, budgetStatus, DEFAULT_NEARING_PERCENT, type BudgetDef, type BudgetStatus, type Querier } from './budgets';
 import { BUDGETS_SQL, mapBudgets, mapTargetVersions, periodTarget, readPeriodProfile, TARGET_VERSIONS_SQL } from './budgetStore';
+import { categoryIdsUnder, needsWantsSavings } from './needsWantsSavings';
 
 export type BudgetGroup = 'overall' | '50_30_20' | 'categories';
 
@@ -11,12 +12,16 @@ export interface BudgetListRow {
   readonly name: string;
   readonly group: BudgetGroup;
   readonly scope: BudgetDef['scope'];
+  /** Needs or Wants for a type budget (Story 4.11); null otherwise. */
+  readonly budgetType: 'need' | 'want' | null;
   readonly period: Period;
   /** `1–30 Nov`, `Weekly · 2–8 Nov`, `Custom · 1–15 Nov`. */
   readonly periodLabel: string;
   readonly usedMinor: number;
   readonly targetMinor: number;
   readonly refundSurplusMinor: number;
+  /** Savings budgets: the net moved into savings pots, exact; a net withdrawal reads `More moved out than in this period`. */
+  readonly savingsMovedMinor?: number;
   readonly status: BudgetStatus;
   /** A category budget next to an overall one: `Also counted in your overall budget`. */
   readonly overlapsOverall: boolean;
@@ -27,6 +32,8 @@ export interface BudgetList {
   readonly rows: readonly BudgetListRow[];
   /** The id of the overall budget, if there is one (the editor offers `Edit it`). */
   readonly overallId: string | null;
+  /** With a 50/30/20 template: spending in no type this period, and what to open in Activity to sort it (Story 4.11). */
+  readonly typeSummary: { readonly notClassifiedMinor: number; readonly categoryIds: readonly string[]; readonly period: { readonly start: string; readonly end: string } } | null;
 }
 
 const labelFor = (rule: BudgetDef['period']['rule'], p: Period): string => {
@@ -60,16 +67,24 @@ export async function loadBudgetList(q: Querier, nowMs: number): Promise<BudgetL
       name: b.name ?? '',
       group,
       scope: b.scope,
+      budgetType: b.budgetType,
       period,
       periodLabel: labelFor(b.period.rule, period),
       usedMinor: figures.usedMinor,
       targetMinor: target,
       refundSurplusMinor: figures.refundSurplusMinor,
+      ...(figures.savingsMovedMinor !== undefined ? { savingsMovedMinor: figures.savingsMovedMinor } : {}),
       status,
       overlapsOverall: overall !== null && b.scope !== 'overall' && group === 'categories',
     });
   }
   const order: Record<BudgetGroup, number> = { overall: 0, '50_30_20': 1, categories: 2 };
   rows.sort((a, b) => order[a.group] - order[b.group]);
-  return { today: today.value, rows, overallId: overall?.id ?? null };
+  let typeSummary: BudgetList['typeSummary'] = null;
+  const templateRow = rows.find((r) => r.group === '50_30_20');
+  if (templateRow) {
+    const nw = await needsWantsSavings(q, templateRow.period);
+    typeSummary = { notClassifiedMinor: nw.notClassifiedMinor, categoryIds: await categoryIdsUnder(q, nw.notClassified.map((x) => x.categoryId)), period: { start: templateRow.period.start, end: templateRow.period.end } };
+  }
+  return { today: today.value, rows, overallId: overall?.id ?? null, typeSummary };
 }

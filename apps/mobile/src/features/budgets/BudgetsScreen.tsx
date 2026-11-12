@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { BudgetGroup, BudgetListRow } from '@wmbugo/core';
+import type { ActivityQuery, BudgetGroup, BudgetListRow } from '@wmbugo/core';
 import { controlA11y } from '../../shared/a11y/labels';
 import { copy } from '../../shared/copy';
 import { useSheet } from '../../shared/feedback/SheetHost';
@@ -10,6 +10,7 @@ import { useTheme } from '../../shared/theme/ThemeProvider';
 import { radii } from '../../shared/theme/tokens';
 import { textStyle } from '../../shared/theme/typography';
 import { Button } from '../../shared/ui/Button';
+import { moneyText } from '../../shared/ui/moneyText';
 import { AlertAskSheet } from './AlertAskSheet';
 import { BudgetSheet, type BudgetSheetMode } from './BudgetSheet';
 import { TemplateSheet } from './TemplateSheet';
@@ -26,7 +27,10 @@ const GROUPS: readonly { group: BudgetGroup; title: string }[] = [
  * SCR-14 Budgets, shown on the Plan tab until the Plan hub (Epic 6). Budgets are grouped Overall, 50/30/20 and Categories
  * and never added together. Each row is a limit bar counted from the entries; tap a row to edit it.
  */
-export function BudgetsScreen({ api = realBudgetsApi, onUseTemplate, onOpen }: { api?: BudgetsApi; /** The one-tap 50/30/20 split (Story 4.10) hooks in here. */ onUseTemplate?: () => void; /** Opens SCR-15 for a budget; without it a row opens the editor. */ onOpen?: (budgetId: string) => void }) {
+export function BudgetsScreen({ api = realBudgetsApi, onUseTemplate, onOpen, onOpenActivity }: { api?: BudgetsApi; /** The one-tap 50/30/20 split (Story 4.10) hooks in here. */ onUseTemplate?: () => void; /** Opens SCR-15 for a budget; without it a row opens the editor. */   onOpen?: (budgetId: string) => void;
+  /** Opens Activity filtered to a period's entries (`Not classified · Sort it`). */
+  onOpenActivity?: (query: ActivityQuery) => void;
+}) {
   const theme = useTheme();
   const qc = useQueryClient();
   const sheet = useSheet();
@@ -131,6 +135,16 @@ export function BudgetsScreen({ api = realBudgetsApi, onUseTemplate, onOpen }: {
     if (budget) open({ mode: 'edit', budget }, d);
   };
 
+  const answerIncome = async (update: boolean, d: BudgetsData) => {
+    const c = d.template.incomeChange;
+    if (!c) return;
+    const r = await api.answerIncomeChange(update, { newIncomeMinor: c.newIncomeMinor, periodStart: c.periodStart }).catch(() => ({ ok: false }));
+    if (r.ok) {
+      await invalidateForEvent(qc, 'BudgetsChanged');
+      if (update) toast.show({ message: copy.budgets.targetsSaved });
+    }
+  };
+
   const dismissCard = async () => {
     await api.dismissTemplateCard().catch(() => undefined);
     await invalidateForEvent(qc, 'BudgetsChanged');
@@ -154,6 +168,7 @@ export function BudgetsScreen({ api = realBudgetsApi, onUseTemplate, onOpen }: {
   return (
     <View testID="budgets-screen" style={styles.list}>
       <SetupCard data={data} onSetUp={() => openTemplate(data, data.template.onboardingIncomeMinor)} onDismiss={() => void dismissCard()} />
+      <IncomeCard data={data} onAnswer={(update) => void answerIncome(update, data)} />
       <Button label={copy.budgets.add} variant="secondary" testID="budgets-add" onPress={() => open({ mode: 'add' }, data)} />
       <Button label={copy.budgets.useTemplate} variant="secondary" testID="budgets-use-503020" onPress={() => (onUseTemplate ? onUseTemplate() : openTemplate(data, null))} />
       {GROUPS.map(({ group, title }) => {
@@ -165,9 +180,35 @@ export function BudgetsScreen({ api = realBudgetsApi, onUseTemplate, onOpen }: {
             {inGroup.map((r) => (
               <BudgetRow key={r.id} row={r} data={data} onPress={() => (onOpen ? onOpen(r.id) : void edit(r.id, data))} />
             ))}
+            {group === '50_30_20' && data.list.typeSummary && data.list.typeSummary.notClassifiedMinor > 0 ? (
+              <Pressable
+                testID="budgets-not-classified"
+                {...controlA11y({ label: `${copy.budgets.notClassified} ${moneyText(data.list.typeSummary.notClassifiedMinor, data.currency, data.locale)}. ${copy.budgets.sortIt}`, role: 'button' })}
+                onPress={() => {
+                  const t = data.list.typeSummary!;
+                  onOpenActivity?.({ categoryIds: t.categoryIds, fromDate: t.period.start, toDate: t.period.end });
+                }}
+                style={styles.sortRow}>
+                <Text style={[textStyle('body'), { color: theme.color('text-primary') }]}>{`${copy.budgets.notClassified} ${moneyText(data.list.typeSummary.notClassifiedMinor, data.currency, data.locale)} · ${copy.budgets.sortIt}`}</Text>
+              </Pressable>
+            ) : null}
           </View>
         );
       })}
+    </View>
+  );
+}
+
+/** `Your income changed — update 50/30/20 to ₹90,000?`: nothing changes until Update; either answer hides it until the next period. */
+function IncomeCard({ data, onAnswer }: { data: BudgetsData; onAnswer: (update: boolean) => void }) {
+  const theme = useTheme();
+  const c = data.template.incomeChange;
+  if (!c) return null;
+  return (
+    <View testID="income-card" style={[styles.card, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
+      <Text style={[textStyle('body-medium'), { color: theme.color('text-primary') }]}>{copy.budgets.incomeChanged.replace('{amount}', moneyText(c.newIncomeMinor, data.currency, data.locale))}</Text>
+      <Button label={copy.budgets.updateIncome} testID="income-card-update" onPress={() => onAnswer(true)} />
+      <Button label={copy.budgets.keepIncome.replace('{amount}', moneyText(c.oldIncomeMinor, data.currency, data.locale))} variant="text" testID="income-card-keep" onPress={() => onAnswer(false)} />
     </View>
   );
 }
@@ -193,7 +234,16 @@ function BudgetRow({ row, data, onPress }: { row: BudgetListRow; data: BudgetsDa
       {...controlA11y({ label: `${row.name}, ${row.periodLabel}`, role: 'button' })}
       onPress={onPress}
       style={[styles.card, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
-      <LimitBar testID={`limit-${row.id}`} name={row.name} status={row.status} currency={data.currency} locale={data.locale} {...(row.overlapsOverall ? { caption: copy.budgets.alsoCounted } : {})} />
+      <LimitBar
+        testID={`limit-${row.id}`}
+        name={row.name}
+        status={row.status}
+        currency={data.currency}
+        locale={data.locale}
+        {...(row.group === '50_30_20' ? { tone: row.scope === 'savings' ? ('savings' as const) : row.budgetType === 'need' ? ('needs' as const) : ('wants' as const) } : {})}
+        {...(row.scope === 'savings' ? { savings: true, movedOut: (row.savingsMovedMinor ?? 0) < 0 } : {})}
+        {...(row.overlapsOverall ? { caption: copy.budgets.alsoCounted } : {})}
+      />
       <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{row.periodLabel}</Text>
     </Pressable>
   );
@@ -205,4 +255,5 @@ const styles = StyleSheet.create({
   list: { gap: 16 },
   group: { gap: 8 },
   card: { borderWidth: 1, borderRadius: radii.md, padding: 12, gap: 6 },
+  sortRow: { minHeight: 48, justifyContent: 'center', paddingHorizontal: 4 },
 });

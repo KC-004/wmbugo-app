@@ -1,12 +1,15 @@
 import { toLocalDate } from '../shared/clock';
 import { budgetPeriodFor, customPeriod, dayMonthLabel, periodTitle, previousPeriod, type Period } from '../profile/period';
-import { budgetNets, budgetScopeClause, budgetStatus, DEFAULT_NEARING_PERCENT, figuresFromNets, type BudgetDef, type BudgetStatus, type Querier } from './budgets';
+import { budgetFigures, budgetNets, budgetScopeClause, budgetStatus, DEFAULT_NEARING_PERCENT, figuresFromNets, type BudgetDef, type BudgetStatus, type Querier } from './budgets';
+import { categoryIdsUnder } from './needsWantsSavings';
 import { BUDGETS_SQL, mapBudgets, mapTargetVersions, periodTarget, readPeriodProfile, TARGET_VERSIONS_SQL } from './budgetStore';
 
 /** One entry that makes up a budget in a period: what its in-scope splits add up to, a refund as money back. */
 export interface BudgetEntry {
   readonly id: string;
-  readonly kind: 'expense' | 'refund';
+  readonly kind: 'expense' | 'refund' | 'transfer';
+  /** A savings budget lists transfers: into a pot or out of one. */
+  readonly direction?: 'in' | 'out';
   /** Only the splits that are in this budget's scope (a split entry can be partly outside it). */
   readonly amountMinor: number;
   readonly localDate: string;
@@ -22,12 +25,16 @@ export interface CategoryShare {
   readonly categoryId: string;
   readonly name: string;
   readonly amountMinor: number;
+  /** The category and its subcategories: what to filter Activity by to see these entries. */
+  readonly memberIds: readonly string[];
 }
 
 export interface BudgetDetail {
   readonly id: string;
   readonly name: string;
   readonly scope: BudgetDef['scope'];
+  /** Needs or Wants for a type budget; null otherwise. */
+  readonly budgetType: 'need' | 'want' | null;
   readonly period: Period;
   /** `1–30 Nov`. */
   readonly periodLabel: string;
@@ -45,6 +52,8 @@ export interface BudgetDetail {
   /** The target version this period had. */
   readonly targetMinor: number;
   readonly refundSurplusMinor: number;
+  /** Savings: the exact net moved into pots; below zero reads `More moved out than in this period`. */
+  readonly savingsMovedMinor?: number;
   readonly status: BudgetStatus;
   /** An overall budget lists each category's floored amount above the entries. */
   readonly breakdown: readonly CategoryShare[] | null;
@@ -93,23 +102,35 @@ export async function loadBudgetDetail(q: Querier, budgetId: string, backOrStart
   const before = previousPeriod(period, read.profile);
   const target = periodTarget(budget, versions, period) ?? versions[0]?.targetMinor ?? 0;
   const nets = await budgetNets(q, budget, period);
-  const figures = figuresFromNets(nets);
+  // A savings budget counts money moved into pots, not spending.
+  const figures = budget.scope === 'savings' ? await budgetFigures(q, budget, period) : figuresFromNets(nets);
   const status = budgetStatus({ usedMinor: figures.usedMinor, targetMinor: target, period, today: today.value, nearingPercent: budget.alertThresholds?.[0] ?? DEFAULT_NEARING_PERCENT });
 
   let breakdown: CategoryShare[] | null = null;
-  if (budget.scope === 'overall') {
+  // An overall budget, and a Needs or Wants budget, list each category's floored amount: they add up to the used figure.
+  if (budget.scope === 'overall' || budget.scope === 'budget_type') {
     const names = new Map<string, string>();
     for (const n of nets) {
       const r = (await q.query('SELECT name FROM category WHERE id = ?', [n.categoryId]))[0];
       names.set(n.categoryId, r ? String(r[0]) : '');
     }
-    breakdown = nets
+    const sorted = nets
       .filter((n) => n.netMinor > 0)
       .map((n) => ({ categoryId: n.categoryId, name: names.get(n.categoryId) ?? '', amountMinor: n.netMinor }))
       .sort((a, b) => b.amountMinor - a.amountMinor || a.name.localeCompare(b.name));
+    const shares: CategoryShare[] = [];
+    for (const n of sorted) shares.push({ ...n, memberIds: await categoryIdsUnder(q, [n.categoryId]) });
+    breakdown = shares;
   }
 
   let entries: BudgetEntry[] = [];
+  if (budget.scope === 'savings') {
+    const rows = await q.query(
+      "SELECT t.id, t.amount_minor, t.local_date, t.original_description, afr.name, ato.name, (CASE WHEN ato.type = 'savings_pot' THEN 'in' ELSE 'out' END) FROM \"transaction\" t JOIN posting pf ON pf.transaction_id = t.id AND pf.signed_amount_minor < 0 JOIN account afr ON afr.id = pf.account_id JOIN posting pt ON pt.transaction_id = t.id AND pt.signed_amount_minor > 0 JOIN account ato ON ato.id = pt.account_id WHERE t.event_type = 'transfer' AND t.status = 'confirmed' AND t.removed_at IS NULL AND t.local_date BETWEEN ? AND ? AND ((ato.type = 'savings_pot' AND afr.type <> 'savings_pot') OR (afr.type = 'savings_pot' AND ato.type <> 'savings_pot')) ORDER BY t.local_date DESC, t.id DESC",
+      [period.start, period.end],
+    );
+    entries = rows.map((r) => ({ id: String(r[0]), kind: 'transfer' as const, direction: String(r[6]) === 'in' ? ('in' as const) : ('out' as const), amountMinor: Number(r[1]), localDate: String(r[2]), merchant: s(r[3]), categoryName: null, categoryIcon: null, categoryColor: null, accountName: `${String(r[4])} → ${String(r[5])}` }));
+  }
   if (budget.scope !== 'savings' && !(budget.scope === 'category' && budget.categoryIds.length === 0)) {
     const { where, params } = budgetScopeClause(budget);
     const rows = await q.query(
@@ -125,6 +146,7 @@ export async function loadBudgetDetail(q: Querier, budgetId: string, backOrStart
     id: budget.id,
     name: budget.name ?? '',
     scope: budget.scope,
+    budgetType: budget.budgetType,
     period,
     periodLabel: periodTitle(period),
     isCurrent: back === 0,
@@ -136,6 +158,7 @@ export async function loadBudgetDetail(q: Querier, budgetId: string, backOrStart
     usedMinor: figures.usedMinor,
     targetMinor: target,
     refundSurplusMinor: figures.refundSurplusMinor,
+    ...(figures.savingsMovedMinor !== undefined ? { savingsMovedMinor: figures.savingsMovedMinor } : {}),
     status,
     breakdown,
     entries,

@@ -18,6 +18,8 @@ import { ReviewQueueScreen } from '../activity/ReviewQueueScreen';
 import { useReviewDot } from '../activity/reviewDot';
 import { useEntryActions } from '../activity/useEntryActions';
 import { HomeScreen } from '../home/HomeScreen';
+import type { ActivityQuery } from '@wmbugo/core';
+import { useUiStore } from '../../shared/state/uiStore';
 import { BudgetsScreen } from '../budgets/BudgetsScreen';
 import { appNotifier } from '../../adapters/notifier';
 import { BudgetDetailScreen } from '../budgets/BudgetDetailScreen';
@@ -65,11 +67,12 @@ function HeaderOnly({ title, tab }: { title: string; tab: TabRoute }) {
 /** Plan shows the budget list (SCR-14) until the Plan hub arrives in Epic 6. */
 function PlanTab() {
   const nav = useNavigation<Nav>();
+  const openActivity = useOpenActivityFilter();
   return (
     <TabFrame tab="Plan">
       <ScreenHeader title={copy.nav.plan} onAccounts={() => nav.navigate('Accounts')} onProfile={() => nav.navigate('Settings')} />
       <ScrollView contentContainerStyle={styles.planScroll} keyboardShouldPersistTaps="handled">
-        <BudgetsScreen onOpen={(budgetId) => nav.navigate('BudgetDetail', { budgetId })} />
+        <BudgetsScreen onOpen={(budgetId) => nav.navigate('BudgetDetail', { budgetId })} onOpenActivity={openActivity} />
       </ScrollView>
     </TabFrame>
   );
@@ -192,14 +195,24 @@ function ReviewQueueRoute() {
   );
 }
 
+/** Opens the Activity tab with a filter already applied (a budget's drill-down, `Not classified · Sort it`). */
+function useOpenActivityFilter() {
+  const nav = useNavigation<{ navigate: (s: string, p?: unknown) => void }>();
+  return (query: ActivityQuery) => {
+    useUiStore.getState().setActivityFilter({ query, datePreset: 'custom' });
+    nav.navigate('Tabs', { screen: 'Activity' });
+  };
+}
+
 function BudgetDetailRoute() {
   const theme = useTheme();
+  const openActivity = useOpenActivityFilter();
   const insets = useSafeAreaInsets();
   const nav = useNavigation<{ goBack: () => void; navigate: (s: 'TransactionDetail', p: { transactionId: string }) => void }>();
   const route = useRoute<RouteProp<RootParams, 'BudgetDetail'>>();
   return (
     <View style={[styles.fill, { backgroundColor: theme.color('bg-canvas'), paddingTop: insets.top }]}>
-      <BudgetDetailScreen budgetId={route.params.budgetId} {...(route.params.periodStart ? { periodStart: route.params.periodStart } : {})} onBack={() => nav.goBack()} onOpenEntry={(transactionId) => nav.navigate('TransactionDetail', { transactionId })} />
+      <BudgetDetailScreen onOpenActivity={openActivity} budgetId={route.params.budgetId} {...(route.params.periodStart ? { periodStart: route.params.periodStart } : {})} onBack={() => nav.goBack()} onOpenEntry={(transactionId) => nav.navigate('TransactionDetail', { transactionId })} />
     </View>
   );
 }

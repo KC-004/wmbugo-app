@@ -5,6 +5,8 @@ import {
   loadBudgetList,
   loadTemplateState,
   ChangeTemplateTargets,
+  incomeCardKey,
+  splitIncome,
   CreateFiftyThirtyTwenty,
   MarkPromptSeen,
   PROMPT_503020_CARD_DISMISSED,
@@ -73,6 +75,8 @@ export interface BudgetsApi {
   changeTemplate(targets: TemplateTargets): Promise<{ ok: boolean; code?: string }>;
   /** The setup card was dismissed: remembered in prompt_state, nothing is created. */
   dismissTemplateCard(): Promise<void>;
+  /** `Your income changed`: Update writes new targets from this period, Keep changes nothing; either hides the card until the next period. */
+  answerIncomeChange(update: boolean, change: { newIncomeMinor: number; periodStart: string }): Promise<{ ok: boolean }>;
   /** Whether to offer the one-time notification ask: the notifier can post, permission was never asked, and this ask was never shown. */
   shouldAskForAlerts?(): Promise<boolean>;
   /** Records the ask as answered (never repeated) and, for Allow, shows the system prompt. */
@@ -118,6 +122,15 @@ export const realBudgetsApi: BudgetsApi = {
   },
   undoTemplate: (budgetIds) => getServices().writer.run(UndoFiftyThirtyTwenty, { budgetIds }, 'user'),
   changeTemplate: (targets) => getServices().writer.run(ChangeTemplateTargets, { targets }, 'user'),
+  async answerIncomeChange(update, change) {
+    const w = getServices().writer;
+    if (update) {
+      const r = await w.run(ChangeTemplateTargets, { targets: splitIncome(change.newIncomeMinor), incomeMinor: change.newIncomeMinor }, 'user');
+      if (!r.ok) return { ok: false };
+    }
+    await w.run(MarkPromptSeen, { key: incomeCardKey(change.periodStart) }, 'user');
+    return { ok: true };
+  },
   async dismissTemplateCard() {
     await getServices().writer.run(MarkPromptSeen, { key: PROMPT_503020_CARD_DISMISSED }, 'user');
   },

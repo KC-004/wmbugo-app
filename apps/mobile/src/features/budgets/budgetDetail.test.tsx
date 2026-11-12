@@ -47,8 +47,8 @@ const status = (used: number, target: number, today = '2026-11-15', period: { st
 
 const entry = (id: string, over: Partial<BudgetDetail['entries'][number]> = {}): BudgetDetail['entries'][number] => ({ id, kind: 'expense', amountMinor: 1_200_000, localDate: '2026-11-03', merchant: 'Swiggy', categoryName: 'Food & Drinks', categoryIcon: 'ForkKnife', categoryColor: 'cat-rose', accountName: 'HDFC', ...over });
 const detail = (over: Partial<BudgetDetail> = {}): BudgetDetail => ({
-  id: 'b1', name: 'Overall', scope: 'overall', period: NOV, periodLabel: '1–30 Nov', isCurrent: true, back: 0, canGoBack: true, canGoForward: false, previousStart: '2026-10-01', nextStart: null,
-  usedMinor: 2_000_000, targetMinor: 5_000_000, refundSurplusMinor: 0, status: status(2_000_000, 5_000_000), breakdown: [{ categoryId: 'cat_food', name: 'Food & Drinks', amountMinor: 1_200_000 }, { categoryId: 'cat_groceries', name: 'Groceries', amountMinor: 800_000 }],
+  id: 'b1', name: 'Overall', scope: 'overall', budgetType: null, period: NOV, periodLabel: '1–30 Nov', isCurrent: true, back: 0, canGoBack: true, canGoForward: false, previousStart: '2026-10-01', nextStart: null,
+  usedMinor: 2_000_000, targetMinor: 5_000_000, refundSurplusMinor: 0, status: status(2_000_000, 5_000_000), breakdown: [{ categoryId: 'cat_food', name: 'Food & Drinks', amountMinor: 1_200_000, memberIds: ['cat_food'] }, { categoryId: 'cat_groceries', name: 'Groceries', amountMinor: 800_000, memberIds: ['cat_groceries', 'sub_rice'] }],
   entries: [entry('t1'), entry('t2', { amountMinor: 800_000, localDate: '2026-11-10', merchant: 'BigBasket', categoryName: 'Groceries' })], today: '2026-11-15', ...over,
 });
 
@@ -62,9 +62,9 @@ function fakeApi(byBack: Record<number, BudgetDetail> | 'missing' = { 0: detail(
   const restore = jest.fn<Promise<{ ok: boolean }>, [string]>(async () => ({ ok: true }));
   const save = jest.fn<ReturnType<BudgetsApi['save']>, [SaveBudgetInput]>(async () => ({ ok: true, value: { budgetId: 'b1', created: false, snapshot: {} as BudgetSnapshot } }));
   const undo = jest.fn(async () => ({ ok: true }));
-  const data = (): BudgetsData => ({ list: { today: '2026-11-15', rows: [], overallId: 'b1' }, currency: 'INR', locale: 'en-IN', exponent: 2, payCycle: true, categories: CATEGORIES, accounts: [], template: NO_TEMPLATE });
+  const data = (): BudgetsData => ({ list: { today: '2026-11-15', rows: [], overallId: 'b1', typeSummary: null }, currency: 'INR', locale: 'en-IN', exponent: 2, payCycle: true, categories: CATEGORIES, accounts: [], template: NO_TEMPLATE });
   const readForEdit = jest.fn(async (id: string) => ({ id, name: 'Overall', scope: 'overall' as const, categoryIds: [], budgetType: null, accountIds: null, period: { rule: 'default' as const }, targetMinor: 5_000_000, currentPeriodStart: '2026-11-01', nextPeriodStart: '2026-12-01' }));
-  const api: BudgetsApi = { load: async () => data(), readForEdit, save, undo, loadDetail, remove, restore, createTemplate: async () => ({ ok: true, budgetIds: [] }), undoTemplate: async () => ({ ok: true }), changeTemplate: async () => ({ ok: true }), dismissTemplateCard: async () => undefined };
+  const api: BudgetsApi = { load: async () => data(), readForEdit, save, undo, loadDetail, remove, restore, createTemplate: async () => ({ ok: true, budgetIds: [] }), undoTemplate: async () => ({ ok: true }), changeTemplate: async () => ({ ok: true }), dismissTemplateCard: async () => undefined, answerIncomeChange: async () => ({ ok: true }) };
   return { api, loadDetail, remove, restore, save, undo };
 }
 
@@ -250,5 +250,46 @@ describe('Edit and Delete', () => {
     await press(r, 'budget-edit');
     await press(r, 'budget-save');
     expect(f.save.mock.calls.at(-1)![0]).not.toHaveProperty('targetFrom');
+  });
+});
+
+describe('drilling into Needs, Wants and Savings (Story 4.11)', () => {
+  it('a category row opens Activity filtered to that category (and its subcategories) and this period', async () => {
+    const onOpenActivity = jest.fn();
+    const qc = createQueryClient();
+    let r!: ReactTestRenderer;
+    await act(async () => {
+      r = create(
+        <QueryClientProvider client={qc}>
+          <ThemeProvider>
+            <ToastHost bottomOffset={0}>
+              <SheetHost>
+                <BudgetDetailScreen budgetId="b1" onBack={() => undefined} onOpenEntry={() => undefined} onOpenActivity={onOpenActivity} api={fakeApi().api} />
+              </SheetHost>
+            </ToastHost>
+          </ThemeProvider>
+        </QueryClientProvider>,
+      );
+    });
+    live.push(r);
+    await settle();
+    await press(r, 'budget-share-cat_groceries');
+    expect(onOpenActivity).toHaveBeenCalledWith({ categoryIds: ['cat_groceries', 'sub_rice'], fromDate: '2026-11-01', toDate: '2026-11-30' });
+  });
+
+  it('Savings lists the transfers in and out, hides Left and Projected, and shows no warning', async () => {
+    const sav = detail({
+      name: 'Savings', scope: 'savings', breakdown: null, usedMinor: 700_000, targetMinor: 1_600_000, savingsMovedMinor: 700_000, status: status(700_000, 1_600_000),
+      entries: [
+        { id: 't1', kind: 'transfer', direction: 'out', amountMinor: 200_000, localDate: '2026-11-06', merchant: null, categoryName: null, categoryIcon: null, categoryColor: null, accountName: 'Holiday → HDFC' },
+        { id: 't2', kind: 'transfer', direction: 'in', amountMinor: 900_000, localDate: '2026-11-05', merchant: null, categoryName: null, categoryIcon: null, categoryColor: null, accountName: 'HDFC → Holiday' },
+      ],
+    });
+    const { r } = await mount(fakeApi({ 0: sav }).api);
+    expect(texts(r)).toContain('Moved into and out of savings pots');
+    expect(has(r, 'budget-left')).toBe(false);
+    expect(has(r, 'budget-projected')).toBe(false);
+    expect(has(r, 'budget-entries')).toBe(true);
+    expect(texts(r).join('|')).not.toMatch(/Over by/);
   });
 });

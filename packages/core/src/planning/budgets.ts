@@ -1,4 +1,5 @@
 import type { SqlParam } from '../ports/storage';
+import { SAVINGS_MOVED_IN_SQL, savedDisplay } from '../ledger/savings';
 import { addDays, budgetPeriodFor, daysBetween, previousPeriod, type BudgetPeriodRule, type Period, type PeriodProfile } from '../profile/period';
 
 /**
@@ -93,6 +94,8 @@ export async function budgetNets(q: Querier, budget: BudgetDef, period: { readon
 }
 
 export interface BudgetFigures {
+  /** Savings budgets only: the net moved into savings pots, exact (it can be below zero). */
+  readonly savingsMovedMinor?: number;
   /** Each top-level category floored at zero first, then summed (BDG-006): a refund never inflates what is left. */
   readonly usedMinor: number;
   /** What refunds in the period returned beyond what was spent in the period, shown as `Refunds this period: +₹X`. */
@@ -111,6 +114,11 @@ export function figuresFromNets(nets: readonly CategoryNet[]): BudgetFigures {
 
 /** `budgetUsed` and `refundSurplus` for one budget over one period. */
 export async function budgetFigures(q: Querier, budget: BudgetDef, period: { readonly start: string; readonly end: string }): Promise<BudgetFigures> {
+  // A savings budget measures money moved into savings pots (Story 2.8), never spending; a net withdrawal counts as zero.
+  if (budget.scope === 'savings') {
+    const moved = Number((await q.query(SAVINGS_MOVED_IN_SQL, [period.start, period.end]))[0]?.[0] ?? 0);
+    return { usedMinor: savedDisplay(moved), refundSurplusMinor: 0, savingsMovedMinor: moved };
+  }
   return figuresFromNets(await budgetNets(q, budget, period));
 }
 

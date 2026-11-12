@@ -5,3 +5,4 @@ export * from './budgetList';
 export * from './budgetDetail';
 export * from './budgetAlerts';
 export * from './budgetTemplate';
+export * from './needsWantsSavings';

@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 11-08-2026 09:43
-last_updated: 11-13-2026 06:00
+last_updated: 11-13-2026 08:00
 project: wmbugo-app
 project_key: NOKEY
 tracking_system: file-system
@@ -93,7 +93,7 @@ development_status:
   4-8-changing-payday-mid-cycle-the-shortened-cycle: review
   4-9-budget-threshold-alerts-once-per-threshold-per-period: review
   4-10-one-tap-50-30-20-targets: review
-  4-11-needs-wants-and-savings-progress-and-left-in-budget: backlog
+  4-11-needs-wants-and-savings-progress-and-left-in-budget: review
   epic-4-retrospective: optional
 
   epic-5: backlog

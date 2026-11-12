@@ -17,6 +17,10 @@ import type { Querier } from './budgets';
 export const TEMPLATE_503020 = '50_30_20';
 /** The setup card on the Plan tab was dismissed (prompt_state), so it never comes back. */
 export const PROMPT_503020_CARD_DISMISSED = 'budgets.503020-card-dismissed';
+/** The `Your income changed` card was answered for a period (Update or Keep): hidden until the next period. */
+export const incomeCardKey = (periodStart: string): string => `budgets.income-card.${periodStart}`;
+/** How far the last full period's Salary must be from the template's income (more than this share) to offer an update. */
+export const INCOME_CHANGE_SHARE = 0.1;
 
 export interface TemplateTargets {
   readonly needsMinor: number;
@@ -102,7 +106,7 @@ export const UndoFiftyThirtyTwenty: UseCase<{ budgetIds: readonly string[] }, vo
  * `Edit targets`: new limits for Needs, Wants and Savings from the period running now. A target that did not change adds
  * no version; past periods keep what they had.
  */
-export const ChangeTemplateTargets: UseCase<{ targets: TemplateTargets }, { changed: number }, TemplateError> = {
+export const ChangeTemplateTargets: UseCase<{ targets: TemplateTargets; /** The income the new targets are made from (the income card's Update). */ incomeMinor?: number }, { changed: number }, TemplateError> = {
   name: 'ChangeTemplateTargets',
   async execute(ctx, input) {
     if (!validTargets(input.targets)) return err('AMOUNT_REQUIRED');
@@ -123,6 +127,10 @@ export const ChangeTemplateTargets: UseCase<{ targets: TemplateTargets }, { chan
       await ctx.execute('INSERT INTO budget_target_version (budget_id, version, target_minor, effective_from) VALUES (?, ?, ?, ?)', [b.id, (latest?.version ?? 0) + 1, target, period.start]);
       ctx.touch('budget', b.id, { edited: true, label: b.name ?? '', template: TEMPLATE_503020 });
       changedIds.push(b.id);
+    }
+    if (input.incomeMinor !== undefined && Number.isSafeInteger(input.incomeMinor) && input.incomeMinor > 0) {
+      await ctx.execute('UPDATE budget SET template_income_minor = ? WHERE template = ? AND removed_at IS NULL', [input.incomeMinor, TEMPLATE_503020]);
+      for (const b of budgets) if (!changedIds.includes(b.id)) ctx.touch('budget', b.id, { incomeUpdated: true, template: TEMPLATE_503020 });
     }
     if (changedIds.length > 0) {
       const rebuilt = await rebuildPeriods(ctx, changedIds);
@@ -145,6 +153,8 @@ export interface TemplateState {
   /** The onboarding `Try 50/30/20?` answer was Yes and its figure (null when no rough income was given). */
   readonly onboardingYes: boolean;
   readonly onboardingIncomeMinor: number | null;
+  /** The income changed by more than 10% since the template was made: `Your income changed — update 50/30/20 to ₹90,000?` Hidden until the next period once answered. */
+  readonly incomeChange: { readonly oldIncomeMinor: number; readonly newIncomeMinor: number; readonly periodStart: string } | null;
   /** The setup card `You wanted to try 50/30/20`: Yes at onboarding, nothing created yet, not dismissed. */
   readonly showSetupCard: boolean;
 }
@@ -192,7 +202,16 @@ export async function loadTemplateState(q: Querier, nowMs: number): Promise<Temp
   const salary = await lastPeriodSalaryMinor(q, nowMs);
   const dismissed = Number((await q.query(SEEN_PROMPT_SQL, [PROMPT_503020_CARD_DISMISSED]))[0]?.[0] ?? 0) > 0;
   const exists = budgets.length > 0;
+  let incomeChange: TemplateState['incomeChange'] = null;
+  if (exists && incomeMinor !== null && salary !== null && Math.abs(salary - incomeMinor) > incomeMinor * INCOME_CHANGE_SHARE) {
+    const read = await readPeriodProfile(q);
+    const today = read ? toLocalDate(nowMs, read.timezoneId) : null;
+    const current = read && today?.ok ? budgetPeriodFor({ rule: 'default' }, today.value, read.profile) : null;
+    const answered = current ? Number((await q.query(SEEN_PROMPT_SQL, [incomeCardKey(current.start)]))[0]?.[0] ?? 0) > 0 : true;
+    if (current && !answered) incomeChange = { oldIncomeMinor: incomeMinor, newIncomeMinor: salary, periodStart: current.start };
+  }
   return {
+    incomeChange,
     exists,
     targets,
     incomeMinor,

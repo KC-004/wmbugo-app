@@ -7,7 +7,7 @@ import { ToastHost } from '../../shared/feedback/ToastHost';
 import { createQueryClient } from '../../shared/queryClient';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
 import { BudgetsScreen } from './BudgetsScreen';
-import { barGeometry, limitBarLabel, LimitBar, OVERFLOW_CAP, statusLine } from '../../shared/ui/LimitBar';
+import { barGeometry, limitBarLabel, LimitBar, OVERFLOW_CAP, savingsLabel, savingsStatusLine, statusLine } from '../../shared/ui/LimitBar';
 import type { BudgetsApi, BudgetsData, SaveBudgetOutcome } from './budgetsApi';
 import { NO_TEMPLATE } from './budgetsTestKit';
 
@@ -154,13 +154,13 @@ describe('LimitBar states', () => {
 
 const CATEGORIES = mapCategoryRows(SEED_CATEGORIES.filter((c) => c.kind !== 'income').map((c, i) => [c.id, c.name, c.kind, c.budgetType, c.icon, c.color, i, null]));
 const row = (over: Partial<BudgetListRow> & { id: string; name: string }): BudgetListRow => ({
-  group: 'categories', scope: 'category', period: { ...NOV, kind: 'calendar_month' }, periodLabel: '1–30 Nov', usedMinor: 340_000, targetMinor: 600_000, refundSurplusMinor: 0, status: status(340_000, 600_000), overlapsOverall: false, ...over,
+  group: 'categories', scope: 'category', budgetType: null, period: { ...NOV, kind: 'calendar_month' }, periodLabel: '1–30 Nov', usedMinor: 340_000, targetMinor: 600_000, refundSurplusMinor: 0, status: status(340_000, 600_000), overlapsOverall: false, ...over,
 });
 
-function fakeApi(rows: BudgetListRow[] = [], opts: { payCycle?: boolean; save?: BudgetsApi['save']; template?: Partial<TemplateState> } = {}) {
+function fakeApi(rows: BudgetListRow[] = [], opts: { payCycle?: boolean; save?: BudgetsApi['save']; template?: Partial<TemplateState>; typeSummary?: BudgetsData['list']['typeSummary'] } = {}) {
   const state = { rows };
   const data = (): BudgetsData => ({
-    list: { today: '2026-11-12', rows: state.rows, overallId: state.rows.find((r) => r.group === 'overall')?.id ?? null },
+    list: { today: '2026-11-12', rows: state.rows, overallId: state.rows.find((r) => r.group === 'overall')?.id ?? null, typeSummary: opts.typeSummary ?? null },
     currency: INR, locale: 'en-IN', exponent: 2, payCycle: opts.payCycle ?? true, categories: CATEGORIES,
     accounts: [{ id: 'a1', name: 'HDFC' }, { id: 'a2', name: 'Cash' }],
     template: { ...NO_TEMPLATE, ...(opts.template ?? {}) },
@@ -175,8 +175,9 @@ function fakeApi(rows: BudgetListRow[] = [], opts: { payCycle?: boolean; save?: 
   const undoTemplate = jest.fn(async () => ({ ok: true }));
   const changeTemplate = jest.fn<Promise<{ ok: boolean; code?: string }>, [TemplateTargets]>(async () => ({ ok: true }));
   const dismissTemplateCard = jest.fn(async () => undefined);
-  const api: BudgetsApi = { load: async () => data(), readForEdit, save, undo, loadDetail: async () => null, remove: async () => ({ ok: true }), restore: async () => ({ ok: true }), createTemplate, undoTemplate, changeTemplate, dismissTemplateCard };
-  return { api, save, undo, readForEdit, state, createTemplate, undoTemplate, changeTemplate, dismissTemplateCard };
+  const answerIncomeChange = jest.fn<Promise<{ ok: boolean }>, [boolean, { newIncomeMinor: number; periodStart: string }]>(async () => ({ ok: true }));
+  const api: BudgetsApi = { load: async () => data(), readForEdit, save, undo, loadDetail: async () => null, remove: async () => ({ ok: true }), restore: async () => ({ ok: true }), createTemplate, undoTemplate, changeTemplate, dismissTemplateCard, answerIncomeChange };
+  return { api, save, undo, readForEdit, state, createTemplate, undoTemplate, changeTemplate, dismissTemplateCard, answerIncomeChange };
 }
 
 describe('Budgets list (SCR-14, Story 4.6)', () => {
@@ -481,5 +482,84 @@ describe('One-tap 50/30/20 targets (Story 4.10)', () => {
   it('with no setup card flagged there is no card', async () => {
     const r = await mountNode(<BudgetsScreen api={fakeApi().api} />);
     expect(has(r, 'template-card')).toBe(false);
+  });
+});
+
+describe('Savings bar status (Story 4.11): never a warning, never Over by', () => {
+  const sav = (used: number, target = 1_600_000) => budgetStatus({ usedMinor: used, targetMinor: target, period: NOV, today: '2026-11-12' });
+
+  it('below the target it says how far to go; at or above it, Target reached', () => {
+    expect(savingsStatusLine(sav(600_000), INR, 'en-IN', false)).toEqual({ text: '₹10,000.00 to go · 19 days left', warning: false });
+    expect(savingsStatusLine(sav(1_600_000), INR, 'en-IN', false)).toEqual({ text: 'Target reached', warning: false });
+    expect(savingsStatusLine(sav(1_800_000), INR, 'en-IN', false)).toEqual({ text: 'Target reached', warning: false });
+  });
+
+  it('hidden masks the amount and the label drops the figures', () => {
+    expect(savingsStatusLine(sav(600_000), INR, 'en-IN', true).text).toBe('₹ •••• to go · 19 days left');
+    expect(savingsLabel('Savings', sav(1_800_000), INR, 'en-IN', false, false)).toBe('Savings, 18,000 rupees of 16,000 rupees, Target reached');
+    expect(savingsLabel('Savings', sav(0), INR, 'en-IN', false, true)).toContain('More moved out than in this period');
+  });
+
+  it('no text of a savings status has a minus sign or Over by', () => {
+    for (const used of [0, 500_000, 1_600_000, 3_000_000]) {
+      const t = savingsStatusLine(sav(used), INR, 'en-IN', false).text;
+      expect(t).not.toMatch(/[-−–]|Over by/);
+    }
+  });
+});
+
+describe('Needs, Wants and Savings on the list (Story 4.11)', () => {
+  const tpl = (over: Partial<BudgetListRow> & { id: string; name: string }): BudgetListRow => row({ group: '50_30_20', scope: 'budget_type', ...over });
+  const THREE = (savings: Partial<BudgetListRow> = {}): BudgetListRow[] => [
+    tpl({ id: 'n', name: 'Needs', budgetType: 'need', usedMinor: 2_200_000, targetMinor: 4_000_000, status: status(2_200_000, 4_000_000) }),
+    tpl({ id: 'w', name: 'Wants', budgetType: 'want', usedMinor: 500_000, targetMinor: 2_400_000, status: status(500_000, 2_400_000) }),
+    tpl({ id: 's', name: 'Savings', scope: 'savings', usedMinor: 1_800_000, targetMinor: 1_600_000, savingsMovedMinor: 1_800_000, status: status(1_800_000, 1_600_000), ...savings }),
+  ];
+
+  it('shows the three bars with values, and a Savings above its target reads Target reached with no overflow or Over by', async () => {
+    const r = await mountNode(<BudgetsScreen api={fakeApi(THREE()).api} />);
+    expect(texts(r)).toEqual(expect.arrayContaining(['Needs', 'Wants', 'Savings', '₹22,000.00 of ₹40,000.00', '₹18,000.00 of ₹16,000.00', 'Target reached']));
+    expect(has(r, 'limit-s-overflow')).toBe(false);
+    expect(texts(r).join('|')).not.toMatch(/Over by/);
+    expect(host(r, 'limit-s').props.accessibilityLabel).toContain('Target reached');
+  });
+
+  it('a net outflow shows zero with More moved out than in this period, never a minus sign', async () => {
+    const f = fakeApi(THREE({ usedMinor: 0, savingsMovedMinor: -50_000, status: status(0, 1_600_000) }));
+    const r = await mountNode(<BudgetsScreen api={f.api} />);
+    expect(texts(r)).toContain('More moved out than in this period');
+    expect(texts(r)).toContain('₹0.00 of ₹16,000.00');
+    expect(texts(r).join('|')).not.toMatch(/[-−]\s?₹/);
+  });
+
+  it('Not classified ₹3,000 · Sort it opens Activity for those entries in the period; nothing shows at zero', async () => {
+    const onOpenActivity = jest.fn();
+    const summary = { notClassifiedMinor: 300_000, categoryIds: ['cat_uncategorised', 'cat_family'], period: { start: '2026-11-01', end: '2026-11-30' } };
+    const r = await mountNode(<BudgetsScreen api={fakeApi(THREE(), { typeSummary: summary }).api} onOpenActivity={onOpenActivity} />);
+    expect(texts(r)).toContain('Not classified ₹3,000.00 · Sort it');
+    await press(r, 'budgets-not-classified');
+    expect(onOpenActivity).toHaveBeenCalledWith({ categoryIds: ['cat_uncategorised', 'cat_family'], fromDate: '2026-11-01', toDate: '2026-11-30' });
+    const none = await mountNode(<BudgetsScreen api={fakeApi(THREE(), { typeSummary: { ...summary, notClassifiedMinor: 0 } }).api} />);
+    expect(has(none, 'budgets-not-classified')).toBe(false);
+  });
+
+  it('the income-changed card offers Update to the new figure or Keep the old one; nothing changes until a tap', async () => {
+    const change = { oldIncomeMinor: 8_000_000, newIncomeMinor: 9_000_000, periodStart: '2026-11-01' };
+    const f = fakeApi(THREE(), { template: { exists: true, incomeChange: change } });
+    const r = await mountNode(<BudgetsScreen api={f.api} />);
+    expect(texts(r)).toContain('Your income changed — update 50/30/20 to ₹90,000.00?');
+    expect(has(r, 'income-card-keep')).toBe(true);
+    expect(f.answerIncomeChange).not.toHaveBeenCalled();
+    await press(r, 'income-card-update');
+    expect(f.answerIncomeChange).toHaveBeenCalledWith(true, { newIncomeMinor: 9_000_000, periodStart: '2026-11-01' });
+    const g = fakeApi(THREE(), { template: { exists: true, incomeChange: change } });
+    const k = await mountNode(<BudgetsScreen api={g.api} />);
+    await press(k, 'income-card-keep');
+    expect(g.answerIncomeChange).toHaveBeenCalledWith(false, { newIncomeMinor: 9_000_000, periodStart: '2026-11-01' });
+  });
+
+  it('no income card when the income did not change enough', async () => {
+    const r = await mountNode(<BudgetsScreen api={fakeApi(THREE(), { template: { exists: true } }).api} />);
+    expect(has(r, 'income-card')).toBe(false);
   });
 });

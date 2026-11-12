@@ -3,7 +3,7 @@ import { Warning } from 'phosphor-react-native';
 import type { BudgetStatus, CurrencyCode } from '@wmbugo/core';
 import { spokenAmount } from '../a11y/labels';
 import { copy } from '../copy';
-import { formatAmount } from '../formatAmount';
+import { moneyText } from './moneyText';
 import { Icon } from '../theme/Icon';
 import { useTheme } from '../theme/ThemeProvider';
 import { radii } from '../theme/tokens';
@@ -25,22 +25,33 @@ export function barGeometry(usedMinor: number, targetMinor: number): { fill: num
   return { fill: 1 / total, overflow: over / total, tick: 1 / total };
 }
 
-const money = (minor: number, currency: CurrencyCode, locale: string | undefined, hidden: boolean): string => {
-  const f = formatAmount({ amountMinor: hidden ? 0 : minor, currency, direction: 'neutral', ...(locale ? { locale } : {}) });
-  if (!f.ok) return '';
-  // Hidden amounts keep the symbol and show four dots, whatever the value (same rule as the Amount component).
-  return hidden ? f.value.replace(/[0-9٠-٩۰-۹]+([.,٫٬][0-9٠-٩]+)?/g, '••••').replace(/^([^\s•]+)(•)/, '$1 $2') : f.value;
-};
-
 const daysText = (n: number): string => (n === 1 ? copy.budgets.dayLeft : copy.budgets.daysLeft.replace('{n}', String(n)));
 
 /** The status line under the bar: `₹600 left · 12 days left`, `85% used`, `Over by ₹740` or `Too early to tell`. */
 export function statusLine(s: BudgetStatus, currency: CurrencyCode, locale: string | undefined, hidden: boolean): { text: string; warning: boolean } {
   const b = copy.budgets;
-  if (s.status === 'exceeded') return { text: b.over.replace('{amount}', money(s.usedMinor - s.targetMinor, currency, locale, hidden)), warning: true };
+  if (s.status === 'exceeded') return { text: b.over.replace('{amount}', moneyText(s.usedMinor - s.targetMinor, currency, locale, hidden)), warning: true };
   if (s.status === 'insufficient-data') return { text: b.tooEarly, warning: false };
   if (s.status === 'nearing') return { text: hidden ? daysText(s.daysRemaining) : b.percentUsed.replace('{n}', String(s.percentUsed)), warning: false };
-  return { text: `${b.left.replace('{left}', money(s.remainingMinor, currency, locale, hidden))}${s.daysRemaining > 0 ? ` · ${daysText(s.daysRemaining)}` : ''}`, warning: false };
+  return { text: `${b.left.replace('{left}', moneyText(s.remainingMinor, currency, locale, hidden))}${s.daysRemaining > 0 ? ` · ${daysText(s.daysRemaining)}` : ''}`, warning: false };
+}
+
+/**
+ * The status line of a Savings bar (Story 4.11): saving is never a warning, so there is no `Over by` and no warning tint.
+ * Below the target it says how far to go; at or above it, `Target reached`.
+ */
+export function savingsStatusLine(s: BudgetStatus, currency: CurrencyCode, locale: string | undefined, hidden: boolean): { text: string; warning: false } {
+  const b = copy.budgets;
+  if (s.usedMinor >= s.targetMinor && s.targetMinor > 0) return { text: b.targetReached, warning: false };
+  const toGo = b.toGo.replace('{amount}', moneyText(s.targetMinor - s.usedMinor, currency, locale, hidden));
+  return { text: `${toGo}${s.daysRemaining > 0 ? ` · ${daysText(s.daysRemaining)}` : ''}`, warning: false };
+}
+
+/** What TalkBack reads for a Savings row: `Savings, 18,000 of 16,000 rupees, target reached`. */
+export function savingsLabel(name: string, s: BudgetStatus, currency: CurrencyCode, locale: string | undefined, hidden: boolean, movedOut: boolean): string {
+  const amounts = hidden ? '' : `${spokenAmount(s.usedMinor, currency, locale)} of ${spokenAmount(s.targetMinor, currency, locale)}`;
+  const line = savingsStatusLine(s, currency, locale, hidden).text;
+  return [name, amounts, hidden ? daysText(s.daysRemaining) : line, movedOut ? copy.budgets.movedOut : ''].filter(Boolean).join(', ');
 }
 
 /** What TalkBack reads for the whole row: `Groceries, 3,400 of 4,000 rupees, 85% used, 12 days left`. Never the bar. */
@@ -65,6 +76,9 @@ export function LimitBar({
   hidden = false,
   dueText,
   caption,
+  tone,
+  savings = false,
+  movedOut = false,
   testID,
 }: {
   name: string;
@@ -76,26 +90,33 @@ export function LimitBar({
   dueText?: string;
   /** A small line under the status, e.g. `Also counted in your overall budget`. */
   caption?: string;
+  /** Needs, Wants and Savings draw in their own colours with a thin outline on light surfaces (Story 4.11). */
+  tone?: 'needs' | 'wants' | 'savings';
+  /** A Savings bar: never a warning, no overflow, `Target reached` above the target. */
+  savings?: boolean;
+  /** Savings: more moved out of pots than in this period (the bar shows zero, never a minus). */
+  movedOut?: boolean;
   testID?: string;
 }) {
   const theme = useTheme();
   const g = barGeometry(status.usedMinor, status.targetMinor);
-  const line = statusLine(status, currency, locale, hidden);
+  const line = savings ? savingsStatusLine(status, currency, locale, hidden) : statusLine(status, currency, locale, hidden);
+  const outline = tone && theme.scheme === 'light' ? { borderWidth: 1, borderColor: theme.color('text-secondary') } : null;
   const warn = theme.color('semantic-warning');
   return (
-    <View testID={testID} accessible accessibilityLabel={limitBarLabel(name, status, currency, locale, hidden, dueText)} style={styles.row}>
+    <View testID={testID} accessible accessibilityLabel={savings ? savingsLabel(name, status, currency, locale, hidden, movedOut) : limitBarLabel(name, status, currency, locale, hidden, dueText)} style={styles.row}>
       <View style={styles.head}>
         <Text style={[textStyle('body-medium'), styles.name, { color: theme.color('text-primary') }]}>{name}</Text>
         <Text testID={testID ? `${testID}-amounts` : undefined} style={[textStyle('caption'), styles.tnum, { color: theme.color('text-secondary') }]}>
-          {copy.budgets.ofTarget.replace('{used}', money(status.usedMinor, currency, locale, hidden)).replace('{target}', money(status.targetMinor, currency, locale, hidden))}
+          {copy.budgets.ofTarget.replace('{used}', moneyText(status.usedMinor, currency, locale, hidden)).replace('{target}', moneyText(status.targetMinor, currency, locale, hidden))}
         </Text>
       </View>
       <View style={styles.barBox}>
-        <View testID={testID ? `${testID}-track` : undefined} style={[styles.track, { backgroundColor: theme.color('bg-muted') }]}>
+        <View testID={testID ? `${testID}-track` : undefined} style={[styles.track, { backgroundColor: theme.color('bg-muted') }, outline]}>
         {hidden ? null : (
           <>
-            <View testID={testID ? `${testID}-fill` : undefined} style={[styles.fill, { width: `${g.fill * 100}%`, backgroundColor: theme.color('accent-primary') }]} />
-            {g.overflow > 0 ? <View testID={testID ? `${testID}-overflow` : undefined} style={[styles.overflow, { left: `${g.fill * 100}%`, width: `${g.overflow * 100}%`, backgroundColor: warn }]} /> : null}
+            <View testID={testID ? `${testID}-fill` : undefined} style={[styles.fill, { width: `${g.fill * 100}%`, backgroundColor: theme.color(tone ?? 'accent-primary') }]} />
+            {g.overflow > 0 && !savings ? <View testID={testID ? `${testID}-overflow` : undefined} style={[styles.overflow, { left: `${g.fill * 100}%`, width: `${g.overflow * 100}%`, backgroundColor: warn }]} /> : null}
           </>
         )}
         </View>
@@ -108,6 +129,7 @@ export function LimitBar({
         </Text>
         {dueText ? <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{` · ${dueText}`}</Text> : null}
       </View>
+      {movedOut ? <Text testID={testID ? `${testID}-moved-out` : undefined} style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{copy.budgets.movedOut}</Text> : null}
       {caption ? <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{caption}</Text> : null}
     </View>
   );

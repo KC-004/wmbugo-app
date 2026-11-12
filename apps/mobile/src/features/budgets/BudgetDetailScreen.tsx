@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CaretLeft, CaretRight } from 'phosphor-react-native';
-import { dayMonthLabel, monthName, type ActivityRow, type BudgetDetail, type BudgetEntry } from '@wmbugo/core';
+import { dayMonthLabel, monthName, type ActivityQuery, type ActivityRow, type BudgetDetail, type BudgetEntry } from '@wmbugo/core';
 import { controlA11y } from '../../shared/a11y/labels';
 import { copy } from '../../shared/copy';
 import { EmptyState, ErrorBlock, Skeleton } from '../../shared/feedback/Feedback';
@@ -56,7 +56,7 @@ function TemplateAmount({ template, amountMinor, data, direction = 'neutral', te
  * up and a switcher to earlier periods (never a future one). Edit changes the limit from this period or the next; Delete
  * is soft and can be undone. Every figure comes from the entries' dates and the target version that period had.
  */
-export function BudgetDetailScreen({ budgetId, periodStart, onBack, onOpenEntry, api = realBudgetsApi }: { budgetId: string; /** A tapped notification opens the period it was about. */ periodStart?: string; onBack: () => void; onOpenEntry: (transactionId: string) => void; api?: BudgetsApi }) {
+export function BudgetDetailScreen({ budgetId, periodStart, onBack, onOpenEntry, onOpenActivity, api = realBudgetsApi }: { budgetId: string; /** A tapped notification opens the period it was about. */ periodStart?: string; onBack: () => void; onOpenEntry: (transactionId: string) => void; /** Opens Activity filtered to a category and this period (a drill-down row). */ onOpenActivity?: (query: ActivityQuery) => void; api?: BudgetsApi }) {
   const theme = useTheme();
   const qc = useQueryClient();
   const sheet = useSheet();
@@ -198,11 +198,18 @@ export function BudgetDetailScreen({ budgetId, periodStart, onBack, onOpenEntry,
         </View>
 
         <View style={[styles.card, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
-          <LimitBar testID="detail-limit" name={d.name} status={d.status} currency={data.currency} locale={data.locale} />
+          <LimitBar
+            testID="detail-limit"
+            name={d.name}
+            status={d.status}
+            currency={data.currency}
+            locale={data.locale}
+            {...(d.scope === 'savings' ? { tone: 'savings' as const, savings: true, movedOut: (d.savingsMovedMinor ?? 0) < 0 } : d.scope === 'budget_type' && d.budgetType ? { tone: d.budgetType === 'need' ? ('needs' as const) : ('wants' as const) } : {})}
+          />
         </View>
 
-        <TemplateAmount testID="budget-left" template={over ? copy.budgets.overLine : copy.budgets.leftLine} amountMinor={over ? d.usedMinor - d.targetMinor : d.status.remainingMinor} data={data} />
-        {d.status.projectedMinor !== null ? (
+        {d.scope === 'savings' ? null : <TemplateAmount testID="budget-left" template={over ? copy.budgets.overLine : copy.budgets.leftLine} amountMinor={over ? d.usedMinor - d.targetMinor : d.status.remainingMinor} data={data} />}
+        {d.scope !== 'savings' && d.status.projectedMinor !== null ? (
           <TemplateAmount testID="budget-projected" template={copy.budgets.projected} amountMinor={d.status.projectedMinor} data={data} tail={{ date: dayMonthLabel(d.period.end) }} />
         ) : null}
         {d.refundSurplusMinor > 0 ? <TemplateAmount testID="budget-refunds" template={copy.budgets.refundsThisPeriod} amountMinor={d.refundSurplusMinor} data={data} direction="income" /> : null}
@@ -211,15 +218,21 @@ export function BudgetDetailScreen({ budgetId, periodStart, onBack, onOpenEntry,
           <View testID="budget-breakdown" style={styles.gap}>
             <Text accessibilityRole="header" style={[textStyle('label'), muted]}>{copy.budgets.byCategory}</Text>
             {d.breakdown.map((c) => (
-              <View key={c.categoryId} testID={`budget-share-${c.categoryId}`} accessible style={styles.share}>
+              <Pressable
+                key={c.categoryId}
+                testID={`budget-share-${c.categoryId}`}
+                accessible
+                accessibilityRole={onOpenActivity ? 'button' : 'text'}
+                onPress={onOpenActivity ? () => onOpenActivity({ categoryIds: c.memberIds, fromDate: d.period.start, toDate: d.period.end }) : undefined}
+                style={styles.share}>
                 <Text style={[textStyle('body'), ink, styles.shareName]}>{c.name}</Text>
                 <Amount amountMinor={c.amountMinor} currency={data.currency} locale={data.locale} direction="neutral" role="body" />
-              </View>
+              </Pressable>
             ))}
           </View>
         ) : null}
 
-        <Text accessibilityRole="header" style={[textStyle('label'), muted]}>{copy.budgets.entriesHeading}</Text>
+        <Text accessibilityRole="header" style={[textStyle('label'), muted]}>{d.scope === 'savings' ? copy.budgets.transfersHeading : copy.budgets.entriesHeading}</Text>
         {d.entries.length === 0 ? (
           <Text testID="budget-nothing" style={[textStyle('body'), muted]}>{copy.budgets.nothingCounted}</Text>
         ) : (
