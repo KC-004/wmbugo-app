@@ -1,7 +1,7 @@
 import { AccessibilityInfo, Text } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { budgetStatus, mapCategoryRows, SEED_CATEGORIES, type BudgetListRow, type BudgetSnapshot, type SaveBudgetInput } from '@wmbugo/core';
+import { budgetStatus, mapCategoryRows, SEED_CATEGORIES, type BudgetListRow, type BudgetSnapshot, type SaveBudgetInput, type TemplateState, type TemplateTargets } from '@wmbugo/core';
 import { SheetHost } from '../../shared/feedback/SheetHost';
 import { ToastHost } from '../../shared/feedback/ToastHost';
 import { createQueryClient } from '../../shared/queryClient';
@@ -9,6 +9,7 @@ import { ThemeProvider } from '../../shared/theme/ThemeProvider';
 import { BudgetsScreen } from './BudgetsScreen';
 import { barGeometry, limitBarLabel, LimitBar, OVERFLOW_CAP, statusLine } from '../../shared/ui/LimitBar';
 import type { BudgetsApi, BudgetsData, SaveBudgetOutcome } from './budgetsApi';
+import { NO_TEMPLATE } from './budgetsTestKit';
 
 jest.mock('../../adapters/startApp', () => ({ getServices: jest.fn(), systemClock: { nowMs: () => 0 } }));
 
@@ -156,12 +157,13 @@ const row = (over: Partial<BudgetListRow> & { id: string; name: string }): Budge
   group: 'categories', scope: 'category', period: { ...NOV, kind: 'calendar_month' }, periodLabel: '1–30 Nov', usedMinor: 340_000, targetMinor: 600_000, refundSurplusMinor: 0, status: status(340_000, 600_000), overlapsOverall: false, ...over,
 });
 
-function fakeApi(rows: BudgetListRow[] = [], opts: { payCycle?: boolean; save?: BudgetsApi['save'] } = {}) {
+function fakeApi(rows: BudgetListRow[] = [], opts: { payCycle?: boolean; save?: BudgetsApi['save']; template?: Partial<TemplateState> } = {}) {
   const state = { rows };
   const data = (): BudgetsData => ({
     list: { today: '2026-11-12', rows: state.rows, overallId: state.rows.find((r) => r.group === 'overall')?.id ?? null },
     currency: INR, locale: 'en-IN', exponent: 2, payCycle: opts.payCycle ?? true, categories: CATEGORIES,
     accounts: [{ id: 'a1', name: 'HDFC' }, { id: 'a2', name: 'Cash' }],
+    template: { ...NO_TEMPLATE, ...(opts.template ?? {}) },
   });
   const save = jest.fn<ReturnType<BudgetsApi['save']>, [SaveBudgetInput]>(opts.save ?? (async (input) => {
     state.rows = [...state.rows, row({ id: `b${state.rows.length + 1}`, name: input.scope === 'overall' ? 'Overall' : 'Groceries', group: input.scope === 'overall' ? 'overall' : 'categories', scope: input.scope })];
@@ -169,19 +171,21 @@ function fakeApi(rows: BudgetListRow[] = [], opts: { payCycle?: boolean; save?: 
   }));
   const undo = jest.fn(async () => ({ ok: true }));
   const readForEdit = jest.fn(async (id: string) => ({ id, scope: 'overall' as const, categoryIds: [], budgetType: null, accountIds: null, period: { rule: 'default' as const }, targetMinor: 5_000_000, currentPeriodStart: '2026-11-01', nextPeriodStart: '2026-12-01' }));
-  const api: BudgetsApi = { load: async () => data(), readForEdit, save, undo, loadDetail: async () => null, remove: async () => ({ ok: true }), restore: async () => ({ ok: true }) };
-  return { api, save, undo, readForEdit, state };
+  const createTemplate = jest.fn<ReturnType<BudgetsApi['createTemplate']>, [number, TemplateTargets?]>(async () => ({ ok: true, budgetIds: ['n', 'w', 's'] }));
+  const undoTemplate = jest.fn(async () => ({ ok: true }));
+  const changeTemplate = jest.fn<Promise<{ ok: boolean; code?: string }>, [TemplateTargets]>(async () => ({ ok: true }));
+  const dismissTemplateCard = jest.fn(async () => undefined);
+  const api: BudgetsApi = { load: async () => data(), readForEdit, save, undo, loadDetail: async () => null, remove: async () => ({ ok: true }), restore: async () => ({ ok: true }), createTemplate, undoTemplate, changeTemplate, dismissTemplateCard };
+  return { api, save, undo, readForEdit, state, createTemplate, undoTemplate, changeTemplate, dismissTemplateCard };
 }
 
 describe('Budgets list (SCR-14, Story 4.6)', () => {
-  it('with no budgets: the empty state with Add budget, and no 50/30/20 button until Story 4.10 wires it', async () => {
+  it('with no budgets: the empty state with Add budget and Use 50/30/20', async () => {
     const f = fakeApi();
     const r = await mountNode(<BudgetsScreen api={f.api} />);
     expect(texts(r)).toContain('No budgets yet. Set one limit for this period.');
     expect(has(r, 'budgets-add')).toBe(true);
-    expect(has(r, 'budgets-use-503020')).toBe(false);
-    const withTemplate = await mountNode(<BudgetsScreen api={f.api} onUseTemplate={() => undefined} />);
-    expect(has(withTemplate, 'budgets-use-503020')).toBe(true);
+    expect(has(r, 'budgets-use-503020')).toBe(true);
   });
 
   it('groups Overall, 50/30/20 and Categories, labels each period and flags a category budget that overlaps the overall one', async () => {
@@ -189,11 +193,11 @@ describe('Budgets list (SCR-14, Story 4.6)', () => {
       row({ id: 'o', name: 'Overall', group: 'overall', scope: 'overall' }),
       row({ id: 'g', name: 'Groceries', overlapsOverall: true }),
       row({ id: 'w', name: 'Food & Drinks', periodLabel: 'Weekly · 9–15 Nov' }),
-      row({ id: 'n', name: 'Needs', group: 'fifty_thirty_twenty', scope: 'budget_type' }),
+      row({ id: 'n', name: 'Needs', group: '50_30_20', scope: 'budget_type' }),
     ]);
     const r = await mountNode(<BudgetsScreen api={f.api} />);
     const groups = r.root.findAll((n) => typeof n.type === 'string' && /^budgets-group-/.test(String(n.props.testID))).map((n) => n.props.testID);
-    expect(groups).toEqual(['budgets-group-overall', 'budgets-group-fifty_thirty_twenty', 'budgets-group-categories']);
+    expect(groups).toEqual(['budgets-group-overall', 'budgets-group-50_30_20', 'budgets-group-categories']);
     const t = texts(r);
     expect(t).toEqual(expect.arrayContaining(['Overall', '50/30/20', 'Categories', '1–30 Nov', 'Weekly · 9–15 Nov']));
     expect(t.filter((x) => x === 'Also counted in your overall budget')).toHaveLength(1);
@@ -383,5 +387,99 @@ describe('alerts in the editor and the first-time ask (Story 4.9)', () => {
     await act(async () => new Promise((res) => setTimeout(res, 10)));
     expect(has(b, 'alert-ask')).toBe(false);
     expect(muted.shouldAskForAlerts).not.toHaveBeenCalled();
+  });
+});
+
+describe('One-tap 50/30/20 targets (Story 4.10)', () => {
+  const open = async (opts: Parameters<typeof fakeApi>[1] = {}) => {
+    const f = fakeApi([], opts);
+    const r = await mountNode(<BudgetsScreen api={f.api} />);
+    await press(r, 'budgets-use-503020');
+    return { f, r };
+  };
+  const rowsOf = (r: ReactTestRenderer) => ['needs', 'wants', 'savings'].map((k) => host(r, `template-${k}`).props.value);
+
+  it('asks for the monthly income (per pay cycle when salaried), with the change-later caption, empty when nothing is known', async () => {
+    const monthly = await open({ payCycle: false });
+    expect(texts(monthly.r)).toEqual(expect.arrayContaining(['Your monthly income', 'You can change these later']));
+    expect(host(monthly.r, 'template-income').props.value).toBe('');
+    const cycle = await open({ payCycle: true });
+    expect(texts(cycle.r)).toContain('Your income per pay cycle');
+  });
+
+  it('is pre-filled with the best income known (Salary, or the onboarding figure) and previews the rows', async () => {
+    const { r } = await open({ template: { suggestedIncomeMinor: 8_000_000, suggestionSource: 'onboarding' } });
+    expect(host(r, 'template-income').props.value).toBe('80000');
+    expect(rowsOf(r)).toEqual(['40000', '24000', '16000']);
+  });
+
+  it('Create targets saves the exact split and toasts 50/30/20 targets created with Undo', async () => {
+    const { f, r } = await open();
+    await type(r, 'template-income', '80000');
+    expect(rowsOf(r)).toEqual(['40000', '24000', '16000']);
+    await press(r, 'template-save');
+    expect(f.createTemplate).toHaveBeenCalledWith(8_000_000, undefined);
+    expect(has(r, 'template-sheet')).toBe(false);
+    expect(texts(r)).toContain('50/30/20 targets created');
+    await press(r, 'toast-undo');
+    expect(f.undoTemplate).toHaveBeenCalledWith(['n', 'w', 's']);
+  });
+
+  it('an income that does not divide exactly puts the leftover minor unit in Savings', async () => {
+    const { r } = await open();
+    await type(r, 'template-income', '80000.01');
+    expect(rowsOf(r)).toEqual(['40000', '24000', '16000.01']);
+  });
+
+  it('an edited row is saved as typed and the caption says the targets add up to more than the income', async () => {
+    const { f, r } = await open();
+    await type(r, 'template-income', '80000');
+    expect(has(r, 'template-sum')).toBe(false);
+    await type(r, 'template-needs', '42000');
+    expect(texts(r)).toEqual(expect.arrayContaining(['Targets add up to  of  income', '₹82,000.00', '₹80,000.00']));
+    await press(r, 'template-save');
+    expect(f.createTemplate).toHaveBeenCalledWith(8_000_000, { needsMinor: 4_200_000, wantsMinor: 2_400_000, savingsMinor: 1_600_000 });
+  });
+
+  it('an empty or zero income says Error: income required and writes nothing', async () => {
+    const { f, r } = await open();
+    await press(r, 'template-save');
+    expect(texts(r)).toContain('Error: income required');
+    await type(r, 'template-income', '0');
+    await press(r, 'template-save');
+    expect(texts(r)).toContain('Error: income required');
+    expect(f.createTemplate).not.toHaveBeenCalled();
+    expect(has(r, 'template-sheet')).toBe(true);
+  });
+
+  it('when 50/30/20 already exists it says so and offers Edit targets; no second set is created', async () => {
+    const { f, r } = await open({ template: { exists: true, incomeMinor: 8_000_000, targets: { needsMinor: 4_000_000, wantsMinor: 2_400_000, savingsMinor: 1_600_000 } } });
+    expect(texts(r)).toContain('You already use 50/30/20.');
+    expect(f.createTemplate).not.toHaveBeenCalled();
+    await press(r, 'template-edit');
+    expect(rowsOf(r)).toEqual(['40000', '24000', '16000']);
+    await type(r, 'template-savings', '20000');
+    await press(r, 'template-save');
+    expect(f.changeTemplate).toHaveBeenCalledWith({ needsMinor: 4_000_000, wantsMinor: 2_400_000, savingsMinor: 2_000_000 });
+    expect(f.createTemplate).not.toHaveBeenCalled();
+  });
+
+  it('the setup card You wanted to try 50/30/20 opens the sheet pre-filled with the onboarding figure; dismissing is remembered and creates nothing', async () => {
+    const f = fakeApi([], { template: { showSetupCard: true, onboardingYes: true, onboardingIncomeMinor: 8_000_000, suggestedIncomeMinor: 9_500_000, suggestionSource: 'salary' } });
+    const r = await mountNode(<BudgetsScreen api={f.api} />);
+    expect(texts(r)).toContain('You wanted to try 50/30/20');
+    await press(r, 'template-card-setup');
+    expect(host(r, 'template-income').props.value).toBe('80000');
+    expect(f.createTemplate).not.toHaveBeenCalled();
+    const g = fakeApi([], { template: { showSetupCard: true, onboardingYes: true, onboardingIncomeMinor: 8_000_000 } });
+    const d = await mountNode(<BudgetsScreen api={g.api} />);
+    await press(d, 'template-card-dismiss');
+    expect(g.dismissTemplateCard).toHaveBeenCalled();
+    expect(g.createTemplate).not.toHaveBeenCalled();
+  });
+
+  it('with no setup card flagged there is no card', async () => {
+    const r = await mountNode(<BudgetsScreen api={fakeApi().api} />);
+    expect(has(r, 'template-card')).toBe(false);
   });
 });

@@ -141,6 +141,13 @@
       "when": 1794509672637,
       "tag": "0019_budget_alert_fired",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1794510765775,
+      "tag": "0020_budget_template_income",
+      "breakpoints": true
     }
   ]
 }

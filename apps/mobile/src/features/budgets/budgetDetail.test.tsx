@@ -8,6 +8,7 @@ import { createQueryClient } from '../../shared/queryClient';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
 import { BudgetDetailScreen } from './BudgetDetailScreen';
 import type { BudgetDetailData, BudgetsApi, BudgetsData } from './budgetsApi';
+import { NO_TEMPLATE } from './budgetsTestKit';
 
 jest.mock('../../adapters/startApp', () => ({ getServices: jest.fn(), systemClock: { nowMs: () => 0 } }));
 
@@ -61,9 +62,9 @@ function fakeApi(byBack: Record<number, BudgetDetail> | 'missing' = { 0: detail(
   const restore = jest.fn<Promise<{ ok: boolean }>, [string]>(async () => ({ ok: true }));
   const save = jest.fn<ReturnType<BudgetsApi['save']>, [SaveBudgetInput]>(async () => ({ ok: true, value: { budgetId: 'b1', created: false, snapshot: {} as BudgetSnapshot } }));
   const undo = jest.fn(async () => ({ ok: true }));
-  const data = (): BudgetsData => ({ list: { today: '2026-11-15', rows: [], overallId: 'b1' }, currency: 'INR', locale: 'en-IN', exponent: 2, payCycle: true, categories: CATEGORIES, accounts: [] });
+  const data = (): BudgetsData => ({ list: { today: '2026-11-15', rows: [], overallId: 'b1' }, currency: 'INR', locale: 'en-IN', exponent: 2, payCycle: true, categories: CATEGORIES, accounts: [], template: NO_TEMPLATE });
   const readForEdit = jest.fn(async (id: string) => ({ id, name: 'Overall', scope: 'overall' as const, categoryIds: [], budgetType: null, accountIds: null, period: { rule: 'default' as const }, targetMinor: 5_000_000, currentPeriodStart: '2026-11-01', nextPeriodStart: '2026-12-01' }));
-  const api: BudgetsApi = { load: async () => data(), readForEdit, save, undo, loadDetail, remove, restore };
+  const api: BudgetsApi = { load: async () => data(), readForEdit, save, undo, loadDetail, remove, restore, createTemplate: async () => ({ ok: true, budgetIds: [] }), undoTemplate: async () => ({ ok: true }), changeTemplate: async () => ({ ok: true }), dismissTemplateCard: async () => undefined };
   return { api, loadDetail, remove, restore, save, undo };
 }
 

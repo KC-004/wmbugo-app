@@ -12,12 +12,13 @@ import { textStyle } from '../../shared/theme/typography';
 import { Button } from '../../shared/ui/Button';
 import { AlertAskSheet } from './AlertAskSheet';
 import { BudgetSheet, type BudgetSheetMode } from './BudgetSheet';
+import { TemplateSheet } from './TemplateSheet';
 import { BUDGETS_QUERY_KEY, realBudgetsApi, type BudgetsApi, type BudgetsData } from './budgetsApi';
 import { LimitBar } from '../../shared/ui/LimitBar';
 
 const GROUPS: readonly { group: BudgetGroup; title: string }[] = [
   { group: 'overall', title: copy.budgets.groupOverall },
-  { group: 'fifty_thirty_twenty', title: copy.budgets.groupTemplate },
+  { group: '50_30_20', title: copy.budgets.groupTemplate },
   { group: 'categories', title: copy.budgets.groupCategories },
 ];
 
@@ -81,9 +82,58 @@ export function BudgetsScreen({ api = realBudgetsApi, onUseTemplate, onOpen }: {
       body: (close) => <AlertAskSheet close={close} onAnswer={(allow) => void api.answerAlertAsk?.(allow).catch(() => undefined)} />,
     });
 
+  /** The 50/30/20 sheet (Story 4.10). `income` pre-fills it: from the setup card the onboarding figure, otherwise the best suggestion. */
+  const openTemplate = (d: BudgetsData, income: number | null) => {
+    sheet.open({
+      id: 'budget-template',
+      title: copy.budgets.templateTitle,
+      body: (close) => (
+        <TemplateSheet
+          template={d.template}
+          initialIncomeMinor={income ?? d.template.suggestedIncomeMinor}
+          payCycle={d.payCycle}
+          exponent={d.exponent}
+          currency={d.currency}
+          locale={d.locale}
+          close={close}
+          onCreate={async (incomeMinor, targets) => {
+            const r = await api.createTemplate(incomeMinor, targets);
+            if (!r.ok) return r;
+            await invalidateForEvent(qc, 'BudgetsChanged');
+            toast.show({
+              message: copy.budgets.templateCreated,
+              undo: {
+                label: copy.common.undo,
+                onUndo: () =>
+                  void api
+                    .undoTemplate(r.budgetIds)
+                    .then(async (u) => (u.ok ? invalidateForEvent(qc, 'BudgetsChanged') : toast.show({ message: copy.budgets.undoFailed })))
+                    .catch(() => toast.show({ message: copy.budgets.undoFailed })),
+              },
+            });
+            return { ok: true };
+          }}
+          onEdit={async (targets) => {
+            const r = await api.changeTemplate(targets);
+            if (r.ok) {
+              await invalidateForEvent(qc, 'BudgetsChanged');
+              toast.show({ message: copy.budgets.targetsSaved });
+            }
+            return r;
+          }}
+        />
+      ),
+    });
+  };
+
   const edit = async (id: string, d: BudgetsData) => {
     const budget = await api.readForEdit(id).catch(() => null);
     if (budget) open({ mode: 'edit', budget }, d);
+  };
+
+  const dismissCard = async () => {
+    await api.dismissTemplateCard().catch(() => undefined);
+    await invalidateForEvent(qc, 'BudgetsChanged');
   };
 
   if (q.isError) return <Text style={[textStyle('body'), { color: theme.color('semantic-warning') }]}>{copy.budgets.loadError}</Text>;
@@ -95,14 +145,17 @@ export function BudgetsScreen({ api = realBudgetsApi, onUseTemplate, onOpen }: {
       <View testID="budgets-empty" style={styles.empty}>
         <Text style={[textStyle('body'), styles.center, { color: theme.color('text-primary') }]}>{copy.budgets.empty}</Text>
         <Button label={copy.budgets.add} testID="budgets-add" onPress={() => open({ mode: 'add' }, data)} />
-        {onUseTemplate ? <Button label={copy.budgets.useTemplate} variant="secondary" testID="budgets-use-503020" onPress={onUseTemplate} /> : null}
+        <SetupCard data={data} onSetUp={() => openTemplate(data, data.template.onboardingIncomeMinor)} onDismiss={() => void dismissCard()} />
+        <Button label={copy.budgets.useTemplate} variant="secondary" testID="budgets-use-503020" onPress={() => (onUseTemplate ? onUseTemplate() : openTemplate(data, null))} />
       </View>
     );
   }
 
   return (
     <View testID="budgets-screen" style={styles.list}>
+      <SetupCard data={data} onSetUp={() => openTemplate(data, data.template.onboardingIncomeMinor)} onDismiss={() => void dismissCard()} />
       <Button label={copy.budgets.add} variant="secondary" testID="budgets-add" onPress={() => open({ mode: 'add' }, data)} />
+      <Button label={copy.budgets.useTemplate} variant="secondary" testID="budgets-use-503020" onPress={() => (onUseTemplate ? onUseTemplate() : openTemplate(data, null))} />
       {GROUPS.map(({ group, title }) => {
         const inGroup = rows.filter((r) => r.group === group);
         if (inGroup.length === 0) return null;
@@ -115,6 +168,19 @@ export function BudgetsScreen({ api = realBudgetsApi, onUseTemplate, onOpen }: {
           </View>
         );
       })}
+    </View>
+  );
+}
+
+/** `You wanted to try 50/30/20`: shown when onboarding said Yes and nothing was set up. Dismissing is remembered. */
+function SetupCard({ data, onSetUp, onDismiss }: { data: BudgetsData; onSetUp: () => void; onDismiss: () => void }) {
+  const theme = useTheme();
+  if (!data.template.showSetupCard) return null;
+  return (
+    <View testID="template-card" style={[styles.card, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
+      <Text style={[textStyle('body-medium'), { color: theme.color('text-primary') }]}>{copy.budgets.templateCard}</Text>
+      <Button label={copy.budgets.setItUp} testID="template-card-setup" onPress={onSetUp} />
+      <Button label={copy.budgets.dismiss} variant="text" testID="template-card-dismiss" onPress={onDismiss} />
     </View>
   );
 }

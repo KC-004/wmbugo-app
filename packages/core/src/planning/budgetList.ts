@@ -3,7 +3,7 @@ import { budgetPeriodFor, customPeriod, periodTitle, type Period } from '../prof
 import { budgetFigures, budgetStatus, DEFAULT_NEARING_PERCENT, type BudgetDef, type BudgetStatus, type Querier } from './budgets';
 import { BUDGETS_SQL, mapBudgets, mapTargetVersions, periodTarget, readPeriodProfile, TARGET_VERSIONS_SQL } from './budgetStore';
 
-export type BudgetGroup = 'overall' | 'fifty_thirty_twenty' | 'categories';
+export type BudgetGroup = 'overall' | '50_30_20' | 'categories';
 
 /** One row of the budget list (SCR-14): everything the limit bar and its status line say, counted from the entries. */
 export interface BudgetListRow {
@@ -54,7 +54,7 @@ export async function loadBudgetList(q: Querier, nowMs: number): Promise<BudgetL
     const target = periodTarget(b, versions, period) ?? versions[0]?.targetMinor ?? 0;
     const figures = await budgetFigures(q, b, period);
     const status = budgetStatus({ usedMinor: figures.usedMinor, targetMinor: target, period, today: today.value, nearingPercent: b.alertThresholds?.[0] ?? DEFAULT_NEARING_PERCENT });
-    const group: BudgetGroup = b.scope === 'overall' ? 'overall' : b.template === 'fifty_thirty_twenty' ? 'fifty_thirty_twenty' : 'categories';
+    const group: BudgetGroup = b.scope === 'overall' ? 'overall' : b.template === '50_30_20' ? '50_30_20' : 'categories';
     rows.push({
       id: b.id,
       name: b.name ?? '',
@@ -69,7 +69,7 @@ export async function loadBudgetList(q: Querier, nowMs: number): Promise<BudgetL
       overlapsOverall: overall !== null && b.scope !== 'overall' && group === 'categories',
     });
   }
-  const order: Record<BudgetGroup, number> = { overall: 0, fifty_thirty_twenty: 1, categories: 2 };
+  const order: Record<BudgetGroup, number> = { overall: 0, '50_30_20': 1, categories: 2 };
   rows.sort((a, b) => order[a.group] - order[b.group]);
   return { today: today.value, rows, overallId: overall?.id ?? null };
 }

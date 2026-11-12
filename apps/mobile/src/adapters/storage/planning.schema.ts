@@ -23,8 +23,10 @@ export const budget = sqliteTable(
     period_rule: text('period_rule').notNull().default('default'),
     custom_start: text('custom_start'),
     custom_end: text('custom_end'),
-    /** `fifty_thirty_twenty` for the one-tap split (Story 4.10); null otherwise. */
+    /** `50_30_20` for the one-tap split (Story 4.10); null otherwise. */
     template: text('template'),
+    /** The income a 50/30/20 template was made from (Story 4.10), in minor units; null for any other budget. */
+    template_income_minor: integer('template_income_minor'),
     /** JSON alert thresholds; null means the default (75% and 100%). */
     alert_rule: text('alert_rule'),
     muted: integer('muted').notNull().default(0),

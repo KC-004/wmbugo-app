@@ -13,7 +13,7 @@ export interface BudgetDef {
   readonly id: string;
   /** What the list shows; absent in tests that only count. */
   readonly name?: string;
-  /** `fifty_thirty_twenty` for the one-tap split (Story 4.10). */
+  /** `50_30_20` for the one-tap split (Story 4.10). */
   readonly template?: string | null;
   /** The end date of the last period this budget runs (its only category was archived or merged). */
   readonly endedAfter?: string | null;

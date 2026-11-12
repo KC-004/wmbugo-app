@@ -21,6 +21,7 @@ import m0016 from './0016_category_guess_backfill.sql';
 import m0017 from './0017_budget_ended_after.sql';
 import m0018 from './0018_category_guess_backfill_apply.sql';
 import m0019 from './0019_budget_alert_fired.sql';
+import m0020 from './0020_budget_template_income.sql';
 
   export default {
     journal,
@@ -44,7 +45,8 @@ m0015,
 m0016,
 m0017,
 m0018,
-m0019
+m0019,
+m0020
     }
   }
   

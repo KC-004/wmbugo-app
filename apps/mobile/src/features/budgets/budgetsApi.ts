@@ -3,6 +3,14 @@ import {
   CATEGORY_LIST_SQL,
   loadBudgetDetail,
   loadBudgetList,
+  loadTemplateState,
+  ChangeTemplateTargets,
+  CreateFiftyThirtyTwenty,
+  MarkPromptSeen,
+  PROMPT_503020_CARD_DISMISSED,
+  UndoFiftyThirtyTwenty,
+  type TemplateState,
+  type TemplateTargets,
   RemoveBudget,
   RestoreBudget,
   type BudgetDetail,
@@ -34,6 +42,8 @@ export interface BudgetsData {
   /** Active categories a budget can cover: spending and Both, with their subcategories. */
   readonly categories: readonly CategoryRow[];
   readonly accounts: readonly { id: string; name: string }[];
+  /** The 50/30/20 template: whether it exists, what to pre-fill the income with, and the setup card (Story 4.10). */
+  readonly template: TemplateState;
 }
 
 export type { EditableBudget };
@@ -58,6 +68,11 @@ export interface BudgetsApi {
   loadDetail(id: string, back: number | string): Promise<BudgetDetailData | 'missing' | null>;
   remove(id: string): Promise<{ ok: boolean }>;
   restore(id: string): Promise<{ ok: boolean }>;
+  createTemplate(incomeMinor: number, targets?: TemplateTargets): Promise<{ ok: true; budgetIds: string[] } | { ok: false; code: string }>;
+  undoTemplate(budgetIds: readonly string[]): Promise<{ ok: boolean }>;
+  changeTemplate(targets: TemplateTargets): Promise<{ ok: boolean; code?: string }>;
+  /** The setup card was dismissed: remembered in prompt_state, nothing is created. */
+  dismissTemplateCard(): Promise<void>;
   /** Whether to offer the one-time notification ask: the notifier can post, permission was never asked, and this ask was never shown. */
   shouldAskForAlerts?(): Promise<boolean>;
   /** Records the ask as answered (never repeated) and, for Allow, shows the system prompt. */
@@ -85,6 +100,7 @@ export const realBudgetsApi: BudgetsApi = {
       payCycle: periodRule(p.payday, p.settings.periodMode).kind !== 'none',
       categories: mapCategoryRows(await db.query(CATEGORY_LIST_SQL)).filter((c) => c.kind !== 'income'),
       accounts: mapAccountRows(await db.query(ACCOUNT_LIST_SQL)).filter((a) => a.status === 'active').map((a) => ({ id: a.id, name: a.name })),
+      template: await loadTemplateState(db, systemClock.nowMs()),
     };
   },
   readForEdit: (id) => readBudgetForEdit(getServices().db, id, systemClock.nowMs()),
@@ -95,6 +111,15 @@ export const realBudgetsApi: BudgetsApi = {
     const detail = await loadBudgetDetail(db, id, back, systemClock.nowMs());
     if (detail === null || detail === 'missing') return detail;
     return { detail, currency: p.currency, locale: p.locale, exponent: p.exponent };
+  },
+  async createTemplate(incomeMinor, targets) {
+    const r = await getServices().writer.run(CreateFiftyThirtyTwenty, { incomeMinor, ...(targets ? { targets } : {}) }, 'user');
+    return r.ok ? { ok: true, budgetIds: r.value.budgetIds } : { ok: false, code: r.code };
+  },
+  undoTemplate: (budgetIds) => getServices().writer.run(UndoFiftyThirtyTwenty, { budgetIds }, 'user'),
+  changeTemplate: (targets) => getServices().writer.run(ChangeTemplateTargets, { targets }, 'user'),
+  async dismissTemplateCard() {
+    await getServices().writer.run(MarkPromptSeen, { key: PROMPT_503020_CARD_DISMISSED }, 'user');
   },
   async shouldAskForAlerts() {
     if (!appNotifier.available) return false;

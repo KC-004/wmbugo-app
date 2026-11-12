@@ -1,0 +1,1 @@
+ALTER TABLE `budget` ADD `template_income_minor` integer;

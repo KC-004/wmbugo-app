@@ -93,7 +93,7 @@ describe('changing payday mid-cycle (Story 4.8)', () => {
     const weekly = await save({ scope: 'category', categoryIds: ['cat_travel'], periodRule: 'weekly', targetMinor: 200_000 });
     const custom = await save({ scope: 'category', categoryIds: ['cat_shopping'], periodRule: 'custom', customStart: '2026-11-03', customEnd: '2026-11-20', targetMinor: 700_000 });
     // A Need/Want budget (Story 4.10 creates them) follows the default period too.
-    db.raw.exec(`INSERT INTO budget (id, name, scope, scope_budget_type, period_rule, template, created_at) VALUES ('need', 'Needs', 'budget_type', 'need', 'default', 'fifty_thirty_twenty', 1)`);
+    db.raw.exec(`INSERT INTO budget (id, name, scope, scope_budget_type, period_rule, template, created_at) VALUES ('need', 'Needs', 'budget_type', 'need', 'default', '50_30_20', 1)`);
     db.raw.exec(`INSERT INTO budget_target_version (budget_id, version, target_minor, effective_from) VALUES ('need', 1, 2500000, '2026-11-01')`);
     await change({ kind: 'day', day: 25 });
     expect((await periods(overall))[0]).toEqual(['2026-11-01', '2026-11-24', 4_000_000, 1]);
