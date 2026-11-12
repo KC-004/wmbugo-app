@@ -108,6 +108,43 @@ describe('runMigrations', () => {
     expect(db.tables.has('audit_event')).toBe(false);
   });
 
+  it('does not mind line endings: a database made from LF text opens when the checkout turned the files into CRLF, and the other way round', async () => {
+    const lf = 'CREATE TABLE `schema_migration` (`version` integer);\n--> statement-breakpoint\nCREATE TABLE `audit_event` (`id` text);\n';
+    const crlf = lf.replace(/\n/g, '\r\n');
+    const make = (sql: string) => load({ journal: { entries: [{ idx: 0, tag: '0000_a' }] }, migrations: { m0000: sql } });
+    // Built from LF, reopened from CRLF.
+    const db1 = new FakeSqlDatabase();
+    await runMigrations(db1, make(lf), () => 1);
+    const again = await runMigrations(db1, make(crlf), () => 2);
+    expect(again).toEqual({ ok: true, value: { appliedVersions: [], currentVersion: 1 } });
+    // Built from CRLF, reopened from LF.
+    const db2 = new FakeSqlDatabase();
+    await runMigrations(db2, make(crlf), () => 1);
+    expect(await runMigrations(db2, make(lf), () => 2)).toMatchObject({ ok: true, value: { appliedVersions: [] } });
+    // The same migration reads the same checksum whatever its line endings.
+    const a = loadMigrations({ journal: { entries: [{ idx: 0, tag: 'x' }] }, migrations: { m0000: lf } });
+    const b = loadMigrations({ journal: { entries: [{ idx: 0, tag: 'x' }] }, migrations: { m0000: crlf } });
+    expect(a.ok && b.ok && a.value[0]!.checksum === b.value[0]!.checksum).toBe(true);
+  });
+
+  it('still refuses a real edit, in any line endings', async () => {
+    const sql = 'CREATE TABLE `schema_migration` (`version` integer);\r\n';
+    const make = (s: string) => load({ journal: { entries: [{ idx: 0, tag: '0000_a' }] }, migrations: { m0000: s } });
+    const db = new FakeSqlDatabase();
+    await runMigrations(db, make(sql), () => 1);
+    expect(await runMigrations(db, make('CREATE TABLE `schema_migration` (`version` integer, `x` text);\r\n'), () => 2)).toEqual({ ok: false, code: 'MIGRATION_CHECKSUM_MISMATCH' });
+    expect(await runMigrations(db, make('CREATE TABLE `schema_migration` (`version` integer, `x` text);\n'), () => 2)).toEqual({ ok: false, code: 'MIGRATION_CHECKSUM_MISMATCH' });
+  });
+
+  it('accepts a checksum an earlier build recorded from the raw text', async () => {
+    const sql = 'CREATE TABLE `schema_migration` (`version` integer);\r\n';
+    const make = (s: string) => load({ journal: { entries: [{ idx: 0, tag: '0000_a' }] }, migrations: { m0000: s } });
+    const db = new FakeSqlDatabase();
+    await runMigrations(db, make(sql), () => 1);
+    db.migrationRows[0]!.checksum = sha256Hex(sql);
+    expect(await runMigrations(db, make(sql), () => 2)).toMatchObject({ ok: true });
+  });
+
   it('refuses an edited migration that was already applied', async () => {
     const db = new FakeSqlDatabase();
     await runMigrations(db, load(), () => 1);

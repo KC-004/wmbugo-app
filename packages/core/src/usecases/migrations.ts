@@ -13,7 +13,10 @@ export interface Migration {
   readonly version: number;
   readonly tag: string;
   readonly statements: readonly string[];
+  /** Hash of the SQL with line endings normalised to LF, so a Windows checkout (CRLF) and a Unix one agree. */
   readonly checksum: string;
+  /** Hashes an earlier build recorded for the same SQL: the raw text and its LF and CRLF forms. */
+  readonly alsoAccepts?: readonly string[];
 }
 
 export type MigrationErrorCode =
@@ -23,6 +26,9 @@ export type MigrationErrorCode =
   | 'MIGRATION_FAILED';
 
 const BREAKPOINT = '--> statement-breakpoint';
+
+/** The same SQL whatever the checkout's line endings are (git can rewrite them), so only a real edit changes the checksum. */
+export const normalizeSql = (sql: string): string => sql.replace(/\r\n/g, '\n');
 
 /** Turns the bundled drizzle output into ordered migrations with checksums. */
 export function loadMigrations(bundle: BundledMigrations): Result<Migration[], 'MIGRATION_BUNDLE_INVALID'> {
@@ -39,7 +45,9 @@ export function loadMigrations(bundle: BundledMigrations): Result<Migration[], '
         .split(BREAKPOINT)
         .map((s) => s.trim())
         .filter((s) => s !== ''),
-      checksum: sha256Hex(sql),
+      checksum: sha256Hex(normalizeSql(sql)),
+      // Databases made before line endings were normalised recorded the hash of the raw text, whichever endings it had.
+      alsoAccepts: [sha256Hex(sql), sha256Hex(normalizeSql(sql).replace(/\n/g, '\r\n'))],
     });
   }
   return ok(out);
@@ -80,7 +88,7 @@ export async function runMigrations(
 
   for (const m of migrations) {
     const sum = applied.get(m.version);
-    if (sum !== undefined && sum !== m.checksum) return err('MIGRATION_CHECKSUM_MISMATCH');
+    if (sum !== undefined && sum !== m.checksum && !(m.alsoAccepts ?? []).includes(sum)) return err('MIGRATION_CHECKSUM_MISMATCH');
   }
 
   const pending = migrations.filter((m) => !applied.has(m.version));
