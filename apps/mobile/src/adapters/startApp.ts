@@ -1,6 +1,7 @@
 import {
   createFileLogSink,
   ATTACHMENT_IDS_SQL,
+  RebuildBudgetPeriods,
   RunDailyPurge,
   createIdGenerator,
   searchIndexer,
@@ -15,7 +16,7 @@ import {
   type SetUpProfileInput,
   type SqlDatabase,
 } from '@wmbugo/core';
-import type { Clock, Logger, Result, StartupErrorCode, StartupOk } from '@wmbugo/core';
+import type { Clock, HandlerMap, Logger, Result, StartupErrorCode, StartupOk } from '@wmbugo/core';
 import migrations from '../../drizzle/migrations';
 import { ensureDir, PRIVATE_DIR, rnFileStore } from './files/rnFileStore';
 import { setSaveTimingSink } from '../features/add/saveTiming';
@@ -101,6 +102,11 @@ export function startApp(): Promise<Result<StartupOk, StartupErrorCode>> {
   return starting;
 }
 
+/** The invalidation handlers plus one more for `ProfileChanged`. */
+function withBudgetRebuild(handlers: HandlerMap, rebuild: () => Promise<void>): HandlerMap {
+  return { ...handlers, ProfileChanged: [...(handlers.ProfileChanged ?? []), () => rebuild().catch(() => undefined)] };
+}
+
 async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
   const log = await getLogger();
   const started = await startStorage({
@@ -117,7 +123,14 @@ async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
     db: started.value.db,
     clock: systemClock,
     logger: log,
-    handlers: invalidationHandlers(queryClient),
+    handlers: withBudgetRebuild(invalidationHandlers(queryClient), async () => {
+      // Payday, the period mode or the first day of the week changed: the derived budget periods are rebuilt from the period
+      // service (Story 4.5). A failure is logged and the cache is rebuilt on the next change; no entry is touched either way.
+      const w = services?.writer;
+      if (!w) return;
+      const r = await w.run(RebuildBudgetPeriods, {}, 'system');
+      if (!r.ok) log.warn('budget.rebuild_failed', { code: r.code });
+    }),
   });
   const newId = createIdGenerator(systemClock, secureRandom);
   const writer = new LedgerWriter({

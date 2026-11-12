@@ -4,7 +4,7 @@ import type { PaydayRule } from './payday';
 export interface Period {
   readonly start: string;
   readonly end: string;
-  readonly kind: 'calendar_month' | 'pay_cycle';
+  readonly kind: 'calendar_month' | 'pay_cycle' | 'week' | 'custom';
 }
 
 interface Ymd {
@@ -132,5 +132,98 @@ export function paydayRuleFromRow(rule: string | null, day: number | null): Payd
       return day !== null && day >= 1 && day <= 31 ? { kind: 'day', day } : { kind: 'none' };
     default:
       return { kind: 'none' };
+  }
+}
+
+// ---- Budget periods (Story 4.5, AD-7) -------------------------------------------------------------------------------
+// This file is the only place that turns a date into a period. Planning code asks for periods here and never computes a
+// boundary itself (architecture test).
+
+/** First day of the week, as the setting stores it. */
+export type WeekStart = 'mon' | 'sun' | 'sat';
+
+const WEEK_START_DAY: Readonly<Record<WeekStart, number>> = { sun: 0, mon: 1, sat: 6 };
+
+/** A local date `by` days after (or before, when negative) another. */
+export function addDays(date: string, by: number): string {
+  const { y, m, d } = parse(date);
+  const t = new Date(Date.UTC(y, m - 1, d + by));
+  return fmt({ y: t.getUTCFullYear(), m: t.getUTCMonth() + 1, d: t.getUTCDate() });
+}
+
+/** Whole days from `from` to `to` (negative when `to` is earlier). */
+export function daysBetween(from: string, to: string): number {
+  const a = parse(from);
+  const b = parse(to);
+  return Math.round((Date.UTC(b.y, b.m - 1, b.d) - Date.UTC(a.y, a.m - 1, a.d)) / 86_400_000);
+}
+
+/** The inclusive number of days in a period. */
+export const periodDays = (p: { readonly start: string; readonly end: string }): number => daysBetween(p.start, p.end) + 1;
+
+/** The calendar month a local date is in. */
+export function calendarMonthFor(localDate: string): Period {
+  const { y, m } = parse(localDate);
+  return { start: fmt({ y, m, d: 1 }), end: fmt({ y, m, d: daysIn(y, m) }), kind: 'calendar_month' };
+}
+
+/** The seven-day week a local date is in, starting on the profile's first day of the week. */
+export function weekFor(localDate: string, firstDay: WeekStart): Period {
+  const { y, m, d } = parse(localDate);
+  const back = (weekday(y, m, d) - WEEK_START_DAY[firstDay] + 7) % 7;
+  const start = addDays(localDate, -back);
+  return { start, end: addDays(start, 6), kind: 'week' };
+}
+
+/** A one-off range, inclusive on both ends. */
+export const customPeriod = (start: string, end: string): Period => ({ start, end, kind: 'custom' });
+
+/** What a budget's period rule needs from the profile. */
+export interface PeriodProfile {
+  /** The payday rule, already turned into the calendar month when the profile counts by month. */
+  readonly rule: PaydayRule;
+  readonly firstDay: WeekStart;
+}
+
+export interface BudgetPeriodRule {
+  readonly rule: 'default' | 'monthly' | 'weekly' | 'custom';
+  readonly customStart?: string | null;
+  readonly customEnd?: string | null;
+}
+
+/**
+ * The period of a budget that contains a local date. A custom range has no period outside its dates (null): the budget
+ * is not running then. Every other rule covers every date.
+ */
+export function budgetPeriodFor(budget: BudgetPeriodRule, localDate: string, profile: PeriodProfile): Period | null {
+  switch (budget.rule) {
+    case 'monthly':
+      return calendarMonthFor(localDate);
+    case 'weekly':
+      return weekFor(localDate, profile.firstDay);
+    case 'custom': {
+      if (!budget.customStart || !budget.customEnd) return null;
+      return localDate >= budget.customStart && localDate <= budget.customEnd ? customPeriod(budget.customStart, budget.customEnd) : null;
+    }
+    default:
+      return periodFor(localDate, profile.rule);
+  }
+}
+
+/**
+ * The period just before another, by the same rule. A one-off custom range has none (null). A pay cycle is the one that
+ * contains the day before this one starts, so an unusual cycle (a changed payday) never skips or overlaps.
+ */
+export function previousPeriod(period: Period, profile: PeriodProfile): Period | null {
+  const before = addDays(period.start, -1);
+  switch (period.kind) {
+    case 'custom':
+      return null;
+    case 'week':
+      return weekFor(before, profile.firstDay);
+    case 'calendar_month':
+      return calendarMonthFor(before);
+    default:
+      return periodFor(before, profile.rule);
   }
 }
