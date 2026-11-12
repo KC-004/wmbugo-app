@@ -161,6 +161,12 @@ export function daysBetween(from: string, to: string): number {
 /** The inclusive number of days in a period. */
 export const periodDays = (p: { readonly start: string; readonly end: string }): number => daysBetween(p.start, p.end) + 1;
 
+/** `1 Dec`. */
+export function dayMonthLabel(date: string): string {
+  const { m, d } = parse(date);
+  return `${d} ${MONTHS[m - 1]}`;
+}
+
 /** `1–30 Nov` for one month, `25 Oct–24 Nov` across two. */
 export function periodRangeLabel(start: string, end: string): string {
   const s = parse(start);

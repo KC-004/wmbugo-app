@@ -19,6 +19,7 @@ import { useReviewDot } from '../activity/reviewDot';
 import { useEntryActions } from '../activity/useEntryActions';
 import { HomeScreen } from '../home/HomeScreen';
 import { BudgetsScreen } from '../budgets/BudgetsScreen';
+import { BudgetDetailScreen } from '../budgets/BudgetDetailScreen';
 import { SettingsScreen } from '../settings/SettingsScreen';
 import { AccountDetailScreen } from '../accounts/AccountDetailScreen';
 import { AccountsScreen } from '../accounts/AccountsScreen';
@@ -27,12 +28,12 @@ import { ScreenHeader } from './ScreenHeader';
 import { TabBar, type TabRoute } from './TabBar';
 import { markTabFirstFrame } from './navTiming';
 
-type RootParams = { Tabs: undefined; Accounts: undefined; AccountDetail: { accountId: string }; TransactionDetail: { transactionId: string }; ReviewQueue: { focusId?: string }; Settings: undefined };
+type RootParams = { Tabs: undefined; BudgetDetail: { budgetId: string }; Accounts: undefined; AccountDetail: { accountId: string }; TransactionDetail: { transactionId: string }; ReviewQueue: { focusId?: string }; Settings: undefined };
 const RootStack = createNativeStackNavigator<RootParams>();
 const Tabs = createBottomTabNavigator();
 const TabStack = createNativeStackNavigator();
 
-type Nav = { navigate: (s: keyof RootParams) => void };
+type Nav = { navigate: (s: keyof RootParams, p?: RootParams[keyof RootParams]) => void };
 
 /** The frame every tab shares: safe area, a centred column, and the first-frame timing mark. */
 function TabFrame({ tab, children }: { tab?: TabRoute; children: ReactNode }) {
@@ -67,7 +68,7 @@ function PlanTab() {
     <TabFrame tab="Plan">
       <ScreenHeader title={copy.nav.plan} onAccounts={() => nav.navigate('Accounts')} onProfile={() => nav.navigate('Settings')} />
       <ScrollView contentContainerStyle={styles.planScroll} keyboardShouldPersistTaps="handled">
-        <BudgetsScreen />
+        <BudgetsScreen onOpen={(budgetId) => nav.navigate('BudgetDetail', { budgetId })} />
       </ScrollView>
     </TabFrame>
   );
@@ -181,6 +182,18 @@ function ReviewQueueRoute() {
   );
 }
 
+function BudgetDetailRoute() {
+  const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  const nav = useNavigation<{ goBack: () => void; navigate: (s: 'TransactionDetail', p: { transactionId: string }) => void }>();
+  const route = useRoute<RouteProp<RootParams, 'BudgetDetail'>>();
+  return (
+    <View style={[styles.fill, { backgroundColor: theme.color('bg-canvas'), paddingTop: insets.top }]}>
+      <BudgetDetailScreen budgetId={route.params.budgetId} onBack={() => nav.goBack()} onOpenEntry={(transactionId) => nav.navigate('TransactionDetail', { transactionId })} />
+    </View>
+  );
+}
+
 function TransactionDetailRoute() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -221,6 +234,7 @@ export function RootNavigator() {
             <RootStack.Screen name="Tabs" component={TabsWithAdd} />
             <RootStack.Screen name="Accounts" component={AccountsRoute} />
             <RootStack.Screen name="AccountDetail" component={AccountDetailRoute} />
+            <RootStack.Screen name="BudgetDetail" component={BudgetDetailRoute} />
             <RootStack.Screen name="TransactionDetail" component={TransactionDetailRoute} />
             <RootStack.Screen name="ReviewQueue" component={ReviewQueueRoute} />
             <RootStack.Screen name="Settings" component={SettingsRoute} />

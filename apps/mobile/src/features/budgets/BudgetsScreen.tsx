@@ -24,7 +24,7 @@ const GROUPS: readonly { group: BudgetGroup; title: string }[] = [
  * SCR-14 Budgets, shown on the Plan tab until the Plan hub (Epic 6). Budgets are grouped Overall, 50/30/20 and Categories
  * and never added together. Each row is a limit bar counted from the entries; tap a row to edit it.
  */
-export function BudgetsScreen({ api = realBudgetsApi, onUseTemplate }: { api?: BudgetsApi; /** The one-tap 50/30/20 split (Story 4.10) hooks in here. */ onUseTemplate?: () => void }) {
+export function BudgetsScreen({ api = realBudgetsApi, onUseTemplate, onOpen }: { api?: BudgetsApi; /** The one-tap 50/30/20 split (Story 4.10) hooks in here. */ onUseTemplate?: () => void; /** Opens SCR-15 for a budget; without it a row opens the editor. */ onOpen?: (budgetId: string) => void }) {
   const theme = useTheme();
   const qc = useQueryClient();
   const sheet = useSheet();
@@ -95,7 +95,7 @@ export function BudgetsScreen({ api = realBudgetsApi, onUseTemplate }: { api?: B
           <View key={group} testID={`budgets-group-${group}`} style={styles.group}>
             <Text accessibilityRole="header" style={[textStyle('label'), { color: theme.color('text-secondary') }]}>{title}</Text>
             {inGroup.map((r) => (
-              <BudgetRow key={r.id} row={r} data={data} onPress={() => void edit(r.id, data)} />
+              <BudgetRow key={r.id} row={r} data={data} onPress={() => (onOpen ? onOpen(r.id) : void edit(r.id, data))} />
             ))}
           </View>
         );

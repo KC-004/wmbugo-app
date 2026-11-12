@@ -168,8 +168,8 @@ function fakeApi(rows: BudgetListRow[] = [], opts: { payCycle?: boolean; save?: 
     return { ok: true, value: { budgetId: 'new', created: true, snapshot: {} as BudgetSnapshot } };
   }));
   const undo = jest.fn(async () => ({ ok: true }));
-  const readForEdit = jest.fn(async (id: string) => ({ id, scope: 'overall' as const, categoryIds: [], budgetType: null, accountIds: null, period: { rule: 'default' as const }, targetMinor: 5_000_000 }));
-  const api: BudgetsApi = { load: async () => data(), readForEdit, save, undo };
+  const readForEdit = jest.fn(async (id: string) => ({ id, scope: 'overall' as const, categoryIds: [], budgetType: null, accountIds: null, period: { rule: 'default' as const }, targetMinor: 5_000_000, currentPeriodStart: '2026-11-01', nextPeriodStart: '2026-12-01' }));
+  const api: BudgetsApi = { load: async () => data(), readForEdit, save, undo, loadDetail: async () => null, remove: async () => ({ ok: true }), restore: async () => ({ ok: true }) };
   return { api, save, undo, readForEdit, state };
 }
 

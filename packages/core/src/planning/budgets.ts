@@ -42,7 +42,7 @@ const marks = (n: number) => Array.from({ length: n }, () => '?').join(',');
  * categorised, FIN-028), by the entry's own date. Needs-review, excluded, reversed and removed entries, transfers and card
  * payments are not expense or refund entries, so they never count.
  */
-export function budgetNetSql(budget: BudgetDef): { sql: string; params: (string | number)[] } {
+export function budgetScopeClause(budget: BudgetDef): { where: string[]; params: (string | number)[] } {
   const where: string[] = [
     "t.event_type IN ('expense','refund')",
     "t.status = 'confirmed'",
@@ -63,6 +63,11 @@ export function budgetNetSql(budget: BudgetDef): { sql: string; params: (string 
     where.push(`EXISTS (SELECT 1 FROM posting p WHERE p.transaction_id = t.id AND p.account_id IN (${marks(budget.accountIds.length)}))`);
     params.push(...budget.accountIds);
   }
+  return { where, params };
+}
+
+export function budgetNetSql(budget: BudgetDef): { sql: string; params: (string | number)[] } {
+  const { where, params } = budgetScopeClause(budget);
   const sql =
     "SELECT COALESCE(c.parent_id, c.id), SUM(CASE WHEN t.event_type = 'expense' THEN s.amount_minor ELSE -s.amount_minor END) FROM split s JOIN \"transaction\" t ON t.id = s.transaction_id JOIN category c ON c.id = s.category_id LEFT JOIN category pc ON pc.id = c.parent_id WHERE " +
     where.join(' AND ') +

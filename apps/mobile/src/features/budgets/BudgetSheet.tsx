@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, type ComponentRef } from 'react';
 import { AccessibilityInfo, findNodeHandle, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { ALERT_LEVELS, DEFAULT_ALERT_LEVELS, parseAmountInput, parseOverallExists, type SaveBudgetInput } from '@wmbugo/core';
+import { ALERT_LEVELS, DEFAULT_ALERT_LEVELS, dayMonthLabel, parseAmountInput, parseOverallExists, type SaveBudgetInput } from '@wmbugo/core';
 import { copy } from '../../shared/copy';
 import { minorToInput } from '../../shared/minorInput';
 import { useTheme } from '../../shared/theme/ThemeProvider';
@@ -52,6 +52,7 @@ export function BudgetSheet({
   const [to, setTo] = useState(editing?.period.customEnd ?? '');
   const [limit, setLimit] = useState(editing ? minorToInput(editing.targetMinor, data.exponent) : '');
   const [levels, setLevels] = useState<number[]>(editing?.alertThresholds ? [...editing.alertThresholds] : [...DEFAULT_ALERT_LEVELS]);
+  const [targetFrom, setTargetFrom] = useState<'this_period' | 'next_period'>('this_period');
   const [error, setError] = useState<FieldError | null>(null);
   const [overallId, setOverallId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -75,6 +76,8 @@ export function BudgetSheet({
 
   const toggle = <T,>(list: T[], v: T): T[] => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
   const overall = scope === 'overall';
+  const parsedLimit = parseAmountInput(limit, data.exponent);
+  const limitChanged = editing !== null && parsedLimit.ok && parsedLimit.value > 0 && parsedLimit.value !== editing.targetMinor;
   const defaultLabel = data.payCycle ? b.eachCycle : b.eachMonth;
 
   const fail = (e: FieldError) => {
@@ -106,6 +109,7 @@ export function BudgetSheet({
         ...(periodRule === 'custom' && !overall ? { customStart: from.trim(), customEnd: to.trim() } : {}),
         targetMinor: amount.value,
         alertLevels: levels,
+        ...(editing && amount.value !== editing.targetMinor ? { targetFrom } : {}),
       });
     } catch {
       r = { ok: false, code: 'WRITE_FAILED' };
@@ -204,6 +208,15 @@ export function BudgetSheet({
           style={input(error?.field === 'limit')}
         />
         {errorText('limit')}
+        {limitChanged ? (
+          <>
+            <Text accessibilityRole="header" style={[textStyle('label'), ink]}>{b.changeStarts}</Text>
+            <View style={styles.row} accessibilityRole="radiogroup" accessibilityLabel={b.changeStarts}>
+              <Chip onGlass role="radio" label={b.thisPeriodOnly} testID="budget-from-this" selected={targetFrom === 'this_period'} onPress={() => setTargetFrom('this_period')} />
+              {editing?.nextPeriodStart ? <Chip onGlass role="radio" label={b.fromNext.replace('{date}', dayMonthLabel(editing.nextPeriodStart))} testID="budget-from-next" selected={targetFrom === 'next_period'} onPress={() => setTargetFrom('next_period')} /> : null}
+            </View>
+          </>
+        ) : null}
 
         <Text accessibilityRole="header" style={[textStyle('label'), ink]}>{b.alertAt}</Text>
         <View style={styles.row}>
