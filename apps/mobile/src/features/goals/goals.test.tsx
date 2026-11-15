@@ -267,6 +267,40 @@ describe('Pace and moves (Story 6.7)', () => {
     expect(texts(r).join(' ')).not.toMatch(/!|behind|late|overdue/i);
   });
 
+  const freeOk = { gate: 'ok' as const, valueMinor: 2_400_000, shortByMinor: 0, smaller: 'accounts' as const, leavesMinor: 2_400_000, leftMinor: 6_000_000, leftBudgetId: 'b1', notClassifiedMinor: 0, assetsMinor: 4_200_000, notSetAccounts: 0, billsReservedMinor: 1_800_000, billsCount: 1, setAsideMinor: 0 };
+
+  it('Free to use: setting aside more than is free warns politely and still saves', async () => {
+    const api = fakeApi(data(), detail(goal()));
+    api.freeToUse = jest.fn(async () => freeOk);
+    const r = await mountNode(<GoalDetailScreen goalId="g1" api={api} onBack={() => undefined} />);
+    await press(r, 'goal-detail-set-aside');
+    await type(r, 'goal-amount-input', '20000');
+    expect(has(r, 'goal-amount-note')).toBe(false);
+    await type(r, 'goal-amount-input', '29000');
+    expect(texts(r).some((t) => /^This leaves you short by ₹5,000(\.00)?$/.test(t))).toBe(true);
+    expect(r.root.findAll((n) => n.props.testID === 'goal-amount-note')[0]!.props.accessibilityLiveRegion).toBe('polite');
+    await press(r, 'goal-amount-confirm');
+    expect(api.setAside).toHaveBeenCalledWith('g1', 2_900_000);
+  });
+
+  it('Free to use: with the gate failing there is no warning', async () => {
+    const api = fakeApi(data(), detail(goal()));
+    api.freeToUse = jest.fn(async () => ({ gate: 'needs_limit' as const }));
+    const r = await mountNode(<GoalDetailScreen goalId="g1" api={api} onBack={() => undefined} />);
+    await press(r, 'goal-detail-set-aside');
+    await type(r, 'goal-amount-input', '99999');
+    expect(has(r, 'goal-amount-note')).toBe(false);
+  });
+
+  it('Free to use: restoring an archived goal that holds money warns when it would leave you short', async () => {
+    const api = fakeApi(data(), detail(withMoney(goal({ state: 'archived' }), 3_000_000)));
+    api.freeToUse = jest.fn(async () => freeOk);
+    const r = await mountNode(<GoalDetailScreen goalId="g1" api={api} onBack={() => undefined} />);
+    await press(r, 'goal-detail-restore');
+    expect(api.changeState).toHaveBeenCalledWith('g1', 'active');
+    expect(texts(r).some((t) => /This leaves you short by ₹6,000(\.00)?$/.test(t))).toBe(true);
+  });
+
   it('Move to savings hands the goal and its pot to the Add sheet; with no pot it says to add one first', async () => {
     const onMove = jest.fn();
     const r = await mountNode(<GoalDetailScreen goalId="g1" api={fakeApi(data(), detail(goal()))} onBack={() => undefined} onMove={onMove} onAddPot={() => undefined} />);

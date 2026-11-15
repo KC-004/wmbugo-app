@@ -21,6 +21,7 @@ import { BUDGETS_QUERY_KEY, realBudgetsApi, type BudgetsApi } from '../budgets/b
 import { GoalCard } from '../goals/GoalCard';
 import { GOALS_QUERY_KEY, realGoalsApi, type GoalsApi } from '../goals/goalsApi';
 import { useGoalActions } from '../goals/useGoalActions';
+import { FreeToUseTile } from './FreeToUseTile';
 import { PLAN_TIMELINE_KEY, realPlanApi, type PlanApi } from './planApi';
 
 const p = copy.plan;
@@ -109,6 +110,8 @@ export interface PlanHubNav {
   onOpenGoal: (goalId: string) => void;
   onOpenBudgets: () => void;
   onOpenBudget: (budgetId: string) => void;
+  /** Accounts (SCR-06), for Free to use's `Add an account` and its breakdown. */
+  onOpenAccounts: () => void;
   onOpenActivity?: Parameters<typeof BudgetsScreen>[0]['onOpenActivity'];
 }
 
@@ -128,6 +131,7 @@ export function PlanHubScreen({
   onOpenGoal,
   onOpenBudgets,
   onOpenBudget,
+  onOpenAccounts,
   onOpenActivity,
 }: PlanHubNav & { plan?: PlanApi; billsApi?: BillsApi; goalsApi?: GoalsApi; budgetsApi?: BudgetsApi }) {
   const theme = useTheme();
@@ -202,6 +206,7 @@ export function PlanHubScreen({
 
   return (
     <ScrollView testID="plan-hub" contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+      <FreeToUseTile plan={plan} nav={{ onSetLimit: requestBudgetEditor, onOpenAccounts, onOpenBudget, onOpenBudgets, onOpenBills, onOpenGoals }} />
       <Section title={timeline?.period.payCycle === false ? p.beforeMonthEnd : p.beforePayday} testID="plan-timeline">
         {billTotal === 0 ? (
           nothingYet ? (

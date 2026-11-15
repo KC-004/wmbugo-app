@@ -89,6 +89,7 @@ function PlanTab() {
         onOpenGoal={(goalId) => nav.navigate('GoalDetail', { goalId })}
         onOpenBudgets={() => nav.navigate('Budgets')}
         onOpenBudget={(budgetId) => nav.navigate('BudgetDetail', { budgetId })}
+        onOpenAccounts={() => nav.navigate('Accounts')}
         onOpenActivity={openActivity}
       />
     </TabFrame>

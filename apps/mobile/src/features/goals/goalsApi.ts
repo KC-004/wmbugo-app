@@ -14,7 +14,9 @@ import {
   toLocalDate,
   UndoAddGoal,
   UndoGoalAllocation,
+  freeToUse,
   type CurrencyCode,
+  type FreeToUse,
   type GoalDetail,
   type GoalRow,
   type GoalState,
@@ -75,6 +77,8 @@ export interface GoalsApi {
   forTransfer(transactionId: string): Promise<TransferGoalState>;
   countToward(transactionId: string, goalId: string): Promise<GoalOutcome>;
   removeTag(transactionId: string): Promise<GoalOutcome>;
+  /** Story 6.9: what Free to use is now, so setting aside or restoring can warn when it would leave you short. */
+  freeToUse?(): Promise<FreeToUse>;
 }
 
 export const GOALS_QUERY_KEY = ['goals', 'list'] as const;
@@ -128,6 +132,7 @@ export const realGoalsApi: GoalsApi = {
     const goals = canCount ? (await loadGoals(db)).filter((g) => g.state === 'active').map((g) => ({ id: g.id, name: g.name })) : [];
     return { goal, canCount, goals };
   },
+  freeToUse: () => freeToUse(getServices().db, systemClock.nowMs()),
   countToward: (transactionId, goalId) => run(getServices().writer.run(CountTowardGoal, { transactionId, goalId }, 'user')),
   removeTag: (transactionId) => run(getServices().writer.run(RemoveGoalTag, { transactionId }, 'user')),
 };

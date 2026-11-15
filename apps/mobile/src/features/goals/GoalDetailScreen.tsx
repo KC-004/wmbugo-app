@@ -80,8 +80,8 @@ export function GoalDetailScreen({ goalId, onBack, onMove, onAddPot, api = realG
         <View style={styles.actions}>
           {active && pot && onMove ? <Button label={g.moveToSavings} testID="goal-detail-move" onPress={() => onMove(goal, pot.id)} /> : null}
           {active && !pot && onAddPot ? <Button label={g.addPotFirst} variant="secondary" testID="goal-detail-add-pot" onPress={onAddPot} /> : null}
-          {active ? <Button label={g.setAside} variant={pot && onMove ? 'secondary' : 'primary'} testID="goal-detail-set-aside" onPress={() => actions.openAmount(goal, 'set_aside')} /> : null}
-          {live && goal.setAsideMinor > 0 ? <Button label={g.takeBack} variant="secondary" testID="goal-detail-take-back" onPress={() => actions.openAmount(goal, 'take_back')} /> : null}
+          {active ? <Button label={g.setAside} variant={pot && onMove ? 'secondary' : 'primary'} testID="goal-detail-set-aside" onPress={() => void actions.openAmount(goal, 'set_aside')} /> : null}
+          {live && goal.setAsideMinor > 0 ? <Button label={g.takeBack} variant="secondary" testID="goal-detail-take-back" onPress={() => void actions.openAmount(goal, 'take_back')} /> : null}
           <Button label={g.edit} variant="secondary" testID="goal-detail-edit" onPress={() => actions.openEditor(goal, data.accounts, data.thisMonth)} />
           {active ? <Button label={g.pause} variant="secondary" testID="goal-detail-pause" onPress={() => void actions.change(goal, 'paused')} /> : null}
           {goal.state === 'paused' ? <Button label={g.resume} variant="secondary" testID="goal-detail-resume" onPress={() => void actions.change(goal, 'active')} /> : null}

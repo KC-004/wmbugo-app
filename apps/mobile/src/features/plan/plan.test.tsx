@@ -1,7 +1,7 @@
 import { AccessibilityInfo, Text } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { budgetStatus, mapCategoryRows, SEED_CATEGORIES, type BudgetListRow, type GoalRow, type PlanTimeline, type TimelineItem } from '@wmbugo/core';
+import { budgetStatus, mapCategoryRows, type FreeToUse, SEED_CATEGORIES, type BudgetListRow, type GoalRow, type PlanTimeline, type TimelineItem } from '@wmbugo/core';
 import { SheetHost } from '../../shared/feedback/SheetHost';
 import { ToastHost } from '../../shared/feedback/ToastHost';
 import { createQueryClient } from '../../shared/queryClient';
@@ -67,7 +67,11 @@ const timeline = (over: Partial<PlanTimeline> = {}): PlanTimeline => ({
   today: '2026-11-12', period: { start: '2026-11-01', end: '2026-11-30', label: '1–30 Nov', daysLeft: 19, payCycle: true }, items: [item()], activeBills: 1, nextBill: { title: 'Rent', dueDate: '2026-11-20' }, ...over,
 });
 
-const planApi = (t: PlanTimeline | 'error' | null): PlanApi => ({
+const planApi = (t: PlanTimeline | 'error' | null, free: FreeToUse | 'error' = { gate: 'needs_limit' }): PlanApi => ({
+  loadFreeToUse: jest.fn(async () => {
+    if (free === 'error') throw new Error('x');
+    return { free, currency: 'INR' as const, locale: 'en-IN', payCycle: true };
+  }),
   loadTimeline: jest.fn(async () => {
     if (t === 'error') throw new Error('x');
     return t ? { timeline: t, currency: 'INR' as const, locale: 'en-IN' } : null;
@@ -119,7 +123,7 @@ const budgetsApi = (rows: BudgetListRow[]): BudgetsApi => {
   return { load: async () => data, readForEdit: async () => null, save: async () => ({ ok: false, code: 'X' }), undo: async () => ({ ok: true }), loadDetail: async () => null, remove: async () => ({ ok: true }), restore: async () => ({ ok: true }), createTemplate: async () => ({ ok: false, code: 'X' }), undoTemplate: async () => ({ ok: true }), changeTemplate: async () => ({ ok: true }), dismissTemplateCard: async () => undefined, answerIncomeChange: async () => ({ ok: true }) };
 };
 
-const nav = () => ({ onOpenBills: jest.fn(), onOpenBill: jest.fn(), onOpenGoals: jest.fn(), onOpenGoal: jest.fn(), onOpenBudgets: jest.fn(), onOpenBudget: jest.fn() });
+const nav = () => ({ onOpenAccounts: jest.fn(), onOpenBills: jest.fn(), onOpenBill: jest.fn(), onOpenGoals: jest.fn(), onOpenGoal: jest.fn(), onOpenBudgets: jest.fn(), onOpenBudget: jest.fn() });
 
 describe('timeline helpers (Story 6.8)', () => {
   it('labels a due date Today, Tomorrow or by day and month', () => {
@@ -237,6 +241,88 @@ describe('Plan hub (Story 6.8)', () => {
       expect(r.root.findAll((n) => n.props.testID === 'bill-row-r1-2026-11-20')[0]!.props.accessibilityLabel).not.toMatch(/18,000|eighteen/i);
     } finally {
       act(() => useAmountsStore.setState({ hidden: false } as never));
+    }
+  });
+});
+
+describe('Free to use (Story 6.9)', () => {
+  const ok = (over: Partial<Extract<FreeToUse, { gate: 'ok' }>> = {}): FreeToUse => ({
+    gate: 'ok', valueMinor: 1_200_000, shortByMinor: 0, smaller: 'accounts', leavesMinor: 1_200_000, leftMinor: 1_800_000, leftBudgetId: 'b1', notClassifiedMinor: 0, assetsMinor: 4_200_000, notSetAccounts: 0,
+    billsReservedMinor: 1_800_000, billsCount: 2, setAsideMinor: 1_200_000, ...over,
+  });
+  const hub = (free: FreeToUse | 'error', n = nav()) => mountNode(<PlanHubScreen plan={planApi(timeline(), free)} billsApi={billsApi(billsData(1))} goalsApi={goalsApi(goalsData([goal()]))} budgetsApi={budgetsApi([budgetRow('b1', 'Groceries', 300_000)])} {...n} />);
+
+  it('shows the figure, the caption and one tappable tile above the timeline', async () => {
+    const r = await hub(ok());
+    expect(texts(r).some((t) => /^₹12,000(\.00)?$/.test(t))).toBe(true);
+    expect(texts(r)).toEqual(expect.arrayContaining(['Free to use', 'Estimate from what you\'ve entered']));
+    expect(r.root.findAll((n) => n.props.testID === 'free-tile')[0]!.props.accessibilityLabel).toMatch(/^Free to use, estimate, 12,000 rupees.* Double-tap to see how we worked this out$/);
+  });
+
+  it('a negative value reads Short by with no sign and no warning icon', async () => {
+    const r = await hub(ok({ valueMinor: -500_000, shortByMinor: 500_000, leavesMinor: -500_000 }));
+    expect(texts(r).some((t) => /^Short by ₹5,000(\.00)?$/.test(t))).toBe(true);
+    expect(texts(r).join(' ')).not.toMatch(/-₹|−/);
+    expect(r.root.findAll((n) => n.props.testID === 'free-tile')[0]!.props.accessibilityLabel).toMatch(/short by 5,000 rupees/);
+  });
+
+  it('without a limit one row names the one step, and Set a limit opens the budget editor', async () => {
+    const r = await hub({ gate: 'needs_limit' });
+    expect(texts(r)).toContain('Not enough information yet · Set a limit →');
+    expect(has(r, 'free-tile')).toBe(false);
+    await press(r, 'free-need-limit');
+    expect(has(r, 'budget-sheet')).toBe(true);
+  });
+
+  it('with a limit but no account with a balance, the one step is Add an account', async () => {
+    const n = nav();
+    const r = await hub({ gate: 'needs_account', hasAccounts: false }, n);
+    expect(texts(r)).toContain('Not enough information yet · Add an account →');
+    await press(r, 'free-need-account');
+    expect(n.onOpenAccounts).toHaveBeenCalled();
+  });
+
+  it('tapping the figure shows how it was worked out, marks the smaller side and opens each source', async () => {
+    const n = nav();
+    const r = await hub(ok({ notClassifiedMinor: 300_000, notSetAccounts: 1 }), n);
+    await press(r, 'free-tile');
+    const tx = texts(r);
+    expect(tx).toEqual(expect.arrayContaining(['How we worked this out', 'We use the smaller', 'This is an estimate from what you\'ve entered, not a guarantee.', 'Accounts in your totals, not savings pots · +1 account not set']));
+    expect(tx.some((t) => /^Left in budget ₹18,000(\.00)?$/.test(t))).toBe(true);
+    expect(tx.some((t) => /^Bills before payday take ₹18,000(\.00)? \(2 bills\)$/.test(t))).toBe(true);
+    expect(tx.some((t) => /^Set aside for goals takes ₹12,000(\.00)?$/.test(t))).toBe(true);
+    expect(tx.some((t) => /^Leaves ₹12,000(\.00)?$/.test(t))).toBe(true);
+    expect(tx.some((t) => /^includes ₹3,000(\.00)? not classified$/.test(t))).toBe(true);
+    expect(has(r, 'free-how-accounts-smaller')).toBe(true);
+    expect(has(r, 'free-how-left-smaller')).toBe(false);
+    await press(r, 'free-how-left');
+    expect(n.onOpenBudget).toHaveBeenCalledWith('b1');
+    await press(r, 'free-tile');
+    await press(r, 'free-how-bills');
+    expect(n.onOpenBills).toHaveBeenCalled();
+    await press(r, 'free-tile');
+    await press(r, 'free-how-aside');
+    expect(n.onOpenGoals).toHaveBeenCalled();
+  });
+
+  it('hidden amounts mask the figure and the spoken label says amount hidden', async () => {
+    const { useAmountsStore } = jest.requireActual('../../shared/state/amountsHidden') as typeof import('../../shared/state/amountsHidden');
+    act(() => useAmountsStore.setState({ hidden: true } as never));
+    try {
+      const r = await hub(ok({ valueMinor: -500_000, shortByMinor: 500_000 }));
+      expect(texts(r)).toContain('Short by ₹ ••••');
+      expect(r.root.findAll((n) => n.props.testID === 'free-tile')[0]!.props.accessibilityLabel).toBe('Free to use, estimate, amount hidden. Double-tap to see how we worked this out');
+    } finally {
+      act(() => useAmountsStore.setState({ hidden: false } as never));
+    }
+  });
+
+  it('never appears on Home: the tile belongs to Plan only', () => {
+    const fs = jest.requireActual('fs') as typeof import('fs');
+    const path = jest.requireActual('path') as typeof import('path');
+    const homeDir = path.join(__dirname, '..', 'home');
+    for (const f of fs.readdirSync(homeDir).filter((n: string) => /\.tsx?$/.test(n) && !/test/.test(n))) {
+      expect(fs.readFileSync(path.join(homeDir, f), 'utf8')).not.toMatch(/FreeToUse|Free to use/);
     }
   });
 });
