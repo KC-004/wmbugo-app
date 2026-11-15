@@ -37,7 +37,7 @@ import { TopBar } from '../../shared/ui/TopBar';
 import { TabBar, type TabRoute } from './TabBar';
 import { markTabFirstFrame } from './navTiming';
 
-type RootParams = { Tabs: undefined; BudgetDetail: { budgetId: string; periodStart?: string }; Accounts: undefined; AccountDetail: { accountId: string }; TransactionDetail: { transactionId: string }; ReviewQueue: { focusId?: string }; Settings: undefined; HomeEdit: undefined; Bills: undefined; BillDetail: { ruleId: string } };
+type RootParams = { Tabs: undefined; BudgetDetail: { budgetId: string; periodStart?: string }; Accounts: undefined; AccountDetail: { accountId: string }; TransactionDetail: { transactionId: string }; ReviewQueue: { focusId?: string }; Settings: undefined; HomeEdit: undefined; Bills: { focusRuleId?: string } | undefined; BillDetail: { ruleId: string } };
 const RootStack = createNativeStackNavigator<RootParams>();
 const Tabs = createBottomTabNavigator();
 const TabStack = createNativeStackNavigator();
@@ -137,6 +137,8 @@ function TabsWithAdd() {
   useEffect(
     () =>
       appNotifier.onOpen((data) => {
+        // A bill reminder opens Bills, scrolled to that bill (Story 6.5).
+        if (data.screen === 'Bills') root.navigate('Bills', data.ruleId ? { focusRuleId: data.ruleId } : undefined);
         if (data.screen === 'BudgetDetail' && data.budgetId) root.navigate('BudgetDetail', { budgetId: data.budgetId, ...(data.periodStart ? { periodStart: data.periodStart } : {}) });
       }),
     [root],
@@ -224,9 +226,10 @@ function useOpenActivityFilter() {
 
 function BillsRoute() {
   const nav = useNavigation<{ goBack: () => void; navigate: (s: 'BillDetail', p: { ruleId: string }) => void }>();
+  const route = useRoute<RouteProp<RootParams, 'Bills'>>();
   return (
     <ScreenFrame>
-      <BillsScreen onBack={() => nav.goBack()} onOpenBill={(ruleId) => nav.navigate('BillDetail', { ruleId })} />
+      <BillsScreen onBack={() => nav.goBack()} {...(route.params?.focusRuleId ? { focusRuleId: route.params.focusRuleId } : {})} onOpenBill={(ruleId) => nav.navigate('BillDetail', { ruleId })} />
     </ScreenFrame>
   );
 }

@@ -9,6 +9,7 @@ import { useTheme } from '../../shared/theme/ThemeProvider';
 import { textStyle } from '../../shared/theme/typography';
 import { Button } from '../../shared/ui/Button';
 import { BillLinkPicker } from './BillLinkPicker';
+import { ReminderAskSheet } from './ReminderAskSheet';
 import { BillSheet, type BillPickers, type BillSheetMode } from './BillSheet';
 import type { BillsApi } from './billsApi';
 
@@ -52,6 +53,13 @@ export function useBillActions(api: BillsApi) {
   const refresh = () => invalidateForEvent(qc, 'RecurringChanged');
   const failed = () => toast.show({ message: b.actionFailed });
 
+  const openReminderAsk = () =>
+    sheet.open({
+      id: 'bill-reminder-ask',
+      title: b.askTitle,
+      body: (close) => <ReminderAskSheet close={close} onAnswer={(allow) => void api.answerReminderAsk?.(allow).catch(() => undefined)} />,
+    });
+
   const openEditor = (start: BillSheetMode, pickers: BillPickers, onSaved?: (ruleId: string) => void) => {
     sheet.open({
       id: 'bill',
@@ -66,6 +74,13 @@ export function useBillActions(api: BillsApi) {
             if (!r.ok) return r;
             await refresh();
             onSaved?.(r.value.ruleId);
+            // A bill saved with a reminder on is the one place bill reminders ask for the notification permission, once. The
+            // editor closes itself after this returns, so the ask opens just after.
+            if (input.remindDays !== null && input.remindDays !== undefined) {
+              void api.shouldAskForReminders?.().then((ask) => {
+                if (ask) setTimeout(() => openReminderAsk(), 0);
+              }).catch(() => undefined);
+            }
             const saved = r.value;
             const previous = start.mode === 'edit' ? ruleAsInput(start.rule) : null;
             toast.show({

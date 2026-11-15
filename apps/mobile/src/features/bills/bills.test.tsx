@@ -66,11 +66,11 @@ const row = (over: Partial<BillRowModel> = {}): BillRowModel => ({
 });
 const rule = (over: Partial<BillRule> = {}): BillRule => ({
   id: 'r1', title: 'Rent', expectedAmountMinor: 1_800_000, cadence: 'monthly', customEvery: null, customUnit: null, anchorDate: '2026-12-05', accountId: 'a1', categoryId: 'cat_housing', kind: 'rent', paidTo: 'Ramesh', endsOn: null,
-  pausedAt: null, pausedOn: null, resumedOn: null, endedAt: null, endedOn: null, removedAt: null, ...over,
+  pausedAt: null, pausedOn: null, resumedOn: null, endedAt: null, endedOn: null, removedAt: null, remindDays: 1, ...over,
 });
 
 const categories = mapCategoryRows(SEED_CATEGORIES.map((c, i) => [c.id, c.name, c.kind, c.budgetType, c.icon, c.color, i, null]));
-const pickers = { categories, accounts: [{ id: 'a1', name: 'HDFC' }, { id: 'a2', name: 'Cash' }] };
+const pickers = { categories, accounts: [{ id: 'a1', name: 'HDFC' }, { id: 'a2', name: 'Cash' }], notificationsDenied: false };
 
 const data = (rows: { active?: BillRowModel[]; paused?: BillRowModel[]; ended?: BillRowModel[] } = {}): BillsData => ({
   list: { today: '2026-11-12', active: rows.active ?? [], paused: rows.paused ?? [], ended: rows.ended ?? [], subscriptions: { totalMinor: 0, counted: 0 } },
@@ -149,7 +149,7 @@ describe('Bills & Recurring (Story 6.2)', () => {
     await type(r, 'bill-amount', '18000');
     await type(r, 'bill-due', '2026-12-05');
     await press(r, 'bill-save');
-    expect(api.save).toHaveBeenCalledWith({ title: 'Rent', expectedAmountMinor: 1_800_000, cadence: 'monthly', anchorDate: '2026-12-05', accountId: 'a1', categoryId: 'cat_housing', kind: 'rent', paidTo: null, endsOn: null });
+    expect(api.save).toHaveBeenCalledWith({ title: 'Rent', expectedAmountMinor: 1_800_000, cadence: 'monthly', anchorDate: '2026-12-05', accountId: 'a1', categoryId: 'cat_housing', kind: 'rent', paidTo: null, endsOn: null, remindDays: 1 });
     expect(has(r, 'bill-sheet')).toBe(false);
     expect(texts(r)).toContain('Bill added');
     await press(r, 'toast-undo');
@@ -366,6 +366,93 @@ describe('Subscriptions filter (Story 6.4)', () => {
     expect(has(plain, 'bill-past-charges')).toBe(false);
   });
 });
+
+describe('Bill reminders (Story 6.5)', () => {
+  const fill = async (r: ReactTestRenderer) => {
+    await press(r, 'empty-state-action');
+    await type(r, 'bill-name', 'Rent');
+    await type(r, 'bill-amount', '18000');
+    await type(r, 'bill-due', '2026-12-05');
+  };
+
+  it('Remind me offers Off, On the day, 1 day before (the default) and 3 days before, with the 9 am caption', async () => {
+    const api = fakeApi(data());
+    const r = await mountNode(<BillsScreen api={api} onBack={() => undefined} onOpenBill={() => undefined} />);
+    await fill(r);
+    expect(texts(r)).toEqual(expect.arrayContaining(['Remind me', 'Off', 'On the day', '1 day before', '3 days before', 'Reminders come around 9 am. Your phone may delay them a little.']));
+    await press(r, 'bill-save');
+    expect(api.save).toHaveBeenLastCalledWith(expect.objectContaining({ remindDays: 1 }));
+  });
+
+  it('chooses 3 days before, or Off', async () => {
+    const api = fakeApi(data());
+    const r = await mountNode(<BillsScreen api={api} onBack={() => undefined} onOpenBill={() => undefined} />);
+    await fill(r);
+    await press(r, 'bill-remind-3');
+    await press(r, 'bill-save');
+    expect(api.save).toHaveBeenLastCalledWith(expect.objectContaining({ remindDays: 3 }));
+    const off = await mountNode(<BillsScreen api={fakeApi(data())} onBack={() => undefined} onOpenBill={() => undefined} />);
+    await fill(off);
+    await press(off, 'bill-remind-off');
+    await press(off, 'bill-save');
+    expect(has(off, 'reminder-ask')).toBe(false);
+  });
+
+  it('saving with a reminder on asks once for the permission, and Allow records and requests it', async () => {
+    const api = fakeApi(data());
+    const answered: boolean[] = [];
+    Object.assign(api, { shouldAskForReminders: jest.fn(async () => true), answerReminderAsk: jest.fn(async (allow: boolean) => void answered.push(allow)) });
+    const r = await mountNode(<BillsScreen api={api} onBack={() => undefined} onOpenBill={() => undefined} />);
+    await fill(r);
+    await press(r, 'bill-save');
+    await settleAsk();
+    expect(has(r, 'reminder-ask')).toBe(true);
+    expect(texts(r)).toContain('Get a reminder before bills are due?');
+    await press(r, 'reminder-ask-allow');
+    expect(answered).toEqual([true]);
+  });
+
+  it('Not now answers false, and with Off or when the ask was made before nothing is asked', async () => {
+    const api = fakeApi(data());
+    Object.assign(api, { shouldAskForReminders: jest.fn(async () => true), answerReminderAsk: jest.fn(async () => undefined) });
+    const r = await mountNode(<BillsScreen api={api} onBack={() => undefined} onOpenBill={() => undefined} />);
+    await fill(r);
+    await press(r, 'bill-save');
+    await settleAsk();
+    await press(r, 'reminder-ask-later');
+    expect((api as unknown as { answerReminderAsk: jest.Mock }).answerReminderAsk).toHaveBeenCalledWith(false);
+    const never = fakeApi(data());
+    Object.assign(never, { shouldAskForReminders: jest.fn(async () => false) });
+    const r2 = await mountNode(<BillsScreen api={never} onBack={() => undefined} onOpenBill={() => undefined} />);
+    await fill(r2);
+    await press(r2, 'bill-save');
+    await settleAsk();
+    expect(has(r2, 'reminder-ask')).toBe(false);
+    const off = fakeApi(data());
+    const shouldAsk = jest.fn(async () => true);
+    Object.assign(off, { shouldAskForReminders: shouldAsk });
+    const r3 = await mountNode(<BillsScreen api={off} onBack={() => undefined} onOpenBill={() => undefined} />);
+    await fill(r3);
+    await press(r3, 'bill-remind-off');
+    await press(r3, 'bill-save');
+    await settleAsk();
+    expect(shouldAsk).not.toHaveBeenCalled();
+  });
+
+  it('with notifications off the editor keeps the setting and says so with a way to settings', async () => {
+    const d = { ...data(), notificationsDenied: true };
+    const r = await mountNode(<BillsScreen api={fakeApi(d)} onBack={() => undefined} onOpenBill={() => undefined} />);
+    await press(r, 'empty-state-action');
+    expect(texts(r)).toContain('Notifications are off for wmbugo');
+    expect(has(r, 'bill-open-settings')).toBe(true);
+    await press(r, 'bill-remind-off');
+    expect(has(r, 'bill-notif-off')).toBe(false);
+  });
+});
+
+const settleAsk = async () => {
+  for (let i = 0; i < 3; i++) await act(async () => new Promise((res) => setTimeout(res, 5)));
+};
 
 const MATCH = { ruleId: 'r1', title: 'Rent', dueDate: '2026-12-05', expectedAmountMinor: 1_800_000 };
 const candidate = (over: Partial<LinkCandidate> = {}): LinkCandidate => ({ id: 't1', amountMinor: 1_800_000, localDate: '2026-12-04', merchant: 'Ramesh Kumar', categoryName: 'Housing', categoryIcon: 'House', categoryColor: 'cat-brown', accountName: 'HDFC', looksLikeMatch: true, ...over });

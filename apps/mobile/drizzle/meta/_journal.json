@@ -162,6 +162,13 @@
       "when": 1794767584827,
       "tag": "0022_recurring_match_dismissed",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1794768361753,
+      "tag": "0023_recurring_remind_days",
+      "breakpoints": true
     }
   ]
 }

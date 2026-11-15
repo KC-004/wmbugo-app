@@ -21,6 +21,8 @@ export interface SaveRecurringRuleInput {
   readonly kind: BillKind;
   readonly paidTo?: string | null;
   readonly endsOn?: string | null;
+  /** Remind me: 0 (on the day), 1 or 3 days before, null for Off. New bills start at 1 day before; an edit that leaves it out keeps what the bill had. */
+  readonly remindDays?: 0 | 1 | 3 | null;
 }
 
 export type SaveRecurringRuleError =
@@ -31,6 +33,7 @@ export type SaveRecurringRuleError =
   | 'END_BEFORE_START'
   | 'CADENCE_INVALID'
   | 'KIND_INVALID'
+  | 'REMIND_INVALID'
   | 'ACCOUNT_NOT_FOUND'
   | 'CATEGORY_NOT_FOUND'
   | 'RULE_NOT_FOUND'
@@ -57,6 +60,7 @@ export const SaveRecurringRule: UseCase<SaveRecurringRuleInput, { ruleId: string
       if (n === null || n === undefined || !Number.isInteger(n) || n < 1 || n > 99 || !input.customUnit || !(CUSTOM_UNITS as readonly string[]).includes(input.customUnit)) return err('CADENCE_INVALID');
     }
     if (!(BILL_KINDS as readonly string[]).includes(input.kind)) return err('KIND_INVALID');
+    if (input.remindDays !== undefined && input.remindDays !== null && ![0, 1, 3].includes(input.remindDays)) return err('REMIND_INVALID');
     const endsOn = clean(input.endsOn);
     if (endsOn !== null) {
       if (!isLocalDate(endsOn)) return err('DATE_INVALID');
@@ -72,15 +76,16 @@ export const SaveRecurringRule: UseCase<SaveRecurringRuleInput, { ruleId: string
     if (existing && existing.endedAt !== null) return err('RULE_NOT_EDITABLE');
 
     const id = existing ? existing.id : ctx.newId();
-    const cols = [title, input.expectedAmountMinor, input.cadence, custom ? input.customEvery! : null, custom ? input.customUnit! : null, input.anchorDate, accountId, categoryId, input.kind, clean(input.paidTo), endsOn] as const;
+    const remind = input.remindDays !== undefined ? input.remindDays : existing ? existing.remindDays : 1;
+    const cols = [title, input.expectedAmountMinor, input.cadence, custom ? input.customEvery! : null, custom ? input.customUnit! : null, input.anchorDate, accountId, categoryId, input.kind, clean(input.paidTo), endsOn, remind] as const;
     if (existing) {
       await ctx.execute(
-        'UPDATE recurring_rule SET title = ?, expected_amount_minor = ?, cadence = ?, custom_every = ?, custom_unit = ?, anchor_date = ?, account_id = ?, category_id = ?, kind = ?, paid_to = ?, ends_on = ? WHERE id = ?',
+        'UPDATE recurring_rule SET title = ?, expected_amount_minor = ?, cadence = ?, custom_every = ?, custom_unit = ?, anchor_date = ?, account_id = ?, category_id = ?, kind = ?, paid_to = ?, ends_on = ?, remind_days = ? WHERE id = ?',
         [...cols, id],
       );
     } else {
       await ctx.execute(
-        'INSERT INTO recurring_rule (id, title, expected_amount_minor, cadence, custom_every, custom_unit, anchor_date, account_id, category_id, kind, paid_to, ends_on, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO recurring_rule (id, title, expected_amount_minor, cadence, custom_every, custom_unit, anchor_date, account_id, category_id, kind, paid_to, ends_on, remind_days, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [id, ...cols, ctx.nowMs()],
       );
     }

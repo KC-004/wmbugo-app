@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState, type ComponentRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { isAmountsHidden, useAmountsHidden } from '../../shared/state/amountsHidden';
@@ -27,10 +27,13 @@ const b = copy.bills;
  * SCR-16 Bills & Recurring (Story 6.2): active bills by next due date, then Paused and Ended collapsed at the bottom. A bill
  * is a plan: nothing here creates an entry or changes a balance. Reached from Plan.
  */
-export function BillsScreen({ api = realBillsApi, onBack, onOpenBill }: { api?: BillsApi; onBack: () => void; onOpenBill: (id: string) => void }) {
+export function BillsScreen({ api = realBillsApi, onBack, onOpenBill, focusRuleId }: { api?: BillsApi; onBack: () => void; onOpenBill: (id: string) => void; /** A tapped bill reminder opens the list scrolled to that bill. */ focusRuleId?: string }) {
   useAmountsHidden(); // re-render when Hide amounts is toggled: the subscription header builds amount text
   const theme = useTheme();
   const actions = useBillActions(api);
+  const scroller = useRef<ComponentRef<typeof ScrollView>>(null);
+  const ys = useRef<Record<string, number>>({});
+  const scrolled = useRef(false);
   const [filter, setFilter] = useState<'all' | 'subscriptions'>('all');
   const q = useQuery({ queryKey: BILLS_QUERY_KEY, queryFn: () => api.load() });
   const [open, setOpen] = useState<{ paused: boolean; ended: boolean }>({ paused: false, ended: false });
@@ -55,7 +58,7 @@ export function BillsScreen({ api = realBillsApi, onBack, onOpenBill }: { api?: 
   const active = keep(all.active);
   const paused = keep(all.paused);
   const ended = keep(all.ended);
-  const pickers = { exponent: data.exponent, categories: data.categories, accounts: data.accounts };
+  const pickers = { exponent: data.exponent, categories: data.categories, accounts: data.accounts, notificationsDenied: data.notificationsDenied };
   const add = () => actions.openEditor({ mode: 'add', ...(subsOnly ? { prefill: { kind: 'subscription' as const } } : {}) }, pickers);
   /** `₹1,189 a year · about ₹99 a month`: what a subscription costs per month, with its own cadence first. */
   const subsCaption = (r: BillRowModel): string | undefined => {
@@ -65,8 +68,8 @@ export function BillsScreen({ api = realBillsApi, onBack, onOpenBill }: { api?: 
     return [base, note].filter(Boolean).join(' · ') || undefined;
   };
   const row = (r: BillRowModel) => (
+    <View key={r.id} onLayout={(e) => { ys.current[r.id] = e.nativeEvent.layout.y; }}>
     <BillRow
-      key={r.id}
       row={r}
       currency={data.currency}
       locale={data.locale}
@@ -76,6 +79,7 @@ export function BillsScreen({ api = realBillsApi, onBack, onOpenBill }: { api?: 
         ? { onMarkPaid: () => actions.confirmMarkPaid({ id: r.id, title: r.title }, r.status.date!), onLink: () => actions.openLinkPicker({ id: r.id, title: r.title }, r.status.date!, { currency: data.currency, locale: data.locale, today: data.list.today }) }
         : {})}
     />
+    </View>
   );
   const group = (key: 'paused' | 'ended', title: string, rows: readonly BillRowModel[]) =>
     rows.length === 0 ? null : (
@@ -111,7 +115,17 @@ export function BillsScreen({ api = realBillsApi, onBack, onOpenBill }: { api?: 
   return (
     <View style={styles.fill} testID="bills-screen">
       {header}
-      <ScrollView contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        ref={scroller}
+        contentContainerStyle={styles.pad}
+        keyboardShouldPersistTaps="handled"
+        onContentSizeChange={() => {
+          const y = focusRuleId ? ys.current[focusRuleId] : undefined;
+          if (y !== undefined && !scrolled.current) {
+            scrolled.current = true;
+            scroller.current?.scrollTo({ y: Math.max(0, y - 8), animated: false });
+          }
+        }}>
         {filters}
         {subsOnly && all.subscriptions.counted > 0 ? (
           <View

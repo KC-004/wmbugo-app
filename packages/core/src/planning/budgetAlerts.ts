@@ -7,6 +7,7 @@ import type { UseCase } from '../writer/ledgerWriter';
 import { budgetFigures, type Querier } from './budgets';
 import { BUDGETS_SQL, mapBudgets, mapTargetVersions, periodTarget, readPeriodProfile, TARGET_VERSIONS_SQL } from './budgetStore';
 import { DEFAULT_ALERT_LEVELS } from './budgetCommands';
+import { billSlotsToday, DAILY_NOTIFICATION_CAP, foldedOverflow } from './billReminders';
 
 /**
  * Budget threshold alerts (Story 4.9, BDG-004): one calm heads-up when a budget crosses an alert level, never the same one
@@ -82,6 +83,8 @@ export interface BudgetAlertDeps {
   readonly evaluate: () => Promise<unknown>;
   readonly notifier: Notifier;
   readonly db: Querier;
+  /** The clock, so a day's notification slots are today's. */
+  readonly nowMs?: () => number;
 }
 
 /**
@@ -101,6 +104,13 @@ export function budgetAlertHandlers(deps: BudgetAlertDeps): { TransactionsChange
     if ((await deps.notifier.permission()) !== 'granted') return;
     const row = (await deps.db.query('SELECT name FROM budget WHERE id = ? AND removed_at IS NULL', [p.budgetId]))[0];
     if (!row) return;
+    // Bill reminders claim the day's three slots first: with them taken the alert is folded into that day's `N more reminders`
+    // (updated in place). Its threshold was recorded as fired already, so it is never posted again.
+    const slots = deps.nowMs ? await billSlotsToday(deps.db, deps.nowMs()) : null;
+    if (slots && slots.taken >= DAILY_NOTIFICATION_CAP) {
+      await deps.notifier.post(foldedOverflow(slots.date, slots.overflowMore));
+      return;
+    }
     await deps.notifier.post(budgetAlertContent({ budgetId: p.budgetId, periodStart: p.periodStart, name: String(row[0]), thresholdPct: p.thresholdPct }));
   };
   return { TransactionsChanged: [check], BudgetsChanged: [check], BudgetThresholdCrossed: [post] };

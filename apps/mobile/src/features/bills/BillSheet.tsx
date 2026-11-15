@@ -1,5 +1,5 @@
 import { useRef, useState, type ComponentRef } from 'react';
-import { AccessibilityInfo, findNodeHandle, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { AccessibilityInfo, findNodeHandle, Linking, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { parseAmountInput, isLocalDate, type BillKind, type BillRule, type Cadence, type CategoryRow, type CustomUnit, type SaveRecurringRuleInput } from '@wmbugo/core';
 import { copy } from '../../shared/copy';
 import { minorToInput } from '../../shared/minorInput';
@@ -20,6 +20,8 @@ export interface BillPickers {
   readonly exponent: number;
   readonly categories: readonly CategoryRow[];
   readonly accounts: readonly { id: string; name: string }[];
+  /** Notifications are off for wmbugo: the Remind me setting is kept but nothing is scheduled. */
+  readonly notificationsDenied?: boolean;
 }
 
 type Field = 'name' | 'amount' | 'date' | 'end' | 'custom' | 'form';
@@ -55,6 +57,7 @@ export function BillSheet({ start, pickers, onSave, close }: { start: BillSheetM
   const [paidTo, setPaidTo] = useState(rule?.paidTo ?? '');
   const [ends, setEnds] = useState<'never' | 'date'>(rule?.endsOn ? 'date' : 'never');
   const [endsOn, setEndsOn] = useState(rule?.endsOn ?? '');
+  const [remind, setRemind] = useState<0 | 1 | 3 | null>(rule ? (rule.remindDays as 0 | 1 | 3 | null) : 1);
   const [error, setError] = useState<{ field: Field; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const nameRef = useRef<ComponentRef<typeof TextInput>>(null);
@@ -109,6 +112,7 @@ export function BillSheet({ start, pickers, onSave, close }: { start: BillSheetM
         kind,
         paidTo: paidTo.trim() === '' ? null : paidTo.trim(),
         endsOn: endDate,
+        remindDays: remind,
       });
     } catch {
       r = { ok: false, code: 'WRITE_FAILED' };
@@ -198,6 +202,20 @@ export function BillSheet({ start, pickers, onSave, close }: { start: BillSheetM
         <Text accessibilityRole="header" style={[textStyle('label'), ink]}>{b.paidTo}</Text>
         <TextInput testID="bill-paid-to" accessibilityLabel={b.paidTo} value={paidTo} onChangeText={setPaidTo} style={input(false)} />
         <Text style={[textStyle('caption'), muted]}>{b.paidToCaption}</Text>
+
+        <Text accessibilityRole="header" style={[textStyle('label'), ink]}>{b.remindMe}</Text>
+        <View style={styles.row} accessibilityRole="radiogroup" accessibilityLabel={b.remindMe}>
+          {([[null, b.remindOff], [0, b.remindDay], [1, b.remindOne], [3, b.remindThree]] as const).map(([v, label]) => (
+            <Chip key={String(v)} onGlass role="radio" label={label} testID={`bill-remind-${v === null ? 'off' : v}`} selected={remind === v} onPress={() => setRemind(v)} />
+          ))}
+        </View>
+        <Text style={[textStyle('caption'), muted]}>{b.remindCaption}</Text>
+        {pickers.notificationsDenied && remind !== null ? (
+          <View style={styles.row}>
+            <Text testID="bill-notif-off" style={[textStyle('caption'), ink]}>{b.notifOff}</Text>
+            <Button label={b.openSettings} variant="text" onGlass testID="bill-open-settings" onPress={() => void Linking.openSettings().catch(() => undefined)} />
+          </View>
+        ) : null}
 
         <Text accessibilityRole="header" style={[textStyle('label'), ink]}>{b.ends}</Text>
         <View style={styles.row} accessibilityRole="radiogroup" accessibilityLabel={b.ends}>

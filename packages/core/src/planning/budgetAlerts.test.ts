@@ -29,6 +29,7 @@ class FakeNotifier implements Notifier {
   post = async (c: NotificationContent) => {
     this.posted.push(c);
   };
+  replaceScheduled = async () => undefined;
   onOpen = () => () => undefined;
 }
 

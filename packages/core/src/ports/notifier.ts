@@ -5,7 +5,7 @@
 export interface NotificationContent {
   /** A stable id, so posting the same notification twice replaces it instead of adding another. */
   readonly id: string;
-  readonly channel: 'budget_alerts';
+  readonly channel: 'budget_alerts' | 'bill_reminders';
   readonly title: string;
   readonly body: string;
   /** What the lock screen shows when the phone hides notification content. */
@@ -14,6 +14,12 @@ export interface NotificationContent {
   /** Always false: no numeric app badge. */
   readonly badge: false;
   readonly data: Readonly<Record<string, string>>;
+}
+
+/** A notification to be shown later, at a UTC instant (inexact: the system may delay it a little, no exact-alarm permission). */
+export interface ScheduledNotification {
+  readonly content: NotificationContent;
+  readonly atMs: number;
 }
 
 export type NotificationPermission = 'granted' | 'denied' | 'undetermined';
@@ -30,6 +36,8 @@ export interface Notifier {
   requestPermission(): Promise<NotificationPermission>;
   /** Posts one notification; nothing is posted without permission. */
   post(content: NotificationContent): Promise<void>;
+  /** Replaces everything scheduled on a channel with exactly these, so running it again with the same list changes nothing. */
+  replaceScheduled(channel: NotificationContent['channel'], items: readonly ScheduledNotification[]): Promise<void>;
   /** Calls back with a notification's data when the user taps it. Returns the unsubscribe. */
   onOpen(listener: (data: Readonly<Record<string, string>>) => void): () => void;
 }
@@ -39,5 +47,6 @@ export const unavailableNotifier: Notifier = {
   permission: async () => 'denied',
   requestPermission: async () => 'denied',
   post: async () => undefined,
+  replaceScheduled: async () => undefined,
   onOpen: () => () => undefined,
 };

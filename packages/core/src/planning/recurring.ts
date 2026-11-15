@@ -42,6 +42,8 @@ export interface BillRule extends Recurrence {
   readonly endedAt: number | null;
   readonly endedOn: string | null;
   readonly removedAt: number | null;
+  /** Remind me: days before the due date (0, 1 or 3); null is Off (Story 6.5). */
+  readonly remindDays: number | null;
 }
 
 interface Step {

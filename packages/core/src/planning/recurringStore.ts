@@ -5,11 +5,11 @@ import type { Querier } from './budgets';
 
 /** Bill rules that are not removed, oldest first. Columns are read by `mapRules`. */
 export const RECURRING_RULES_SQL =
-  'SELECT id, title, expected_amount_minor, cadence, custom_every, custom_unit, anchor_date, account_id, category_id, kind, paid_to, ends_on, paused_at, paused_on, resumed_on, ended_at, ended_on, removed_at FROM recurring_rule WHERE removed_at IS NULL ORDER BY created_at, id';
+  'SELECT id, title, expected_amount_minor, cadence, custom_every, custom_unit, anchor_date, account_id, category_id, kind, paid_to, ends_on, paused_at, paused_on, resumed_on, ended_at, ended_on, removed_at, remind_days FROM recurring_rule WHERE removed_at IS NULL ORDER BY created_at, id';
 
 /** One rule by id, removed or not. Param: id. */
 export const RECURRING_RULE_SQL =
-  'SELECT id, title, expected_amount_minor, cadence, custom_every, custom_unit, anchor_date, account_id, category_id, kind, paid_to, ends_on, paused_at, paused_on, resumed_on, ended_at, ended_on, removed_at FROM recurring_rule WHERE id = ?';
+  'SELECT id, title, expected_amount_minor, cadence, custom_every, custom_unit, anchor_date, account_id, category_id, kind, paid_to, ends_on, paused_at, paused_on, resumed_on, ended_at, ended_on, removed_at, remind_days FROM recurring_rule WHERE id = ?';
 
 export const RECURRING_PAYMENTS_SQL = 'SELECT rule_id, due_date, payment_kind, transaction_id, recorded_at FROM recurring_payment ORDER BY due_date, rule_id';
 
@@ -36,6 +36,7 @@ export function mapRules(rows: readonly (readonly unknown[])[]): BillRule[] {
     endedAt: num(r[15]),
     endedOn: text(r[16]),
     removedAt: num(r[17]),
+    remindDays: num(r[18]),
   }));
 }
 

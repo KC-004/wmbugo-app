@@ -54,7 +54,7 @@ export function BillDetailScreen({ ruleId, onBack, onOpenEntry, api = realBillsA
 
   const data = q.data;
   const d = data.detail;
-  const pickers = { exponent: data.exponent, categories: data.categories, accounts: data.accounts };
+  const pickers = { exponent: data.exponent, categories: data.categories, accounts: data.accounts, notificationsDenied: data.notificationsDenied };
   const ink = { color: theme.color('text-primary') };
   const muted = { color: theme.color('text-secondary') };
   const row = d.row;

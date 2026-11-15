@@ -1,0 +1,1 @@
+ALTER TABLE `recurring_rule` ADD `remind_days` integer;

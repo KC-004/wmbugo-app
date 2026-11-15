@@ -78,7 +78,7 @@ describe('occurrences (Story 6.1, REC-006)', () => {
 
 const rule = (over: Partial<BillRule> = {}): BillRule => ({
   id: 'r1', title: 'Rent', expectedAmountMinor: 1_800_000, cadence: 'monthly', customEvery: null, customUnit: null, anchorDate: '2026-10-05', accountId: null, categoryId: null, kind: 'rent', paidTo: null,
-  endsOn: null, pausedAt: null, pausedOn: null, resumedOn: null, endedAt: null, endedOn: null, removedAt: null, ...over,
+  endsOn: null, pausedAt: null, pausedOn: null, resumedOn: null, endedAt: null, endedOn: null, removedAt: null, remindDays: null, ...over,
 });
 const paid = (dueDate: string, ruleId = 'r1'): BillPayment => ({ ruleId, dueDate, kind: 'marked', transactionId: null, recordedAt: 1 });
 

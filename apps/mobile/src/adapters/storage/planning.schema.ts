@@ -124,6 +124,8 @@ export const recurring_rule = sqliteTable(
     ended_on: text('ended_on'),
     removed_at: integer('removed_at'),
     created_at: integer('created_at').notNull(),
+    /** Remind me: days before the due date (0, 1 or 3); null is Off (Story 6.5). */
+    remind_days: integer('remind_days'),
   },
   (t) => [
     check('recurring_rule_cadence_check', sql`${t.cadence} IN ('weekly','monthly','quarterly','annual','custom')`),

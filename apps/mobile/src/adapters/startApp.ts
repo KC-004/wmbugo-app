@@ -5,6 +5,7 @@ import {
   EvaluateBudgetAlerts,
   RebuildBudgetPeriods,
   ReleaseBillLinks,
+  syncBillReminders,
   RunDailyPurge,
   createIdGenerator,
   searchIndexer,
@@ -29,7 +30,7 @@ import { BENCH_TRIGGER, runSaveBenchmark } from './benchmark';
 import { keychainKeyStore } from './storage/keychainKeyStore';
 import { appNotifier } from './notifier';
 import { withBudgetHandlers } from './budgetHandlers';
-import { withBillHandlers } from './billHandlers';
+import { withBillHandlers, withReminderSync } from './billHandlers';
 import { realReceiptFiles } from './files/receiptFiles';
 import { appStateScheduler } from './appStateScheduler';
 import { opSqliteOpener } from './storage/opSqliteOpener';
@@ -124,7 +125,7 @@ async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
     db: started.value.db,
     clock: systemClock,
     logger: log,
-    handlers: withBillHandlers(withBudgetHandlers(invalidationHandlers(queryClient), async () => {
+    handlers: withReminderSync(withBillHandlers(withBudgetHandlers(invalidationHandlers(queryClient), async () => {
       // Payday, the period mode or the first day of the week changed: the derived budget periods are rebuilt from the period
       // service (Story 4.5). A failure is logged and the cache is rebuilt on the next change; no entry is touched either way.
       const w = services?.writer;
@@ -139,11 +140,12 @@ async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
       },
       notifier: appNotifier,
       db: started.value.db,
+      nowMs: () => systemClock.nowMs(),
     }), log), async () => {
       // A linked entry was deleted, rejected or excluded: its bill's due date is unpaid again (Story 6.3).
       const w = services?.writer;
       if (w) await w.run(ReleaseBillLinks, {}, 'system');
-    }, log),
+    }, log), () => syncBillReminders(started.value.db, appNotifier, systemClock.nowMs()).then(() => undefined), log),
   });
   const newId = createIdGenerator(systemClock, secureRandom);
   const writer = new LedgerWriter({
@@ -174,6 +176,8 @@ async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
     const r = await writer.run(RunDailyPurge, {}, 'system');
     if (r.ok) for (const name of r.value.fileNames) await realReceiptFiles.remove(name.replace(/\.enc$/, ''));
   });
+  // Bill reminders are scheduled again at start and whenever the app comes back (Story 6.5): the window moves with the day.
+  appStateScheduler.onStartOrResume(() => syncBillReminders(started.value.db, appNotifier, systemClock.nowMs()).then(() => undefined));
   // Events committed before the app was last killed are delivered now, without holding up the first screen.
   void dispatcher.deliverPending().catch(() => undefined);
   // NFR-04 benchmark: only when the trigger file was placed in the private directory (debuggable builds via run-as).
