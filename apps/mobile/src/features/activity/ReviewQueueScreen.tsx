@@ -1,3 +1,5 @@
+import { useAmountsHidden } from '../../shared/state/amountsHidden';
+import { foreignMoneyText } from '../../shared/ui/moneyText';
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -5,7 +7,6 @@ import { categoryFits, parseAmountInput, sourceWords, type ReviewItem, type Revi
 import { announce } from '../../shared/a11y/announce';
 import { copy } from '../../shared/copy';
 import { currencySymbol } from '../../shared/currencySymbol';
-import { minorToInput } from '../../shared/minorInput';
 import { ErrorBlock, Reveal, Skeleton } from '../../shared/feedback/Feedback';
 import { useToast } from '../../shared/feedback/ToastHost';
 import { PaperBoat } from '../../shared/brand/PaperBoat';
@@ -234,6 +235,7 @@ function ReviewCard({
   onRemove: () => void;
   onConfirmForeign: (amountMinor: number, accountId: string) => void;
 }) {
+  useAmountsHidden(); // the foreign amount below masks with Hide amounts
   const theme = useTheme();
   const { fontScale } = useWindowDimensions();
   const [text, setText] = useState('');
@@ -265,7 +267,7 @@ function ReviewCard({
     return (
       <View style={card}>
         <Text style={[textStyle('label'), { color: theme.color('text-secondary') }]}>{item.merchant ?? ''}</Text>
-        <Text testID={`review-foreign-${item.id}`} style={[textStyle('headline'), { color: theme.color('text-primary') }]}>{`${f.currency} ${minorToInput(f.amountMinor, f.exponent)}`}</Text>
+        <Text testID={`review-foreign-${item.id}`} style={[textStyle('headline'), { color: theme.color('text-primary') }]}>{foreignMoneyText(f.currency, f.amountMinor, f.exponent)}</Text>
         <Text style={[textStyle('label'), { color: theme.color('text-secondary') }]}>{copy.review.amountCharged.replace('{symbol}', symbol)}</Text>
         <TextInput
           testID={`review-amount-${item.id}`}

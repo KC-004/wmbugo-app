@@ -12,7 +12,9 @@ import { textStyle } from '../../shared/theme/typography';
 import { Button } from '../../shared/ui/Button';
 import { ScreenHeader } from '../shell/ScreenHeader';
 import { realSettingsApi, TIMEZONE_QUERY_KEY, type SettingsApi } from '../settings/settingsApi';
+import { useAmountsHidden } from '../../shared/state/amountsHidden';
 import { HeroCard } from './HeroCard';
+import { useToggleHideAmounts } from './useHideAmounts';
 import { HomeBand } from './HomeBand';
 import { HOME_QUERY_KEY, realHomeApi, type HomeApi } from './homeApi';
 import { useHomeRefresh, useSlowFlag } from './useHomeRefresh';
@@ -42,8 +44,9 @@ export function HomeScreen({ api = realHomeApi, settingsApi = realSettingsApi, o
   const d = home.data ?? null;
   const tz = useQuery({ queryKey: TIMEZONE_QUERY_KEY, queryFn: () => settingsApi.timezoneCheck() });
   const qc = useQueryClient();
-  // Hide amounts is Story 5.3: until then the eye toggles this local flag only.
-  const [hidden, setHidden] = useState(false);
+  // Hide amounts (Story 5.3): the eye flips the one app-wide flag and saves it.
+  const hidden = useAmountsHidden();
+  const toggleHidden = useToggleHideAmounts(settingsApi);
 
   // A recompute that takes longer than 300 ms keeps the old values and says so; a quick one never flashes (Story 5.1).
   const updating = useSlowFlag(home.isFetching && !home.isLoading);
@@ -113,7 +116,7 @@ export function HomeScreen({ api = realHomeApi, settingsApi = realSettingsApi, o
                 currency={d.currency}
                 locale={d.locale}
                 hidden={hidden}
-                onToggleHidden={() => setHidden((h) => !h)}
+                onToggleHidden={toggleHidden}
                 updating={updating}
                 onOpen={open}
                 onSetLimit={onSetLimit}

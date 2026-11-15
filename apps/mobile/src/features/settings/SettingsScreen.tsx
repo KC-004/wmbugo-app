@@ -174,9 +174,9 @@ function Appearance({ d, onSet }: { d: SettingsData; onSet: (key: string, value:
         style={styles.preview}
         testID="format-preview"
         accessible
-        accessibilityLabel={`${copy.settings.previewLead} ${amountLabel({ amountMinor: sampleMinor(d.profile.currency), currency: d.profile.currency as never, locale: previewLocale(d), inline: true })}`}>
+        accessibilityLabel={`${copy.settings.previewLead} ${amountLabel({ amountMinor: sampleMinor(d.profile.currency), currency: d.profile.currency as never, locale: previewLocale(d), inline: true, hidden: false })}`}>
         <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{copy.settings.previewLead}</Text>
-        <Amount amountMinor={sampleMinor(d.profile.currency)} currency={d.profile.currency as never} direction="neutral" locale={previewLocale(d)} />
+        <Amount amountMinor={sampleMinor(d.profile.currency)} currency={d.profile.currency as never} direction="neutral" hidden={false} locale={previewLocale(d)} />
       </View>
       <SwitchRow testID="switch-haptics" label={copy.settings.haptics} value={d.settings.haptics} onChange={(v) => void onSet('ui.haptics', v)} />
       <SwitchRow testID="switch-reduce-motion" label={copy.settings.reduceMotion} hint={copy.settings.reduceMotionHint} value={d.settings.reduceMotion} onChange={(v) => void onSet('ui.reduce_motion', v)} />

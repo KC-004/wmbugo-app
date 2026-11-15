@@ -1,3 +1,5 @@
+import { moneyLeaks } from '../../shared/moneyLeaks.testkit';
+import { useAmountsStore } from '../../shared/state/amountsHidden';
 import { AccessibilityInfo, Text } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -104,6 +106,31 @@ describe('review queue screen (Story 3.10)', () => {
     const m = await mountQueue(dataOf([item('p1'), item('p2', { merchant: 'Uber' })]));
     expect(texts(m.r)).toContain('2 to check');
     expect(has(m.r, 'review-item-p1') && has(m.r, 'review-item-p2')).toBe(true);
+  });
+
+  it('with Hide amounts on, the review queue shows and speaks no money', async () => {
+    useAmountsStore.getState().setHidden(true);
+    try {
+      const m = await mountQueue(dataOf([item('p1'), item('p2', { merchant: 'Uber' })]));
+      expect(moneyLeaks(m.r)).toEqual([]);
+      expect(texts(m.r)).toContain('2 to check'); // counts stay
+    } finally {
+      useAmountsStore.getState().setHidden(false);
+    }
+  });
+
+  it('hiding amounts while the review queue is already open masks it in place, and showing them brings the amounts back', async () => {
+    try {
+      const m = await mountQueue(dataOf([item('p1'), item('p2', { merchant: 'Uber' })]));
+      const r = m.r;
+      expect(moneyLeaks(r)).not.toEqual([]);
+      act(() => useAmountsStore.getState().setHidden(true));
+      expect(moneyLeaks(r)).toEqual([]);
+      act(() => useAmountsStore.getState().setHidden(false));
+      expect(moneyLeaks(r)).not.toEqual([]);
+    } finally {
+      useAmountsStore.getState().setHidden(false);
+    }
   });
 
   it('a possible duplicate shows This entry and Already recorded side by side with Keep both, Merge and Delete / Reject', async () => {

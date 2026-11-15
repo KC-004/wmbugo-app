@@ -3,6 +3,7 @@ import { Eye, EyeSlash, Warning } from 'phosphor-react-native';
 import { notSetNote, type CurrencyCode, type HomeSummary } from '@wmbugo/core';
 import { controlA11y, spokenAmount } from '../../shared/a11y/labels';
 import { copy } from '../../shared/copy';
+import { useAmountsHidden } from '../../shared/state/amountsHidden';
 import { Glass } from '../../shared/theme/Glass';
 import { Icon } from '../../shared/theme/Icon';
 import { useTheme } from '../../shared/theme/ThemeProvider';
@@ -41,8 +42,10 @@ const dailyLine = (view: HeroView, currency: CurrencyCode, locale: string | unde
  * line and, below a divider, In accounts and Card dues side by side (stacked at large text), never summed. The merged
  * TalkBack node is built from the view model; the eye, `Set a limit`, `Sort it` and `Add an account` are separate nodes.
  */
-export function HeroCard({ view, summary, currency, locale, hidden = false, onToggleHidden, updating = false, onOpen, onSetLimit, onSortIt, onAddAccount }: HeroCardProps) {
+export function HeroCard({ view, summary, currency, locale, hidden: hiddenProp, onToggleHidden, updating = false, onOpen, onSetLimit, onSortIt, onAddAccount }: HeroCardProps) {
   const theme = useTheme();
+  const globalHidden = useAmountsHidden();
+  const hidden = hiddenProp ?? globalHidden;
   const { fontScale } = useWindowDimensions();
   const stack = fontScale >= 1.3;
   const ink = theme.color('on-glass-primary');

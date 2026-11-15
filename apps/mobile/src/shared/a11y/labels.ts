@@ -1,6 +1,7 @@
 import type { AccessibilityRole, AccessibilityState } from 'react-native';
 import { getCurrency, type CurrencyCode } from '@wmbugo/core';
 import { formatPlainNumber } from '../formatAmount';
+import { isAmountsHidden } from '../state/amountsHidden';
 
 /** Spoken currency units (plural). TalkBack reads "85,000 rupees", not "INR 85,000.00". */
 const UNIT: Readonly<Record<CurrencyCode, string>> = {
@@ -12,8 +13,12 @@ const UNIT: Readonly<Record<CurrencyCode, string>> = {
 
 export type AmountKind = 'plain' | 'spent' | 'income' | 'refund' | 'transfer' | 'over-budget';
 
+/** What TalkBack hears instead of an amount while Hide amounts is on. */
+export const HIDDEN_SPOKEN = 'amount hidden';
+
 /** The number alone, as spoken: "85,000" (for a sentence that names the unit once, like "8,140 of 20,000"). */
 export function spokenNumber(amountMinor: number, currency: CurrencyCode, locale?: string): string {
+  if (isAmountsHidden()) return HIDDEN_SPOKEN;
   const n = formatPlainNumber(amountMinor, currency, locale);
   if (!n.ok) return '';
   // Drop only the currency's exact minor digits when they are all zero; grouping zeros (1,000) stay.
@@ -24,6 +29,7 @@ export function spokenNumber(amountMinor: number, currency: CurrencyCode, locale
 
 /** "85,000 rupees"; an all-zero fraction is not spoken ("85,000.00" becomes "85,000"). */
 export function spokenAmount(amountMinor: number, currency: CurrencyCode, locale?: string): string {
+  if (isAmountsHidden()) return HIDDEN_SPOKEN;
   const n = spokenNumber(amountMinor, currency, locale);
   return n === '' ? '' : `${n} ${UNIT[currency]}`;
 }
@@ -55,7 +61,7 @@ export function amountLabel(input: AmountLabelInput): string {
   const kind = input.kind ?? 'plain';
   const lead = LEAD[kind];
   let text: string;
-  if (input.hidden) {
+  if (input.hidden ?? isAmountsHidden()) {
     const word = lead.replace(/, plus $| $|, $/, '');
     text = word === '' ? 'Amount hidden' : `${word}, amount hidden`;
   } else {

@@ -1,5 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 import Svg, { Defs, Pattern, Rect } from 'react-native-svg';
+import { useAmountsHidden } from '../../shared/state/amountsHidden';
 import { useTheme } from '../../shared/theme/ThemeProvider';
 import { colorTokens } from '../../shared/theme/colors';
 
@@ -35,8 +36,10 @@ export const withAlpha = (hex: string, alpha: number): string => `${hex.slice(0,
  * The hero bar (UX-DR24): 8dp, rounded full, on glass. `hidden` keeps the track and draws no fill, tick or overflow, so the
  * layout does not move while amounts are masked.
  */
-export function HeroBar({ usedMinor, targetMinor, hidden = false, testID = 'hero-bar' }: { usedMinor: number; targetMinor: number; hidden?: boolean; testID?: string }) {
+export function HeroBar({ usedMinor, targetMinor, hidden: hiddenProp, testID = 'hero-bar' }: { usedMinor: number; targetMinor: number; hidden?: boolean; testID?: string }) {
   const theme = useTheme();
+  const globalHidden = useAmountsHidden();
+  const hidden = hiddenProp ?? globalHidden;
   const g = heroBarGeometry(usedMinor, targetMinor);
   const fill = theme.scheme === 'dark' ? theme.color('on-glass-accent') : theme.color('on-glass-primary');
   const ink = theme.color('on-glass-primary');

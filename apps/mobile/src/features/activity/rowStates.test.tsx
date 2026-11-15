@@ -1,3 +1,5 @@
+import { moneyLeaks } from '../../shared/moneyLeaks.testkit';
+import { useAmountsStore } from '../../shared/state/amountsHidden';
 import { AccessibilityInfo, Text } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -159,5 +161,27 @@ describe('the Activity tab dot', () => {
     await act(async () => new Promise((res) => setTimeout(res, 0)));
     expect(seen[seen.length - 1]).toBe(false);
     qc.clear();
+  });
+});
+
+describe('Hide amounts (Story 5.3)', () => {
+  it.each(STATES.map((s) => [s.name, s.row] as const))('the %s row masks in place when amounts are hidden after it is shown', (_name, row) => {
+    const r = mountRow(row);
+    expect(moneyLeaks(r)).not.toEqual([]);
+    try {
+      act(() => useAmountsStore.getState().setHidden(true));
+      expect(moneyLeaks(r)).toEqual([]);
+    } finally {
+      act(() => useAmountsStore.getState().setHidden(false));
+    }
+  });
+
+  it.each(STATES.map((s) => [s.name, s.row] as const))('the %s row shows and speaks no money while amounts are hidden', (_name, row) => {
+    useAmountsStore.getState().setHidden(true);
+    try {
+      expect(moneyLeaks(mountRow(row))).toEqual([]);
+    } finally {
+      useAmountsStore.getState().setHidden(false);
+    }
   });
 });

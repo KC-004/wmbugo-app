@@ -1,3 +1,5 @@
+import { moneyLeaks } from '../../shared/moneyLeaks.testkit';
+import { useAmountsStore } from '../../shared/state/amountsHidden';
 import { AccessibilityInfo, Text } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -109,6 +111,30 @@ describe('search (Story 3.6)', () => {
     await press(m.r, 'search-back');
     expect(texts(m.r)).toContain('Activity');
     expect(useUiStore.getState().activityFilter.query).toEqual({});
+  });
+
+  it('with Hide amounts on, Activity shows and speaks no money', async () => {
+    useAmountsStore.getState().setHidden(true);
+    try {
+      const m = await mountActivity();
+      expect(moneyLeaks(m.r)).toEqual([]);
+    } finally {
+      useAmountsStore.getState().setHidden(false);
+    }
+  });
+
+  it('hiding amounts while Activity is already open masks it in place, and showing them brings the amounts back', async () => {
+    try {
+      const m = await mountActivity();
+      const r = m.r;
+      expect(moneyLeaks(r)).not.toEqual([]);
+      act(() => useAmountsStore.getState().setHidden(true));
+      expect(moneyLeaks(r)).toEqual([]);
+      act(() => useAmountsStore.getState().setHidden(false));
+      expect(moneyLeaks(r)).not.toEqual([]);
+    } finally {
+      useAmountsStore.getState().setHidden(false);
+    }
   });
 });
 

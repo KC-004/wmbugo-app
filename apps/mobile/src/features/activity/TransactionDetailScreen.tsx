@@ -1,3 +1,4 @@
+import { useAmountsHidden } from '../../shared/state/amountsHidden';
 import { useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -83,6 +84,7 @@ export function TransactionDetailScreen({
   /** Delete permanently (confirm sheet facts and the purge). */
   deletedApi?: Pick<DeletedApi, 'purgeFacts' | 'purge'>;
 }) {
+  useAmountsHidden(); // re-render when Hide amounts is toggled: this component builds amount text and labels
   const theme = useTheme();
   const toast = useToast();
   const sheet = useSheet();

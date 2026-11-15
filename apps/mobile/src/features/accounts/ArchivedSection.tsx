@@ -1,3 +1,4 @@
+import { useAmountsHidden } from '../../shared/state/amountsHidden';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { accountLine, type AccountRow, type CurrencyCode } from '@wmbugo/core';
@@ -24,6 +25,7 @@ export function ArchivedSection({
   onOpen: (id: string) => void;
   onRestore: (id: string) => void | Promise<void>;
 }) {
+  useAmountsHidden(); // re-render when Hide amounts is toggled: this component builds amount text and labels
   const theme = useTheme();
   const [open, setOpen] = useState(false);
   const label = copy.archive.archivedRow.replace('{n}', String(rows.length));

@@ -1,6 +1,7 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { setInAppReduceMotion } from '../../shared/a11y/inAppMotion';
+import { useAmountsStore } from '../../shared/state/amountsHidden';
 import { useTheme } from '../../shared/theme/ThemeProvider';
 import { realSettingsApi, SETTINGS_QUERY_KEY, type SettingsApi } from './settingsApi';
 
@@ -14,6 +15,7 @@ export function SettingsBridge({ api = realSettingsApi, children }: { api?: Sett
   const q = useQuery({ queryKey: SETTINGS_QUERY_KEY, queryFn: () => api.load() });
   const mode = q.data?.settings.theme;
   const reduce = q.data?.settings.reduceMotion;
+  const hideAmounts = q.data?.settings.hideAmounts;
   const { setMode } = theme;
   useEffect(() => {
     if (mode) setMode(mode);
@@ -21,6 +23,12 @@ export function SettingsBridge({ api = realSettingsApi, children }: { api?: Sett
   useEffect(() => {
     if (reduce !== undefined) setInAppReduceMotion(reduce);
   }, [reduce]);
+  // Hide amounts is read before the first frame, so a masked app never flashes its amounts on opening (Story 5.3).
+  useLayoutEffect(() => {
+    if (hideAmounts !== undefined) useAmountsStore.getState().setHidden(hideAmounts);
+    // The saved choice could not be read: keep amounts hidden rather than show money the user may have hidden.
+    else if (q.isError) useAmountsStore.getState().setHidden(true);
+  }, [hideAmounts, q.isError]);
   if (q.isLoading) return null;
   return <>{children}</>;
 }

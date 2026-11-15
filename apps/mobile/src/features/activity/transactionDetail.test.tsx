@@ -1,3 +1,5 @@
+import { moneyLeaks } from '../../shared/moneyLeaks.testkit';
+import { useAmountsStore } from '../../shared/state/amountsHidden';
 import { AccessibilityInfo, Text } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -69,6 +71,31 @@ describe('TransactionDetailScreen (Story 3.4)', () => {
     expect(t).toEqual(expect.arrayContaining(['Swiggy', '₹450.00', 'Type', 'Expense', 'Account', 'HDFC', 'Category', 'Merchant', 'Note', 'lunch', 'Payment method', 'UPI', 'Status', 'Recorded', 'Source']));
     expect(t.some((x) => x.startsWith('Added by you · 7 Nov, '))).toBe(true);
     m.unmount();
+  });
+
+  it('with Hide amounts on, the entry detail shows and speaks no money', async () => {
+    useAmountsStore.getState().setHidden(true);
+    try {
+      const m = await mountDetail(detail());
+      expect(moneyLeaks(m.r)).toEqual([]);
+      m.unmount();
+    } finally {
+      useAmountsStore.getState().setHidden(false);
+    }
+  });
+
+  it('hiding amounts while the entry detail is already open masks it in place, and showing them brings the amounts back', async () => {
+    try {
+      const m = await mountDetail(detail());
+      const r = m.r;
+      expect(moneyLeaks(r)).not.toEqual([]);
+      act(() => useAmountsStore.getState().setHidden(true));
+      expect(moneyLeaks(r)).toEqual([]);
+      act(() => useAmountsStore.getState().setHidden(false));
+      expect(moneyLeaks(r)).not.toEqual([]);
+    } finally {
+      useAmountsStore.getState().setHidden(false);
+    }
   });
 
   it('a transfer reads From → To, neutral and unsigned; an income reads +', async () => {

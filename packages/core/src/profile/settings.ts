@@ -9,6 +9,8 @@ export const SETTING_FIRST_DAY = 'finance.first_day_of_week';
 export const SETTING_DEFAULT_ACCOUNT = 'finance.default_account';
 export const SETTING_BLOCK_TRANSFERS_KEY = 'finance.block_transfers_above_balance';
 export const SETTING_SHOW_NET_WORTH = 'ui.show_net_worth';
+/** Hide amounts (Story 5.3): every amount in the app is masked while it is on. Per device; the setting is the source of truth. */
+export const SETTING_HIDE_AMOUNTS = 'ui.hide_amounts';
 export const SETTING_THEME_KEY = 'theme';
 
 export type ThemeChoice = 'system' | 'light' | 'dark';
@@ -30,6 +32,7 @@ export interface AppSettings {
   readonly defaultAccountId: string | null;
   readonly blockTransfers: boolean;
   readonly showNetWorth: boolean;
+  readonly hideAmounts: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -42,6 +45,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultAccountId: null,
   blockTransfers: false,
   showNetWorth: false,
+  hideAmounts: false,
 };
 
 export const SETTINGS_SQL = 'SELECT key, value_json FROM settings';
@@ -62,6 +66,7 @@ export function validateSetting(key: string, value: unknown): { ok: true; value:
     case SETTING_REDUCE_MOTION:
     case SETTING_BLOCK_TRANSFERS_KEY:
     case SETTING_SHOW_NET_WORTH:
+    case SETTING_HIDE_AMOUNTS:
       return typeof value === 'boolean' ? { ok: true, value } : { ok: false };
     case SETTING_DEFAULT_ACCOUNT:
       return value === null || (typeof value === 'string' && value.length > 0 && value.length <= 64) ? { ok: true, value } : { ok: false };
@@ -95,6 +100,7 @@ export function parseSettings(rows: readonly (readonly unknown[])[]): AppSetting
     defaultAccountId: pick<string | null>(SETTING_DEFAULT_ACCOUNT, null),
     blockTransfers: pick(SETTING_BLOCK_TRANSFERS_KEY, DEFAULT_SETTINGS.blockTransfers),
     showNetWorth: pick(SETTING_SHOW_NET_WORTH, DEFAULT_SETTINGS.showNetWorth),
+    hideAmounts: pick(SETTING_HIDE_AMOUNTS, DEFAULT_SETTINGS.hideAmounts),
   };
 }
 

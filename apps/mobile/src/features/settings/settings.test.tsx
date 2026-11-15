@@ -69,7 +69,8 @@ function fakeApi(initial: SettingsData) {
   });
   const timezoneCheck = jest.fn(async () => null as { deviceTz: string } | null);
   const answerTimezone = jest.fn(async () => ({ ok: true }));
-  const api: SettingsApi = { load: async () => current, changeSetting, changeProfile, timezoneCheck, answerTimezone };
+  const setHideAmounts = jest.fn(async () => ({ ok: true }));
+  const api: SettingsApi = { load: async () => current, changeSetting, setHideAmounts, changeProfile, timezoneCheck, answerTimezone };
   return { api, changeSetting, changeProfile, timezoneCheck, answerTimezone };
 }
 

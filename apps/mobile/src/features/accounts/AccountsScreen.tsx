@@ -1,3 +1,4 @@
+import { useAmountsHidden } from '../../shared/state/amountsHidden';
 import { useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -217,6 +218,7 @@ function AccountRowView(props: {
   onRenameSubmit: (name: string) => Promise<boolean>;
   onRenameCancel: () => void;
 }) {
+  useAmountsHidden(); // re-render when Hide amounts is toggled: this component builds amount text and labels
   const { account: a, currency, locale, isFirst, isLast, editing } = props;
   const theme = useTheme();
   const [name, setName] = useState(a.name);
@@ -376,6 +378,7 @@ function lineWords(l: Exclude<AccountLineView, { kind: 'not-set' }>): string {
 }
 
 function GroupHeader({ title, group, currency, locale, kind, testID }: { title: string; group: AccountGroup; currency?: CurrencyCode; locale?: string; kind: 'account' | 'card'; testID: string }) {
+  useAmountsHidden(); // the spoken total below changes with Hide amounts
   const theme = useTheme();
   if (!currency) return null;
   const notSetYet = group.total.kind === 'not-set-yet';

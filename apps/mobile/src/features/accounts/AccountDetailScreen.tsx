@@ -1,3 +1,4 @@
+import { useAmountsHidden } from '../../shared/state/amountsHidden';
 import { useRef, useState } from 'react';
 import { SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -302,6 +303,7 @@ export function AccountDetailScreen({
 }
 
 function Header({ d }: { d: AccountDetailData }) {
+  useAmountsHidden(); // re-render when Hide amounts is toggled: this component builds amount text and labels
   const theme = useTheme();
   const a = d.account;
   const line = accountLine(a);
@@ -355,6 +357,7 @@ function DayHeading({ date, today }: { date: string; today: string }) {
 }
 
 function StartingRow({ minor, localDate, currency, locale }: { minor: number; localDate: string; currency: CurrencyCode; locale: string }) {
+  useAmountsHidden(); // re-render when Hide amounts is toggled: this component builds amount text and labels
   const theme = useTheme();
   const amount = Math.abs(minor);
   // "Sun 1 Nov" without the weekday: the starting day reads "1 Nov".

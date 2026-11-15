@@ -1,3 +1,5 @@
+import { moneyLeaks } from '../../shared/moneyLeaks.testkit';
+import { useAmountsStore } from '../../shared/state/amountsHidden';
 import { AccessibilityInfo, Text } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -100,6 +102,30 @@ describe('Budget detail (SCR-15, Story 4.7)', () => {
     expect(has(r, 'detail-limit')).toBe(true);
     expect(r.root.findAll((n) => typeof n.type === 'string' && /^activity-row-|^row-/.test(String(n.props.testID))).length).toBeGreaterThanOrEqual(0);
     expect(has(r, 'budget-entries')).toBe(true);
+  });
+
+  it('with Hide amounts on, the budget detail shows and speaks no money', async () => {
+    useAmountsStore.getState().setHidden(true);
+    try {
+      const { r } = await mount(fakeApi().api);
+      expect(moneyLeaks(r)).toEqual([]);
+      expect(texts(r)).toEqual(expect.arrayContaining(['Overall'])); // names and labels stay
+    } finally {
+      useAmountsStore.getState().setHidden(false);
+    }
+  });
+
+  it('hiding amounts while the budget detail is already open masks it in place, and showing them brings the amounts back', async () => {
+    try {
+      const { r } = await mount(fakeApi().api);
+      expect(moneyLeaks(r)).not.toEqual([]);
+      act(() => useAmountsStore.getState().setHidden(true));
+      expect(moneyLeaks(r)).toEqual([]);
+      act(() => useAmountsStore.getState().setHidden(false));
+      expect(moneyLeaks(r)).not.toEqual([]);
+    } finally {
+      useAmountsStore.getState().setHidden(false);
+    }
   });
 
   it('hides Projected while the budget is too early to tell, and says Over by when the limit is passed', async () => {

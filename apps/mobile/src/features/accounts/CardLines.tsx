@@ -1,3 +1,4 @@
+import { useAmountsHidden } from '../../shared/state/amountsHidden';
 import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Warning } from 'phosphor-react-native';
@@ -17,6 +18,7 @@ export const dayMonth = (shortDate: string): string => shortDate.split(' ').slic
  * never what is owed. Overdue uses text-primary with a warning icon, never red text alone.
  */
 export function CardLines({ card, today, currency, locale, formatDate }: { card: CardDetailsRead; today: string; currency: CurrencyCode; locale: string; formatDate: (d: string) => string }) {
+  useAmountsHidden(); // re-render when Hide amounts is toggled: this component builds amount text and labels
   const theme = useTheme();
   const status = statementStatus(card, today);
   const ink = { color: theme.color('text-primary') };

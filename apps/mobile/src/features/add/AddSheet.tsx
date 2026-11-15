@@ -557,7 +557,7 @@ export function AddSheet({
         accessibilityLiveRegion="polite"
         style={styles.amount}>
         {data ? (
-          <Amount amountMinor={minor} currency={data.currency} direction={kind === 'income' ? 'income' : kind === 'transfer' ? 'neutral' : 'expense'} role="display-amount" locale={locale} color={error === 'amount' ? 'on-glass-accent' : 'on-glass-primary'} />
+          <Amount amountMinor={minor} currency={data.currency} direction={kind === 'income' ? 'income' : kind === 'transfer' ? 'neutral' : 'expense'} role="display-amount" hidden={false} locale={locale} color={error === 'amount' ? 'on-glass-accent' : 'on-glass-primary'} />
         ) : null}
       </View>
       {/* Takes hardware number keys and Backspace; the soft keyboard stays closed (the keypad is the input). */}

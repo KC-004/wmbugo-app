@@ -1,3 +1,4 @@
+import { useAmountsHidden } from '../../shared/state/amountsHidden';
 import { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useUiStore } from '../../shared/state/uiStore';
@@ -33,6 +34,7 @@ export function BudgetsScreen({ api = realBudgetsApi, onUseTemplate, onOpen, onO
   /** Opens Activity filtered to a period's entries (`Not classified · Sort it`). */
   onOpenActivity?: (query: ActivityQuery) => void;
 }) {
+  useAmountsHidden(); // re-render when Hide amounts is toggled: this component builds amount text and labels
   const theme = useTheme();
   const qc = useQueryClient();
   const sheet = useSheet();
@@ -219,6 +221,7 @@ export function BudgetsScreen({ api = realBudgetsApi, onUseTemplate, onOpen, onO
 
 /** `Your income changed — update 50/30/20 to ₹90,000?`: nothing changes until Update; either answer hides it until the next period. */
 function IncomeCard({ data, onAnswer }: { data: BudgetsData; onAnswer: (update: boolean) => void }) {
+  useAmountsHidden(); // re-render when Hide amounts is toggled: this component builds amount text and labels
   const theme = useTheme();
   const c = data.template.incomeChange;
   if (!c) return null;

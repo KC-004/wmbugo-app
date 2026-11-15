@@ -1,10 +1,11 @@
+import { foreignMoneyText } from '../../shared/ui/moneyText';
+import { useAmountsHidden } from '../../shared/state/amountsHidden';
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { ArrowsLeftRight, ArrowUUpLeft, Check, DotsThree, Scales, Warning } from 'phosphor-react-native';
 import { longDate, rowState, shortDate, type ActivityRow, type CurrencyCode } from '@wmbugo/core';
 import { amountLabel, type AmountKind } from '../../shared/a11y/labels';
 import { copy } from '../../shared/copy';
-import { minorToInput } from '../../shared/minorInput';
 import { Icon } from '../../shared/theme/Icon';
 import type { ColorName } from '../../shared/theme/colors';
 import { useTheme } from '../../shared/theme/ThemeProvider';
@@ -73,6 +74,7 @@ export function ActivityRowView({
   actions?: readonly { name: string; label: string }[];
   onAction?: (name: string) => void;
 }) {
+  useAmountsHidden(); // re-render when Hide amounts is toggled: this component builds amount text and labels
   const theme = useTheme();
   const { fontScale } = useWindowDimensions();
   const state = rowState(row);
@@ -87,7 +89,7 @@ export function ActivityRowView({
   const foreignCurrency = row.foreign?.currency as CurrencyCode | undefined;
   const amountSpoken =
     state === 'currency' && row.foreign
-      ? `${row.foreign.currency} ${minorToInput(row.foreign.amountMinor, 2)}, ${copy.activity.waitingForCurrency.toLowerCase()}`
+      ? `${foreignMoneyText(row.foreign.currency, row.foreign.amountMinor, 2)}, ${copy.activity.waitingForCurrency.toLowerCase()}`
       : adjustment
         ? `${(up ? copy.activity.up : copy.activity.down).toLowerCase()} ${amountLabel({ amountMinor: row.amountMinor, currency, locale, inline: true })}`
         : row.kind === 'refund'

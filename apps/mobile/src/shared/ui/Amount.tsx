@@ -2,6 +2,7 @@ import { StyleSheet, Text, type StyleProp, type TextStyle } from 'react-native';
 import type { CurrencyCode } from '@wmbugo/core';
 import { amountLabel, type AmountKind } from '../a11y/labels';
 import { formatAmount, type AmountDirection } from '../formatAmount';
+import { useAmountsHidden } from '../state/amountsHidden';
 import { useTheme } from '../theme/ThemeProvider';
 import type { ColorName } from '../theme/colors';
 import { maxFontScale, textStyle, type TypeRole } from '../theme/typography';
@@ -41,7 +42,7 @@ export function Amount({
   direction,
   role = 'amount',
   kind,
-  hidden = false,
+  hidden: hiddenProp,
   approximate = false,
   color = 'text-primary',
   locale,
@@ -49,6 +50,8 @@ export function Amount({
   testID,
 }: AmountProps) {
   const theme = useTheme();
+  const globalHidden = useAmountsHidden();
+  const hidden = hiddenProp ?? globalHidden;
   const formatted = formatAmount({ amountMinor, currency, direction, locale });
   const symbolOnly = hidden ? formatAmount({ amountMinor: 0, currency, direction, locale }) : null;
 

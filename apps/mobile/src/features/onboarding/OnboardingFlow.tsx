@@ -135,7 +135,7 @@ export function OnboardingFlow({ detected, timezoneId, onFinish }: OnboardingFlo
                 </Text>
                 <View testID="region-preview" style={styles.preview}>
                   <Text style={[textStyle('body'), secondary]}>{copy.onboarding.regionPreview}</Text>
-                  <Amount amountMinor={sampleMinor(state.region)} currency={state.region.currency} direction="neutral" role="body" locale={state.region.locale} color="text-secondary" />
+                  <Amount amountMinor={sampleMinor(state.region)} currency={state.region.currency} direction="neutral" role="body" hidden={false} locale={state.region.locale} color="text-secondary" />
                 </View>
               </View>
             ) : null}

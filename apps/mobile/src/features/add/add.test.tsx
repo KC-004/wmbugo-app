@@ -1,3 +1,4 @@
+import { useAmountsStore } from '../../shared/state/amountsHidden';
 import { TextInput } from 'react-native';
 import { act, type ReactTestRenderer } from 'react-test-renderer';
 import { typedAmountLabel } from '../../shared/a11y/labels';
@@ -66,6 +67,18 @@ describe('keypad', () => {
     expect(node.props.accessibilityLiveRegion).toBe('polite');
     expect(node.props.accessibilityLabel).toBe('Amount 12 point 50 Singapore dollars');
     expect(texts(r)).toContain('S$12.50');
+  });
+
+  it('with Hide amounts on, the keypad still shows and speaks what is being typed', async () => {
+    useAmountsStore.getState().setHidden(true);
+    try {
+      const { r } = await mountReady();
+      tap(r, '12.50');
+      expect(texts(r)).toContain('S$12.50');
+      expect(amountText(r).props.accessibilityLabel).toBe('Amount 12 point 50 Singapore dollars');
+    } finally {
+      useAmountsStore.getState().setHidden(false);
+    }
   });
 
   it('blocks a third decimal instead of rounding', async () => {

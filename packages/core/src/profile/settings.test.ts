@@ -9,7 +9,7 @@ import { SETTING_BLOCK_TRANSFERS } from '../ledger/transferCommands';
 import { LedgerWriter } from '../writer/ledgerWriter';
 import { findRegion } from './regions';
 import { effectiveLocale, parseSettings, paydaySummary, periodRule, SETTINGS_SQL, validateSetting, youSummary, DEFAULT_SETTINGS } from './settings';
-import { AnswerTimezonePrompt, ApplyPendingTimezone, ChangeProfile, ChangeSetting, TrackTimezone } from './settingsCommands';
+import { AnswerTimezonePrompt, ApplyPendingTimezone, ChangeProfile, ChangeSetting, SetHideAmounts, TrackTimezone } from './settingsCommands';
 import { nextLocalDate, offsetMinutes, PROMPT_TIMEZONE, shouldAskTimezone, timezonesDiffer } from './timezone';
 import { periodFor } from './period';
 import { recordEntry, recordTransfer } from '../testing/capture';
@@ -94,6 +94,31 @@ describe('ChangeSetting', () => {
     expect(await recordTransfer(writer, { amountMinor: 5000, fromAccountId: ids[0]!, toAccountId: ids[1]! })).toEqual({ ok: false, code: 'INSUFFICIENT_FUNDS' });
     await writer.run(ChangeSetting, { key: SETTING_BLOCK_TRANSFERS, value: false }, 'user');
     expect((await recordTransfer(writer, { amountMinor: 5000, fromAccountId: ids[0]!, toAccountId: ids[1]! })).ok).toBe(true);
+  });
+});
+
+describe('SetHideAmounts (Story 5.3, HOM-008)', () => {
+  it('is off by default, turns on and off, audits the key not the value, and raises ProfileChanged', async () => {
+    const { writer, db, settings } = await setup();
+    expect((await settings()).hideAmounts).toBe(false);
+    expect((await writer.run(SetHideAmounts, { hidden: true }, 'user')).ok).toBe(true);
+    expect((await settings()).hideAmounts).toBe(true);
+    expect(JSON.stringify(await db.query("SELECT * FROM audit_event WHERE entity_kind = 'settings'"))).toContain('ui.hide_amounts');
+    expect((await db.query('SELECT event FROM outbox')).map((r) => r[0])).toContain('ProfileChanged');
+    await writer.run(SetHideAmounts, { hidden: false }, 'user');
+    expect((await settings()).hideAmounts).toBe(false);
+  });
+
+  it('refuses anything that is not a boolean and writes nothing', async () => {
+    const { writer, db } = await setup();
+    expect(await writer.run(SetHideAmounts, { hidden: 'yes' as never }, 'user')).toEqual({ ok: false, code: 'SETTING_INVALID' });
+    expect((await db.query("SELECT 1 FROM settings WHERE key = 'ui.hide_amounts'")).length).toBe(0);
+  });
+
+  it('reads a corrupt stored value as off', async () => {
+    const { db, settings } = await setup();
+    await db.query("INSERT INTO settings (key, value_json, version, updated_at) VALUES ('ui.hide_amounts', '\"nope\"', 1, 0)");
+    expect((await settings()).hideAmounts).toBe(false);
   });
 });
 

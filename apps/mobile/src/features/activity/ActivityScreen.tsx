@@ -1,3 +1,4 @@
+import { useAmountsHidden } from '../../shared/state/amountsHidden';
 import { BackHandler, FlatList, Pressable, SectionList, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -406,6 +407,7 @@ export function ActivityScreen({
 }
 
 function DayHeader({ day, today, currency, locale }: { day: ActivityDay; today: string; currency: CurrencyCode; locale: string }) {
+  useAmountsHidden(); // re-render when Hide amounts is toggled: this component builds amount text and labels
   const theme = useTheme();
   const { fontScale } = useWindowDimensions();
   const spoken = `${longDate(day.localDate)}, ${amountLabel({ amountMinor: day.spentMinor, currency, locale, kind: 'spent', inline: true })}`;

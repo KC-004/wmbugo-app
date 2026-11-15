@@ -1,3 +1,5 @@
+import { moneyLeaks } from '../../shared/moneyLeaks.testkit';
+import { useAmountsStore } from '../../shared/state/amountsHidden';
 import { AccessibilityInfo, Text } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -95,6 +97,29 @@ describe('AccountDetailScreen', () => {
     expect(host(r, 'account-detail-header')[0]!.props.accessibilityLabel).toBe('HDFC, Bank account, 31,200 rupees');
     const order = host(r, 'account-timeline')[0] && r.root.findAll((n) => typeof n.type === 'string' && /^activity-row-/.test(String(n.props.testID))).map((n) => n.props.testID);
     expect(order).toEqual(['activity-row-t', 'activity-row-e', 'activity-row-i']);
+  });
+
+  it('with Hide amounts on, the account detail shows and speaks no money', async () => {
+    useAmountsStore.getState().setHidden(true);
+    try {
+      const { r } = await mountDetail(data(rows, { t: -20000, e: -45000, i: 500000 }));
+      expect(moneyLeaks(r)).toEqual([]);
+    } finally {
+      useAmountsStore.getState().setHidden(false);
+    }
+  });
+
+  it('hiding amounts while the account detail is already open masks it in place, and showing them brings the amounts back', async () => {
+    try {
+      const { r } = await mountDetail(data(rows, { t: -20000, e: -45000, i: 500000 }));
+      expect(moneyLeaks(r)).not.toEqual([]);
+      act(() => useAmountsStore.getState().setHidden(true));
+      expect(moneyLeaks(r)).toEqual([]);
+      act(() => useAmountsStore.getState().setHidden(false));
+      expect(moneyLeaks(r)).not.toEqual([]);
+    } finally {
+      useAmountsStore.getState().setHidden(false);
+    }
   });
 
   it('a transfer reads "To Cash" with the outgoing leg and "From HDFC" on the other side, unsigned', async () => {

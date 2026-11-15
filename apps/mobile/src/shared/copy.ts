@@ -99,6 +99,8 @@ export const copy = {
       sortIt: 'Sort it',
       hideAmounts: 'Hide amounts',
       detailsHint: 'Double-tap for budget details',
+      amountsHidden: 'Amounts hidden',
+      amountsShown: 'Amounts shown',
     },
   },
   activity: {

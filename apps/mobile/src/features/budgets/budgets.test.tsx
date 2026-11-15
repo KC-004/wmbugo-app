@@ -1,3 +1,5 @@
+import { moneyLeaks } from '../../shared/moneyLeaks.testkit';
+import { useAmountsStore } from '../../shared/state/amountsHidden';
 import { AccessibilityInfo, Text } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -569,6 +571,30 @@ describe('Needs, Wants and Savings on the list (Story 4.11)', () => {
     expect(onOpenActivity).toHaveBeenCalledWith({ categoryIds: ['cat_uncategorised', 'cat_family'], fromDate: '2026-11-01', toDate: '2026-11-30' });
     const none = await mountNode(<BudgetsScreen api={fakeApi(THREE(), { typeSummary: { ...summary, notClassifiedMinor: 0 } }).api} />);
     expect(has(none, 'budgets-not-classified')).toBe(false);
+  });
+
+  it('with Hide amounts on, the budget list (limit bars, Needs, Wants, Savings, Not classified) shows and speaks no money', async () => {
+    useAmountsStore.getState().setHidden(true);
+    try {
+      const summary = { notClassifiedMinor: 300_000, categoryIds: ['cat_uncategorised'], period: { start: '2026-11-01', end: '2026-11-30' } };
+      const r = await mountNode(<BudgetsScreen api={fakeApi(THREE(), { typeSummary: summary }).api} />);
+      expect(moneyLeaks(r)).toEqual([]);
+      expect(texts(r)).toContain('Not classified ₹ •••• · Sort it'); // the line and its label stay, the amount is masked
+    } finally {
+      useAmountsStore.getState().setHidden(false);
+    }
+  });
+
+  it('hiding amounts while the budget list is open masks it in place', async () => {
+    try {
+      const summary = { notClassifiedMinor: 300_000, categoryIds: ['cat_uncategorised'], period: { start: '2026-11-01', end: '2026-11-30' } };
+      const r = await mountNode(<BudgetsScreen api={fakeApi(THREE(), { typeSummary: summary }).api} />);
+      expect(moneyLeaks(r)).not.toEqual([]);
+      act(() => useAmountsStore.getState().setHidden(true));
+      expect(moneyLeaks(r)).toEqual([]);
+    } finally {
+      act(() => useAmountsStore.getState().setHidden(false));
+    }
   });
 
   it('the income-changed card offers Update to the new figure or Keep the old one; nothing changes until a tap', async () => {

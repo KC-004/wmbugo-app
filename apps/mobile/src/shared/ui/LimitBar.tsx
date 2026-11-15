@@ -5,6 +5,7 @@ import { spokenAmount } from '../a11y/labels';
 import { copy } from '../copy';
 import { moneyText } from './moneyText';
 import { Icon } from '../theme/Icon';
+import { useAmountsHidden } from '../state/amountsHidden';
 import { useTheme } from '../theme/ThemeProvider';
 import { radii } from '../theme/tokens';
 import { textStyle } from '../theme/typography';
@@ -73,7 +74,7 @@ export function LimitBar({
   status,
   currency,
   locale,
-  hidden = false,
+  hidden: hiddenProp,
   dueText,
   caption,
   tone,
@@ -99,6 +100,8 @@ export function LimitBar({
   testID?: string;
 }) {
   const theme = useTheme();
+  const globalHidden = useAmountsHidden();
+  const hidden = hiddenProp ?? globalHidden;
   const g = barGeometry(status.usedMinor, status.targetMinor);
   const line = savings ? savingsStatusLine(status, currency, locale, hidden) : statusLine(status, currency, locale, hidden);
   const outline = tone && theme.scheme === 'light' ? { borderWidth: 1, borderColor: theme.color('text-secondary') } : null;

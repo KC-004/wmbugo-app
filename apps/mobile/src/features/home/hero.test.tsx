@@ -13,6 +13,9 @@ import { HomeScreen } from './HomeScreen';
 import type { HomeApi, HomeData } from './homeApi';
 import { homeData } from './homeTestKit';
 import { homeHeroNav } from './homeNav';
+import { moneyLeaks } from '../../shared/moneyLeaks.testkit';
+import { useAmountsStore } from '../../shared/state/amountsHidden';
+import type { SettingsApi } from '../settings/settingsApi';
 
 jest.mock('../../adapters/startApp', () => ({ getServices: jest.fn(), systemClock: { nowMs: () => 0, timezoneId: () => 'Asia/Kolkata' } }));
 let mockFontScale = 1;
@@ -29,6 +32,7 @@ afterEach(async () => {
   for (const c of clients.splice(0)) c.clear();
   jest.restoreAllMocks();
   mockFontScale = 1;
+  useAmountsStore.getState().setHidden(false);
 });
 beforeEach(() => {
   jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(true);
@@ -44,9 +48,10 @@ const texts = (r: ReactTestRenderer) => r.root.findAll((n) => n.type === Text).m
 const host = (r: ReactTestRenderer, id: string) => r.root.findAll((n) => typeof n.type === 'string' && n.props.testID === id);
 const press = (r: ReactTestRenderer, id: string) => act(() => r.root.findAll((n) => n.props.testID === id && typeof n.props.onPress === 'function')[0]!.props.onPress());
 
+const settingsFake = (ok = true) => ({ setHideAmounts: jest.fn(async () => ({ ok })), timezoneCheck: async () => null }) as unknown as SettingsApi & { setHideAmounts: jest.Mock };
 const nav = () => ({ onAccounts: jest.fn(), onProfile: jest.fn(), onAddAccount: jest.fn(), onOpenBudget: jest.fn(), onOpenPlan: jest.fn(), onSetLimit: jest.fn(), onSortIt: jest.fn() });
 
-async function mountHero(d: HomeData, mode: ThemeMode = 'light') {
+async function mountHero(d: HomeData, mode: ThemeMode = 'light', settings = settingsFake()) {
   const qc = createQueryClient();
   clients.push(qc);
   const api: HomeApi = { load: async () => d, seen: new MemorySeenStore() };
@@ -58,7 +63,7 @@ async function mountHero(d: HomeData, mode: ThemeMode = 'light') {
         <ThemeProvider initialMode={mode}>
           <ToastHost bottomOffset={0}>
             <SheetHost>
-              <HomeScreen api={api} {...n} />
+              <HomeScreen api={api} settingsApi={settings} {...n} />
             </SheetHost>
           </ToastHost>
         </ThemeProvider>
@@ -67,7 +72,7 @@ async function mountHero(d: HomeData, mode: ThemeMode = 'light') {
   });
   live.push(r);
   await settle();
-  return { r, n };
+  return { r, n, settings };
 }
 
 const ACCOUNTS = { hasAccounts: true, inAccountsMinor: 5_230_000, notSetCount: 0, cardDuesMinor: 410_000, notSetCards: 0 };
@@ -257,6 +262,73 @@ describe('hero taps and the eye', () => {
     expect(texts(r)).toContain('₹ ••••');
     expect(host(r, 'hero-bar-fill')).toHaveLength(0);
   });
+
+  it('saves the setting, announces politely, and the next tap shows the amounts again', async () => {
+    const { r, settings } = await mountHero(UNDER);
+    press(r, 'hero-eye');
+    expect(settings.setHideAmounts).toHaveBeenLastCalledWith(true);
+    expect(AccessibilityInfo.announceForAccessibility).toHaveBeenLastCalledWith('Amounts hidden');
+    press(r, 'hero-eye');
+    expect(settings.setHideAmounts).toHaveBeenLastCalledWith(false);
+    expect(AccessibilityInfo.announceForAccessibility).toHaveBeenLastCalledWith('Amounts shown');
+    expect(texts(r)).toContain('₹11,860.00');
+  });
+
+  it('a failed save is announced, and a rejected save goes back too', async () => {
+    const failed = await mountHero(UNDER, 'light', settingsFake(false));
+    press(failed.r, 'hero-eye');
+    await settle();
+    expect(AccessibilityInfo.announceForAccessibility).toHaveBeenLastCalledWith('Amounts shown');
+    const rejecting = settingsFake();
+    rejecting.setHideAmounts.mockRejectedValue(new Error('boom'));
+    const r = await mountHero(UNDER, 'light', rejecting);
+    press(r.r, 'hero-eye');
+    await settle();
+    expect(useAmountsStore.getState().hidden).toBe(false);
+  });
+
+  it('two quick taps with the first save failing leave the last tap standing', async () => {
+    const s = settingsFake();
+    let rejectFirst!: (e: Error) => void;
+    s.setHideAmounts.mockImplementationOnce(() => new Promise((_res, rej) => { rejectFirst = rej; }));
+    const { r } = await mountHero(UNDER, 'light', s);
+    press(r, 'hero-eye'); // hide
+    press(r, 'hero-eye'); // show again
+    await act(async () => rejectFirst(new Error('late failure')));
+    await settle();
+    expect(useAmountsStore.getState().hidden).toBe(false);
+    expect(AccessibilityInfo.announceForAccessibility).toHaveBeenLastCalledWith('Amounts shown');
+    expect(texts(r)).toContain('₹11,860.00');
+  });
+
+  it('goes back to what it was when the save fails, so the screen never claims what is not stored', async () => {
+    const { r } = await mountHero(UNDER, 'light', settingsFake(false));
+    press(r, 'hero-eye');
+    await settle();
+    expect(useAmountsStore.getState().hidden).toBe(false);
+    expect(texts(r)).toContain('₹11,860.00');
+  });
+});
+
+describe('Hide amounts across Home (Story 5.3)', () => {
+  it.each([['under', UNDER], ['over', OVER], ['50/30/20 only', TYPES], ['no budget', NONE]] as const)('the %s hero shows and speaks no money, keeps counts and days', async (_n, d) => {
+    const { r } = await mountHero(d);
+    press(r, 'hero-eye');
+    expect(moneyLeaks(r)).toEqual([]);
+    expect(host(r, 'hero-bar-fill')).toHaveLength(0);
+    expect(host(r, 'hero-bar-track')).toHaveLength(_n === 'no budget' ? 0 : 1); // the track stays under every budget state, never with no budget
+  });
+  it('keeps the card the same height masked and unmasked: the track stays and nothing moves', async () => {
+    const a = await mountHero(UNDER);
+    const before = host(a.r, 'hero-bar-track').length;
+    press(a.r, 'hero-eye');
+    expect(host(a.r, 'hero-bar-track')).toHaveLength(before);
+  });
+  it('the masked over state keeps its days and the Over budget label', async () => {
+    const { r } = await mountHero(OVER);
+    press(r, 'hero-eye');
+    expect(texts(r)).toEqual(expect.arrayContaining(['Over budget', '5 days to payday', '₹ ••••']));
+  });
 });
 
 describe('hero TalkBack (UX-DR86)', () => {
@@ -274,6 +346,7 @@ describe('hero TalkBack (UX-DR86)', () => {
     press(r, 'hero-eye');
     expect(label(r)).toBe('Left in budget, amount hidden. Spent amount hidden of amount hidden. About amount hidden per day, 12 days to payday. In accounts amount hidden. Card dues amount hidden. Double-tap for budget details');
     expect(host(r, 'hero-sort-it')[0]!.props.accessibilityLabel).toBe('Sort amount hidden of unclassified spending');
+    useAmountsStore.getState().setHidden(false);
     const o = await mountHero(OVER);
     press(o.r, 'hero-eye');
     expect(label(o.r)).toMatch(/^Over budget, amount hidden./);

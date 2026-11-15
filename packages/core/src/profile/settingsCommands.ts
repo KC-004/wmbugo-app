@@ -7,7 +7,7 @@ import { parsePaydayTransitions, readPaydayRule, samePayday, SETTING_PAYDAY_TRAN
 import { planPaydayChange } from './period';
 import { rebuildPeriods } from '../planning/budgetStore';
 import type { Region } from './regions';
-import { SETTING_DEFAULT_ACCOUNT, SETTINGS_SQL, validateSetting } from './settings';
+import { SETTING_DEFAULT_ACCOUNT, SETTING_HIDE_AMOUNTS, SETTINGS_SQL, validateSetting } from './settings';
 import { nextLocalDate, offsetMinutes, PROMPT_TIMEZONE, SETTING_TZ_MISMATCH_SINCE, SETTING_TZ_PENDING, TIMEZONE_GAP_MINUTES } from './timezone';
 
 async function upsertSetting(ctx: WriterContext, key: string, value: unknown): Promise<void> {
@@ -40,6 +40,22 @@ export const ChangeSetting: UseCase<{ key: string; value: unknown }, void, 'SETT
     await upsertSetting(ctx, input.key, v.value);
     ctx.touch('settings', input.key, { changed: true });
     ctx.emit('ProfileChanged', { fields: [input.key] });
+    return ok(undefined);
+  },
+};
+
+/**
+ * Turns Hide amounts on or off (Story 5.3, HOM-008). One audited write with `ProfileChanged`; the audit row records the key,
+ * never the value. The value is a strict boolean.
+ */
+export const SetHideAmounts: UseCase<{ hidden: boolean }, void, 'SETTING_INVALID'> = {
+  name: 'SetHideAmounts',
+  async execute(ctx, input) {
+    const v = validateSetting(SETTING_HIDE_AMOUNTS, input.hidden);
+    if (!v.ok) return err('SETTING_INVALID');
+    await upsertSetting(ctx, SETTING_HIDE_AMOUNTS, v.value);
+    ctx.touch('settings', SETTING_HIDE_AMOUNTS, { changed: true });
+    ctx.emit('ProfileChanged', { fields: [SETTING_HIDE_AMOUNTS] });
     return ok(undefined);
   },
 };

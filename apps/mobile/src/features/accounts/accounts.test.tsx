@@ -1,3 +1,5 @@
+import { moneyLeaks } from '../../shared/moneyLeaks.testkit';
+import { useAmountsStore } from '../../shared/state/amountsHidden';
 import { AccessibilityInfo, Text, TextInput } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -249,6 +251,29 @@ describe('AccountsScreen', () => {
     expect(texts(r).join('|')).not.toMatch(/[-−]/);
     expect(balance('b')).not.toMatch(/S\$0\.00/);
     expect(texts(r).filter((t) => t === 'Balance not set')).toHaveLength(1);
+  });
+
+  it('with Hide amounts on, the accounts list shows and speaks no money', async () => {
+    useAmountsStore.getState().setHidden(true);
+    try {
+      const r = await mountScreen(fakeApi(three()));
+      expect(moneyLeaks(r)).toEqual([]);
+    } finally {
+      useAmountsStore.getState().setHidden(false);
+    }
+  });
+
+  it('hiding amounts while the accounts list is already open masks it in place, and showing them brings the amounts back', async () => {
+    try {
+      const r = await mountScreen(fakeApi(three()));
+      expect(moneyLeaks(r)).not.toEqual([]);
+      act(() => useAmountsStore.getState().setHidden(true));
+      expect(moneyLeaks(r)).toEqual([]);
+      act(() => useAmountsStore.getState().setHidden(false));
+      expect(moneyLeaks(r)).not.toEqual([]);
+    } finally {
+      useAmountsStore.getState().setHidden(false);
+    }
   });
 
   it('reads each row to TalkBack with name, type and balance, and offers the custom actions', async () => {
