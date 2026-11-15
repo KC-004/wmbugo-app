@@ -27,7 +27,7 @@ import { appNotifier } from '../../adapters/notifier';
 import { BudgetDetailScreen } from '../budgets/BudgetDetailScreen';
 import { BillsScreen } from '../bills/BillsScreen';
 import { BillDetailScreen } from '../bills/BillDetailScreen';
-import { PlanLinkRow } from '../bills/PlanLinkRow';
+import { PlanHubScreen } from '../plan/PlanHubScreen';
 import { GoalsScreen } from '../goals/GoalsScreen';
 import { GoalDetailScreen } from '../goals/GoalDetailScreen';
 import { SettingsScreen } from '../settings/SettingsScreen';
@@ -39,7 +39,7 @@ import { TopBar } from '../../shared/ui/TopBar';
 import { TabBar, type TabRoute } from './TabBar';
 import { markTabFirstFrame } from './navTiming';
 
-type RootParams = { Tabs: undefined; BudgetDetail: { budgetId: string; periodStart?: string }; Accounts: undefined; AccountDetail: { accountId: string }; TransactionDetail: { transactionId: string }; ReviewQueue: { focusId?: string }; Settings: undefined; HomeEdit: undefined; Bills: { focusRuleId?: string } | undefined; BillDetail: { ruleId: string }; Goals: undefined; GoalDetail: { goalId: string } };
+type RootParams = { Tabs: undefined; BudgetDetail: { budgetId: string; periodStart?: string }; Accounts: undefined; AccountDetail: { accountId: string }; TransactionDetail: { transactionId: string }; ReviewQueue: { focusId?: string }; Settings: undefined; HomeEdit: undefined; Bills: { focusRuleId?: string } | undefined; BillDetail: { ruleId: string }; Goals: undefined; GoalDetail: { goalId: string }; Budgets: undefined };
 const RootStack = createNativeStackNavigator<RootParams>();
 const Tabs = createBottomTabNavigator();
 const TabStack = createNativeStackNavigator();
@@ -75,18 +75,22 @@ function HeaderOnly({ title, tab }: { title: string; tab: TabRoute }) {
   );
 }
 
-/** Plan shows the budget list (SCR-14) until the Plan hub arrives in Epic 6. */
+/** Plan opens on the hub (SCR-13): Before payday, then Budgets, Bills & recurring and Goals. SCR-14, SCR-16 and SCR-17 are pushed from it. */
 function PlanTab() {
   const nav = useNavigation<Nav>();
   const openActivity = useOpenActivityFilter();
   return (
     <TabFrame tab="Plan">
       <TabTopBar title={copy.nav.plan} />
-      <ScrollView contentContainerStyle={styles.planScroll} keyboardShouldPersistTaps="handled">
-        <BudgetsScreen onOpen={(budgetId) => nav.navigate('BudgetDetail', { budgetId })} onOpenActivity={openActivity} />
-        <PlanLinkRow label={copy.bills.planRow} testID="plan-open-bills" onPress={() => nav.navigate('Bills')} />
-        <PlanLinkRow label={copy.goals.planRow} testID="plan-open-goals" onPress={() => nav.navigate('Goals')} />
-      </ScrollView>
+      <PlanHubScreen
+        onOpenBills={() => nav.navigate('Bills')}
+        onOpenBill={(ruleId) => nav.navigate('BillDetail', { ruleId })}
+        onOpenGoals={() => nav.navigate('Goals')}
+        onOpenGoal={(goalId) => nav.navigate('GoalDetail', { goalId })}
+        onOpenBudgets={() => nav.navigate('Budgets')}
+        onOpenBudget={(budgetId) => nav.navigate('BudgetDetail', { budgetId })}
+        onOpenActivity={openActivity}
+      />
     </TabFrame>
   );
 }
@@ -247,6 +251,20 @@ function BillDetailRoute() {
   );
 }
 
+/** SCR-14 Budgets, pushed from the Plan hub (`See all budgets`); Back returns to the hub. */
+function BudgetsRoute() {
+  const nav = useNavigation<{ goBack: () => void; navigate: (s: 'BudgetDetail', p: { budgetId: string }) => void }>();
+  const openActivity = useOpenActivityFilter();
+  return (
+    <ScreenFrame>
+      <TopBar title={copy.budgets.title} onBack={() => nav.goBack()} backTestID="budgets-back" />
+      <ScrollView contentContainerStyle={styles.planScroll} keyboardShouldPersistTaps="handled">
+        <BudgetsScreen onOpen={(budgetId) => nav.navigate('BudgetDetail', { budgetId })} onOpenActivity={openActivity} />
+      </ScrollView>
+    </ScreenFrame>
+  );
+}
+
 function GoalsRoute() {
   const nav = useNavigation<{ goBack: () => void; navigate: (s: 'GoalDetail', p: { goalId: string }) => void }>();
   return (
@@ -324,6 +342,7 @@ export function RootNavigator() {
             <RootStack.Screen name="BudgetDetail" component={BudgetDetailRoute} />
             <RootStack.Screen name="Bills" component={BillsRoute} />
             <RootStack.Screen name="BillDetail" component={BillDetailRoute} />
+            <RootStack.Screen name="Budgets" component={BudgetsRoute} />
             <RootStack.Screen name="Goals" component={GoalsRoute} />
             <RootStack.Screen name="GoalDetail" component={GoalDetailRoute} />
             <RootStack.Screen name="TransactionDetail" component={TransactionDetailRoute} />

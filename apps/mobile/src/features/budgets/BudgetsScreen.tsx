@@ -30,7 +30,7 @@ const GROUPS: readonly { group: BudgetGroup; title: string }[] = [
  * SCR-14 Budgets, shown on the Plan tab until the Plan hub (Epic 6). Budgets are grouped Overall, 50/30/20 and Categories
  * and never added together. Each row is a limit bar counted from the entries; tap a row to edit it.
  */
-export function BudgetsScreen({ api = realBudgetsApi, onUseTemplate, onOpen, onOpenActivity }: { api?: BudgetsApi; /** The one-tap 50/30/20 split (Story 4.10) hooks in here. */ onUseTemplate?: () => void; /** Opens SCR-15 for a budget; without it a row opens the editor. */   onOpen?: (budgetId: string) => void;
+export function BudgetsScreen({ api = realBudgetsApi, onUseTemplate, onOpen, onOpenActivity, compact = false, onSeeAll }: { api?: BudgetsApi; /** The Plan hub's Budgets section (Story 6.8): the setup and income cards, the 50/30/20 bars and up to three other bars by percent used. */ compact?: boolean; onSeeAll?: () => void; /** The one-tap 50/30/20 split (Story 4.10) hooks in here. */ onUseTemplate?: () => void; /** Opens SCR-15 for a budget; without it a row opens the editor. */   onOpen?: (budgetId: string) => void;
   /** Opens Activity filtered to a period's entries (`Not classified · Sort it`). */
   onOpenActivity?: (query: ActivityQuery) => void;
 }) {
@@ -173,6 +173,21 @@ export function BudgetsScreen({ api = realBudgetsApi, onUseTemplate, onOpen, onO
   if (q.isError) return <Text style={[textStyle('body'), { color: theme.color('semantic-warning') }]}>{copy.budgets.loadError}</Text>;
   if (!data) return null;
   const rows = data.list.rows;
+
+  if (compact) {
+    const template = rows.filter((r) => r.group === '50_30_20');
+    const others = rows.filter((r) => r.group !== '50_30_20').sort((a, b) => b.status.percentUsed - a.status.percentUsed).slice(0, 3);
+    return (
+      <View testID="budgets-compact" style={styles.list}>
+        <SetupCard data={data} onSetUp={() => openTemplate(data, data.template.onboardingIncomeMinor)} onDismiss={() => void dismissCard()} />
+        <IncomeCard data={data} onAnswer={(update) => void answerIncome(update, data)} />
+        {[...template, ...others].map((r) => (
+          <BudgetRow key={r.id} row={r} data={data} onPress={() => (onOpen ? onOpen(r.id) : void edit(r.id, data))} />
+        ))}
+        {rows.length > 0 && onSeeAll ? <Button label={copy.plan.seeAllBudgets} variant="text" testID="budgets-see-all" onPress={onSeeAll} /> : null}
+      </View>
+    );
+  }
 
   if (rows.length === 0) {
     return (

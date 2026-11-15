@@ -24,9 +24,9 @@ export interface EventSpec {
 }
 
 export const EVENT_CATALOGUE = {
-  TransactionsChanged: { areas: ['ledger', 'budgets', 'insights', 'home', 'widget'] },
-  AccountsChanged: { areas: ['ledger', 'insights', 'home', 'widget'] },
-  ProfileChanged: { areas: ['ledger', 'budgets', 'insights', 'home', 'periods', 'notifications', 'widget'] },
+  TransactionsChanged: { areas: ['ledger', 'budgets', 'insights', 'home', 'widget', 'plan'] },
+  AccountsChanged: { areas: ['ledger', 'insights', 'home', 'widget', 'plan'] },
+  ProfileChanged: { areas: ['ledger', 'budgets', 'insights', 'home', 'periods', 'notifications', 'widget', 'plan'] },
   CapturesSubmitted: { areas: ['captures', 'ledger', 'home', 'widget'] },
   CapturesRejected: { areas: ['captures', 'ledger', 'home', 'widget'] },
   CategoryAssigned: { areas: ['learning', 'insights', 'budgets'] },

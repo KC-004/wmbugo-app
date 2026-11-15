@@ -233,8 +233,8 @@ describe('event catalogue', () => {
     for (const n of names) expect(n).toMatch(/(Changed|Submitted|AutoApproved|Rejected|Linked|Unlinked|Assigned|Crossed|Restored)$/);
   });
 
-  it('maps TransactionsChanged to ledger, budgets, insights, home and widget only', () => {
-    expect([...areasFor('TransactionsChanged')].sort()).toEqual(['budgets', 'home', 'insights', 'ledger', 'widget']);
+  it('maps TransactionsChanged to ledger, budgets, insights, home, widget and plan only', () => {
+    expect([...areasFor('TransactionsChanged')].sort()).toEqual(['budgets', 'home', 'insights', 'ledger', 'plan', 'widget']);
   });
 
   it('recognises only catalogue names', () => {
