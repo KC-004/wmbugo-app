@@ -221,6 +221,23 @@ export function addDays(date: string, by: number): string {
   return fmt({ y: t.getUTCFullYear(), m: t.getUTCMonth() + 1, d: t.getUTCDate() });
 }
 
+/**
+ * A local date `months` calendar months after (or before) another, keeping its day of the month: a month too short for the
+ * day falls on its last day (31 Jan + 1 month is 28 Feb, 29 Feb 2028 + 12 months is 28 Feb 2029). Used for bill due dates (Story 6.1).
+ */
+export function addMonthsClamped(date: string, months: number): string {
+  const { y, m, d } = parse(date);
+  const s = shiftMonth(y, m, months);
+  return fmt({ y: s.y, m: s.m, d: Math.min(d, daysIn(s.y, s.m)) });
+}
+
+/** Whole calendar months from the month of `from` to the month of `to` (day of month ignored). */
+export function monthsBetween(from: string, to: string): number {
+  const a = parse(from);
+  const b = parse(to);
+  return (b.y - a.y) * 12 + (b.m - a.m);
+}
+
 /** Whole days from `from` to `to` (negative when `to` is earlier). */
 export function daysBetween(from: string, to: string): number {
   const a = parse(from);

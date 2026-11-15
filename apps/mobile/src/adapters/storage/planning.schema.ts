@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { check, index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 /**
  * The `planning` module's tables (Story 4.5). Budgets are lasting rules measured over a period; a new period starts at
@@ -92,4 +92,65 @@ export const budget_alert_fired = sqliteTable(
     fired_at: integer('fired_at').notNull(),
   },
   (t) => [primaryKey({ columns: [t.budget_id, t.period_start, t.threshold_pct] }), check('budget_alert_threshold_check', sql`${t.threshold_pct} > 0`)],
+);
+
+/**
+ * A bill or subscription the user lists (Story 6.1, REC-001). It is a plan, never a ledger entry: it feeds only Plan's
+ * timeline and Free to use. `anchor_date` is the first due date and every later date keeps its day of the month.
+ */
+export const recurring_rule = sqliteTable(
+  'recurring_rule',
+  {
+    id: text('id').primaryKey(),
+    title: text('title').notNull(),
+    expected_amount_minor: integer('expected_amount_minor').notNull(),
+    cadence: text('cadence').notNull(),
+    custom_every: integer('custom_every'),
+    custom_unit: text('custom_unit'),
+    anchor_date: text('anchor_date').notNull(),
+    /** Opaque refs into the ledger module. */
+    account_id: text('account_id'),
+    category_id: text('category_id'),
+    kind: text('kind').notNull().default('other'),
+    paid_to: text('paid_to'),
+    ends_on: text('ends_on'),
+    paused_at: integer('paused_at'),
+    /** The local date the rule was paused on: no due date from it until it resumes. */
+    paused_on: text('paused_on'),
+    /** Set on resume: occurrences before this date are never created (missed while paused). */
+    resumed_on: text('resumed_on'),
+    ended_at: integer('ended_at'),
+    /** The local date the rule was ended on: no due date after it. */
+    ended_on: text('ended_on'),
+    removed_at: integer('removed_at'),
+    created_at: integer('created_at').notNull(),
+  },
+  (t) => [
+    check('recurring_rule_cadence_check', sql`${t.cadence} IN ('weekly','monthly','quarterly','annual','custom')`),
+    check('recurring_rule_kind_check', sql`${t.kind} IN ('subscription','rent','emi','utility','other')`),
+    check('recurring_rule_amount_check', sql`${t.expected_amount_minor} > 0`),
+    check('recurring_rule_custom_check', sql`(${t.cadence} <> 'custom' AND ${t.custom_every} IS NULL AND ${t.custom_unit} IS NULL) OR (${t.cadence} = 'custom' AND ${t.custom_every} BETWEEN 1 AND 99 AND ${t.custom_unit} IN ('days','weeks','months'))`),
+  ],
+);
+
+/**
+ * That one occurrence of a bill is paid, by a linked entry or marked by the user. The two unique keys make "paid once" a
+ * database fact: an occurrence has one payment row, and an entry pays one occurrence.
+ */
+export const recurring_payment = sqliteTable(
+  'recurring_payment',
+  {
+    rule_id: text('rule_id')
+      .notNull()
+      .references(() => recurring_rule.id),
+    due_date: text('due_date').notNull(),
+    payment_kind: text('payment_kind').notNull(),
+    transaction_id: text('transaction_id'),
+    recorded_at: integer('recorded_at').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.rule_id, t.due_date] }),
+    uniqueIndex('recurring_payment_transaction_idx').on(t.transaction_id).where(sql`${t.transaction_id} IS NOT NULL`),
+    check('recurring_payment_kind_check', sql`${t.payment_kind} IN ('linked','marked')`),
+  ],
 );

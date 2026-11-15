@@ -148,6 +148,13 @@
       "when": 1794510765775,
       "tag": "0020_budget_template_income",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1794766709521,
+      "tag": "0021_recurring_tables",
+      "breakpoints": true
     }
   ]
 }

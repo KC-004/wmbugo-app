@@ -8,6 +8,7 @@ export type QueryArea =
   | 'ledger'
   | 'budgets'
   | 'plan'
+  | 'bills'
   | 'insights'
   | 'home'
   | 'widget'
@@ -31,6 +32,7 @@ export const EVENT_CATALOGUE = {
   CategoriesChanged: { areas: ['ledger', 'budgets', 'insights', 'home'] },
   BudgetsChanged: { areas: ['budgets', 'home', 'plan'] },
   BudgetThresholdCrossed: { areas: ['notifications'] },
+  RecurringChanged: { areas: ['bills', 'plan', 'home'] },
 } as const satisfies Record<string, EventSpec>;
 
 export type EventName = keyof typeof EVENT_CATALOGUE;
@@ -56,6 +58,8 @@ export interface EventPayloads {
   /** Budget ids only: the budget list, Home and Plan refresh. */
   BudgetsChanged: { readonly budgetIds: readonly string[] };
   /** The highest alert level a budget crossed in a period (Story 4.9): ids and the percentage only, never an amount. */
+  /** Bill rule ids only (Story 6.1): the bills list, Plan and Home refresh; never an amount or a title. */
+  RecurringChanged: { readonly ruleIds: readonly string[] };
   BudgetThresholdCrossed: { readonly budgetId: string; readonly periodStart: string; readonly thresholdPct: number };
 }
 
