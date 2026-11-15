@@ -1,6 +1,6 @@
 import { toLocalDate } from '../shared/clock';
 import { SAVINGS_MOVED_IN_SQL, savedDisplay } from '../ledger/savings';
-import { budgetPeriodFor } from '../profile/period';
+import { budgetPeriodFor, type Period } from '../profile/period';
 import { budgetFigures, budgetScopeClause, type BudgetDef, type Querier } from './budgets';
 import { BUDGETS_SQL, mapBudgets, mapTargetVersions, periodTarget, readPeriodProfile, TARGET_VERSIONS_SQL } from './budgetStore';
 import { TEMPLATE_503020 } from './budgetTemplate';
@@ -68,8 +68,8 @@ export async function categoryIdsUnder(q: Querier, topIds: readonly string[]): P
 }
 
 export type LeftInBudget =
-  | { readonly kind: 'overall'; readonly targetMinor: number; readonly usedMinor: number; readonly leftMinor: number; readonly refundSurplusMinor: number }
-  | { readonly kind: 'types'; readonly targetMinor: number; readonly usedMinor: number; readonly leftMinor: number; readonly notClassifiedMinor: number }
+  | { readonly kind: 'overall'; readonly period: Period; readonly targetMinor: number; readonly usedMinor: number; readonly leftMinor: number; readonly refundSurplusMinor: number }
+  | { readonly kind: 'types'; readonly period: Period; readonly targetMinor: number; readonly usedMinor: number; readonly leftMinor: number; readonly notClassifiedMinor: number }
   | { readonly kind: 'none' };
 
 /**
@@ -92,7 +92,7 @@ export async function leftInBudget(q: Querier, nowMs: number): Promise<LeftInBud
   if (overall && op) {
     const f = await budgetFigures(q, overall, op);
     const target = await targetOf(overall, op);
-    return { kind: 'overall', targetMinor: target, usedMinor: f.usedMinor, leftMinor: target - f.usedMinor, refundSurplusMinor: f.refundSurplusMinor };
+    return { kind: 'overall', period: op, targetMinor: target, usedMinor: f.usedMinor, leftMinor: target - f.usedMinor, refundSurplusMinor: f.refundSurplusMinor };
   }
   const needs = budgets.find((b) => b.template === TEMPLATE_503020 && b.scope === 'budget_type' && b.budgetType === 'need');
   const wants = budgets.find((b) => b.template === TEMPLATE_503020 && b.scope === 'budget_type' && b.budgetType === 'want');
@@ -101,7 +101,7 @@ export async function leftInBudget(q: Querier, nowMs: number): Promise<LeftInBud
     const target = (await targetOf(needs, np)) + (await targetOf(wants, np));
     const t = await needsWantsSavings(q, np);
     const used = t.needsMinor + t.wantsMinor + t.notClassifiedMinor;
-    return { kind: 'types', targetMinor: target, usedMinor: used, leftMinor: target - used, notClassifiedMinor: t.notClassifiedMinor };
+    return { kind: 'types', period: np, targetMinor: target, usedMinor: used, leftMinor: target - used, notClassifiedMinor: t.notClassifiedMinor };
   }
   return { kind: 'none' };
 }

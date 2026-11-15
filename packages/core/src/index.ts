@@ -15,3 +15,4 @@ export * from './profile';
 export * from './ledger';
 export * from './capture';
 export * from './planning';
+export * from './insights';

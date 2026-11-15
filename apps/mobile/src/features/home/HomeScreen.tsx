@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { greetingFor, notSetNote, shortDate } from '@wmbugo/core';
@@ -15,8 +15,10 @@ import { Button } from '../../shared/ui/Button';
 import { ScreenHeader } from '../shell/ScreenHeader';
 import { realSettingsApi, TIMEZONE_QUERY_KEY, type SettingsApi } from '../settings/settingsApi';
 import { HOME_QUERY_KEY, realHomeApi, type HomeApi, type HomeData } from './homeApi';
+import { useHomeRefresh, useSlowFlag } from './useHomeRefresh';
 
 const TIP_ID = 'tip.in-accounts';
+const systemNow = () => Date.now();
 
 /**
  * Home: greeting and today's date, "Spent this period" from the ledger, and the accounts line ("In accounts"
@@ -43,6 +45,11 @@ export function HomeScreen({
   const tz = useQuery({ queryKey: TIMEZONE_QUERY_KEY, queryFn: () => settingsApi.timezoneCheck() });
   const qc = useQueryClient();
   const stack = fontScale >= 1.3;
+
+  // A recompute that takes longer than 300 ms keeps the old values and says so; a quick one never flashes (Story 5.1).
+  const updating = useSlowFlag(home.isFetching && !home.isLoading);
+  const refresh = useCallback(() => void qc.invalidateQueries({ queryKey: ['home'] }), [qc]);
+  useHomeRefresh({ today: d?.today, timezoneId: d?.timezoneId, nowMs: api.nowMs ?? systemNow, refresh });
 
   const [tip, setTip] = useState<string | null>(null);
   const sheetOpen = useRef(false);
@@ -81,14 +88,22 @@ export function HomeScreen({
       <Reveal loading={home.isLoading} skeleton={skeleton}>
         {d ? (
           <View style={styles.gap}>
+            {/* A recompute failed but the last values are kept: say so, with Retry, instead of leaving them looking current. */}
+            {home.isError && !home.isFetching ? (
+              <View testID="stale-error">
+                <ErrorBlock cause={copy.home.cardError} onRetry={() => void home.refetch()} />
+              </View>
+            ) : null}
             <View
               testID="spent-card"
               accessible
-              accessibilityLabel={`${copy.home.spentThisPeriod}, ${amountLabel({ amountMinor: d.spentMinor, currency: d.currency, locale: d.locale, inline: true })}, ${d.scope}`}
+              accessibilityLabel={`${copy.home.spentThisPeriod}, ${amountLabel({ amountMinor: d.spentMinor, currency: d.currency, locale: d.locale, inline: true })}, ${updating ? copy.home.updating : d.scope}`}
               style={card}>
               <Text style={[textStyle('label'), muted]}>{copy.home.spentThisPeriod}</Text>
               <Amount amountMinor={d.spentMinor} currency={d.currency} direction="expense" role="display-amount" locale={d.locale} />
-              <Text style={[textStyle('caption'), muted]}>{d.scope}</Text>
+              <Text testID="spent-scope" style={[textStyle('caption'), muted]}>
+                {updating ? copy.home.updating : d.scope}
+              </Text>
             </View>
 
             <View testID="accounts-line" style={[card, stack ? styles.column : styles.row]}>
@@ -132,23 +147,38 @@ export function HomeScreen({
                   <Button label={copy.home.addAccount} variant="secondary" onPress={onAddAccount} testID="home-add-account" />
                 </View>
               )}
+              {updating && d.accounts.hasAccounts ? (
+                <Text testID="accounts-updating" style={[textStyle('caption'), muted]}>
+                  {copy.home.updating}
+                </Text>
+              ) : null}
             </View>
 
-            {tz.data ? (
-              <View testID="timezone-prompt" accessibilityLiveRegion="polite" style={card}>
-                <Text style={[textStyle('body'), ink]}>{copy.settings.tzPrompt}</Text>
-                <View style={styles.row}>
-                  <Button label={copy.settings.tzYes} testID="tz-yes" onPress={() => void settingsApi.answerTimezone(true, tz.data!.deviceTz).then(() => qc.invalidateQueries({ queryKey: TIMEZONE_QUERY_KEY }))} />
-                  <Button label={copy.settings.tzNo} variant="text" testID="tz-no" onPress={() => void settingsApi.answerTimezone(false, tz.data!.deviceTz).then(() => qc.invalidateQueries({ queryKey: TIMEZONE_QUERY_KEY }))} />
-                </View>
-              </View>
-            ) : null}
             {tip ? <Tooltip text={copy.home.tip} onAcknowledge={() => void tips.current?.acknowledge().catch(() => undefined)} /> : null}
           </View>
         ) : home.isError ? (
-          <ErrorBlock cause={copy.home.loadError} onRetry={() => void home.refetch()} alternative={{ label: copy.nav.accounts, onPress: onAccounts }} />
+          // One card's data failed: that card says so with Retry; the header and the rest of Home stay usable and nothing reads as zero.
+          <View style={styles.gap}>
+            <View testID="spent-card-error">
+              <ErrorBlock cause={copy.home.cardError} onRetry={() => void home.refetch()} />
+            </View>
+            <View testID="accounts-line-error">
+              <ErrorBlock cause={copy.home.cardError} onRetry={() => void home.refetch()} />
+            </View>
+          </View>
         ) : null}
       </Reveal>
+
+      {/* Its own query: a failing Home load never hides it. */}
+      {tz.data ? (
+        <View testID="timezone-prompt" accessibilityLiveRegion="polite" style={card}>
+          <Text style={[textStyle('body'), ink]}>{copy.settings.tzPrompt}</Text>
+          <View style={styles.row}>
+            <Button label={copy.settings.tzYes} testID="tz-yes" onPress={() => void settingsApi.answerTimezone(true, tz.data!.deviceTz).then(() => qc.invalidateQueries({ queryKey: TIMEZONE_QUERY_KEY }))} />
+            <Button label={copy.settings.tzNo} variant="text" testID="tz-no" onPress={() => void settingsApi.answerTimezone(false, tz.data!.deviceTz).then(() => qc.invalidateQueries({ queryKey: TIMEZONE_QUERY_KEY }))} />
+          </View>
+        </View>
+      ) : null}
     </ScrollView>
   );
 }

@@ -16,3 +16,12 @@
 - **`reopenBudgets` requires every category of an ended budget to be restored at once** (`planning/budgetStore.ts`). A two-category budget that ended after both were archived stays ended when only one comes back. Marked low; rare.
 - **Migration 0018 stamps `category_set_by = 'user'` on every entry with `needs_category = 0`, including transfers and card payments that never had a category.** It cannot be edited now (applied on the dev phone, and the checksum guard forbids it); harmless, because `ApplySuggestion` only acts on single-category expenses and incomes.
 - **Missing CHECK constraints** on `category_guessed`, `category_set_by`, `budget_period.target_minor` and scope-versus-field consistency (`budget`). Adding them needs a table rebuild migration. Marked low.
+
+## Deferred from: build of Story 5.1 (2026-11-15)
+
+- source_spec: `spec-5-1-home-read-model-refresh-and-stale-indication.md`
+  summary: Assert `refundSurplusMinor`, `period.shortened` and `daysLeft` for a budget on a non-default period in `homeSummary` tests, and test `realHomeApi.load` mapping.
+  evidence: Verification-gap review of 5.1: these fields are not rendered until Story 5.2, whose hero is the first consumer; the mapping is thin and was only checked by hand.
+- source_spec: `spec-5-1-home-read-model-refresh-and-stale-indication.md`
+  summary: Split Home into independent per-card queries so one failing card does not blank the others.
+  evidence: 5.1 keeps one combined `home.summary` query; the cards in 5.4 and 5.5 need their own queries to meet the per-card error criterion.

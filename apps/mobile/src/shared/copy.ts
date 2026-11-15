@@ -84,7 +84,16 @@ export const copy = {
     setUpAccount: 'Set up an account to calculate your balance',
     addAccount: 'Add an account',
     tip: "This is money in accounts you've added",
-    loadError: 'Could not load Home.',
+    cardError: "Couldn't load this card",
+    updating: 'Updating…',
+    hero: {
+      leftInBudget: 'Left in budget',
+      overBudget: 'Over budget',
+      daysLeft: '{n} days left',
+      dayLeft: '1 day left',
+      daysToPayday: '{n} days to payday',
+      dayToPayday: '1 day to payday',
+    },
   },
   activity: {
     empty: 'Nothing here yet. Your first expense will show up in this list.',

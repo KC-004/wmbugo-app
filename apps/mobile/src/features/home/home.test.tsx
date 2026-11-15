@@ -1,11 +1,11 @@
-import { AccessibilityInfo, Text, useWindowDimensions } from 'react-native';
+import { AccessibilityInfo, AppState, Text, useWindowDimensions } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { groupByDay, type ActivityRow } from '@wmbugo/core';
 import { SheetHost } from '../../shared/feedback/SheetHost';
 import { ToastHost } from '../../shared/feedback/ToastHost';
 import { MemorySeenStore } from '../../shared/feedback/tooltipController';
-import { createQueryClient } from '../../shared/queryClient';
+import { createQueryClient, invalidateForEvent } from '../../shared/queryClient';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
 import { ActivityScreen } from '../activity/ActivityScreen';
 import type { ActivityApi, ActivityData } from '../activity/activityApi';
@@ -153,6 +153,111 @@ describe('Home', () => {
     await act(async () => qc.invalidateQueries({ queryKey: ['home'] }));
     await settle();
     expect(api.load).toHaveBeenCalledTimes(2);
+  });
+
+  describe('refresh and stale indication (Story 5.1)', () => {
+    const TRIGGERS = ['TransactionsChanged', 'CapturesSubmitted', 'CapturesRejected', 'AccountsChanged', 'CategoriesChanged', 'BudgetsChanged', 'ProfileChanged'] as const;
+    it.each(TRIGGERS)('recomputes without a restart when %s is emitted', async (name) => {
+      const api = homeApi(data());
+      const { qc } = await mountHome(api);
+      expect(api.load).toHaveBeenCalledTimes(1);
+      await act(async () => invalidateForEvent(qc, name));
+      await settle();
+      expect(api.load).toHaveBeenCalledTimes(2);
+    });
+
+    it('recomputes when the app returns to the foreground', async () => {
+      let onChange: ((s: string) => void) | undefined;
+      jest.spyOn(AppState, 'addEventListener').mockImplementation(((_: string, fn: (s: string) => void) => {
+        onChange = fn;
+        return { remove: () => undefined };
+      }) as never);
+      const api = homeApi(data());
+      await mountHome(api);
+      await act(async () => onChange?.('background'));
+      await settle();
+      expect(api.load).toHaveBeenCalledTimes(1);
+      await act(async () => onChange?.('active'));
+      await settle();
+      expect(api.load).toHaveBeenCalledTimes(2);
+    });
+
+    it('recomputes when the date changes while Home is open, and shows the new period', async () => {
+      const ticks: (() => void)[] = [];
+      jest.spyOn(global, 'setInterval').mockImplementation(((fn: () => void) => {
+        ticks.push(fn);
+        return 1 as never;
+      }) as never);
+      let now = Date.UTC(2026, 10, 7, 4, 0, 0); // 7 Nov, 12:00 in Singapore
+      const api = homeApi(data({ today: '2026-11-07', scope: '1–30 Nov' }));
+      api.nowMs = () => now;
+      const m = await mountHome(api);
+      act(() => ticks.forEach((t) => t()));
+      await settle();
+      expect(api.load).toHaveBeenCalledTimes(1); // same day: nothing
+      now = Date.UTC(2026, 10, 7, 16, 30, 0); // 8 Nov 00:30 in Singapore
+      api.load.mockResolvedValue(data({ today: '2026-11-08', scope: '1–30 Nov' }));
+      act(() => ticks.forEach((t) => t()));
+      await settle();
+      expect(api.load).toHaveBeenCalledTimes(2);
+      expect(texts(m.r)).toContain('Sun 8 Nov');
+    });
+
+    it('keeps the old values and says Updating… when a recompute takes longer than 300 ms, then shows the new values', async () => {
+      const api = homeApi(data({ spentMinor: 1250 }));
+      const { r, qc } = await mountHome(api);
+      let release!: (d: HomeData) => void;
+      api.load.mockImplementation(() => new Promise<HomeData>((res) => { release = res; }));
+      await act(async () => { void qc.invalidateQueries({ queryKey: ['home'] }); });
+      await act(async () => new Promise((res) => setTimeout(res, 100)));
+      expect(texts(r)).toContain('This month'); // quick so far: nothing flashes
+      await act(async () => new Promise((res) => setTimeout(res, 350)));
+      expect(texts(r)).toContain('Updating…');
+      expect(texts(r)).toContain('S$12.50'); // the previous value stays
+      // Both indicators: the spent card's scope caption (and its TalkBack label) and the accounts line.
+      const scope = host(r, 'spent-scope')[0]!;
+      expect([scope.props.children].flat().join('')).toBe('Updating…');
+      expect(host(r, 'accounts-updating')).toHaveLength(1);
+      expect(host(r, 'spent-card')[0]!.props.accessibilityLabel).toContain('Updating…');
+      await act(async () => release(data({ spentMinor: 9900 })));
+      await settle();
+      expect(texts(r)).not.toContain('Updating…');
+      expect(texts(r)).toContain('S$99.00');
+    });
+
+    it('a failing load shows the card error with Retry on the cards only, never a zero', async () => {
+      const api = homeApi(data());
+      api.load.mockRejectedValue(new Error('boom'));
+      const { r } = await mountHome(api);
+      expect(host(r, 'error-block')).toHaveLength(2);
+      expect(texts(r).filter((x) => x === "Couldn't load this card")).toHaveLength(2);
+      expect(texts(r)).toContain('Home'); // the header is still there
+      expect(texts(r).join(' ')).not.toMatch(/S\$0\.00/);
+      // Retry really loads again, and the cards come back with data.
+      api.load.mockResolvedValue(data({ spentMinor: 4200 }));
+      const retry = r.root.findAll((n) => n.props.label === 'Try again' && typeof n.props.onPress === 'function')[0]!;
+      await act(async () => retry.props.onPress());
+      await settle();
+      expect(api.load).toHaveBeenCalledTimes(2);
+      expect(host(r, 'error-block')).toHaveLength(0);
+      expect(texts(r)).toContain('S$42.00');
+    });
+
+    it('a recompute that fails keeps the last values and says so with Retry', async () => {
+      const api = homeApi(data({ spentMinor: 1250 }));
+      const { r, qc } = await mountHome(api);
+      api.load.mockRejectedValue(new Error('boom'));
+      await act(async () => qc.invalidateQueries({ queryKey: ['home'] }));
+      await settle();
+      expect(host(r, 'stale-error')).toHaveLength(1);
+      expect(texts(r)).toContain('S$12.50'); // the last values stay
+      api.load.mockResolvedValue(data({ spentMinor: 9900 }));
+      const retry = r.root.findAll((n) => n.props.label === 'Try again' && typeof n.props.onPress === 'function')[0]!;
+      await act(async () => retry.props.onPress());
+      await settle();
+      expect(host(r, 'stale-error')).toHaveLength(0);
+      expect(texts(r)).toContain('S$99.00');
+    });
   });
 });
 

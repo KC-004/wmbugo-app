@@ -1,22 +1,8 @@
-import {
-  ACCOUNT_LIST_SQL,
-  homeAccounts,
-  mapAccountRows,
-  MarkPromptSeen,
-  periodRule,
-  periodFor,
-  periodLabel,
-  SEEN_PROMPT_SQL,
-  SPENT_EXPENSES_SQL,
-  SPENT_REFUNDS_SQL,
-  spentMinor,
-  toLocalDate,
-  type CurrencyCode,
-  type HomeAccounts,
-} from '@wmbugo/core';
+import { getCurrency, homeSummary, MarkPromptSeen, SEEN_PROMPT_SQL, type CurrencyCode, type HomeAccounts, type HomeSummary } from '@wmbugo/core';
 import { getServices, systemClock } from '../../adapters/startApp';
 import { readProfile } from '../../adapters/readProfile';
 import type { SeenStore } from '../../shared/feedback/tooltipController';
+import { presentHero, type HeroView } from './heroPresenter';
 
 export interface HomeData {
   readonly currency: CurrencyCode;
@@ -28,11 +14,16 @@ export interface HomeData {
   readonly scope: string;
   readonly spentMinor: number;
   readonly accounts: HomeAccounts;
+  /** The whole snapshot and the hero view model built from it (the hero card itself arrives in Story 5.2). */
+  readonly summary?: HomeSummary;
+  readonly hero?: HeroView;
 }
 
 export interface HomeApi {
   load(): Promise<HomeData | null>;
   seen: SeenStore;
+  /** The current time in ms; Home compares its local date with the loaded one to notice midnight. */
+  nowMs?: () => number;
 }
 
 export const HOME_QUERY_KEY = ['home', 'summary'] as const;
@@ -58,28 +49,26 @@ export const promptStateSeenStore: SeenStore = {
 
 export const realHomeApi: HomeApi = {
   seen: promptStateSeenStore,
+  nowMs: () => systemClock.nowMs(),
   async load() {
     const db = getServices().db;
     const p = await readProfile(db);
     if (!p) return null;
-    const tz = p.timezoneId;
     const now = systemClock.nowMs();
-    const date = toLocalDate(now, tz);
-    if (!date.ok) return null;
-    const rule = periodRule(p.payday, p.settings.periodMode);
-    const period = periodFor(date.value, rule);
-    const expenses = Number((await db.query(SPENT_EXPENSES_SQL, [period.start, period.end]))[0]![0]);
-    const refunds = Number((await db.query(SPENT_REFUNDS_SQL, [period.start, period.end]))[0]![0]);
-    const accounts = mapAccountRows(await db.query(ACCOUNT_LIST_SQL));
+    const summary = await homeSummary(db, now);
+    if (!summary) return null;
+    const exponent = getCurrency(p.currency);
     return {
       currency: p.currency,
       locale: p.locale,
-      timezoneId: tz,
-      today: date.value,
-      hour: hourIn(now, tz),
-      scope: periodLabel(period, date.value),
-      spentMinor: spentMinor(expenses, refunds),
-      accounts: homeAccounts(accounts),
+      timezoneId: p.timezoneId,
+      today: summary.today,
+      hour: hourIn(now, p.timezoneId),
+      scope: summary.period.label,
+      spentMinor: summary.spentThisPeriodMinor,
+      accounts: summary.accounts,
+      summary,
+      hero: presentHero(summary, exponent.ok ? exponent.value.exponent : 2),
     };
   },
 };

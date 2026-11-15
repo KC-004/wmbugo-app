@@ -189,7 +189,7 @@ describe('leftInBudget (Story 4.11, for Home and Free to use)', () => {
     await spend('cat_food', 1_000_000, ist(11, 5));
     await refund(tv, 900_000);
     ok(await writer.run(SaveBudget, { scope: 'overall', categoryIds: [], accountIds: null, periodRule: 'default', targetMinor: 5_000_000, alertLevels: [75, 90, 100] }, 'user'));
-    expect(await leftInBudget(db, NOW)).toEqual({ kind: 'overall', targetMinor: 5_000_000, usedMinor: 1_000_000, leftMinor: 4_000_000, refundSurplusMinor: 700_000 });
+    expect(await leftInBudget(db, NOW)).toEqual({ kind: 'overall', period: expect.objectContaining({ start: '2026-11-01', end: '2026-11-30' }), targetMinor: 5_000_000, usedMinor: 1_000_000, leftMinor: 4_000_000, refundSurplusMinor: 700_000 });
   });
 
   it('with only 50/30/20: Needs + Wants targets minus Needs + Wants + Not classified spending, naming the Not classified part', async () => {
@@ -198,7 +198,7 @@ describe('leftInBudget (Story 4.11, for Home and Free to use)', () => {
     await spend('cat_groceries', 1_500_000, ist(11, 3));
     await spend('cat_food', 1_000_000, ist(11, 4)); // 25,000 in Needs and Wants
     await spend('cat_uncategorised', 300_000, ist(11, 5)); // 3,000 not classified
-    expect(await leftInBudget(db, NOW)).toEqual({ kind: 'types', targetMinor: 4_000_000, usedMinor: 2_800_000, leftMinor: 1_200_000, notClassifiedMinor: 300_000 });
+    expect(await leftInBudget(db, NOW)).toEqual({ kind: 'types', period: expect.objectContaining({ start: '2026-11-01', end: '2026-11-30' }), targetMinor: 4_000_000, usedMinor: 2_800_000, leftMinor: 1_200_000, notClassifiedMinor: 300_000 });
   });
 
   it('with an overall budget as well, the overall one wins and the two are never added', async () => {
