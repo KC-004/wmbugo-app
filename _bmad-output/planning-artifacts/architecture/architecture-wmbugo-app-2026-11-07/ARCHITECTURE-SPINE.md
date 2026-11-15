@@ -7,9 +7,9 @@ paradigm: 'hexagonal (ports & adapters) core with a use-case layer, a pipes-and-
 scope: 'wmbugo Phase 1 — Android app (React Native CLI), offline-first personal finance, four market groups'
 status: final
 created: '2026-11-07'
-updated: '2026-11-07'
+updated: '2026-11-15'
 binds: [DEC-01..DEC-33, FIN-*, ACC-*, TXN-*, CAT-*, BDG-*, REC-*, GOAL-*, HOM-*, INS-*, IMP-*, OCR-*, SMS-*, SET-*, BKP-*, SEC-*, CAP-*, LRN-*, UPI-*, NFR-01..NFR-20]
-sources: ['_bmad-output/planning-artifacts/prds/prd-wmbugo-app-2026-11-01/prd.md (v1.3.5)', '_bmad-output/planning-artifacts/prds/prd-wmbugo-app-2026-11-01/addendum.md']
+sources: ['_bmad-output/planning-artifacts/prds/prd-wmbugo-app-2026-11-01/prd.md (v1.3.6)', '_bmad-output/planning-artifacts/prds/prd-wmbugo-app-2026-11-01/addendum.md']
 companions: []
 ---
 
@@ -77,10 +77,10 @@ flowchart LR
 
 | Owner | Owns |
 | --- | --- |
-| ledger | account (incl. savings pots), account_identifier, transaction (incl. status), posting, split, category, attachment, receipt_item |
-| capture | source_record, review_candidate, sender, balance_chain, sms_cursor, tombstone (for every source, incl. manual), import_batch, pending_share |
+| ledger | account (incl. savings pots), account_identifier, transaction (incl. status, `needs_category`, `category_guessed`, `category_set_by`), posting, split, category (`kind` expense / income / mixed, `archived`), attachment, receipt_item |
+| capture | source_record, review_candidate, sender, balance_chain, sms_cursor, tombstone (for every source, incl. manual), import_batch, csv_format (planned 9.2), pending_share |
 | learning | learned_mapping, payee, merchant |
-| planning | budget, budget_period, budget_alert_fired, recurring_rule, goal, goal_allocation |
+| planning | budget (incl. `template`, `template_income_minor`, `ended_after`), budget_target_version, budget_period, budget_alert_fired, recurring_rule and recurring_payment (planned 6.1), goal, goal_allocation (planned 6.6) |
 | insights | nothing (read-only) |
 | profile | profile, settings (incl. hide-amounts, tombstone salt), auto_approve_rule, clock_guard, prompt_state, period service |
 | writer (core infrastructure) | audit_event, outbox |
@@ -103,7 +103,7 @@ flowchart LR
 
 - **Binds:** DEC-29, CAP-*, SMS-*, UPI-*, OCR-*, IMP-*, TXN-012/013, FIN-024/026/027/028
 - **Prevents:** per-source duplicate rules; a source bypassing dedup; two stores of pending items.
-- **Rule:** Every new entry — SMS, UPI screenshot, receipt, CSV row and **manual entry** — is submitted through the `SubmitCapture` use case: parse → normalize → match (FIN-027) → classify (eligibility, learning suggestion) → create a ledger transaction with status `needs_review` or `confirmed`. Waiting items are ledger transactions with status `needs_review`, excluded from every total; `capture` owns their source and review details; status changes only through ledger commands called from capture use cases. Auto-approval and auto-linking happen only in `WriteAutoApprovals` (FIN-026). Every stage is idempotent on the source fingerprint. Learning is taught only by outbox events whose actor is `user`.
+- **Rule:** Every new entry — SMS, UPI screenshot, receipt, CSV row and **manual entry** — is submitted through the `SubmitCapture` use case (accepted sequencing exception: Stories 1.13 and 1.15 saved manual entries through `RecordManualEntry` outside it until Story 3.2 retired that path, commit 0563b33): parse → normalize → match (FIN-027) → classify (eligibility, learning suggestion) → create a ledger transaction with status `needs_review` or `confirmed`. Waiting items are ledger transactions with status `needs_review`, excluded from every total; `capture` owns their source and review details; status changes only through ledger commands called from capture use cases. Auto-approval and auto-linking happen only in `WriteAutoApprovals` (FIN-026). Every stage is idempotent on the source fingerprint. Learning is taught only by outbox events whose actor is `user`.
 
 ### AD-7 — One owner of periods
 
@@ -197,17 +197,24 @@ flowchart LR
 | Feature code | Anything used by two or more features moves to `apps/mobile/shared`; never copied |
 | Package manager | pnpm only, `node-linker=hoisted` |
 
-**Event catalogue** (outbox; each event names its actor `user | auto | system`):
+**Event catalogue** (outbox; each event names its actor `user | auto | system`; the code catalogue in `packages/core/src/writer/events.ts` is type-checked and is the authority for built events). Payloads carry ids and field names only, never amounts or text.
 
-| Event | Changed areas (query keys invalidated) |
-| --- | --- |
-| `TransactionsChanged` | ledger, budgets, insights, home, widget |
-| `CapturesSubmitted` / `CapturesAutoApproved` / `CapturesRejected` | captures, ledger, home, widget |
-| `TransferLinked` / `TransferUnlinked` | ledger, captures |
-| `CategoryAssigned` (teaches learning when actor = user) | ledger, learning |
-| `BudgetThresholdCrossed` (emitted by planning's handler of `TransactionsChanged`) | budgets, notifications |
-| `ProfileChanged` (payday, timezone, currency, settings) | everything period-based, notifications, widget |
-| `BackupRestored` | all |
+| Event | Changed areas (query keys invalidated) | Status |
+| --- | --- | --- |
+| `TransactionsChanged` | ledger, budgets, insights, home, widget | built |
+| `AccountsChanged` | ledger, insights, home, widget | built |
+| `CapturesSubmitted` / `CapturesRejected` | captures, ledger, home, widget | built |
+| `CategoryAssigned` (teaches learning when actor = user; carries `previousCategoryId` and `wasGuessed`) | learning, insights, budgets | built |
+| `CategoriesChanged` | ledger, budgets, insights, home | built |
+| `BudgetsChanged` | budgets, home, plan (adds `widget` in Story 11.15) | built |
+| `BudgetThresholdCrossed` (emitted by planning's handler of `TransactionsChanged`) | notifications | built |
+| `ProfileChanged` (payday, timezone, currency, settings) | ledger, budgets, insights, home, periods, notifications, widget | built |
+| `CapturesAutoApproved` | captures, ledger, home, widget | planned (Epic 11) |
+| `TransferLinked` / `TransferUnlinked` | ledger, captures | planned |
+| `RecurringChanged` | bills, plan, home | planned (Story 6.1) |
+| `GoalsChanged` | plan, home [ASSUMPTION: Story 6.6 does not name the areas] | planned (Story 6.6) |
+| `ReceiptItemCategorised` (actor `user`; teaches item learning) | learning [ASSUMPTION: Story 10.5 does not name the areas] | planned (Story 10.5) |
+| `BackupRestored` | all | planned (Story 8.8) |
 
 ## Stack
 
@@ -229,7 +236,7 @@ flowchart LR
 ```text
 wmbugo-app/
   packages/core/src/
-    ports/            # Storage/UnitOfWork, SmsInbox, OcrEngine, Notifier, Scheduler, Clock, KeyStore, FileStore, WidgetSnapshot, Logger
+    ports/            # Storage/UnitOfWork, SmsInbox, OcrEngine, Notifier, Scheduler, Clock, KeyStore, FileStore, WidgetSnapshot, Logger, CategorySuggester (capture → learning; default returns nothing until Epic 11), Crypto (planned 8.6), CsvTokenizer (planned 9.1)
     usecases/         # SubmitCapture, ApproveCapture, WriteAutoApprovals, ImportCsvBatch, PurgeExpired, RestoreBackup, ...
     writer/           # LedgerWriter, UnitOfWork, invariant checks, audit, outbox, event catalogue
     ledger/  capture/  learning/  planning/  insights/  profile/  backup/
@@ -287,7 +294,7 @@ flowchart TB
 - Metro/Babel `.sql` migration loading and drizzle-kit settings with op-sqlite in the pnpm workspace (AD-8).
 - Live SMS → notification latency through the background job against NFR-16 (AD-11).
 - Capture dialog open time in React Native vs the ~400 ms threshold; widget library (react-native-android-widget vs Glance) (AD-12).
-- Build-time exclusion of SMS/UPI modules from the `nosms` JS bundle (AD-17).
+- Build-time exclusion of SMS modules from the `nosms` JS bundle (AD-17); UPI-share ships in both flavors.
 - Reference device models (assumed: the developer's phone plus one budget phone on Android 8–10).
 
 ## Deferred

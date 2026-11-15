@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 11-08-2026 09:43
-last_updated: 11-13-2026 08:00
+last_updated: 11-15-2026 12:33
 project: wmbugo-app
 project_key: NOKEY
 tracking_system: file-system
@@ -94,7 +94,7 @@ development_status:
   4-9-budget-threshold-alerts-once-per-threshold-per-period: review
   4-10-one-tap-50-30-20-targets: review
   4-11-needs-wants-and-savings-progress-and-left-in-budget: review
-  epic-4-retrospective: optional
+  epic-4-retrospective: done
 
   epic-5: backlog
   5-1-home-read-model-refresh-and-stale-indication: backlog
@@ -241,7 +241,7 @@ action_items:
       refresh stale date / PRD v1.3.6 source / SMS-UPI open question - bmad-architecture
       Update"
     owner: "KCPK"
-    status: open
+    status: done
   - epic: 8
     action: "AD-10 vs SEC-001: sms_cursor after restore (rebuild vs keep) and the
       30-day resume rule from story 13.9 - decide and record in architecture + PRD
@@ -377,3 +377,45 @@ action_items:
     owner: "product owner"
     status: open
     ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-11-08.md"
+  - id: "epic-4-retro-item-24-deliver-story-4-9-notifications-react-na"
+    epic: 4
+    action: "Deliver story 4.9 notifications: react-native-notify-kit adapter, Budget
+      alerts channel, first-ask sheet, and a separate notified state so a failed post
+      is retried"
+    owner: "dev agent"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-11-14.md"
+  - id: "epic-4-retro-item-25-savecategory-refuses-editing-an-archived"
+    epic: 4
+    action: "SaveCategory refuses editing an archived category"
+    owner: "dev agent"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-11-14.md"
+  - id: "epic-4-retro-item-26-record-the-needs-wants-savings-single-ed"
+    epic: 4
+    action: "Record the Needs/Wants/Savings single-edit restriction as an accepted
+      deviation or add an AC to 4.10/4.11"
+    owner: "KCPK"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-11-14.md"
+  - id: "epic-4-retro-item-27-process-story-template-lists-every-statu"
+    epic: 4
+    action: "Process: story template lists every status/event type added and who must
+      handle it; independent review before money or period stories are done"
+    owner: "dev agent"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-11-14.md"
+  - id: "epic-4-retro-item-28-process-stop-the-app-before-drizzle-kit"
+    epic: 4
+    action: "Process: stop the app before drizzle-kit generate, write migration SQL
+      fully before relaunch, add CI check that no applied migration file changes"
+    owner: "dev agent"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-11-14.md"
+  - id: "epic-4-retro-item-29-phone-check-of-stories-4-7-to-4-11-plus"
+    epic: 4
+    action: "Phone check of stories 4.7 to 4.11 plus TalkBack and large-font pass
+      over Budgets and Categories; then mark Epic 4 stories done"
+    owner: "KCPK"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-11-14.md"
