@@ -12,3 +12,4 @@ export * from './recurringCommands';
 export * from './billsList';
 export * from './billLinks';
 export * from './billReminders';
+export * from './goals';

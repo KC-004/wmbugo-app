@@ -169,3 +169,47 @@ export const recurring_match_dismissed = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.rule_id, t.transaction_id] })],
 );
+
+/**
+ * A savings goal (Story 6.6). It is a plan: naming a goal or setting money aside moves no money and changes no balance.
+ * `account_id` is an opaque ref to the savings account it is meant for. `due_date` is the first day of the month it is by.
+ */
+export const goal = sqliteTable(
+  'goal',
+  {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    target_minor: integer('target_minor').notNull(),
+    due_date: text('due_date'),
+    icon: text('icon').notNull(),
+    color: text('color').notNull(),
+    account_id: text('account_id'),
+    state: text('state').notNull().default('active'),
+    created_at: integer('created_at').notNull(),
+    updated_at: integer('updated_at').notNull(),
+    removed_at: integer('removed_at'),
+  },
+  (t) => [check('goal_state_check', sql`${t.state} IN ('active','paused','completed','archived')`), check('goal_target_check', sql`${t.target_minor} > 0`)],
+);
+
+/** One contribution to a goal: money set aside (nothing moves), taken back, or moved into a savings pot (Story 6.7). Always a positive amount. */
+export const goal_allocation = sqliteTable(
+  'goal_allocation',
+  {
+    id: text('id').primaryKey(),
+    goal_id: text('goal_id')
+      .notNull()
+      .references(() => goal.id),
+    kind: text('kind').notNull(),
+    amount_minor: integer('amount_minor').notNull(),
+    transaction_id: text('transaction_id'),
+    local_date: text('local_date').notNull(),
+    created_at: integer('created_at').notNull(),
+  },
+  (t) => [
+    index('goal_allocation_goal_idx').on(t.goal_id),
+    uniqueIndex('goal_allocation_transaction_idx').on(t.transaction_id).where(sql`${t.transaction_id} IS NOT NULL`),
+    check('goal_allocation_kind_check', sql`${t.kind} IN ('set_aside','taken_back','moved')`),
+    check('goal_allocation_amount_check', sql`${t.amount_minor} > 0`),
+  ],
+);

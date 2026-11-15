@@ -25,6 +25,7 @@ import m0020 from './0020_budget_template_income.sql';
 import m0021 from './0021_recurring_tables.sql';
 import m0022 from './0022_recurring_match_dismissed.sql';
 import m0023 from './0023_recurring_remind_days.sql';
+import m0024 from './0024_goals.sql';
 
   export default {
     journal,
@@ -52,7 +53,8 @@ m0019,
 m0020,
 m0021,
 m0022,
-m0023
+m0023,
+m0024
     }
   }
   

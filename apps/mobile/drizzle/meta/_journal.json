@@ -169,6 +169,13 @@
       "when": 1794768361753,
       "tag": "0023_recurring_remind_days",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1794768785323,
+      "tag": "0024_goals",
+      "breakpoints": true
     }
   ]
 }

@@ -28,6 +28,8 @@ import { BudgetDetailScreen } from '../budgets/BudgetDetailScreen';
 import { BillsScreen } from '../bills/BillsScreen';
 import { BillDetailScreen } from '../bills/BillDetailScreen';
 import { PlanLinkRow } from '../bills/PlanLinkRow';
+import { GoalsScreen } from '../goals/GoalsScreen';
+import { GoalDetailScreen } from '../goals/GoalDetailScreen';
 import { SettingsScreen } from '../settings/SettingsScreen';
 import { AccountDetailScreen } from '../accounts/AccountDetailScreen';
 import { AccountsScreen } from '../accounts/AccountsScreen';
@@ -37,7 +39,7 @@ import { TopBar } from '../../shared/ui/TopBar';
 import { TabBar, type TabRoute } from './TabBar';
 import { markTabFirstFrame } from './navTiming';
 
-type RootParams = { Tabs: undefined; BudgetDetail: { budgetId: string; periodStart?: string }; Accounts: undefined; AccountDetail: { accountId: string }; TransactionDetail: { transactionId: string }; ReviewQueue: { focusId?: string }; Settings: undefined; HomeEdit: undefined; Bills: { focusRuleId?: string } | undefined; BillDetail: { ruleId: string } };
+type RootParams = { Tabs: undefined; BudgetDetail: { budgetId: string; periodStart?: string }; Accounts: undefined; AccountDetail: { accountId: string }; TransactionDetail: { transactionId: string }; ReviewQueue: { focusId?: string }; Settings: undefined; HomeEdit: undefined; Bills: { focusRuleId?: string } | undefined; BillDetail: { ruleId: string }; Goals: undefined; GoalDetail: { goalId: string } };
 const RootStack = createNativeStackNavigator<RootParams>();
 const Tabs = createBottomTabNavigator();
 const TabStack = createNativeStackNavigator();
@@ -83,6 +85,7 @@ function PlanTab() {
       <ScrollView contentContainerStyle={styles.planScroll} keyboardShouldPersistTaps="handled">
         <BudgetsScreen onOpen={(budgetId) => nav.navigate('BudgetDetail', { budgetId })} onOpenActivity={openActivity} />
         <PlanLinkRow label={copy.bills.planRow} testID="plan-open-bills" onPress={() => nav.navigate('Bills')} />
+        <PlanLinkRow label={copy.goals.planRow} testID="plan-open-goals" onPress={() => nav.navigate('Goals')} />
       </ScrollView>
     </TabFrame>
   );
@@ -244,6 +247,25 @@ function BillDetailRoute() {
   );
 }
 
+function GoalsRoute() {
+  const nav = useNavigation<{ goBack: () => void; navigate: (s: 'GoalDetail', p: { goalId: string }) => void }>();
+  return (
+    <ScreenFrame>
+      <GoalsScreen onBack={() => nav.goBack()} onOpenGoal={(goalId) => nav.navigate('GoalDetail', { goalId })} />
+    </ScreenFrame>
+  );
+}
+
+function GoalDetailRoute() {
+  const nav = useNavigation<{ goBack: () => void }>();
+  const route = useRoute<RouteProp<RootParams, 'GoalDetail'>>();
+  return (
+    <ScreenFrame>
+      <GoalDetailScreen goalId={route.params.goalId} onBack={() => nav.goBack()} />
+    </ScreenFrame>
+  );
+}
+
 function BudgetDetailRoute() {
   const openActivity = useOpenActivityFilter();
   const nav = useNavigation<{ goBack: () => void; navigate: (s: 'TransactionDetail', p: { transactionId: string }) => void }>();
@@ -296,6 +318,8 @@ export function RootNavigator() {
             <RootStack.Screen name="BudgetDetail" component={BudgetDetailRoute} />
             <RootStack.Screen name="Bills" component={BillsRoute} />
             <RootStack.Screen name="BillDetail" component={BillDetailRoute} />
+            <RootStack.Screen name="Goals" component={GoalsRoute} />
+            <RootStack.Screen name="GoalDetail" component={GoalDetailRoute} />
             <RootStack.Screen name="TransactionDetail" component={TransactionDetailRoute} />
             <RootStack.Screen name="ReviewQueue" component={ReviewQueueRoute} />
             <RootStack.Screen name="Settings" component={SettingsRoute} />

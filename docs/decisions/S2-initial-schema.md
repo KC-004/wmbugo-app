@@ -34,7 +34,7 @@ One migration per story (forward-only, one transaction, safety copy first, recor
 | later | Epic 2 | `account_identifier` (ledger) — transfer linking and discovery; `auto_approve_rule` and `clock_guard` with the story that first enforces them (profile) |
 | later | Epic 3 | `merchant`, `payee`, `learned_mapping` (learning) as search/fixes first need them; `attachment` (ledger) with the first attachment story |
 | later | Epic 4 | `budget`, `budget_period`, `budget_alert_fired` (planning) |
-| 0021 to 0023 | Epic 6 (6.1, 6.3, 6.5) | `recurring_rule`, `recurring_payment`, `recurring_match_dismissed` (planning); `goal`, `goal_allocation` follow with Story 6.6 |
+| 0021 to 0024 | Epic 6 (6.1, 6.3, 6.5, 6.6) | `recurring_rule`, `recurring_payment`, `recurring_match_dismissed`, `goal`, `goal_allocation` (planning) |
 | later | Epic 9 | `import_batch`, `source_record` (capture) |
 | later | Epic 10 | `receipt_item` (ledger) |
 | later | Epic 11 | `review_candidate`, `learned_mapping` extensions (capture/learning) |
