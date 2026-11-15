@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 11-08-2026 09:43
-last_updated: 11-16-2026 06:00
+last_updated: 11-16-2026 12:00
 project: wmbugo-app
 project_key: NOKEY
 tracking_system: file-system
@@ -103,7 +103,7 @@ development_status:
   5-4-home-cards-things-to-check-income-and-expense-budgets-and-ne: review
   5-5-top-categories-and-7-day-spend-charts-with-view-as-table: review
   5-6-edit-home-reorder-hide-resize-and-reset-cards: review
-  epic-5-retrospective: optional
+  epic-5-retrospective: done
 
   epic-6: backlog
   6-1-bill-rules-and-due-dates-in-core: backlog
@@ -419,3 +419,49 @@ action_items:
     owner: "KCPK"
     status: open
     ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-11-14.md"
+  - id: "epic-5-retro-item-30-phone-check-of-epic-5-hero-hide-amounts"
+    epic: 5
+    action: "Phone check of Epic 5 (hero, hide amounts, cards, charts, Edit Home)
+      plus TalkBack and large font; turn on USB debugging first"
+    owner: "KCPK with dev agent"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-11-16.md"
+  - id: "epic-5-retro-item-31-decide-whether-the-plain-view-barchart-r"
+    epic: 5
+    action: "Decide whether the plain-view BarChart replaces Victory Native XL in
+      story 5.5"
+    owner: "KCPK"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-11-16.md"
+  - id: "epic-5-retro-item-32-reconcile-epic-5-spec-wording-no-migrati"
+    epic: 5
+    action: "Reconcile Epic 5 spec wording: no migrations, table-view persistence,
+      Edit Home always visible"
+    owner: "KCPK"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-11-16.md"
+  - id: "epic-5-retro-item-33-investigate-the-rundailypurge-writer-fai"
+    epic: 5
+    action: "Investigate the RunDailyPurge writer.failed errors in the app log"
+    owner: "dev agent"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-11-16.md"
+  - id: "epic-5-retro-item-34-find-the-slow-jest-screen-tests-so-testt"
+    epic: 5
+    action: "Find the slow Jest screen tests so testTimeout 20000 can come down"
+    owner: "dev agent"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-11-16.md"
+  - id: "epic-5-retro-item-35-split-copy-ts-by-feature-and-extract-per"
+    epic: 5
+    action: "Split copy.ts by feature and extract per-card components from HomeCards.tsx
+      on the next Home change"
+    owner: "dev agent"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-11-16.md"
+  - id: "epic-5-retro-item-36-push-the-branch-chain-and-run-the-first"
+    epic: 5
+    action: "Push the branch chain and run the first GitHub CI pass"
+    owner: "KCPK"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-11-16.md"
