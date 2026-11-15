@@ -74,7 +74,7 @@ const data = (over: DataIn = {}, accounts: Partial<HomeData['summary']['accounts
 const homeApi = (d: HomeData | null, seen = new MemorySeenStore()): HomeApi & { load: jest.Mock } => ({ load: jest.fn(async () => d), seen });
 const noop = () => undefined;
 const mountHome = async (api: HomeApi, onAddAccount = noop) => {
-  const m = mount(<HomeScreen api={api} onAccounts={noop} onProfile={noop} onAddAccount={onAddAccount} onOpenBudget={noop} onOpenPlan={noop} onSetLimit={noop} onSortIt={noop} />);
+  const m = mount(<HomeScreen api={api} onAccounts={noop} onProfile={noop} onAddAccount={onAddAccount} onOpenBudget={noop} onOpenPlan={noop} onSetLimit={noop} onSortIt={noop} onOpenReview={noop} onOpenActivity={noop} />);
   await settle();
   return m;
 };
@@ -91,7 +91,7 @@ describe('Home', () => {
   it('shows skeletons while loading, then the values', async () => {
     let release!: (d: HomeData) => void;
     const api: HomeApi = { load: () => new Promise((res) => { release = res; }), seen: new MemorySeenStore() };
-    const { r } = mount(<HomeScreen api={api} onAccounts={noop} onProfile={noop} onAddAccount={noop} onOpenBudget={noop} onOpenPlan={noop} onSetLimit={noop} onSortIt={noop} />);
+    const { r } = mount(<HomeScreen api={api} onAccounts={noop} onProfile={noop} onAddAccount={noop} onOpenBudget={noop} onOpenPlan={noop} onSetLimit={noop} onSortIt={noop} onOpenReview={noop} onOpenActivity={noop} />);
     await settle();
     expect(host(r, 'home-skeleton')).toHaveLength(1);
     await act(async () => release(data()));

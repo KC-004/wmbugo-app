@@ -49,7 +49,7 @@ const host = (r: ReactTestRenderer, id: string) => r.root.findAll((n) => typeof 
 const press = (r: ReactTestRenderer, id: string) => act(() => r.root.findAll((n) => n.props.testID === id && typeof n.props.onPress === 'function')[0]!.props.onPress());
 
 const settingsFake = (ok = true) => ({ setHideAmounts: jest.fn(async () => ({ ok })), timezoneCheck: async () => null }) as unknown as SettingsApi & { setHideAmounts: jest.Mock };
-const nav = () => ({ onAccounts: jest.fn(), onProfile: jest.fn(), onAddAccount: jest.fn(), onOpenBudget: jest.fn(), onOpenPlan: jest.fn(), onSetLimit: jest.fn(), onSortIt: jest.fn() });
+const nav = () => ({ onAccounts: jest.fn(), onProfile: jest.fn(), onAddAccount: jest.fn(), onOpenBudget: jest.fn(), onOpenPlan: jest.fn(), onSetLimit: jest.fn(), onSortIt: jest.fn(), onOpenReview: jest.fn(), onOpenActivity: jest.fn() });
 
 async function mountHero(d: HomeData, mode: ThemeMode = 'light', settings = settingsFake()) {
   const qc = createQueryClient();
@@ -242,7 +242,7 @@ describe('hero taps and the eye', () => {
   it('tapping the hero opens the overall budget, the Plan tab, or the editor', async () => {
     const a = await mountHero(UNDER);
     press(a.r, 'hero-main');
-    expect(a.n.onOpenBudget).toHaveBeenCalledWith('b1');
+    expect(a.n.onOpenBudget).toHaveBeenCalledWith('b1', '2026-11-01');
     const b = await mountHero(TYPES);
     press(b.r, 'hero-main');
     expect(b.n.onOpenPlan).toHaveBeenCalled();
@@ -395,6 +395,17 @@ describe('homeHeroNav (Story 5.2)', () => {
     n.onSortIt({ categoryIds: ['c1'], fromDate: '2026-11-01', toDate: '2026-11-30' });
     expect(d.openActivity).toHaveBeenCalledWith({ categoryIds: ['c1'], fromDate: '2026-11-01', toDate: '2026-11-30' });
   });
+  it('opens a budget at its period, the review queue, and Activity from a card', () => {
+    const d = deps();
+    const n = homeHeroNav(d);
+    n.onOpenBudget('g', '2026-11-16');
+    expect(d.navigate).toHaveBeenLastCalledWith('BudgetDetail', { budgetId: 'g', periodStart: '2026-11-16' });
+    n.onOpenReview();
+    expect(d.navigate).toHaveBeenLastCalledWith('ReviewQueue', {});
+    n.onOpenActivity({ types: ['income'], fromDate: '2026-11-01', toDate: '2026-11-30' });
+    expect(d.openActivity).toHaveBeenLastCalledWith({ types: ['income'], fromDate: '2026-11-01', toDate: '2026-11-30' });
+  });
+
   it('Set a limit asks for the editor first, then goes to the Plan tab', () => {
     const d = deps();
     homeHeroNav(d).onSetLimit();

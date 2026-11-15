@@ -327,7 +327,7 @@ describe('time zone prompt on Home', () => {
     f.timezoneCheck.mockResolvedValue({ deviceTz: 'Asia/Dubai' });
     const r = mount(
       <SheetHost>
-        <HomeScreen api={homeApi} settingsApi={f.api} onAccounts={jest.fn()} onProfile={jest.fn()} onAddAccount={jest.fn()} onOpenBudget={jest.fn()} onOpenPlan={jest.fn()} onSetLimit={jest.fn()} onSortIt={jest.fn()} />
+        <HomeScreen api={homeApi} settingsApi={f.api} onAccounts={jest.fn()} onProfile={jest.fn()} onAddAccount={jest.fn()} onOpenBudget={jest.fn()} onOpenPlan={jest.fn()} onSetLimit={jest.fn()} onSortIt={jest.fn()} onOpenReview={jest.fn()} onOpenActivity={jest.fn()} />
       </SheetHost>,
     );
     await settle();
@@ -348,7 +348,7 @@ describe('time zone prompt on Home', () => {
         <QueryClientProvider client={qc}>
           <ThemeProvider>
             <SheetHost>
-              <HomeScreen api={homeApi} settingsApi={f.api} onAccounts={jest.fn()} onProfile={jest.fn()} onAddAccount={jest.fn()} onOpenBudget={jest.fn()} onOpenPlan={jest.fn()} onSetLimit={jest.fn()} onSortIt={jest.fn()} />
+              <HomeScreen api={homeApi} settingsApi={f.api} onAccounts={jest.fn()} onProfile={jest.fn()} onAddAccount={jest.fn()} onOpenBudget={jest.fn()} onOpenPlan={jest.fn()} onSetLimit={jest.fn()} onSortIt={jest.fn()} onOpenReview={jest.fn()} onOpenActivity={jest.fn()} />
             </SheetHost>
           </ThemeProvider>
         </QueryClientProvider>,
@@ -366,7 +366,7 @@ describe('time zone prompt on Home', () => {
     const f = fakeApi(data());
     const r = mount(
       <SheetHost>
-        <HomeScreen api={homeApi} settingsApi={f.api} onAccounts={jest.fn()} onProfile={jest.fn()} onAddAccount={jest.fn()} onOpenBudget={jest.fn()} onOpenPlan={jest.fn()} onSetLimit={jest.fn()} onSortIt={jest.fn()} />
+        <HomeScreen api={homeApi} settingsApi={f.api} onAccounts={jest.fn()} onProfile={jest.fn()} onAddAccount={jest.fn()} onOpenBudget={jest.fn()} onOpenPlan={jest.fn()} onSetLimit={jest.fn()} onSortIt={jest.fn()} onOpenReview={jest.fn()} onOpenActivity={jest.fn()} />
       </SheetHost>,
     );
     await settle();

@@ -1,4 +1,4 @@
-import { getCurrency, homeSummary, MarkPromptSeen, SEEN_PROMPT_SQL, type CurrencyCode, type HomeSummary } from '@wmbugo/core';
+import { getCurrency, homeBudgetCards, homeIncomeExpense, homeSummary, MarkPromptSeen, SEEN_PROMPT_SQL, type CurrencyCode, type HomeBudgetCards, type HomeSummary, type IncomeExpense } from '@wmbugo/core';
 import { getServices, systemClock } from '../../adapters/startApp';
 import { readProfile } from '../../adapters/readProfile';
 import type { SeenStore } from '../../shared/feedback/tooltipController';
@@ -19,6 +19,10 @@ export interface HomeData {
 export interface HomeApi {
   load(): Promise<HomeData | null>;
   seen: SeenStore;
+  /** The Income and expense card's figures; each card reads its own query so one failure shows only that card (Story 5.4). */
+  loadIncomeExpense?(): Promise<IncomeExpense | null>;
+  /** The category budgets and the 50/30/20 progress for the Budgets and Needs, Wants and Savings cards. */
+  loadBudgetCards?(): Promise<HomeBudgetCards | null>;
   /** The current time in ms; Home compares its local date with the loaded one to notice midnight. */
   nowMs?: () => number;
 }
@@ -61,6 +65,8 @@ export function homeDataFrom(profile: { currency: CurrencyCode; locale: string; 
 export const realHomeApi: HomeApi = {
   seen: promptStateSeenStore,
   nowMs: () => systemClock.nowMs(),
+  loadIncomeExpense: () => homeIncomeExpense(getServices().db, systemClock.nowMs()),
+  loadBudgetCards: () => homeBudgetCards(getServices().db, systemClock.nowMs()),
   async load() {
     const db = getServices().db;
     const p = await readProfile(db);

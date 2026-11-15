@@ -10,7 +10,9 @@ export interface HomeNavDeps {
 /** The four hero destinations (Story 5.2): the overall budget, the Plan tab, the editor with Overall, and Activity filtered. */
 export function homeHeroNav(d: HomeNavDeps) {
   return {
-    onOpenBudget: (budgetId: string) => d.navigate('BudgetDetail', { budgetId }),
+    onOpenBudget: (budgetId: string, periodStart?: string) => d.navigate('BudgetDetail', { budgetId, ...(periodStart ? { periodStart } : {}) }),
+    onOpenReview: () => d.navigate('ReviewQueue', {}),
+    onOpenActivity: (query: ActivityQuery) => d.openActivity(query),
     onOpenPlan: () => d.navigate('Tabs', { screen: 'Plan' }),
     onSetLimit: () => {
       d.requestBudgetEditor();

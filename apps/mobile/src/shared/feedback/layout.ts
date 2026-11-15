@@ -30,3 +30,9 @@ export function headerSplits(fontScale: number, fitsOneRow = true): boolean {
 /** Tab slots are at least 64dp wide and 56dp tall. */
 export const TAB_SLOT = { minWidth: 64, minHeight: 56 } as const;
 export const ADD_BUTTON_SIZE = 56;
+
+/**
+ * How far the end of a tab's scroll must stay clear of the floating tab bar and the ＋ button above it: the bar's margin, its slot
+ * height and half the ＋ that rises over it, plus a gap and the bottom safe-area inset (HOM-006).
+ */
+export const tabBarClearance = (insetBottom: number): number => 8 + TAB_SLOT.minHeight + ADD_BUTTON_SIZE / 2 + 16 + insetBottom;

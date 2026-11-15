@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { greetingFor, shortDate, type ActivityQuery } from '@wmbugo/core';
 import { copy } from '../../shared/copy';
+import { tabBarClearance } from '../../shared/feedback/layout';
 import { ErrorBlock, Reveal, Skeleton, Tooltip } from '../../shared/feedback/Feedback';
 import { useSheet } from '../../shared/feedback/SheetHost';
 import { TooltipController } from '../../shared/feedback/tooltipController';
@@ -14,6 +16,7 @@ import { ScreenHeader } from '../shell/ScreenHeader';
 import { realSettingsApi, TIMEZONE_QUERY_KEY, type SettingsApi } from '../settings/settingsApi';
 import { useAmountsHidden } from '../../shared/state/amountsHidden';
 import { HeroCard } from './HeroCard';
+import { HomeCards, type HomeCardsNav } from './HomeCards';
 import { useToggleHideAmounts } from './useHideAmounts';
 import { HomeBand } from './HomeBand';
 import { HOME_QUERY_KEY, realHomeApi, type HomeApi } from './homeApi';
@@ -23,11 +26,10 @@ const TIP_ID = 'tip.in-accounts';
 const systemNow = () => Date.now();
 
 /** What a tap on the hero opens: the overall budget, the Plan tab (only 50/30/20 targets), or the editor (no budget). */
-export interface HomeNav {
+export interface HomeNav extends HomeCardsNav {
   onAccounts: () => void;
   onProfile: () => void;
   onAddAccount: () => void;
-  onOpenBudget: (budgetId: string) => void;
   onOpenPlan: () => void;
   onSetLimit: () => void;
   onSortIt: (query: ActivityQuery) => void;
@@ -37,9 +39,10 @@ export interface HomeNav {
  * Home: the greeting, today's date and the period chip, then the "Am I okay?" hero (Story 5.2) on the brand band (light) or
  * the glows (dark). It refreshes by itself: events, returning to the app and a new day all recompute it (Story 5.1).
  */
-export function HomeScreen({ api = realHomeApi, settingsApi = realSettingsApi, onAccounts, onProfile, onAddAccount, onOpenBudget, onOpenPlan, onSetLimit, onSortIt }: HomeNav & { api?: HomeApi; settingsApi?: SettingsApi }) {
+export function HomeScreen({ api = realHomeApi, settingsApi = realSettingsApi, onAccounts, onProfile, onAddAccount, onOpenBudget, onOpenPlan, onSetLimit, onSortIt, onOpenReview, onOpenActivity }: HomeNav & { api?: HomeApi; settingsApi?: SettingsApi }) {
   const theme = useTheme();
   const sheet = useSheet();
+  const insets = useContext(SafeAreaInsetsContext);
   const home = useQuery({ queryKey: HOME_QUERY_KEY, queryFn: () => api.load() });
   const d = home.data ?? null;
   const tz = useQuery({ queryKey: TIMEZONE_QUERY_KEY, queryFn: () => settingsApi.timezoneCheck() });
@@ -80,13 +83,13 @@ export function HomeScreen({ api = realHomeApi, settingsApi = realSettingsApi, o
   const open = () => {
     if (!d) return;
     const s = d.summary;
-    if (s.overallBudgetId) onOpenBudget(s.overallBudgetId);
+    if (s.overallBudgetId) onOpenBudget(s.overallBudgetId, s.period.start);
     else if (s.heroMode === 'nws_only') onOpenPlan();
     else onSetLimit();
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.pad}>
+    <ScrollView testID="home-scroll" contentContainerStyle={[styles.pad, { paddingBottom: 16 + tabBarClearance(insets?.bottom ?? 0) }]}>
       <ScreenHeader title={d ? greetingFor(d.hour) : copy.nav.home} onAccounts={onAccounts} onProfile={onProfile} />
       {d ? (
         <View style={styles.dateRow}>
@@ -123,6 +126,7 @@ export function HomeScreen({ api = realHomeApi, settingsApi = realSettingsApi, o
                 onSortIt={() => d.summary.sortIt && onSortIt({ categoryIds: d.summary.sortIt.categoryIds, fromDate: d.summary.sortIt.fromDate, toDate: d.summary.sortIt.toDate })}
                 onAddAccount={onAddAccount}
               />
+              <HomeCards api={api} toCheckCount={d.summary.toCheckCount} currency={d.currency} locale={d.locale} nav={{ onOpenReview, onOpenBudget, onOpenPlan, onOpenActivity }} />
               {tip ? <Tooltip text={copy.home.tip} onAcknowledge={() => void tips.current?.acknowledge().catch(() => undefined)} /> : null}
             </View>
           ) : home.isError ? (
