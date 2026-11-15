@@ -25,6 +25,9 @@ import { useUiStore } from '../../shared/state/uiStore';
 import { BudgetsScreen } from '../budgets/BudgetsScreen';
 import { appNotifier } from '../../adapters/notifier';
 import { BudgetDetailScreen } from '../budgets/BudgetDetailScreen';
+import { BillsScreen } from '../bills/BillsScreen';
+import { BillDetailScreen } from '../bills/BillDetailScreen';
+import { PlanLinkRow } from '../bills/PlanLinkRow';
 import { SettingsScreen } from '../settings/SettingsScreen';
 import { AccountDetailScreen } from '../accounts/AccountDetailScreen';
 import { AccountsScreen } from '../accounts/AccountsScreen';
@@ -34,7 +37,7 @@ import { TopBar } from '../../shared/ui/TopBar';
 import { TabBar, type TabRoute } from './TabBar';
 import { markTabFirstFrame } from './navTiming';
 
-type RootParams = { Tabs: undefined; BudgetDetail: { budgetId: string; periodStart?: string }; Accounts: undefined; AccountDetail: { accountId: string }; TransactionDetail: { transactionId: string }; ReviewQueue: { focusId?: string }; Settings: undefined; HomeEdit: undefined };
+type RootParams = { Tabs: undefined; BudgetDetail: { budgetId: string; periodStart?: string }; Accounts: undefined; AccountDetail: { accountId: string }; TransactionDetail: { transactionId: string }; ReviewQueue: { focusId?: string }; Settings: undefined; HomeEdit: undefined; Bills: undefined; BillDetail: { ruleId: string } };
 const RootStack = createNativeStackNavigator<RootParams>();
 const Tabs = createBottomTabNavigator();
 const TabStack = createNativeStackNavigator();
@@ -79,6 +82,7 @@ function PlanTab() {
       <TabTopBar title={copy.nav.plan} />
       <ScrollView contentContainerStyle={styles.planScroll} keyboardShouldPersistTaps="handled">
         <BudgetsScreen onOpen={(budgetId) => nav.navigate('BudgetDetail', { budgetId })} onOpenActivity={openActivity} />
+        <PlanLinkRow label={copy.bills.planRow} testID="plan-open-bills" onPress={() => nav.navigate('Bills')} />
       </ScrollView>
     </TabFrame>
   );
@@ -218,6 +222,25 @@ function useOpenActivityFilter() {
   };
 }
 
+function BillsRoute() {
+  const nav = useNavigation<{ goBack: () => void; navigate: (s: 'BillDetail', p: { ruleId: string }) => void }>();
+  return (
+    <ScreenFrame>
+      <BillsScreen onBack={() => nav.goBack()} onOpenBill={(ruleId) => nav.navigate('BillDetail', { ruleId })} />
+    </ScreenFrame>
+  );
+}
+
+function BillDetailRoute() {
+  const nav = useNavigation<{ goBack: () => void }>();
+  const route = useRoute<RouteProp<RootParams, 'BillDetail'>>();
+  return (
+    <ScreenFrame>
+      <BillDetailScreen ruleId={route.params.ruleId} onBack={() => nav.goBack()} />
+    </ScreenFrame>
+  );
+}
+
 function BudgetDetailRoute() {
   const openActivity = useOpenActivityFilter();
   const nav = useNavigation<{ goBack: () => void; navigate: (s: 'TransactionDetail', p: { transactionId: string }) => void }>();
@@ -268,6 +291,8 @@ export function RootNavigator() {
             <RootStack.Screen name="Accounts" component={AccountsRoute} />
             <RootStack.Screen name="AccountDetail" component={AccountDetailRoute} />
             <RootStack.Screen name="BudgetDetail" component={BudgetDetailRoute} />
+            <RootStack.Screen name="Bills" component={BillsRoute} />
+            <RootStack.Screen name="BillDetail" component={BillDetailRoute} />
             <RootStack.Screen name="TransactionDetail" component={TransactionDetailRoute} />
             <RootStack.Screen name="ReviewQueue" component={ReviewQueueRoute} />
             <RootStack.Screen name="Settings" component={SettingsRoute} />
