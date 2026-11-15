@@ -1,4 +1,4 @@
-import type { HomeBudgetCards, HomeCardSize, IncomeExpense, RegisteredCard, Spend7d, TopCategories } from '@wmbugo/core';
+import type { ComingUp, HomeBudgetCards, HomeCardSize, IncomeExpense, RegisteredCard, SavingsGoalCard, Spend7d, TopCategories } from '@wmbugo/core';
 import { copy } from '../../shared/copy';
 
 /**
@@ -6,7 +6,7 @@ import { copy } from '../../shared/copy';
  * and where it drills down to, so a later story adds a card by adding an entry here without changing Home. The order of this
  * list is the default order (PRD 6.3): later stories append, and Edit Home (5.6) reorders and hides on top of it.
  */
-export type CardId = 'to_check' | 'income_expense' | 'budgets' | 'nws' | 'top_categories' | 'spend_7d';
+export type CardId = 'to_check' | 'income_expense' | 'budgets' | 'nws' | 'top_categories' | 'spend_7d' | 'coming_up' | 'savings_goal';
 /** `full` is the default; `compact` shows fewer rows (Story 5.6). Cards without a choice support `full` only. */
 export type CardSize = HomeCardSize;
 export type DrillDown = 'review_queue' | 'activity' | 'budget_detail' | 'plan';
@@ -18,6 +18,8 @@ export interface CardInputs {
   readonly budgets?: HomeBudgetCards | null;
   readonly topCategories?: TopCategories | null;
   readonly spend7d?: Spend7d | null;
+  readonly comingUp?: ComingUp | null;
+  readonly savingsGoal?: SavingsGoalCard | null;
 }
 
 export interface HomeCardDef {
@@ -44,6 +46,8 @@ export const HOME_CARDS: readonly HomeCardDef[] = [
   { id: 'nws', title: copy.home.cards.nws, editTitle: copy.home.cards.nws, sizes: ['full'], editable: true, whenHidden: copy.home.edit.showsWhenFiftyThirtyTwenty, drillDown: 'plan', visible: (i) => i.budgets?.nws != null },
   { id: 'top_categories', title: copy.home.cards.topCategories, editTitle: copy.home.cards.topCategories, sizes: ['full', 'compact'], editable: true, drillDown: 'activity', visible: (i) => i.topCategories !== null },
   { id: 'spend_7d', title: copy.home.cards.spendLastWeek, editTitle: copy.home.cards.spendShort, sizes: ['full'], editable: true, drillDown: 'activity', visible: (i) => i.spend7d !== null },
+  { id: 'coming_up', title: copy.home.cards.comingUp, editTitle: copy.home.cards.comingUp, sizes: ['full'], editable: true, whenHidden: copy.home.edit.showsWhenBill, drillDown: 'plan', visible: (i) => i.comingUp != null },
+  { id: 'savings_goal', title: copy.home.cards.savingsGoal, editTitle: copy.home.cards.savingsGoal, sizes: ['full'], editable: true, whenHidden: copy.home.edit.showsWhenGoal, drillDown: 'plan', visible: (i) => i.savingsGoal != null },
 ];
 
 /** The cards Edit Home lists, in PRD order, as the layout resolver wants them. */

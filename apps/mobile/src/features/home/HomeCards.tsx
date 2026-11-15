@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { CaretRight } from 'phosphor-react-native';
-import { defaultHomeLayout, shortDate, type ActivityQuery, type HomeLayoutEntry, type BudgetListRow, type CurrencyCode, type HomeBudgetCards, type IncomeExpense, type Spend7d, type TopCategories } from '@wmbugo/core';
+import { dayMonthLabel, defaultHomeLayout, shortDate, type ActivityQuery, type HomeLayoutEntry, type BudgetListRow, type CurrencyCode, type ComingUp, type HomeBudgetCards, type IncomeExpense, type SavingsGoalCard, type Spend7d, type TopCategories } from '@wmbugo/core';
 import { amountLabel, controlA11y, spokenAmount } from '../../shared/a11y/labels';
 import { useAmountsHidden } from '../../shared/state/amountsHidden';
 import { copy } from '../../shared/copy';
@@ -20,17 +20,26 @@ import { LimitBar, limitBarLabel, savingsLabel } from '../../shared/ui/LimitBar'
 import { moneyText } from '../../shared/ui/moneyText';
 import { REGISTERED_FOR_LAYOUT, visibleCards, type CardId } from './cardRegistry';
 import type { HomeApi } from './homeApi';
+import { GoalCard } from '../goals/GoalCard';
+import { statusText } from '../bills/billText';
+import { timelineAsRow } from '../plan/PlanHubScreen';
 
 export const HOME_INCOME_KEY = ['home', 'income'] as const;
 export const HOME_BUDGETS_KEY = ['home', 'budgets'] as const;
 export const HOME_TOP_CATEGORIES_KEY = ['home', 'top-categories'] as const;
 export const HOME_SPEND_7D_KEY = ['home', 'spend-7d'] as const;
+export const HOME_COMING_UP_KEY = ['home', 'coming-up'] as const;
+export const HOME_SAVINGS_GOAL_KEY = ['home', 'savings-goal'] as const;
 
 export interface HomeCardsNav {
   onOpenReview: () => void;
   onOpenBudget: (budgetId: string, periodStart: string) => void;
   onOpenPlan: () => void;
   onOpenActivity: (query: ActivityQuery) => void;
+  /** Coming up and Savings goal (Story 6.10): a bill's detail, a goal's detail, and the lists they come from. */
+  onOpenBill?: (ruleId: string) => void;
+  onOpenGoal?: (goalId: string) => void;
+  onOpenGoals?: () => void;
 }
 
 /** A card: `bg-surface`, `rounded.md`, padding 16, no shadow; a heading title and the scope caption on the right. */
@@ -238,6 +247,47 @@ function Spend7dCard({ d, currency, locale, table, onToggleTable, onOpenActivity
   );
 }
 
+function ComingUpCard({ d, currency, locale, nav }: { d: ComingUp; currency: CurrencyCode; locale: string; nav: HomeCardsNav }) {
+  const theme = useTheme();
+  useAmountsHidden(); // the amounts below follow Hide amounts
+  const when = d.payCycle ? 'payday' : 'month-end';
+  const c = copy.home.cards;
+  return (
+    <CardFrame id="coming_up" title={c.comingUp} scope={d.payCycle ? c.beforePayday : c.beforeMonthEnd}>
+      {d.items.length === 0 ? (
+        <Text testID="coming-up-empty" style={[textStyle('body'), { color: theme.color('text-secondary') }]}>{c.nothingDue.replace('{when}', when)}</Text>
+      ) : (
+        <View style={styles.rows}>
+          {d.items.map((i) => {
+            const s = statusText(timelineAsRow(i).status);
+            const label = `${i.title}, ${dayMonthLabel(i.dueDate)}, ${amountLabel({ amountMinor: i.expectedAmountMinor, currency, locale, inline: true })}, ${s.text}`;
+            return (
+              <Pressable key={`${i.ruleId}-${i.dueDate}`} testID={`coming-up-${i.ruleId}-${i.dueDate}`} {...controlA11y({ label, role: 'button' })} onPress={() => nav.onOpenBill?.(i.ruleId)} style={styles.comingRow}>
+                <View style={styles.comingText}>
+                  <Text style={[textStyle('body-medium'), { color: theme.color('text-primary') }]}>{`${i.title} · ${dayMonthLabel(i.dueDate)}`}</Text>
+                  <Text style={[textStyle('caption'), { color: theme.color(s.tone === 'warning' ? 'semantic-warning' : 'text-secondary') }]}>{s.text}</Text>
+                </View>
+                <Amount amountMinor={i.expectedAmountMinor} currency={currency} direction="neutral" role="body" locale={locale} />
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+      {d.moreCount > 0 ? <Button label={c.moreBills.replace('{n}', String(d.moreCount))} variant="text" testID="coming-up-more" onPress={nav.onOpenPlan} /> : null}
+    </CardFrame>
+  );
+}
+
+function SavingsGoalHomeCard({ d, currency, locale, nav }: { d: SavingsGoalCard; currency: CurrencyCode; locale: string; nav: HomeCardsNav }) {
+  const c = copy.home.cards;
+  return (
+    <CardFrame id="savings_goal" title={c.savingsGoal} scope={null}>
+      <GoalCard bare goal={d.goal} currency={currency} locale={locale} onPress={() => nav.onOpenGoal?.(d.goal.id)} />
+      {d.moreCount > 0 ? <Button label={d.moreCount === 1 ? c.moreGoalOne : c.moreGoals.replace('{n}', String(d.moreCount))} variant="text" testID="savings-goal-more" onPress={() => nav.onOpenGoals?.()} /> : null}
+    </CardFrame>
+  );
+}
+
 function CardError({ id, title, onRetry }: { id: CardId; title: string; onRetry: () => void }) {
   return (
     <CardFrame id={id} title={title} scope={null}>
@@ -260,9 +310,11 @@ export function HomeCards({ api, toCheckCount, currency, locale, nav, layout = d
   const income = useQuery({ queryKey: HOME_INCOME_KEY, enabled: isOn('income_expense'), queryFn: async () => (api.loadIncomeExpense ? await api.loadIncomeExpense() : null) });
   const topCategories = useQuery({ queryKey: HOME_TOP_CATEGORIES_KEY, enabled: isOn('top_categories'), queryFn: async () => (api.loadTopCategories ? await api.loadTopCategories() : null) });
   const spend7d = useQuery({ queryKey: HOME_SPEND_7D_KEY, enabled: isOn('spend_7d'), queryFn: async () => (api.loadSpend7d ? await api.loadSpend7d() : null) });
+  const comingUp = useQuery({ queryKey: HOME_COMING_UP_KEY, enabled: isOn('coming_up'), queryFn: async () => (api.loadComingUp ? await api.loadComingUp() : null) });
+  const savingsGoal = useQuery({ queryKey: HOME_SAVINGS_GOAL_KEY, enabled: isOn('savings_goal'), queryFn: async () => (api.loadSavingsGoal ? await api.loadSavingsGoal() : null) });
   const budgets = useQuery({ queryKey: HOME_BUDGETS_KEY, enabled: isOn('budgets') || isOn('nws'), queryFn: async () => (api.loadBudgetCards ? await api.loadBudgetCards() : null) });
   // A card keeps its last good data when a refresh fails (the hero says so); an error shows only when there is nothing to show.
-  const inputs = { toCheckCount, ...(income.data !== undefined ? { income: income.data } : {}), ...(budgets.data !== undefined ? { budgets: budgets.data } : {}), ...(topCategories.data !== undefined ? { topCategories: topCategories.data } : {}), ...(spend7d.data !== undefined ? { spend7d: spend7d.data } : {}) };
+  const inputs = { toCheckCount, ...(income.data !== undefined ? { income: income.data } : {}), ...(budgets.data !== undefined ? { budgets: budgets.data } : {}), ...(topCategories.data !== undefined ? { topCategories: topCategories.data } : {}), ...(spend7d.data !== undefined ? { spend7d: spend7d.data } : {}), ...(comingUp.data !== undefined ? { comingUp: comingUp.data } : {}), ...(savingsGoal.data !== undefined ? { savingsGoal: savingsGoal.data } : {}) };
   const shown = new Set(visibleCards(inputs).map((c) => c.id));
   const budgetsFailed = budgets.isError && budgets.data === undefined;
 
@@ -286,6 +338,10 @@ export function HomeCards({ api, toCheckCount, currency, locale, nav, layout = d
         if (spend7d.data) return <Spend7dCard key={id} d={spend7d.data} currency={currency} locale={locale} table={!!tables[id]} onToggleTable={toggle(id)} onOpenActivity={nav.onOpenActivity} />;
         if (spend7d.isError) return <CardError key={id} id={id} title={copy.home.cards.spendLastWeek} onRetry={() => void spend7d.refetch()} />;
         return <Skeleton key={id} height={160} />;
+      case 'coming_up':
+        return comingUp.data ? <ComingUpCard key={id} d={comingUp.data} currency={currency} locale={locale} nav={nav} /> : null;
+      case 'savings_goal':
+        return savingsGoal.data ? <SavingsGoalHomeCard key={id} d={savingsGoal.data} currency={currency} locale={locale} nav={nav} /> : null;
       case 'nws':
         return budgets.data?.nws ? <NwsCard key={id} cards={budgets.data} currency={currency} locale={locale} onOpenPlan={nav.onOpenPlan} onOpenActivity={nav.onOpenActivity} /> : null;
     }
@@ -317,5 +373,7 @@ const styles = StyleSheet.create({
   rows: { gap: 16 },
   budgetRow: { gap: 4 },
   sortRow: { minHeight: 48, justifyContent: 'center' },
+  comingRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, minHeight: 48 },
+  comingText: { flexShrink: 1, gap: 2 },
   catChip: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
 });

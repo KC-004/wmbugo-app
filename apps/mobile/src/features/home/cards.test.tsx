@@ -108,7 +108,7 @@ const withToCheck = (count: number) => homeData({ currency: 'INR', summary: { to
 
 describe('the card registry (Story 5.4)', () => {
   it('lists the cards in the default order with a stable id, title, sizes, drill-down and a visibility rule each', () => {
-    expect(HOME_CARDS.map((c) => c.id)).toEqual(['to_check', 'income_expense', 'budgets', 'nws', 'top_categories', 'spend_7d']);
+    expect(HOME_CARDS.map((c) => c.id)).toEqual(['to_check', 'income_expense', 'budgets', 'nws', 'top_categories', 'spend_7d', 'coming_up', 'savings_goal']);
     for (const c of HOME_CARDS) {
       expect(c.title.length).toBeGreaterThan(0);
       expect(c.sizes.length).toBeGreaterThan(0);

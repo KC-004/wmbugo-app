@@ -96,14 +96,14 @@ describe('Edit Home (SCR-05, Story 5.6)', () => {
     expect(host(r, 'edit-pinned')).toHaveLength(1);
     expect(host(r, 'edit-pinned')[0]!.props.accessibilityLabel).toBe('Am I okay?, Always first');
     expect(host(r, 'edit-handle-pinned')).toHaveLength(0);
-    expect(rowIds(r)).toEqual(['income_expense', 'budgets', 'nws', 'top_categories', 'spend_7d']);
+    expect(rowIds(r)).toEqual(['income_expense', 'budgets', 'nws', 'top_categories', 'spend_7d', 'coming_up', 'savings_goal']);
     expect(texts(r).some((t) => /Things to check/.test(t))).toBe(false);
-    expect(texts(r)).toEqual(expect.arrayContaining(['Income and expense', 'Budgets', 'Needs, Wants and Savings', 'Top categories', '7-day spend']));
+    expect(texts(r)).toEqual(expect.arrayContaining(['Income and expense', 'Budgets', 'Needs, Wants and Savings', 'Top categories', '7-day spend', 'Coming up', 'Savings goal']));
   });
 
   it('each row has a handle, Move up, Move down, a Hide switch; only Budgets and Top categories offer Compact and Full', async () => {
     const { r } = await mountEditor();
-    for (const id of ['income_expense', 'budgets', 'nws', 'top_categories', 'spend_7d']) {
+    for (const id of ['income_expense', 'budgets', 'nws', 'top_categories', 'spend_7d', 'coming_up', 'savings_goal']) {
       expect(host(r, `edit-handle-${id}`)).toHaveLength(1);
       expect(host(r, `edit-up-${id}`)).toHaveLength(1);
       expect(host(r, `edit-down-${id}`)).toHaveLength(1);
@@ -116,10 +116,10 @@ describe('Edit Home (SCR-05, Story 5.6)', () => {
   it('Move up on Needs, Wants and Savings reaches the top and says its position', async () => {
     const { r } = await mountEditor();
     press(r, 'edit-up-nws');
-    expect(AccessibilityInfo.announceForAccessibility).toHaveBeenLastCalledWith('Needs, Wants and Savings moved to position 3 of 6');
+    expect(AccessibilityInfo.announceForAccessibility).toHaveBeenLastCalledWith('Needs, Wants and Savings moved to position 3 of 8');
     press(r, 'edit-up-nws');
-    expect(AccessibilityInfo.announceForAccessibility).toHaveBeenLastCalledWith('Needs, Wants and Savings moved to position 2 of 6');
-    expect(rowIds(r)).toEqual(['nws', 'income_expense', 'budgets', 'top_categories', 'spend_7d']);
+    expect(AccessibilityInfo.announceForAccessibility).toHaveBeenLastCalledWith('Needs, Wants and Savings moved to position 2 of 8');
+    expect(rowIds(r)).toEqual(['nws', 'income_expense', 'budgets', 'top_categories', 'spend_7d', 'coming_up', 'savings_goal']);
   });
 
   it('Hide announces, shows the Hidden caption, and the row stays in the list', async () => {
@@ -137,7 +137,7 @@ describe('Edit Home (SCR-05, Story 5.6)', () => {
     expect(up.props.accessibilityState).toMatchObject({ disabled: true });
     expect(up.props.accessibilityHint).toBe('Already at the top');
     expect(up.props.accessible).toBe(true);
-    const down = host(r, 'edit-down-spend_7d')[0]!;
+    const down = host(r, 'edit-down-savings_goal')[0]!;
     expect(down.props.accessibilityHint).toBe('Already at the bottom');
     press(r, 'edit-up-income_expense');
     expect(rowIds(r)[0]).toBe('income_expense'); // nothing moved
@@ -151,9 +151,9 @@ describe('Edit Home (SCR-05, Story 5.6)', () => {
     expect(handle().props.accessible).toBe(true);
     expect(handle().props.accessibilityActions.map((a: { name: string }) => a.name)).toEqual(['moveUp', 'moveDown']);
     act(() => handle().props.onAccessibilityAction({ nativeEvent: { actionName: 'moveDown' } }));
-    expect(rowIds(r)).toEqual(['income_expense', 'nws', 'budgets', 'top_categories', 'spend_7d']);
+    expect(rowIds(r)).toEqual(['income_expense', 'nws', 'budgets', 'top_categories', 'spend_7d', 'coming_up', 'savings_goal']);
     act(() => host(r, 'edit-handle-budgets')[0]!.props.onAccessibilityAction({ nativeEvent: { actionName: 'moveUp' } }));
-    expect(rowIds(r)).toEqual(['income_expense', 'budgets', 'nws', 'top_categories', 'spend_7d']);
+    expect(rowIds(r)).toEqual(['income_expense', 'budgets', 'nws', 'top_categories', 'spend_7d', 'coming_up', 'savings_goal']);
   });
 
   it('the handle is a drag target', async () => {
@@ -171,7 +171,7 @@ describe('Edit Home (SCR-05, Story 5.6)', () => {
     await settle();
     expect(onBack).toHaveBeenCalledTimes(1);
     expect(save).toHaveBeenCalledTimes(1);
-    expect(save).toHaveBeenCalledWith([entry('nws'), entry('income_expense'), entry('budgets'), entry('top_categories', { size: 'compact' }), entry('spend_7d', { hidden: true })]);
+    expect(save).toHaveBeenCalledWith([entry('nws'), entry('income_expense'), entry('budgets'), entry('top_categories', { size: 'compact' }), entry('spend_7d', { hidden: true }), entry('coming_up'), entry('savings_goal')]);
   });
 
   it('the hardware Back saves too, and leaving by unmount does not save a second time', async () => {
@@ -199,7 +199,7 @@ describe('Edit Home (SCR-05, Story 5.6)', () => {
   });
 
   it('saves null when the layout is back at the PRD order, so the default is stored as the default', async () => {
-    const { r, save } = await mountEditor([entry('nws'), entry('income_expense'), entry('budgets'), entry('top_categories'), entry('spend_7d')]);
+    const { r, save } = await mountEditor([entry('nws'), entry('income_expense'), entry('budgets'), entry('top_categories'), entry('spend_7d'), entry('coming_up'), entry('savings_goal')]);
     press(r, 'edit-down-nws');
     press(r, 'edit-down-nws'); // nws is now third: the PRD order
     press(r, 'edit-up-income_expense'); // income first again
@@ -212,7 +212,7 @@ describe('Edit Home (SCR-05, Story 5.6)', () => {
     const { r } = await mountEditor([entry('spend_7d', { hidden: true }), entry('income_expense'), entry('budgets', { size: 'compact' }), entry('nws'), entry('top_categories')]);
     expect(rowIds(r)[0]).toBe('spend_7d');
     press(r, 'home-edit-reset');
-    expect(rowIds(r)).toEqual(['income_expense', 'budgets', 'nws', 'top_categories', 'spend_7d']);
+    expect(rowIds(r)).toEqual(['income_expense', 'budgets', 'nws', 'top_categories', 'spend_7d', 'coming_up', 'savings_goal']);
     expect(host(r, 'edit-hidden-spend_7d')).toHaveLength(0);
     expect(texts(r)).toContain('Home reset');
     const undo = r.root.findAll((n) => n.props.label === 'Undo' && typeof n.props.onPress === 'function')[0]!;
@@ -223,7 +223,7 @@ describe('Edit Home (SCR-05, Story 5.6)', () => {
 
   it('a card added by a later release shows in its default place, and a saved id that is gone is ignored', async () => {
     const { r } = await mountEditor([entry('gone'), entry('spend_7d'), entry('budgets'), entry('income_expense'), entry('top_categories')]);
-    expect(rowIds(r)).toEqual(['spend_7d', 'budgets', 'nws', 'income_expense', 'top_categories']);
+    expect(rowIds(r)).toEqual(['spend_7d', 'coming_up', 'savings_goal', 'budgets', 'nws', 'income_expense', 'top_categories']);
   });
 
   it('a card whose rule is false is still listed and orderable, saying when it will show', async () => {
@@ -259,7 +259,7 @@ describe('Edit Home (SCR-05, Story 5.6)', () => {
     press(r, 'edit-down-income_expense'); // an edit after the reset
     const undo = r.root.findAll((n) => n.props.label === 'Undo' && typeof n.props.onPress === 'function')[0]!;
     act(() => undo.props.onPress());
-    expect(rowIds(r)).toEqual(['budgets', 'income_expense', 'nws', 'top_categories', 'spend_7d']); // still the reset order plus the edit
+    expect(rowIds(r)).toEqual(['budgets', 'income_expense', 'nws', 'top_categories', 'spend_7d', 'coming_up', 'savings_goal']); // still the reset order plus the edit
   });
 
   it('a refresh of the settings while editing does not move the nothing-changed baseline', async () => {
@@ -267,7 +267,7 @@ describe('Edit Home (SCR-05, Story 5.6)', () => {
     press(r, 'edit-down-income_expense');
     press(r, 'edit-up-income_expense'); // back where it started
     await act(async () => {
-      qc.setQueryData(SETTINGS_QUERY_KEY, { settings: { ...DEFAULT_SETTINGS, homeLayout: [entry('nws'), entry('income_expense'), entry('budgets'), entry('top_categories'), entry('spend_7d')] } });
+      qc.setQueryData(SETTINGS_QUERY_KEY, { settings: { ...DEFAULT_SETTINGS, homeLayout: [entry('nws'), entry('income_expense'), entry('budgets'), entry('top_categories'), entry('spend_7d'), entry('coming_up'), entry('savings_goal')] } });
     });
     press(r, 'home-edit-back');
     await settle();
@@ -280,7 +280,7 @@ describe('Edit Home (SCR-05, Story 5.6)', () => {
     press(r, 'home-edit-back');
     await settle();
     const cached = qc.getQueryData<{ settings: { homeLayout: HomeLayoutEntry[] | null } }>(SETTINGS_QUERY_KEY);
-    expect(cached?.settings.homeLayout?.map((e) => e.cardId)).toEqual(['income_expense', 'nws', 'budgets', 'top_categories', 'spend_7d']);
+    expect(cached?.settings.homeLayout?.map((e) => e.cardId)).toEqual(['income_expense', 'nws', 'budgets', 'top_categories', 'spend_7d', 'coming_up', 'savings_goal']);
   });
 
   it('rows are at least 48dp tall to touch and the screen has a Back and a title', async () => {

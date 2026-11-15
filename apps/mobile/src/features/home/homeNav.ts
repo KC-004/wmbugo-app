@@ -16,6 +16,9 @@ export function homeHeroNav(d: HomeNavDeps) {
     onEditHome: () => d.navigate('HomeEdit'),
     onOpenActivity: (query: ActivityQuery) => d.openActivity(query),
     onOpenPlan: () => d.navigate('Tabs', { screen: 'Plan' }),
+    onOpenBill: (ruleId: string) => d.navigate('BillDetail', { ruleId }),
+    onOpenGoal: (goalId: string) => d.navigate('GoalDetail', { goalId }),
+    onOpenGoals: () => d.navigate('Goals'),
     onSetLimit: () => {
       d.requestBudgetEditor();
       d.navigate('Tabs', { screen: 'Plan' });

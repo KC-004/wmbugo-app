@@ -42,7 +42,7 @@ export interface HomeNav extends HomeCardsNav {
  * Home: the greeting, today's date and the period chip, then the "Am I okay?" hero (Story 5.2) on the brand band (light) or
  * the glows (dark). It refreshes by itself: events, returning to the app and a new day all recompute it (Story 5.1).
  */
-export function HomeScreen({ api = realHomeApi, settingsApi = realSettingsApi, onAccounts, onProfile, onAddAccount, onOpenBudget, onOpenPlan, onSetLimit, onSortIt, onOpenReview, onOpenActivity, onEditHome }: HomeNav & { api?: HomeApi; settingsApi?: SettingsApi }) {
+export function HomeScreen({ api = realHomeApi, settingsApi = realSettingsApi, onAccounts, onProfile, onAddAccount, onOpenBudget, onOpenPlan, onSetLimit, onSortIt, onOpenReview, onOpenActivity, onEditHome, onOpenBill, onOpenGoal, onOpenGoals }: HomeNav & { api?: HomeApi; settingsApi?: SettingsApi }) {
   const theme = useTheme();
   const sheet = useSheet();
   const insets = useContext(SafeAreaInsetsContext);
@@ -134,7 +134,7 @@ export function HomeScreen({ api = realHomeApi, settingsApi = realSettingsApi, o
                 onSortIt={() => d.summary.sortIt && onSortIt({ categoryIds: d.summary.sortIt.categoryIds, fromDate: d.summary.sortIt.fromDate, toDate: d.summary.sortIt.toDate })}
                 onAddAccount={onAddAccount}
               />
-              <HomeCards layout={layout} layoutReady={!settingsQ.isPending} api={api} toCheckCount={d.summary.toCheckCount} currency={d.currency} locale={d.locale} nav={{ onOpenReview, onOpenBudget, onOpenPlan, onOpenActivity }} />
+              <HomeCards layout={layout} layoutReady={!settingsQ.isPending} api={api} toCheckCount={d.summary.toCheckCount} currency={d.currency} locale={d.locale} nav={{ onOpenReview, onOpenBudget, onOpenPlan, onOpenActivity, ...(onOpenBill ? { onOpenBill } : {}), ...(onOpenGoal ? { onOpenGoal } : {}), ...(onOpenGoals ? { onOpenGoals } : {}) }} />
               {tip ? <Tooltip text={copy.home.tip} onAcknowledge={() => void tips.current?.acknowledge().catch(() => undefined)} /> : null}
             </View>
           ) : home.isError ? (
