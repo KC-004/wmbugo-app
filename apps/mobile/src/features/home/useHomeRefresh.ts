@@ -36,6 +36,8 @@ export function useHomeRefresh({ today, timezoneId, nowMs, refresh }: { today: s
   useEffect(() => {
     if (!today || !timezoneId) return;
     const id = setInterval(() => {
+      // Nothing to refresh while the app is in the background; returning to the foreground refreshes anyway.
+      if (AppState.currentState === 'background') return;
       const now = toLocalDate(nowMs(), timezoneId);
       if (now.ok && now.value !== today) refresh();
     }, DATE_CHECK_MS);

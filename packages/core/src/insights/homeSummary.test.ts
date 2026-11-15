@@ -13,6 +13,8 @@ import { SaveBudget } from '../planning/budgetCommands';
 import { CreateFiftyThirtyTwenty } from '../planning/budgetTemplate';
 import { SPENT_EXPENSES_SQL, SPENT_REFUNDS_SQL } from '../ledger/readModels';
 import { TO_CHECK_SQL } from '../capture/reviewQueue';
+import { ChangeProfile } from '../profile/settingsCommands';
+import { SubmitCapture } from '../capture/submitCapture';
 import { homeSummary } from './homeSummary';
 
 const ist = (month: number, day: number, hour = 9) => Date.UTC(2026, month - 1, day, hour, 0, 0) - 5.5 * 3_600_000;
@@ -34,6 +36,7 @@ async function setup(payday: PaydayRule = { kind: 'first' }, withAccount = true)
   const spend = async (categoryId: string, amountMinor: number, at: number) => {
     const r = await recordEntry(writer, { kind: 'expense', amountMinor, categoryId, accountId: bank, merchant: 'X', occurredAtMs: at });
     if (!r.ok) throw new Error(r.code);
+    return r.value.transactionId;
   };
   return { db, writer, spend, bank };
 }
@@ -83,6 +86,36 @@ describe('homeSummary (Story 5.1)', () => {
     expect(s.period).toMatchObject({ start: '2026-10-25', end: '2026-11-24' });
     expect(s.daysToPayday).toBe(7); // 18 Nov to 25 Nov
     expect(s.daysLeft).toBe(7);
+  });
+
+  it('a refund of an earlier purchase leaves the surplus apart and spent never goes below zero', async () => {
+    const { db, writer, spend } = await setup();
+    await writer.run(SaveBudget, overall(2_000_000), 'user');
+    const id = await spend('cat_food', 200_000, ist(10, 5)); // bought in October
+    const r = await writer.run(SubmitCapture, { submissionId: 'rf-1', sourceKind: 'manual', refund: { originalId: id, amountMinor: 160_000, recoveryKind: 'refund' } }, 'user');
+    if (!r.ok) throw new Error(r.code);
+    const s = (await homeSummary(db, NOW))!;
+    expect(s).toMatchObject({ usedMinor: 0, leftMinor: 2_000_000, refundSurplusMinor: 160_000, spentThisPeriodMinor: 0 });
+  });
+
+  it('a payday change mid-cycle shows the shortened cycle and counts the days to the new payday', async () => {
+    const { db, writer } = await setup();
+    await writer.run(SaveBudget, overall(3_000_000), 'user');
+    const c = await writer.run(ChangeProfile, { payday: { kind: 'day', day: 25 } }, 'user');
+    if (!c.ok) throw new Error('change');
+    const s = (await homeSummary(db, NOW))!;
+    expect(s.period).toMatchObject({ start: '2026-11-01', end: '2026-11-24', shortened: true });
+    expect(s.period.label).toContain('Shortened cycle');
+    expect(s.daysToPayday).toBe(7);
+    expect(s.daysLeft).toBe(7);
+  });
+
+  it('an overall budget is always on the default period, so days left and days to payday agree', async () => {
+    const { db, writer } = await setup({ kind: 'day', day: 25 });
+    await writer.run(SaveBudget, { ...overall(2_000_000), periodRule: 'weekly' }, 'user'); // an overall budget ignores a weekly rule
+    const s = (await homeSummary(db, NOW))!;
+    expect(s.heroMode).toBe('overall');
+    expect(s.daysLeft).toBe(s.daysToPayday);
   });
 
   it('no accounts: hasAccounts is false and nothing is invented', async () => {

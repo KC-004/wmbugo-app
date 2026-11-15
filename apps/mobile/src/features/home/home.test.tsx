@@ -203,6 +203,24 @@ describe('Home', () => {
       expect(texts(m.r)).toContain('Sun 8 Nov');
     });
 
+    it('does not check the date while the app is in the background', async () => {
+      const ticks: (() => void)[] = [];
+      jest.spyOn(global, 'setInterval').mockImplementation(((fn: () => void) => {
+        ticks.push(fn);
+        return 1 as never;
+      }) as never);
+      const original = Object.getOwnPropertyDescriptor(AppState, 'currentState');
+      Object.defineProperty(AppState, 'currentState', { value: 'background', configurable: true, writable: true });
+      const now = Date.UTC(2026, 10, 7, 16, 30, 0); // already 8 Nov in Singapore
+      const api = homeApi(data({ today: '2026-11-07' }));
+      api.nowMs = () => now;
+      await mountHome(api);
+      act(() => ticks.forEach((t) => t()));
+      await settle();
+      if (original) Object.defineProperty(AppState, 'currentState', original);
+      expect(api.load).toHaveBeenCalledTimes(1);
+    });
+
     it('keeps the old values and says Updating… when a recompute takes longer than 300 ms, then shows the new values', async () => {
       const api = homeApi(data({ spentMinor: 1250 }));
       const { r, qc } = await mountHome(api);

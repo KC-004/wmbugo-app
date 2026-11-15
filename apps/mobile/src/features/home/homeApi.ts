@@ -47,6 +47,23 @@ export const promptStateSeenStore: SeenStore = {
   },
 };
 
+/** What Home shows from the snapshot: the one place the snapshot is mapped to screen data. */
+export function homeDataFrom(profile: { currency: CurrencyCode; locale: string; timezoneId: string }, summary: HomeSummary, nowMs: number): HomeData {
+  const cur = getCurrency(profile.currency);
+  return {
+    currency: profile.currency,
+    locale: profile.locale,
+    timezoneId: profile.timezoneId,
+    today: summary.today,
+    hour: hourIn(nowMs, profile.timezoneId),
+    scope: summary.period.label,
+    spentMinor: summary.spentThisPeriodMinor,
+    accounts: summary.accounts,
+    summary,
+    hero: presentHero(summary, cur.ok ? cur.value.exponent : 2),
+  };
+}
+
 export const realHomeApi: HomeApi = {
   seen: promptStateSeenStore,
   nowMs: () => systemClock.nowMs(),
@@ -55,20 +72,8 @@ export const realHomeApi: HomeApi = {
     const p = await readProfile(db);
     if (!p) return null;
     const now = systemClock.nowMs();
-    const summary = await homeSummary(db, now);
-    if (!summary) return null;
-    const exponent = getCurrency(p.currency);
-    return {
-      currency: p.currency,
-      locale: p.locale,
-      timezoneId: p.timezoneId,
-      today: summary.today,
-      hour: hourIn(now, p.timezoneId),
-      scope: summary.period.label,
-      spentMinor: summary.spentThisPeriodMinor,
-      accounts: summary.accounts,
-      summary,
-      hero: presentHero(summary, exponent.ok ? exponent.value.exponent : 2),
-    };
+    // One transaction on the serialised connection: the hero, the spent card and the accounts all come from the same ledger state.
+    const summary = await db.transaction((tx) => homeSummary(tx, now));
+    return summary ? homeDataFrom(p, summary, now) : null;
   },
 };
