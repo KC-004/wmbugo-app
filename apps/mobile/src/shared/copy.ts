@@ -87,6 +87,11 @@ export const copy = {
     cardError: "Couldn't load this card",
     updating: 'Updating…',
     cards: {
+      topCategories: 'Top categories',
+      spendLastWeek: 'Spending, last 7 days',
+      lastSevenDays: 'Last 7 days',
+      since: 'Since {date}',
+      nothingSpent: 'Nothing spent yet this period.',
       thingsToCheck: 'Things to check',
       toCheck: '{n} to check',
       waitingForYou: 'Waiting for you',
@@ -115,6 +120,13 @@ export const copy = {
       amountsHidden: 'Amounts hidden',
       amountsShown: 'Amounts shown',
     },
+  },
+  chart: {
+    viewAsTable: 'View as table',
+    viewAsChart: 'View as chart',
+    nameColumn: 'Name',
+    amountColumn: 'Amount',
+    shareColumn: 'Share',
   },
   activity: {
     empty: 'Nothing here yet. Your first expense will show up in this list.',

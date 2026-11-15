@@ -1,4 +1,4 @@
-import { getCurrency, homeBudgetCards, homeIncomeExpense, homeSummary, MarkPromptSeen, SEEN_PROMPT_SQL, type CurrencyCode, type HomeBudgetCards, type HomeSummary, type IncomeExpense } from '@wmbugo/core';
+import { getCurrency, homeBudgetCards, homeIncomeExpense, homeSpend7d, homeSummary, homeTopCategories, MarkPromptSeen, SEEN_PROMPT_SQL, type CurrencyCode, type HomeBudgetCards, type HomeSummary, type IncomeExpense, type Spend7d, type TopCategories } from '@wmbugo/core';
 import { getServices, systemClock } from '../../adapters/startApp';
 import { readProfile } from '../../adapters/readProfile';
 import type { SeenStore } from '../../shared/feedback/tooltipController';
@@ -23,6 +23,9 @@ export interface HomeApi {
   loadIncomeExpense?(): Promise<IncomeExpense | null>;
   /** The category budgets and the 50/30/20 progress for the Budgets and Needs, Wants and Savings cards. */
   loadBudgetCards?(): Promise<HomeBudgetCards | null>;
+  /** The Top categories and Spending, last 7 days charts (Story 5.5). */
+  loadTopCategories?(): Promise<TopCategories | null>;
+  loadSpend7d?(): Promise<Spend7d | null>;
   /** The current time in ms; Home compares its local date with the loaded one to notice midnight. */
   nowMs?: () => number;
 }
@@ -67,6 +70,8 @@ export const realHomeApi: HomeApi = {
   nowMs: () => systemClock.nowMs(),
   loadIncomeExpense: () => homeIncomeExpense(getServices().db, systemClock.nowMs()),
   loadBudgetCards: () => homeBudgetCards(getServices().db, systemClock.nowMs()),
+  loadTopCategories: () => homeTopCategories(getServices().db, systemClock.nowMs()),
+  loadSpend7d: () => homeSpend7d(getServices().db, systemClock.nowMs()),
   async load() {
     const db = getServices().db;
     const p = await readProfile(db);

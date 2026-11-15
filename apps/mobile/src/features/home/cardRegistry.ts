@@ -1,4 +1,4 @@
-import type { HomeBudgetCards, IncomeExpense } from '@wmbugo/core';
+import type { HomeBudgetCards, IncomeExpense, Spend7d, TopCategories } from '@wmbugo/core';
 import { copy } from '../../shared/copy';
 
 /**
@@ -6,7 +6,7 @@ import { copy } from '../../shared/copy';
  * and where it drills down to, so a later story adds a card by adding an entry here without changing Home. The order of this
  * list is the default order (PRD 6.3): later stories append, and Edit Home (5.6) reorders and hides on top of it.
  */
-export type CardId = 'to_check' | 'income_expense' | 'budgets' | 'nws';
+export type CardId = 'to_check' | 'income_expense' | 'budgets' | 'nws' | 'top_categories' | 'spend_7d';
 export type CardSize = 'standard' | 'compact';
 export type DrillDown = 'review_queue' | 'activity' | 'budget_detail' | 'plan';
 
@@ -15,6 +15,8 @@ export interface CardInputs {
   readonly toCheckCount: number;
   readonly income?: IncomeExpense | null;
   readonly budgets?: HomeBudgetCards | null;
+  readonly topCategories?: TopCategories | null;
+  readonly spend7d?: Spend7d | null;
 }
 
 export interface HomeCardDef {
@@ -32,6 +34,8 @@ export const HOME_CARDS: readonly HomeCardDef[] = [
   { id: 'income_expense', title: copy.home.cards.incomeExpense, sizes: ['standard'], drillDown: 'activity', visible: (i) => i.income !== null },
   { id: 'budgets', title: copy.home.cards.budgets, sizes: ['standard'], drillDown: 'budget_detail', visible: (i) => (i.budgets?.categoryBudgets.length ?? 0) > 0 },
   { id: 'nws', title: copy.home.cards.nws, sizes: ['standard'], drillDown: 'plan', visible: (i) => i.budgets?.nws != null },
+  { id: 'top_categories', title: copy.home.cards.topCategories, sizes: ['standard'], drillDown: 'activity', visible: (i) => i.topCategories !== null },
+  { id: 'spend_7d', title: copy.home.cards.spendLastWeek, sizes: ['standard'], drillDown: 'activity', visible: (i) => i.spend7d !== null },
 ];
 
 /** The cards that show now, in registry order. */

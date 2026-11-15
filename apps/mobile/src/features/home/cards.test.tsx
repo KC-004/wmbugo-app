@@ -1,7 +1,7 @@
 import { AccessibilityInfo, StyleSheet, Text } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { budgetStatus, type BudgetListRow, type HomeBudgetCards, type IncomeExpense } from '@wmbugo/core';
+import { budgetStatus, type BudgetListRow, type HomeBudgetCards, type IncomeExpense, type Spend7d, type TopCategories } from '@wmbugo/core';
 import { SheetHost } from '../../shared/feedback/SheetHost';
 import { ToastHost } from '../../shared/feedback/ToastHost';
 import { MemorySeenStore } from '../../shared/feedback/tooltipController';
@@ -63,6 +63,8 @@ interface Setup {
   data?: HomeData;
   income?: IncomeExpense | null | (() => Promise<IncomeExpense | null>);
   budgets?: HomeBudgetCards | null | (() => Promise<HomeBudgetCards | null>);
+  topCategories?: TopCategories | null | (() => Promise<TopCategories | null>);
+  spend7d?: Spend7d | null | (() => Promise<Spend7d | null>);
 }
 
 async function mountCards(s: Setup = {}) {
@@ -71,13 +73,16 @@ async function mountCards(s: Setup = {}) {
   const d = s.data ?? homeData({ currency: 'INR' });
   const loadIncome: () => Promise<IncomeExpense | null> = typeof s.income === 'function' ? s.income : async () => (s.income === undefined ? income() : (s.income as IncomeExpense | null));
   const loadBudgets: () => Promise<HomeBudgetCards | null> = typeof s.budgets === 'function' ? s.budgets : async () => (s.budgets === undefined ? cards() : (s.budgets as HomeBudgetCards | null));
-  const api: HomeApi & { loadIncomeExpense: jest.Mock; loadBudgetCards: jest.Mock } = {
+  const api: HomeApi & { loadIncomeExpense: jest.Mock; loadBudgetCards: jest.Mock; loadTopCategories: jest.Mock; loadSpend7d: jest.Mock } = {
+    loadTopCategories: jest.fn(typeof s.topCategories === 'function' ? s.topCategories : async () => (s.topCategories as TopCategories | null | undefined) ?? null),
+    loadSpend7d: jest.fn(typeof s.spend7d === 'function' ? s.spend7d : async () => (s.spend7d as Spend7d | null | undefined) ?? null),
     load: async () => d,
     seen: new MemorySeenStore(),
     loadIncomeExpense: jest.fn(loadIncome as () => Promise<IncomeExpense | null>),
     loadBudgetCards: jest.fn(loadBudgets as () => Promise<HomeBudgetCards | null>),
   };
   const n = nav();
+  const Harness = () => <HomeScreen api={api} settingsApi={{ setHideAmounts: async () => ({ ok: true }), timezoneCheck: async () => null } as never} {...n} />;
   let r!: ReactTestRenderer;
   act(() => {
     r = create(
@@ -85,7 +90,7 @@ async function mountCards(s: Setup = {}) {
         <ThemeProvider>
           <ToastHost bottomOffset={0}>
             <SheetHost>
-              <HomeScreen api={api} settingsApi={{ setHideAmounts: async () => ({ ok: true }), timezoneCheck: async () => null } as never} {...n} />
+              <Harness />
             </SheetHost>
           </ToastHost>
         </ThemeProvider>
@@ -94,14 +99,14 @@ async function mountCards(s: Setup = {}) {
   });
   live.push(r);
   await settle();
-  return { r, n, api, qc };
+  return { r, n, api, qc, remount: () => mountCards(s) };
 }
 
 const withToCheck = (count: number) => homeData({ currency: 'INR', summary: { toCheckCount: count } });
 
 describe('the card registry (Story 5.4)', () => {
   it('lists the cards in the default order with a stable id, title, sizes, drill-down and a visibility rule each', () => {
-    expect(HOME_CARDS.map((c) => c.id)).toEqual(['to_check', 'income_expense', 'budgets', 'nws']);
+    expect(HOME_CARDS.map((c) => c.id)).toEqual(['to_check', 'income_expense', 'budgets', 'nws', 'top_categories', 'spend_7d']);
     for (const c of HOME_CARDS) {
       expect(c.title.length).toBeGreaterThan(0);
       expect(c.sizes.length).toBeGreaterThan(0);
@@ -110,8 +115,8 @@ describe('the card registry (Story 5.4)', () => {
     }
   });
   it('shows a card only when it has something to show', () => {
-    expect(visibleCards({ toCheckCount: 0, income: null, budgets: null }).map((c) => c.id)).toEqual([]);
-    expect(visibleCards({ toCheckCount: 2, income: income(), budgets: cards({ categoryBudgets: [row({ id: 'a', name: 'A' })], nws: { rows: [row({ id: 'n', name: 'Needs', group: '50_30_20' })], typeSummary: null } }) }).map((c) => c.id)).toEqual(['to_check', 'income_expense', 'budgets', 'nws']);
+    expect(visibleCards({ toCheckCount: 0, income: null, budgets: null, topCategories: null, spend7d: null }).map((c) => c.id)).toEqual([]);
+    expect(visibleCards({ toCheckCount: 2, income: income(), budgets: cards({ categoryBudgets: [row({ id: 'a', name: 'A' })], nws: { rows: [row({ id: 'n', name: 'Needs', group: '50_30_20' })], typeSummary: null } }), topCategories: tc(), spend7d: sp() }).map((c) => c.id)).toEqual(['to_check', 'income_expense', 'budgets', 'nws', 'top_categories', 'spend_7d']);
   });
 });
 
@@ -223,6 +228,112 @@ describe('Needs, Wants and Savings (Story 5.4)', () => {
     expect(host(zero.r, 'home-not-classified')).toHaveLength(0);
     const none = await mountCards({ budgets: cards() });
     expect(host(none.r, 'home-card-nws')).toHaveLength(0);
+  });
+});
+
+const tc = (over: Partial<TopCategories> = {}): TopCategories => ({
+  rows: [
+    { categoryId: 'cat_groceries', name: 'Groceries', icon: 'ShoppingCart', colorToken: 'cat-emerald', amountMinor: 420_000, sharePercent: 60, categoryIds: ['cat_groceries', 'cat_veg'] },
+    { categoryId: 'cat_food', name: 'Food & Drinks', icon: 'ForkKnife', colorToken: 'cat-rose', amountMinor: 280_000, sharePercent: 40, categoryIds: ['cat_food'] },
+  ],
+  totalMinor: 700_000,
+  period: NOV,
+  ...over,
+});
+const sp = (over: Partial<Spend7d> = {}): Spend7d => ({
+  days: ['2026-11-12', '2026-11-13', '2026-11-14', '2026-11-15', '2026-11-16', '2026-11-17', '2026-11-18'].map((date, i) => ({ date, label: i === 6 ? 'Today' : ['Thu', 'Fri', 'Sat', 'Sun', 'Mon', 'Tue'][i]!, spentMinor: i === 2 ? 0 : 50_000 * (i + 1), isToday: i === 6 })),
+  since: null,
+  ...over,
+});
+
+describe('Top categories (Story 5.5)', () => {
+  it('ranks the categories as bars with a 40dp chip, the name and a direct amount, and opens Activity for that category', async () => {
+    const { r, n } = await mountCards({ topCategories: tc() });
+    expect(host(r, 'home-card-top_categories')).toHaveLength(1);
+    expect(texts(r)).toEqual(expect.arrayContaining(['Top categories · This period', 'Groceries', '₹4,200.00', 'Food & Drinks', '₹2,800.00', 'View as table']));
+    press(r, 'top-categories-chart-bar-cat_groceries');
+    expect(n.onOpenActivity).toHaveBeenLastCalledWith({ categoryIds: ['cat_groceries', 'cat_veg'], fromDate: '2026-11-01', toDate: '2026-11-30' });
+  });
+
+  it('the table lists name, amount and share, drills down the same way, and is remembered while Home is open', async () => {
+    const { r, n, remount } = await mountCards({ topCategories: tc() });
+    press(r, 'top-categories-chart-toggle');
+    expect(host(r, 'top-categories-chart-table')).toHaveLength(1);
+    expect(host(r, 'top-categories-chart-row-cat_food')[0]!.props.accessibilityLabel).toBe('Food & Drinks, 2,800 rupees, 40 percent');
+    press(r, 'top-categories-chart-row-cat_food');
+    expect(n.onOpenActivity).toHaveBeenLastCalledWith({ categoryIds: ['cat_food'], fromDate: '2026-11-01', toDate: '2026-11-30' });
+    expect(host(r, 'top-categories-chart-table')).toHaveLength(1); // still the table after coming back: Home unchanged
+    const fresh = await remount(); // a new Home (the app reopened) starts on the bars
+    expect(host(fresh.r, 'top-categories-chart-table')).toHaveLength(0);
+  });
+
+  it('with no spending shows the empty state, not an empty chart', async () => {
+    const { r } = await mountCards({ topCategories: tc({ rows: [], totalMinor: 0 }) });
+    expect(texts(r)).toContain('Nothing spent yet this period.');
+    expect(host(r, 'top-categories-chart')).toHaveLength(0);
+  });
+
+  it('shows no money while amounts are hidden: no fill, no percent, names stay', async () => {
+    useAmountsStore.getState().setHidden(true);
+    const { r } = await mountCards({ topCategories: tc() });
+    expect(host(r, 'top-categories-chart-fill-cat_groceries')).toHaveLength(0);
+    expect(moneyLeaks(r)).toEqual([]);
+    expect(texts(r)).toContain('Groceries');
+    press(r, 'top-categories-chart-toggle');
+    expect(moneyLeaks(r)).toEqual([]);
+    expect(texts(r).some((t) => /%/.test(t))).toBe(false);
+  });
+});
+
+describe('chart cards: refresh and failures (Story 5.5)', () => {
+  it('recompute with the hero when the home area is invalidated', async () => {
+    const { r, api, qc } = await mountCards({ topCategories: tc(), spend7d: sp() });
+    api.loadTopCategories.mockResolvedValue(tc({ rows: [{ categoryId: 'cat_health', name: 'Health', icon: 'Heart', colorToken: 'cat-rose', amountMinor: 999_900, sharePercent: 100, categoryIds: ['cat_health'] }] }));
+    api.loadSpend7d.mockResolvedValue(sp({ days: sp().days.map((d) => ({ ...d, spentMinor: 12_300 })) }));
+    await act(async () => qc.invalidateQueries({ queryKey: ['home'] }));
+    await settle();
+    expect(api.loadTopCategories).toHaveBeenCalledTimes(2);
+    expect(api.loadSpend7d).toHaveBeenCalledTimes(2);
+    expect(texts(r)).toEqual(expect.arrayContaining(['Health', '₹9,999.00', '₹123.00']));
+  });
+
+  it('a chart whose load fails shows its own error with Retry that reloads it, and the others stay', async () => {
+    const { r, api } = await mountCards({ topCategories: async () => { throw new Error('boom'); }, spend7d: async () => { throw new Error('boom'); } });
+    for (const id of ['top_categories', 'spend_7d']) {
+      expect(host(r, `home-card-${id}`)[0]!.findAll((x) => typeof x.type === 'string' && x.props.testID === 'error-block')).toHaveLength(1);
+    }
+    expect(host(r, 'home-card-income_expense')).toHaveLength(1);
+    api.loadTopCategories.mockResolvedValue(tc());
+    const retry = host(r, 'home-card-top_categories')[0]!.findAll((x) => x.props.label === 'Try again' && typeof x.props.onPress === 'function')[0]!;
+    await act(async () => retry.props.onPress());
+    await settle();
+    expect(texts(r)).toContain('Groceries');
+    expect(api.loadSpend7d).toHaveBeenCalledTimes(1); // the other chart was not reloaded by this Retry
+  });
+});
+
+describe('Spending, last 7 days (Story 5.5)', () => {
+  it('shows one bar per day, today labelled Today, zero days as genuine zeros, and opens Activity for the day', async () => {
+    const { r, n } = await mountCards({ spend7d: sp() });
+    expect(texts(r)).toEqual(expect.arrayContaining(['Spending, last 7 days · Last 7 days', 'Thu', 'Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Today', '₹0.00']));
+    expect(host(r, 'spend-7d-chart-bar-2026-11-18')).toHaveLength(1);
+    press(r, 'spend-7d-chart-bar-2026-11-14');
+    expect(n.onOpenActivity).toHaveBeenLastCalledWith({ fromDate: '2026-11-14', toDate: '2026-11-14' });
+    for (const t of texts(r)) expect(t).not.toMatch(/[-−]/);
+  });
+
+  it('a young profile shows only its days with Since, and no trend or comparison', async () => {
+    const { r } = await mountCards({ spend7d: sp({ days: sp().days.slice(3), since: '2026-11-15' }) });
+    expect(texts(r)).toContain('Since Sun 15 Nov');
+    expect(host(r, 'spend-7d-chart-bar-2026-11-12')).toHaveLength(0);
+    expect(texts(r).some((t) => /trend|vs|compared|↑|↓/i.test(t))).toBe(false);
+  });
+
+  it('the table reads each day, and masks like the other chart', async () => {
+    const { r } = await mountCards({ spend7d: sp() });
+    press(r, 'spend-7d-chart-toggle');
+    expect(host(r, 'spend-7d-chart-table')).toHaveLength(1);
+    expect(host(r, 'spend-7d-chart-row-2026-11-18')[0]!.props.accessibilityLabel).toBe('Today, 3,500 rupees');
   });
 });
 

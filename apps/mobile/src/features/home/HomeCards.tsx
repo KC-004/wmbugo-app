@@ -1,8 +1,8 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { CaretRight } from 'phosphor-react-native';
-import type { ActivityQuery, BudgetListRow, CurrencyCode, HomeBudgetCards, IncomeExpense } from '@wmbugo/core';
+import { shortDate, type ActivityQuery, type BudgetListRow, type CurrencyCode, type HomeBudgetCards, type IncomeExpense, type Spend7d, type TopCategories } from '@wmbugo/core';
 import { amountLabel, controlA11y, spokenAmount } from '../../shared/a11y/labels';
 import { useAmountsHidden } from '../../shared/state/amountsHidden';
 import { copy } from '../../shared/copy';
@@ -12,6 +12,9 @@ import { useTheme } from '../../shared/theme/ThemeProvider';
 import { radii } from '../../shared/theme/tokens';
 import { textStyle } from '../../shared/theme/typography';
 import { Amount } from '../../shared/ui/Amount';
+import { BarChart, type BarDatum } from '../../shared/ui/BarChart';
+import type { ColorName } from '../../shared/theme/colors';
+import { categoryIcon } from '../add/categoryIcons';
 import { LimitBar, limitBarLabel, savingsLabel } from '../../shared/ui/LimitBar';
 import { moneyText } from '../../shared/ui/moneyText';
 import { HOME_CARDS, visibleCards, type CardId } from './cardRegistry';
@@ -19,6 +22,8 @@ import type { HomeApi } from './homeApi';
 
 export const HOME_INCOME_KEY = ['home', 'income'] as const;
 export const HOME_BUDGETS_KEY = ['home', 'budgets'] as const;
+export const HOME_TOP_CATEGORIES_KEY = ['home', 'top-categories'] as const;
+export const HOME_SPEND_7D_KEY = ['home', 'spend-7d'] as const;
 
 export interface HomeCardsNav {
   onOpenReview: () => void;
@@ -155,6 +160,75 @@ function NwsCard({ cards, currency, locale, onOpenPlan, onOpenActivity }: { card
   );
 }
 
+/** The 40dp category chip drawn before a bar's name: the category icon in its own colour. */
+function CategoryChip({ icon, colorToken }: { icon: string; colorToken: string }) {
+  const theme = useTheme();
+  return (
+    <View style={[styles.catChip, { backgroundColor: theme.color('bg-muted') }]}>
+      <Icon icon={categoryIcon(icon)} size={22} color={colorToken as ColorName} />
+    </View>
+  );
+}
+
+function TopCategoriesCard({ d, currency, locale, table, onToggleTable, onOpenActivity }: { d: TopCategories; currency: CurrencyCode; locale: string; table: boolean; onToggleTable: () => void; onOpenActivity: (q: ActivityQuery) => void }) {
+  const theme = useTheme();
+  if (d.rows.length === 0) {
+    return (
+      <CardFrame id="top_categories" title={copy.home.cards.topCategories}>
+        <Text testID="top-categories-empty" style={[textStyle('body'), { color: theme.color('text-secondary') }]}>
+          {copy.home.cards.nothingSpent}
+        </Text>
+      </CardFrame>
+    );
+  }
+  const data: BarDatum[] = d.rows.map((r) => ({ id: r.categoryId, label: r.name, valueMinor: r.amountMinor, sharePercent: r.sharePercent, leading: <CategoryChip icon={r.icon} colorToken={r.colorToken} /> }));
+  return (
+    <CardFrame id="top_categories" title={copy.home.cards.topCategories} scope={null}>
+      <BarChart
+        testID="top-categories-chart"
+        title={copy.home.cards.topCategories}
+        scope={copy.home.cards.thisPeriod}
+        data={data}
+        currency={currency}
+        locale={locale}
+        orientation="horizontal"
+        table={table}
+        onToggleTable={onToggleTable}
+        onPressDatum={(b) => {
+          const row = d.rows.find((r) => r.categoryId === b.id);
+          if (row) onOpenActivity({ categoryIds: row.categoryIds, fromDate: d.period.start, toDate: d.period.end });
+        }}
+      />
+    </CardFrame>
+  );
+}
+
+function Spend7dCard({ d, currency, locale, table, onToggleTable, onOpenActivity }: { d: Spend7d; currency: CurrencyCode; locale: string; table: boolean; onToggleTable: () => void; onOpenActivity: (q: ActivityQuery) => void }) {
+  const theme = useTheme();
+  const data: BarDatum[] = d.days.map((x) => ({ id: x.date, label: x.label, valueMinor: x.spentMinor }));
+  return (
+    <CardFrame id="spend_7d" title={copy.home.cards.spendLastWeek} scope={null}>
+      <BarChart
+        testID="spend-7d-chart"
+        title={copy.home.cards.spendLastWeek}
+        scope={copy.home.cards.lastSevenDays}
+        data={data}
+        currency={currency}
+        locale={locale}
+        orientation="vertical"
+        table={table}
+        onToggleTable={onToggleTable}
+        onPressDatum={(b) => onOpenActivity({ fromDate: b.id, toDate: b.id })}
+      />
+      {d.since ? (
+        <Text testID="spend-7d-since" style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>
+          {copy.home.cards.since.replace('{date}', shortDate(d.since))}
+        </Text>
+      ) : null}
+    </CardFrame>
+  );
+}
+
 function CardError({ id, title, onRetry }: { id: CardId; title: string; onRetry: () => void }) {
   return (
     <CardFrame id={id} title={title} scope={null}>
@@ -168,10 +242,16 @@ function CardError({ id, title, onRetry }: { id: CardId; title: string; onRetry:
  * error with Retry and the others carry on. The `N to check` count comes with the hero snapshot.
  */
 export function HomeCards({ api, toCheckCount, currency, locale, nav }: { api: HomeApi; toCheckCount: number; currency: CurrencyCode; locale: string; nav: HomeCardsNav }) {
+  // `View as table` is remembered per chart for as long as Home is open: opening an entry list from a bar and coming back
+  // leaves Home unchanged (Story 5.5). A new Home (the app reopened) starts on the bars.
+  const [tables, setTables] = useState<Partial<Record<CardId, boolean>>>({});
+  const toggle = (id: CardId) => () => setTables((t) => ({ ...t, [id]: !t[id] }));
   const income = useQuery({ queryKey: HOME_INCOME_KEY, queryFn: async () => (api.loadIncomeExpense ? await api.loadIncomeExpense() : null) });
+  const topCategories = useQuery({ queryKey: HOME_TOP_CATEGORIES_KEY, queryFn: async () => (api.loadTopCategories ? await api.loadTopCategories() : null) });
+  const spend7d = useQuery({ queryKey: HOME_SPEND_7D_KEY, queryFn: async () => (api.loadSpend7d ? await api.loadSpend7d() : null) });
   const budgets = useQuery({ queryKey: HOME_BUDGETS_KEY, queryFn: async () => (api.loadBudgetCards ? await api.loadBudgetCards() : null) });
   // A card keeps its last good data when a refresh fails (the hero says so); an error shows only when there is nothing to show.
-  const inputs = { toCheckCount, ...(income.data !== undefined ? { income: income.data } : {}), ...(budgets.data !== undefined ? { budgets: budgets.data } : {}) };
+  const inputs = { toCheckCount, ...(income.data !== undefined ? { income: income.data } : {}), ...(budgets.data !== undefined ? { budgets: budgets.data } : {}), ...(topCategories.data !== undefined ? { topCategories: topCategories.data } : {}), ...(spend7d.data !== undefined ? { spend7d: spend7d.data } : {}) };
   const shown = new Set(visibleCards(inputs).map((c) => c.id));
   const budgetsFailed = budgets.isError && budgets.data === undefined;
 
@@ -187,6 +267,14 @@ export function HomeCards({ api, toCheckCount, currency, locale, nav }: { api: H
         if (budgets.data) return <BudgetsCard key={id} cards={budgets.data} currency={currency} locale={locale} onOpenBudget={nav.onOpenBudget} />;
         if (budgetsFailed) return <CardError key={id} id={id} title={copy.home.cards.budgets} onRetry={() => void budgets.refetch()} />;
         return <Skeleton key={id} height={96} />;
+      case 'top_categories':
+        if (topCategories.data) return <TopCategoriesCard key={id} d={topCategories.data} currency={currency} locale={locale} table={!!tables[id]} onToggleTable={toggle(id)} onOpenActivity={nav.onOpenActivity} />;
+        if (topCategories.isError) return <CardError key={id} id={id} title={copy.home.cards.topCategories} onRetry={() => void topCategories.refetch()} />;
+        return <Skeleton key={id} height={120} />;
+      case 'spend_7d':
+        if (spend7d.data) return <Spend7dCard key={id} d={spend7d.data} currency={currency} locale={locale} table={!!tables[id]} onToggleTable={toggle(id)} onOpenActivity={nav.onOpenActivity} />;
+        if (spend7d.isError) return <CardError key={id} id={id} title={copy.home.cards.spendLastWeek} onRetry={() => void spend7d.refetch()} />;
+        return <Skeleton key={id} height={160} />;
       case 'nws':
         return budgets.data?.nws ? <NwsCard key={id} cards={budgets.data} currency={currency} locale={locale} onOpenPlan={nav.onOpenPlan} onOpenActivity={nav.onOpenActivity} /> : null;
     }
@@ -216,4 +304,5 @@ const styles = StyleSheet.create({
   rows: { gap: 16 },
   budgetRow: { gap: 4 },
   sortRow: { minHeight: 48, justifyContent: 'center' },
+  catChip: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
 });
