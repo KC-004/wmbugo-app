@@ -19,7 +19,7 @@ import { captionText, cadenceText, statusText } from './billText';
  * amount right-aligned and one status line. A due-soon bill shows a warning icon with its text; a bill not seen yet offers
  * `Mark as paid`. The row is one TalkBack node; at large font sizes the amount wraps below the name.
  */
-export function BillRow({ row, currency, locale, onPress, onMarkPaid }: { row: BillRowModel; currency: CurrencyCode; locale: string; onPress: () => void; onMarkPaid?: () => void }) {
+export function BillRow({ row, currency, locale, onPress, onMarkPaid, onLink }: { row: BillRowModel; currency: CurrencyCode; locale: string; onPress: () => void; onMarkPaid?: () => void; onLink?: () => void }) {
   useAmountsHidden(); // re-render when Hide amounts is toggled: this component builds amount labels
   const theme = useTheme();
   const { fontScale } = useWindowDimensions();
@@ -45,7 +45,12 @@ export function BillRow({ row, currency, locale, onPress, onMarkPaid }: { row: B
           <Amount amountMinor={row.expectedAmountMinor} currency={currency} locale={locale} direction="neutral" role="amount" />
         </View>
       </Pressable>
-      {row.status.kind === 'not_seen_yet' && onMarkPaid ? <Button label={copy.bills.markAsPaid} variant="text" testID={`bill-mark-${row.id}`} onPress={onMarkPaid} /> : null}
+      {row.status.kind === 'not_seen_yet' && onMarkPaid ? (
+        <View style={styles.actions}>
+          <Button label={copy.bills.markAsPaid} variant="text" testID={`bill-mark-${row.id}`} onPress={onMarkPaid} />
+          {onLink ? <Button label={copy.bills.linkAnEntry} variant="text" testID={`bill-link-${row.id}`} onPress={onLink} /> : null}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -59,4 +64,5 @@ const styles = StyleSheet.create({
   column: { flexDirection: 'column' },
   text: { flexShrink: 1, gap: 2 },
   status: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  actions: { flexDirection: 'row', flexWrap: 'wrap' },
 });

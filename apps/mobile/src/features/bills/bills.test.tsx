@@ -1,14 +1,15 @@
 import { AccessibilityInfo, Text } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { mapCategoryRows, SEED_CATEGORIES, type BillDetail, type BillRowModel, type BillRule, type SaveRecurringRuleInput } from '@wmbugo/core';
+import { mapCategoryRows, SEED_CATEGORIES, type BillDetail, type BillRowModel, type BillRule, type LinkCandidate, type SaveRecurringRuleInput } from '@wmbugo/core';
 import { SheetHost } from '../../shared/feedback/SheetHost';
 import { ToastHost } from '../../shared/feedback/ToastHost';
 import { createQueryClient } from '../../shared/queryClient';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
 import { BillsScreen } from './BillsScreen';
 import { BillDetailScreen } from './BillDetailScreen';
-import type { BillDetailData, BillOutcome, BillsApi, BillsData } from './billsApi';
+import { TransactionBillSection } from './TransactionBillSection';
+import type { BillDetailData, BillOutcome, BillsApi, BillsData, EntryBillState } from './billsApi';
 import { cadenceText, statusText } from './billText';
 
 jest.mock('../../adapters/startApp', () => ({ getServices: jest.fn(), systemClock: { nowMs: () => 0 } }));
@@ -76,7 +77,7 @@ const data = (rows: { active?: BillRowModel[]; paused?: BillRowModel[]; ended?: 
   currency: 'INR', locale: 'en-IN', exponent: 2, ...pickers,
 });
 
-const fakeApi = (d: BillsData, detail?: BillDetailData | 'missing') => {
+const fakeApi = (d: BillsData, detail?: BillDetailData | 'missing', entry: EntryBillState = { link: null, match: null }) => {
   const ok: BillOutcome = { ok: true };
   const api = {
     load: jest.fn(async () => d),
@@ -89,6 +90,11 @@ const fakeApi = (d: BillsData, detail?: BillDetailData | 'missing') => {
     end: jest.fn(async () => ok),
     markPaid: jest.fn(async () => ok),
     unmarkPaid: jest.fn(async () => ok),
+    forEntry: jest.fn(async () => entry),
+    link: jest.fn(async (): Promise<BillOutcome> => ok),
+    unlink: jest.fn(async () => ok),
+    dismissMatch: jest.fn(async () => ok),
+    candidates: jest.fn(async (): Promise<readonly LinkCandidate[]> => []),
   };
   return api as typeof api & BillsApi;
 };
@@ -227,7 +233,7 @@ describe('Bill detail (Story 6.2)', () => {
     const d = detailData({
       row: row({ hasPayments: true }),
       canDelete: false,
-      history: [{ dueDate: '2026-11-05', status: 'paid', paidBy: 'marked', transactionId: null }, { dueDate: '2026-10-05', status: 'not_marked_paid', paidBy: null, transactionId: null }],
+      history: [{ dueDate: '2026-11-05', status: 'paid', paidBy: 'marked', transactionId: null, paidOn: null, paidAmountMinor: null }, { dueDate: '2026-10-05', status: 'not_marked_paid', paidBy: null, transactionId: null, paidOn: null, paidAmountMinor: null }],
     });
     const r = await mountNode(<BillDetailScreen ruleId="r1" api={fakeApi(data(), d)} onBack={() => undefined} />);
     expect(has(r, 'bill-detail-delete')).toBe(false);
@@ -268,5 +274,84 @@ describe('Bill detail (Story 6.2)', () => {
   it('a deleted bill shows the way back', async () => {
     const r = await mountNode(<BillDetailScreen ruleId="r1" api={fakeApi(data())} onBack={() => undefined} />);
     expect(texts(r)).toContain('This bill was deleted.');
+  });
+});
+
+const MATCH = { ruleId: 'r1', title: 'Rent', dueDate: '2026-12-05', expectedAmountMinor: 1_800_000 };
+const candidate = (over: Partial<LinkCandidate> = {}): LinkCandidate => ({ id: 't1', amountMinor: 1_800_000, localDate: '2026-12-04', merchant: 'Ramesh Kumar', categoryName: 'Housing', categoryIcon: 'House', categoryColor: 'cat-brown', accountName: 'HDFC', looksLikeMatch: true, ...over });
+
+describe('Rent paid? Yes, link it (Story 6.3)', () => {
+  it('shows nothing for an entry with no bill, and the prompt for one that looks like a payment', async () => {
+    const none = await mountNode(<TransactionBillSection transactionId="t1" api={fakeApi(data())} />);
+    expect(has(none, 'bill-match-prompt')).toBe(false);
+    expect(has(none, 'bill-linked')).toBe(false);
+    const api = fakeApi(data(), undefined, { link: null, match: MATCH });
+    const r = await mountNode(<TransactionBillSection transactionId="t1" api={api} />);
+    expect(texts(r)).toEqual(expect.arrayContaining(['Rent paid?', 'Yes, link it', 'Not this one']));
+    await press(r, 'bill-match-link');
+    expect(api.link).toHaveBeenCalledWith('r1', '2026-12-05', 't1');
+    expect(texts(r)).toContain('Linked to Rent');
+    await press(r, 'toast-undo');
+    expect(api.unlink).toHaveBeenCalledWith('t1');
+  });
+
+  it('Not this one dismisses the bill for this entry', async () => {
+    const api = fakeApi(data(), undefined, { link: null, match: MATCH });
+    const r = await mountNode(<TransactionBillSection transactionId="t1" api={api} />);
+    await press(r, 'bill-match-dismiss');
+    expect(api.dismissMatch).toHaveBeenCalledWith('r1', 't1');
+  });
+
+  it('a linked entry reads Paid Rent for 5 Dec with Unlink', async () => {
+    const api = fakeApi(data(), undefined, { link: { ruleId: 'r1', title: 'Rent', dueDate: '2026-12-05' }, match: null });
+    const r = await mountNode(<TransactionBillSection transactionId="t1" api={api} />);
+    expect(texts(r)).toContain('Paid Rent for 5 Dec');
+    expect(has(r, 'bill-match-prompt')).toBe(false);
+    await press(r, 'bill-unlink');
+    expect(api.unlink).toHaveBeenCalledWith('t1');
+    expect(texts(r)).toContain('Unlinked');
+  });
+
+  it('a refused link says why and nothing changes', async () => {
+    const api = fakeApi(data(), undefined, { link: null, match: MATCH });
+    api.link.mockResolvedValueOnce({ ok: false, code: 'ALREADY_LINKED:2026-12-05:Rent' });
+    const r = await mountNode(<TransactionBillSection transactionId="t1" api={api} />);
+    await press(r, 'bill-match-link');
+    expect(texts(r)).toContain('This entry is already linked to Rent (5 Dec).');
+    api.link.mockResolvedValueOnce({ ok: false, code: 'OCCURRENCE_PAID:2026-12-05:Rent' });
+    await press(r, 'bill-match-link');
+    expect(texts(r)).toContain('Rent for 5 Dec is already paid.');
+  });
+});
+
+describe('Link an entry (Story 6.3)', () => {
+  it('lists nearby entries with the match first, and picking one links it', async () => {
+    const d = detailData({ row: row({ status: { kind: 'not_seen_yet', date: '2026-11-05', daysUntilDue: null, paidBy: null } }), markableDate: '2026-11-05' });
+    const api = fakeApi(data(), d);
+    api.candidates.mockResolvedValue([candidate(), candidate({ id: 't2', merchant: 'Big Basket', amountMinor: 250_000, looksLikeMatch: false })]);
+    const r = await mountNode(<BillDetailScreen ruleId="r1" api={api} onBack={() => undefined} />);
+    await press(r, 'bill-detail-link');
+    expect(api.candidates).toHaveBeenCalledWith('r1', '2026-11-05', '');
+    expect(has(r, 'bill-link-match-t1')).toBe(true);
+    expect(has(r, 'bill-link-match-t2')).toBe(false);
+    await type(r, 'bill-link-search', 'basket');
+    expect(api.candidates).toHaveBeenLastCalledWith('r1', '2026-11-05', 'basket');
+    await press(r, 'activity-row-t1');
+    expect(api.link).toHaveBeenCalledWith('r1', '2026-11-05', 't1');
+  });
+
+  it('with no entries it says to add the payment first or mark it as paid', async () => {
+    const api = fakeApi(data(), detailData());
+    const r = await mountNode(<BillDetailScreen ruleId="r1" api={api} onBack={() => undefined} />);
+    await press(r, 'bill-detail-link');
+    expect(texts(r)).toContain('No entries near 5 Dec. Add the payment first, or mark it as paid.');
+  });
+
+  it('a linked bill reads Paid 4 Dec · linked and its history shows the actual amount', async () => {
+    const paid = { kind: 'paid' as const, date: '2026-12-05', daysUntilDue: null, paidBy: 'linked' as const, paidOn: '2026-12-04' };
+    const d = detailData({ row: row({ status: paid, hasPayments: true }), canDelete: false, history: [{ dueDate: '2026-12-05', status: 'paid', paidBy: 'linked', transactionId: 't1', paidOn: '2026-12-04', paidAmountMinor: 1_850_000 }] });
+    const r = await mountNode(<BillDetailScreen ruleId="r1" api={fakeApi(data(), d)} onBack={() => undefined} />);
+    expect(texts(r)).toContain('Paid 4 Dec · linked');
+    expect(texts(r).some((t) => /^Paid ₹18,500(\.00)? · 4 Dec$/.test(t))).toBe(true);
   });
 });

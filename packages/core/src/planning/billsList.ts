@@ -18,6 +18,8 @@ export interface BillStatusLine {
   readonly daysUntilDue: number | null;
   /** For `paid`: how it was paid. */
   readonly paidBy: 'linked' | 'marked' | null;
+  /** For a linked payment: the date of the entry that paid it (it can differ from the due date). */
+  readonly paidOn?: string | null;
 }
 
 export interface BillRowModel {
@@ -51,6 +53,16 @@ export interface BillsList {
 /** Far enough back to hold one step of the longest cadence (99 months). */
 const LOOKBACK_DAYS = 3200;
 
+/** The date and amount of the entries that paid bills, by entry id. */
+type LinkedEntries = ReadonlyMap<string, { readonly localDate: string; readonly amountMinor: number }>;
+
+async function readLinked(q: Querier, payments: readonly BillPayment[]): Promise<LinkedEntries> {
+  const ids = payments.map((p) => p.transactionId).filter((x): x is string => x !== null);
+  if (ids.length === 0) return new Map();
+  const rows = await q.query(`SELECT id, local_date, amount_minor FROM "transaction" WHERE id IN (${ids.map(() => '?').join(',')})`, ids);
+  return new Map(rows.map((r) => [String(r[0]), { localDate: String(r[1]), amountMinor: Number(r[2]) }]));
+}
+
 interface Names {
   readonly accounts: ReadonlyMap<string, string>;
   readonly categories: ReadonlyMap<string, { name: string; icon: string; color: string }>;
@@ -63,20 +75,20 @@ async function readNames(q: Querier): Promise<Names> {
 }
 
 /** The occurrence that matters now: the newest due date up to 3 days ahead, or the next one when nothing is that close. */
-function statusFor(rule: BillRule, payments: readonly BillPayment[], today: string): { status: BillStatusLine; focusDate: string | null; focusStatus: BillStatus | null } {
+function statusFor(rule: BillRule, payments: readonly BillPayment[], today: string, linked: LinkedEntries): { status: BillStatusLine; focusDate: string | null; focusStatus: BillStatus | null } {
   if (rule.endedAt !== null) return { status: { kind: 'ended', date: null, daysUntilDue: null, paidBy: null }, focusDate: null, focusStatus: null };
   if (rule.pausedAt !== null) return { status: { kind: 'paused', date: null, daysUntilDue: null, paidBy: null }, focusDate: null, focusStatus: null };
   const from = rule.anchorDate > addDays(today, -LOOKBACK_DAYS) ? rule.anchorDate : addDays(today, -LOOKBACK_DAYS);
   const last = billOccurrences([rule], payments, from, addDays(today, 3), today).at(-1);
   if (last) {
     const kind = last.status === 'not_marked_paid' ? 'not_seen_yet' : last.status === 'upcoming' ? 'upcoming' : last.status;
-    return { status: { kind, date: last.dueDate, daysUntilDue: last.daysUntilDue ?? null, paidBy: last.payment?.kind ?? null }, focusDate: last.dueDate, focusStatus: last.status };
+    return { status: { kind, date: last.dueDate, daysUntilDue: last.daysUntilDue ?? null, paidBy: last.payment?.kind ?? null, paidOn: last.payment?.transactionId ? (linked.get(last.payment.transactionId)?.localDate ?? null) : null }, focusDate: last.dueDate, focusStatus: last.status };
   }
   const next = nextDue(rule, payments, today);
   return { status: { kind: 'upcoming', date: next, daysUntilDue: null, paidBy: null }, focusDate: null, focusStatus: null };
 }
 
-function toRow(rule: BillRule, payments: readonly BillPayment[], names: Names, today: string): BillRowModel {
+function toRow(rule: BillRule, payments: readonly BillPayment[], names: Names, today: string, linked: LinkedEntries): BillRowModel {
   const mine = payments.filter((p) => p.ruleId === rule.id);
   const cat = rule.categoryId ? names.categories.get(rule.categoryId) : undefined;
   return {
@@ -95,7 +107,7 @@ function toRow(rule: BillRule, payments: readonly BillPayment[], names: Names, t
     categoryColor: cat?.color ?? null,
     state: rule.endedAt !== null ? 'ended' : rule.pausedAt !== null ? 'paused' : 'active',
     nextDue: nextDue(rule, mine, today),
-    status: statusFor(rule, mine, today).status,
+    status: statusFor(rule, mine, today, linked).status,
     hasPayments: mine.length > 0,
   };
 }
@@ -107,7 +119,8 @@ export async function loadBillsList(q: Querier, nowMs: number): Promise<BillsLis
   const rules = mapRules(await q.query(RECURRING_RULES_SQL));
   const payments = mapPayments(await q.query(RECURRING_PAYMENTS_SQL));
   const names = await readNames(q);
-  const rows = rules.map((r) => toRow(r, payments, names, today));
+  const linked = await readLinked(q, payments);
+  const rows = rules.map((r) => toRow(r, payments, names, today, linked));
   const byDue = (a: BillRowModel, b: BillRowModel) => (a.nextDue ?? '9999') < (b.nextDue ?? '9999') ? -1 : (a.nextDue ?? '9999') > (b.nextDue ?? '9999') ? 1 : a.title.localeCompare(b.title);
   return {
     today,
@@ -123,6 +136,9 @@ export interface BillHistoryItem {
   readonly status: 'paid' | 'not_marked_paid' | 'not_seen_yet';
   readonly paidBy: 'linked' | 'marked' | null;
   readonly transactionId: string | null;
+  /** For a linked payment: the entry's date and its actual amount (it can differ from the expected one). */
+  readonly paidOn: string | null;
+  readonly paidAmountMinor: number | null;
 }
 
 export interface BillDetail {
@@ -143,14 +159,15 @@ export async function loadBillDetail(q: Querier, nowMs: number, id: string): Pro
   const rule = mapRules(await q.query(RECURRING_RULE_SQL, [id]))[0];
   if (!rule || rule.removedAt !== null) return 'missing';
   const payments = mapPayments(await q.query('SELECT rule_id, due_date, payment_kind, transaction_id, recorded_at FROM recurring_payment WHERE rule_id = ?', [id]));
-  const row = toRow(rule, payments, await readNames(q), today);
+  const linked = await readLinked(q, payments);
+  const row = toRow(rule, payments, await readNames(q), today, linked);
   const from = rule.anchorDate > addDays(today, -LOOKBACK_DAYS) ? rule.anchorDate : addDays(today, -LOOKBACK_DAYS);
   const history: BillHistoryItem[] = billOccurrences([rule], payments, from, today, today)
     .filter((o) => o.status === 'paid' || o.status === 'not_marked_paid' || o.status === 'not_seen_yet')
-    .map((o) => ({ dueDate: o.dueDate, status: o.status as BillHistoryItem['status'], paidBy: o.payment?.kind ?? null, transactionId: o.payment?.transactionId ?? null }))
+    .map((o) => ({ dueDate: o.dueDate, status: o.status as BillHistoryItem['status'], paidBy: o.payment?.kind ?? null, transactionId: o.payment?.transactionId ?? null, paidOn: o.payment?.transactionId ? (linked.get(o.payment.transactionId)?.localDate ?? null) : null, paidAmountMinor: o.payment?.transactionId ? (linked.get(o.payment.transactionId)?.amountMinor ?? null) : null }))
     .reverse()
     .slice(0, 24);
-  const focus = statusFor(rule, payments, today);
+  const focus = statusFor(rule, payments, today, linked);
   const markable = rule.pausedAt !== null || rule.endedAt !== null ? null : focus.focusDate !== null && focus.focusStatus !== 'paid' ? focus.focusDate : row.nextDue;
   return { rule, row, today, history, markableDate: markable, canDelete: !row.hasPayments };
 }

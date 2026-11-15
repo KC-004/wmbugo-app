@@ -10,3 +10,4 @@ export * from './recurring';
 export * from './recurringStore';
 export * from './recurringCommands';
 export * from './billsList';
+export * from './billLinks';

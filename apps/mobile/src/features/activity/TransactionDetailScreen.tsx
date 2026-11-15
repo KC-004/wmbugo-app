@@ -28,6 +28,8 @@ import { CategoryPickerSheet } from './CategoryPickerSheet';
 import { ReceiptPhotos } from './ReceiptPhotos';
 import { usePermanentDelete } from './usePermanentDelete';
 import { realDeletedApi, type DeletedApi } from './deletedApi';
+import { TransactionBillSection } from '../bills/TransactionBillSection';
+import type { BillsApi } from '../bills/billsApi';
 
 const TYPE_LABEL: Readonly<Record<TransactionDetail['type'], string>> = {
   expense: copy.detail.typeExpense,
@@ -72,6 +74,7 @@ export function TransactionDetailScreen({
   api = realTransactionApi,
   duplicateApi = realAddApi,
   deletedApi = realDeletedApi,
+  billsApi,
 }: {
   transactionId: string;
   onBack: () => void;
@@ -83,6 +86,8 @@ export function TransactionDetailScreen({
   duplicateApi?: Pick<AddApi, 'duplicateInfo' | 'keepBoth' | 'merge' | 'undoResolution'>;
   /** Delete permanently (confirm sheet facts and the purge). */
   deletedApi?: Pick<DeletedApi, 'purgeFacts' | 'purge'>;
+  /** Tests inject the bills port; the real one is used otherwise. */
+  billsApi?: BillsApi;
 }) {
   useAmountsHidden(); // re-render when Hide amounts is toggled: this component builds amount text and labels
   const theme = useTheme();
@@ -437,6 +442,8 @@ export function TransactionDetailScreen({
             ))}
           </View>
         ) : null}
+
+        {!d.removed && d.type === 'expense' ? <TransactionBillSection transactionId={d.id} {...(billsApi ? { api: billsApi } : {})} /> : null}
 
         {d.openDuplicate ? (
           <View testID="detail-check" style={styles.row}>

@@ -1,6 +1,8 @@
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
-import { dayMonthLabel, type BillHistoryItem } from '@wmbugo/core';
+import { dayMonthLabel, type BillHistoryItem, type CurrencyCode } from '@wmbugo/core';
+import { useAmountsHidden } from '../../shared/state/amountsHidden';
+import { moneyText } from '../../shared/ui/moneyText';
 import { copy } from '../../shared/copy';
 import { EmptyState, ErrorBlock, Skeleton } from '../../shared/feedback/Feedback';
 import { useTheme } from '../../shared/theme/ThemeProvider';
@@ -16,8 +18,10 @@ import { useBillActions } from './useBillActions';
 
 const b = copy.bills;
 
-const historyText = (h: BillHistoryItem): string => {
+/** A linked payment shows what was actually paid and when (`Paid ₹18,500 · 4 Dec`); a marked one shows the due date. */
+const historyText = (h: BillHistoryItem, currency: CurrencyCode, locale: string): string => {
   const date = dayMonthLabel(h.dueDate);
+  if (h.status === 'paid' && h.paidBy === 'linked' && h.paidAmountMinor !== null) return b.historyPaidAmount.replace('{amount}', moneyText(h.paidAmountMinor, currency, locale)).replace('{date}', dayMonthLabel(h.paidOn ?? h.dueDate));
   if (h.status === 'paid') return (h.paidBy === 'linked' ? b.historyPaidLinked : b.historyPaidMarked).replace('{date}', date);
   return b.historyNotMarked.replace('{date}', date);
 };
@@ -27,6 +31,7 @@ const historyText = (h: BillHistoryItem): string => {
  * Pause or Resume, End this bill and (only without payment history) Delete.
  */
 export function BillDetailScreen({ ruleId, onBack, api = realBillsApi }: { ruleId: string; onBack: () => void; api?: BillsApi }) {
+  useAmountsHidden(); // re-render when Hide amounts is toggled: the history builds amount text
   const theme = useTheme();
   const actions = useBillActions(api);
   const q = useQuery({ queryKey: billDetailKey(ruleId), queryFn: () => api.loadDetail(ruleId) });
@@ -75,13 +80,14 @@ export function BillDetailScreen({ ruleId, onBack, api = realBillsApi }: { ruleI
         ) : (
           <View testID="bill-history" style={styles.gap}>
             {d.history.map((h) => (
-              <Text key={h.dueDate} testID={`bill-history-${h.dueDate}`} style={[textStyle('body'), h.status === 'paid' ? ink : muted]}>{historyText(h)}</Text>
+              <Text key={h.dueDate} testID={`bill-history-${h.dueDate}`} style={[textStyle('body'), h.status === 'paid' ? ink : muted]}>{historyText(h, data.currency, data.locale)}</Text>
             ))}
           </View>
         )}
 
         <View style={styles.actions}>
           {d.markableDate ? <Button label={b.markAsPaid} testID="bill-detail-mark" onPress={() => actions.confirmMarkPaid(rule, d.markableDate!)} /> : null}
+          {d.markableDate ? <Button label={b.linkAnEntry} variant="secondary" testID="bill-detail-link" onPress={() => actions.openLinkPicker(rule, d.markableDate!, { currency: data.currency, locale: data.locale, today: d.today })} /> : null}
           {row.state !== 'ended' ? <Button label={b.edit} variant="secondary" testID="bill-detail-edit" onPress={() => actions.openEditor({ mode: 'edit', rule: d.rule }, pickers)} /> : null}
           {active ? <Button label={b.pause} variant="secondary" testID="bill-detail-pause" onPress={() => void actions.pause(rule)} /> : null}
           {row.state === 'paused' ? <Button label={b.resume} variant="secondary" testID="bill-detail-resume" onPress={() => void actions.resume(rule)} /> : null}

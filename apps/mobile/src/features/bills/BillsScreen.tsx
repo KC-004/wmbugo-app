@@ -51,7 +51,9 @@ export function BillsScreen({ api = realBillsApi, onBack, onOpenBill }: { api?: 
       currency={data.currency}
       locale={data.locale}
       onPress={() => onOpenBill(r.id)}
-      {...(r.status.kind === 'not_seen_yet' && r.status.date ? { onMarkPaid: () => actions.confirmMarkPaid({ id: r.id, title: r.title }, r.status.date!) } : {})}
+      {...(r.status.kind === 'not_seen_yet' && r.status.date
+        ? { onMarkPaid: () => actions.confirmMarkPaid({ id: r.id, title: r.title }, r.status.date!), onLink: () => actions.openLinkPicker({ id: r.id, title: r.title }, r.status.date!, { currency: data.currency, locale: data.locale, today: data.list.today }) }
+        : {})}
     />
   );
   const group = (key: 'paused' | 'ended', title: string, rows: readonly BillRowModel[]) =>

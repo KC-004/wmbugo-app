@@ -1,7 +1,15 @@
 import {
   ACCOUNT_LIST_SQL,
   CATEGORY_LIST_SQL,
+  billLinkOf,
+  DismissBillMatch,
   EndRecurringRule,
+  findBillMatch,
+  linkCandidates,
+  LinkBillPayment,
+  UnlinkBillPayment,
+  type BillMatch,
+  type LinkCandidate,
   loadBillDetail,
   loadBillsList,
   mapAccountRows,
@@ -42,6 +50,12 @@ export interface BillDetailData {
   readonly accounts: readonly { id: string; name: string }[];
 }
 
+/** What an entry's detail needs: the bill it pays, or the bill it looks like the payment of. */
+export interface EntryBillState {
+  readonly link: { ruleId: string; title: string; dueDate: string } | null;
+  readonly match: BillMatch | null;
+}
+
 export type BillOutcome = { ok: true } | { ok: false; code: string };
 export type SaveBillOutcome = { ok: true; value: { ruleId: string; created: boolean } } | { ok: false; code: string };
 
@@ -58,7 +72,16 @@ export interface BillsApi {
   end(id: string): Promise<BillOutcome>;
   markPaid(id: string, dueDate: string): Promise<BillOutcome>;
   unmarkPaid(id: string, dueDate: string): Promise<BillOutcome>;
+  /** Story 6.3: the bill an entry pays, or the one it looks like paying. */
+  forEntry(transactionId: string): Promise<EntryBillState>;
+  link(ruleId: string, dueDate: string, transactionId: string): Promise<BillOutcome>;
+  unlink(transactionId: string): Promise<BillOutcome>;
+  /** `Not this one`. */
+  dismissMatch(ruleId: string, transactionId: string): Promise<BillOutcome>;
+  candidates(ruleId: string, dueDate: string, search: string): Promise<readonly LinkCandidate[]>;
 }
+
+export const entryBillKey = (transactionId: string) => ['bills', 'entry', transactionId] as const;
 
 export const BILLS_QUERY_KEY = ['bills', 'list'] as const;
 export const billDetailKey = (id: string) => ['bills', 'detail', id] as const;
@@ -105,5 +128,14 @@ export const realBillsApi: BillsApi = {
   resume: (id) => run(getServices().writer.run(ResumeRecurringRule, { ruleId: id }, 'user')),
   end: (id) => run(getServices().writer.run(EndRecurringRule, { ruleId: id }, 'user')),
   markPaid: (id, dueDate) => run(getServices().writer.run(MarkBillPaid, { ruleId: id, dueDate }, 'user')),
+  async forEntry(transactionId) {
+    const db = getServices().db;
+    const link = await billLinkOf(db, transactionId);
+    return { link, match: link ? null : await findBillMatch(db, transactionId) };
+  },
+  link: (ruleId, dueDate, transactionId) => run(getServices().writer.run(LinkBillPayment, { ruleId, dueDate, transactionId }, 'user')),
+  unlink: (transactionId) => run(getServices().writer.run(UnlinkBillPayment, { transactionId }, 'user')),
+  dismissMatch: (ruleId, transactionId) => run(getServices().writer.run(DismissBillMatch, { ruleId, transactionId }, 'user')),
+  candidates: (ruleId, dueDate, search) => linkCandidates(getServices().db, ruleId, dueDate, search),
   unmarkPaid: (id, dueDate) => run(getServices().writer.run(UnmarkBillPaid, { ruleId: id, dueDate }, 'user')),
 };

@@ -154,3 +154,16 @@ export const recurring_payment = sqliteTable(
     check('recurring_payment_kind_check', sql`${t.payment_kind} IN ('linked','marked')`),
   ],
 );
+
+/** `Not this one`: the bill is never offered as the payment of this entry again (Story 6.3). Keyed by the pair, so it has no id of its own. */
+export const recurring_match_dismissed = sqliteTable(
+  'recurring_match_dismissed',
+  {
+    rule_id: text('rule_id')
+      .notNull()
+      .references(() => recurring_rule.id),
+    transaction_id: text('transaction_id').notNull(),
+    dismissed_at: integer('dismissed_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.rule_id, t.transaction_id] })],
+);

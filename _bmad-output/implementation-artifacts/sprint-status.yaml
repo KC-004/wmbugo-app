@@ -108,7 +108,7 @@ development_status:
   epic-6: in-progress
   6-1-bill-rules-and-due-dates-in-core: review
   6-2-bills-recurring-add-edit-pause-and-end-a-bill: review
-  6-3-link-a-payment-to-a-bill-rent-paid-yes-link-it: backlog
+  6-3-link-a-payment-to-a-bill-rent-paid-yes-link-it: review
   6-4-subscriptions-filter-with-monthly-cost-and-past-charges: backlog
   6-5-bill-reminders-with-a-just-in-time-permission-ask: backlog
   6-6-savings-goals-name-a-goal-and-set-money-aside: backlog

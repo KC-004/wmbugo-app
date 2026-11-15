@@ -13,6 +13,7 @@ export const KEYED_TABLES: ReadonlySet<string> = new Set([
   'balance_chain',
   'budget_alert_fired',
   'recurring_payment',
+  'recurring_match_dismissed',
 ]);
 
 /** Integer columns that look monetary by name but are not money. */

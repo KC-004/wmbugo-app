@@ -4,6 +4,7 @@ import {
   budgetAlertHandlers,
   EvaluateBudgetAlerts,
   RebuildBudgetPeriods,
+  ReleaseBillLinks,
   RunDailyPurge,
   createIdGenerator,
   searchIndexer,
@@ -28,6 +29,7 @@ import { BENCH_TRIGGER, runSaveBenchmark } from './benchmark';
 import { keychainKeyStore } from './storage/keychainKeyStore';
 import { appNotifier } from './notifier';
 import { withBudgetHandlers } from './budgetHandlers';
+import { withBillHandlers } from './billHandlers';
 import { realReceiptFiles } from './files/receiptFiles';
 import { appStateScheduler } from './appStateScheduler';
 import { opSqliteOpener } from './storage/opSqliteOpener';
@@ -122,7 +124,7 @@ async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
     db: started.value.db,
     clock: systemClock,
     logger: log,
-    handlers: withBudgetHandlers(invalidationHandlers(queryClient), async () => {
+    handlers: withBillHandlers(withBudgetHandlers(invalidationHandlers(queryClient), async () => {
       // Payday, the period mode or the first day of the week changed: the derived budget periods are rebuilt from the period
       // service (Story 4.5). A failure is logged and the cache is rebuilt on the next change; no entry is touched either way.
       const w = services?.writer;
@@ -137,7 +139,11 @@ async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
       },
       notifier: appNotifier,
       db: started.value.db,
-    }), log),
+    }), log), async () => {
+      // A linked entry was deleted, rejected or excluded: its bill's due date is unpaid again (Story 6.3).
+      const w = services?.writer;
+      if (w) await w.run(ReleaseBillLinks, {}, 'system');
+    }, log),
   });
   const newId = createIdGenerator(systemClock, secureRandom);
   const writer = new LedgerWriter({

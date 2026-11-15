@@ -23,6 +23,7 @@ import m0018 from './0018_category_guess_backfill_apply.sql';
 import m0019 from './0019_budget_alert_fired.sql';
 import m0020 from './0020_budget_template_income.sql';
 import m0021 from './0021_recurring_tables.sql';
+import m0022 from './0022_recurring_match_dismissed.sql';
 
   export default {
     journal,
@@ -48,7 +49,8 @@ m0017,
 m0018,
 m0019,
 m0020,
-m0021
+m0021,
+m0022
     }
   }
   

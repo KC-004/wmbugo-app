@@ -7,7 +7,7 @@ Inputs: PRD §11.1, AD-3 (ownership), AD-5 (signs), AD-8, [S1](S1-storage-migrat
 
 | Topic | Rule |
 |-------|------|
-| Primary keys | `id TEXT PRIMARY KEY`, a UUID v7 string from the core ID generator. **Exceptions (keyed lookup tables, no row identity of their own):** `settings` (`key`), `prompt_state` (`key`), `schema_migration` (`version INTEGER`), `sms_cursor` (singleton, `id` fixed to `'singleton'`), `budget_alert_fired`, `recurring_payment` and `balance_chain` (composite natural keys). The schema-lint test carries this allowlist. |
+| Primary keys | `id TEXT PRIMARY KEY`, a UUID v7 string from the core ID generator. **Exceptions (keyed lookup tables, no row identity of their own):** `settings` (`key`), `prompt_state` (`key`), `schema_migration` (`version INTEGER`), `sms_cursor` (singleton, `id` fixed to `'singleton'`), `budget_alert_fired`, `recurring_payment`, `recurring_match_dismissed` and `balance_chain` (composite natural keys). The schema-lint test carries this allowlist. |
 | Money | `INTEGER`, name ends `_minor`, a safe integer in the profile currency's exponent. **No `REAL` column anywhere.** Non-money integers (counts, sizes, percentages) must not end in `_minor`. |
 | Instants | `INTEGER` UTC epoch milliseconds, names end `_at` (or `_at_utc` for `transaction.occurred_at_utc`). |
 | Local dates | `TEXT` `YYYY-MM-DD`, names end `_date` or equal `local_date`, `CHECK (length = 10)`. `transaction.local_date` and `timezone_id` are written once at capture and never recomputed. |
@@ -34,7 +34,7 @@ One migration per story (forward-only, one transaction, safety copy first, recor
 | later | Epic 2 | `account_identifier` (ledger) — transfer linking and discovery; `auto_approve_rule` and `clock_guard` with the story that first enforces them (profile) |
 | later | Epic 3 | `merchant`, `payee`, `learned_mapping` (learning) as search/fixes first need them; `attachment` (ledger) with the first attachment story |
 | later | Epic 4 | `budget`, `budget_period`, `budget_alert_fired` (planning) |
-| 0021 | Epic 6 (6.1) | `recurring_rule`, `recurring_payment` (planning); `goal`, `goal_allocation` follow with Story 6.6 |
+| 0021, 0022 | Epic 6 (6.1, 6.3) | `recurring_rule`, `recurring_payment`, `recurring_match_dismissed` (planning); `goal`, `goal_allocation` follow with Story 6.6 |
 | later | Epic 9 | `import_batch`, `source_record` (capture) |
 | later | Epic 10 | `receipt_item` (ledger) |
 | later | Epic 11 | `review_candidate`, `learned_mapping` extensions (capture/learning) |

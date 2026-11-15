@@ -37,7 +37,7 @@ export function statusText(s: BillStatusLine): StatusText {
       return { text: n === 0 ? b.dueToday : n === 1 ? b.dueTomorrow : b.dueInDays.replace('{n}', String(n)), tone: 'warning' };
     }
     case 'paid':
-      return { text: s.paidBy === 'marked' ? b.paidMarked : b.paidOn.replace('{date}', s.date ? dayMonthLabel(s.date) : ''), tone: 'paid' };
+      return { text: s.paidBy === 'marked' ? b.paidMarked : b.paidLinked.replace('{date}', dayMonthLabel(s.paidOn ?? s.date ?? '')), tone: 'paid' };
     case 'not_seen_yet':
       return { text: b.notSeen.replace('{date}', s.date ? dayMonthLabel(s.date) : ''), tone: 'muted' };
     case 'paused':

@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
-import { dayMonthLabel, type BillRule, type BillKind, type SaveRecurringRuleInput } from '@wmbugo/core';
+import { dayMonthLabel, parseLinkRefusal, type BillRule, type BillKind, type CurrencyCode, type SaveRecurringRuleInput } from '@wmbugo/core';
 import { copy } from '../../shared/copy';
 import { useSheet } from '../../shared/feedback/SheetHost';
 import { useToast } from '../../shared/feedback/ToastHost';
@@ -8,6 +8,7 @@ import { invalidateForEvent } from '../../shared/queryClient';
 import { useTheme } from '../../shared/theme/ThemeProvider';
 import { textStyle } from '../../shared/theme/typography';
 import { Button } from '../../shared/ui/Button';
+import { BillLinkPicker } from './BillLinkPicker';
 import { BillSheet, type BillPickers, type BillSheetMode } from './BillSheet';
 import type { BillsApi } from './billsApi';
 
@@ -159,6 +160,46 @@ export function useBillActions(api: BillsApi) {
     });
   };
 
+  /** Links an entry as the payment of a due date; a refusal says why and writes nothing. Returns whether it linked. */
+  const link = async (rule: { id: string; title: string }, dueDate: string, transactionId: string): Promise<boolean> => {
+    const r = await api.link(rule.id, dueDate, transactionId).catch(() => ({ ok: false as const, code: 'FAILED' }));
+    if (!r.ok) {
+      const p = parseLinkRefusal(r.code);
+      toast.show({ message: p ? (p.kind === 'entry' ? b.alreadyLinked : b.alreadyPaid).replace('{name}', p.title).replace('{date}', dayMonthLabel(p.dueDate)) : b.linkFailed });
+      return false;
+    }
+    await refresh();
+    toast.show({ message: b.linkedToast.replace('{name}', rule.title), undo: { label: copy.common.undo, onUndo: () => void api.unlink(transactionId).then(refresh).catch(() => toast.show({ message: b.undoFailed })) } });
+    return true;
+  };
+
+  /** Opens the picker for a due date; picking an entry links it. `display` is what the rows need to render money. */
+  const openLinkPicker = (rule: { id: string; title: string }, dueDate: string, display: { currency: CurrencyCode; locale: string; today: string }) => {
+    sheet.open({
+      id: 'bill-link',
+      title: b.pickerTitle,
+      body: (close) => (
+        <BillLinkPicker
+          api={api}
+          ruleId={rule.id}
+          dueDate={dueDate}
+          {...display}
+          onPick={(transactionId) => {
+            close();
+            void link(rule, dueDate, transactionId);
+          }}
+        />
+      ),
+    });
+  };
+
+  const unlink = async (transactionId: string) => {
+    const r = await api.unlink(transactionId).catch(() => ({ ok: false as const }));
+    if (!r.ok) return failed();
+    await refresh();
+    toast.show({ message: b.unlinkedToast });
+  };
+
   const pause = async (rule: { id: string; title: string }) => {
     const r = await api.pause(rule.id).catch(() => ({ ok: false as const }));
     if (!r.ok) return failed();
@@ -175,7 +216,7 @@ export function useBillActions(api: BillsApi) {
     toast.show({ message: next ? b.resumedToast.replace('{name}', rule.title).replace('{date}', dayMonthLabel(next)) : b.resumedPlain.replace('{name}', rule.title) });
   };
 
-  return { openEditor, confirmMarkPaid, confirmEnd, confirmDelete, pause, resume, refresh };
+  return { link, unlink, openLinkPicker, openEditor, confirmMarkPaid, confirmEnd, confirmDelete, pause, resume, refresh };
 }
 
 export type { BillKind };
