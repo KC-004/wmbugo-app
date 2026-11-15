@@ -223,3 +223,53 @@ export function nextDue(rule: BillRule, payments: readonly BillPayment[], today:
   }
   return null;
 }
+
+// ---- Monthly equivalent (Story 6.4, REC-008) -----------------------------------------------------------------------
+
+/** An exact fraction of minor units: sums stay exact and are rounded once, at the end. */
+export interface Fraction {
+  readonly num: bigint;
+  readonly den: bigint;
+}
+
+const gcd = (a: bigint, b: bigint): bigint => (b === 0n ? a : gcd(b, a % b));
+const frac = (num: bigint, den: bigint): Fraction => {
+  const g = gcd(num < 0n ? -num : num, den) || 1n;
+  return { num: num / g, den: den / g };
+};
+
+/**
+ * What a bill costs per month, exactly: yearly divided by 12, weekly times 52 divided by 12, every 3 months divided by 3,
+ * and for a custom cadence every N days times 365 divided by 12N, every N weeks times 52 divided by 12N, every N months
+ * divided by N. A malformed custom rule counts as zero.
+ */
+export function monthlyEquivalent(rule: Pick<Recurrence, 'cadence' | 'customEvery' | 'customUnit'> & { readonly expectedAmountMinor: number }): Fraction {
+  const a = BigInt(rule.expectedAmountMinor);
+  switch (rule.cadence) {
+    case 'weekly':
+      return frac(a * 52n, 12n);
+    case 'monthly':
+      return frac(a, 1n);
+    case 'quarterly':
+      return frac(a, 3n);
+    case 'annual':
+      return frac(a, 12n);
+    case 'custom': {
+      const n = rule.customEvery;
+      if (n === null || !Number.isInteger(n) || n < 1 || n > 99) return frac(0n, 1n);
+      const k = BigInt(n);
+      if (rule.customUnit === 'days') return frac(a * 365n, 12n * k);
+      if (rule.customUnit === 'weeks') return frac(a * 52n, 12n * k);
+      if (rule.customUnit === 'months') return frac(a, k);
+      return frac(0n, 1n);
+    }
+  }
+}
+
+/** Half-up to a whole number of minor units. */
+export const roundHalfUp = (f: Fraction): number => Number((2n * f.num + f.den) / (2n * f.den));
+
+/** The sum of several fractions, exact. */
+export function sumFractions(list: readonly Fraction[]): Fraction {
+  return list.reduce((acc, f) => frac(acc.num * f.den + f.num * acc.den, acc.den * f.den), frac(0n, 1n));
+}

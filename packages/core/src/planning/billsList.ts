@@ -1,6 +1,6 @@
 import { addDays } from '../profile/period';
 import type { Querier } from './budgets';
-import { billOccurrences, nextDue, type BillKind, type BillPayment, type BillRule, type BillStatus, type Cadence, type CustomUnit } from './recurring';
+import { billOccurrences, monthlyEquivalent, nextDue, roundHalfUp, sumFractions, type BillKind, type BillPayment, type BillRule, type BillStatus, type Cadence, type CustomUnit } from './recurring';
 import { localToday, mapPayments, mapRules, RECURRING_PAYMENTS_SQL, RECURRING_RULES_SQL, RECURRING_RULE_SQL } from './recurringStore';
 
 /**
@@ -40,6 +40,8 @@ export interface BillRowModel {
   readonly nextDue: string | null;
   readonly status: BillStatusLine;
   readonly hasPayments: boolean;
+  /** What it costs per month (yearly / 12, weekly x 52 / 12 ...), rounded half-up on its own; the list total is rounded once. */
+  readonly monthlyEquivalentMinor: number;
 }
 
 export interface BillsList {
@@ -48,19 +50,25 @@ export interface BillsList {
   readonly active: readonly BillRowModel[];
   readonly paused: readonly BillRowModel[];
   readonly ended: readonly BillRowModel[];
+  /** The Subscriptions filter's header: active subscriptions only (paused and ended are listed but not counted). */
+  readonly subscriptions: { readonly totalMinor: number; readonly counted: number };
 }
 
 /** Far enough back to hold one step of the longest cadence (99 months). */
 const LOOKBACK_DAYS = 3200;
 
 /** The date and amount of the entries that paid bills, by entry id. */
-type LinkedEntries = ReadonlyMap<string, { readonly localDate: string; readonly amountMinor: number }>;
+type LinkedEntries = ReadonlyMap<string, { readonly localDate: string; readonly amountMinor: number; readonly merchant: string | null; readonly categoryName: string | null; readonly categoryIcon: string | null; readonly categoryColor: string | null; readonly accountName: string | null }>;
 
 async function readLinked(q: Querier, payments: readonly BillPayment[]): Promise<LinkedEntries> {
   const ids = payments.map((p) => p.transactionId).filter((x): x is string => x !== null);
   if (ids.length === 0) return new Map();
-  const rows = await q.query(`SELECT id, local_date, amount_minor FROM "transaction" WHERE id IN (${ids.map(() => '?').join(',')})`, ids);
-  return new Map(rows.map((r) => [String(r[0]), { localDate: String(r[1]), amountMinor: Number(r[2]) }]));
+  const rows = await q.query(
+    `SELECT t.id, t.local_date, t.amount_minor, t.original_description, MAX(c.name), MAX(c.icon), MAX(c.color_token), (SELECT a.name FROM posting p JOIN account a ON a.id = p.account_id WHERE p.transaction_id = t.id AND p.posting_kind = 'normal' ORDER BY p.signed_amount_minor LIMIT 1) FROM "transaction" t LEFT JOIN split s ON s.transaction_id = t.id LEFT JOIN category c ON c.id = s.category_id WHERE t.id IN (${ids.map(() => '?').join(',')}) GROUP BY t.id`,
+    ids,
+  );
+  const t = (v: unknown) => (v === null || v === undefined ? null : String(v));
+  return new Map(rows.map((r) => [String(r[0]), { localDate: String(r[1]), amountMinor: Number(r[2]), merchant: t(r[3]), categoryName: t(r[4]), categoryIcon: t(r[5]), categoryColor: t(r[6]), accountName: t(r[7]) }]));
 }
 
 interface Names {
@@ -109,6 +117,7 @@ function toRow(rule: BillRule, payments: readonly BillPayment[], names: Names, t
     nextDue: nextDue(rule, mine, today),
     status: statusFor(rule, mine, today, linked).status,
     hasPayments: mine.length > 0,
+    monthlyEquivalentMinor: roundHalfUp(monthlyEquivalent(rule)),
   };
 }
 
@@ -122,8 +131,10 @@ export async function loadBillsList(q: Querier, nowMs: number): Promise<BillsLis
   const linked = await readLinked(q, payments);
   const rows = rules.map((r) => toRow(r, payments, names, today, linked));
   const byDue = (a: BillRowModel, b: BillRowModel) => (a.nextDue ?? '9999') < (b.nextDue ?? '9999') ? -1 : (a.nextDue ?? '9999') > (b.nextDue ?? '9999') ? 1 : a.title.localeCompare(b.title);
+  const subs = rules.filter((r) => r.kind === 'subscription' && r.endedAt === null && r.pausedAt === null);
   return {
     today,
+    subscriptions: { totalMinor: roundHalfUp(sumFractions(subs.map(monthlyEquivalent))), counted: subs.length },
     active: rows.filter((r) => r.state === 'active').sort(byDue),
     paused: rows.filter((r) => r.state === 'paused'),
     ended: rows.filter((r) => r.state === 'ended'),
@@ -139,6 +150,8 @@ export interface BillHistoryItem {
   /** For a linked payment: the entry's date and its actual amount (it can differ from the expected one). */
   readonly paidOn: string | null;
   readonly paidAmountMinor: number | null;
+  /** For a linked payment: what the entry looks like, so a subscription's Past charges can show it as an Activity row. */
+  readonly entry: { readonly merchant: string | null; readonly categoryName: string | null; readonly categoryIcon: string | null; readonly categoryColor: string | null; readonly accountName: string | null } | null;
 }
 
 export interface BillDetail {
@@ -164,7 +177,7 @@ export async function loadBillDetail(q: Querier, nowMs: number, id: string): Pro
   const from = rule.anchorDate > addDays(today, -LOOKBACK_DAYS) ? rule.anchorDate : addDays(today, -LOOKBACK_DAYS);
   const history: BillHistoryItem[] = billOccurrences([rule], payments, from, today, today)
     .filter((o) => o.status === 'paid' || o.status === 'not_marked_paid' || o.status === 'not_seen_yet')
-    .map((o) => ({ dueDate: o.dueDate, status: o.status as BillHistoryItem['status'], paidBy: o.payment?.kind ?? null, transactionId: o.payment?.transactionId ?? null, paidOn: o.payment?.transactionId ? (linked.get(o.payment.transactionId)?.localDate ?? null) : null, paidAmountMinor: o.payment?.transactionId ? (linked.get(o.payment.transactionId)?.amountMinor ?? null) : null }))
+    .map((o) => ({ dueDate: o.dueDate, status: o.status as BillHistoryItem['status'], paidBy: o.payment?.kind ?? null, transactionId: o.payment?.transactionId ?? null, paidOn: o.payment?.transactionId ? (linked.get(o.payment.transactionId)?.localDate ?? null) : null, paidAmountMinor: o.payment?.transactionId ? (linked.get(o.payment.transactionId)?.amountMinor ?? null) : null, entry: o.payment?.transactionId ? (() => { const e = linked.get(o.payment!.transactionId!); return e ? { merchant: e.merchant, categoryName: e.categoryName, categoryIcon: e.categoryIcon, categoryColor: e.categoryColor, accountName: e.accountName } : null; })() : null }))
     .reverse()
     .slice(0, 24);
   const focus = statusFor(rule, payments, today, linked);

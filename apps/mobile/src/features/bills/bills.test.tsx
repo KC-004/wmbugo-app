@@ -62,7 +62,7 @@ const mountNode = async (node: React.ReactElement) => {
 
 const row = (over: Partial<BillRowModel> = {}): BillRowModel => ({
   id: 'r1', title: 'Rent', kind: 'rent', cadence: 'monthly', customEvery: null, customUnit: null, expectedAmountMinor: 1_800_000, accountId: 'a1', accountName: 'HDFC', categoryId: 'cat_housing', categoryName: 'Housing', categoryIcon: 'House', categoryColor: 'cat-brown',
-  state: 'active', nextDue: '2026-12-05', status: { kind: 'upcoming', date: '2026-12-05', daysUntilDue: null, paidBy: null }, hasPayments: false, ...over,
+  state: 'active', nextDue: '2026-12-05', status: { kind: 'upcoming', date: '2026-12-05', daysUntilDue: null, paidBy: null }, hasPayments: false, monthlyEquivalentMinor: 1_800_000, ...over,
 });
 const rule = (over: Partial<BillRule> = {}): BillRule => ({
   id: 'r1', title: 'Rent', expectedAmountMinor: 1_800_000, cadence: 'monthly', customEvery: null, customUnit: null, anchorDate: '2026-12-05', accountId: 'a1', categoryId: 'cat_housing', kind: 'rent', paidTo: 'Ramesh', endsOn: null,
@@ -73,7 +73,7 @@ const categories = mapCategoryRows(SEED_CATEGORIES.map((c, i) => [c.id, c.name, 
 const pickers = { categories, accounts: [{ id: 'a1', name: 'HDFC' }, { id: 'a2', name: 'Cash' }] };
 
 const data = (rows: { active?: BillRowModel[]; paused?: BillRowModel[]; ended?: BillRowModel[] } = {}): BillsData => ({
-  list: { today: '2026-11-12', active: rows.active ?? [], paused: rows.paused ?? [], ended: rows.ended ?? [] },
+  list: { today: '2026-11-12', active: rows.active ?? [], paused: rows.paused ?? [], ended: rows.ended ?? [], subscriptions: { totalMinor: 0, counted: 0 } },
   currency: 'INR', locale: 'en-IN', exponent: 2, ...pickers,
 });
 
@@ -233,7 +233,7 @@ describe('Bill detail (Story 6.2)', () => {
     const d = detailData({
       row: row({ hasPayments: true }),
       canDelete: false,
-      history: [{ dueDate: '2026-11-05', status: 'paid', paidBy: 'marked', transactionId: null, paidOn: null, paidAmountMinor: null }, { dueDate: '2026-10-05', status: 'not_marked_paid', paidBy: null, transactionId: null, paidOn: null, paidAmountMinor: null }],
+      history: [{ dueDate: '2026-11-05', status: 'paid', paidBy: 'marked', transactionId: null, paidOn: null, paidAmountMinor: null, entry: null }, { dueDate: '2026-10-05', status: 'not_marked_paid', paidBy: null, transactionId: null, paidOn: null, paidAmountMinor: null, entry: null }],
     });
     const r = await mountNode(<BillDetailScreen ruleId="r1" api={fakeApi(data(), d)} onBack={() => undefined} />);
     expect(has(r, 'bill-detail-delete')).toBe(false);
@@ -274,6 +274,96 @@ describe('Bill detail (Story 6.2)', () => {
   it('a deleted bill shows the way back', async () => {
     const r = await mountNode(<BillDetailScreen ruleId="r1" api={fakeApi(data())} onBack={() => undefined} />);
     expect(texts(r)).toContain('This bill was deleted.');
+  });
+});
+
+const sub = (id: string, title: string, over: Partial<BillRowModel> = {}) => row({ id, title, kind: 'subscription', cadence: 'monthly', expectedAmountMinor: 64_900, monthlyEquivalentMinor: 64_900, categoryName: 'Entertainment', ...over });
+
+describe('Subscriptions filter (Story 6.4)', () => {
+  const list = (over: { paused?: BillRowModel[] } = {}) => {
+    const d = data({
+      active: [
+        sub('n', 'Netflix'),
+        sub('s', 'Spotify', { cadence: 'annual', expectedAmountMinor: 118_900, monthlyEquivalentMinor: 9_908 }),
+        sub('c', 'Cloud', { cadence: 'weekly', expectedAmountMinor: 9_900, monthlyEquivalentMinor: 42_900 }),
+        row({ id: 'r1', title: 'Rent' }),
+      ],
+      ...(over.paused ? { paused: over.paused } : {}),
+    });
+    return { ...d, list: { ...d.list, subscriptions: { totalMinor: 117_708, counted: 3 } } };
+  };
+
+  it('offers All bills and Subscriptions, and Subscriptions shows the monthly total with the conversion caption', async () => {
+    const r = await mountNode(<BillsScreen api={fakeApi(list())} onBack={() => undefined} onOpenBill={() => undefined} />);
+    expect(has(r, 'bills-subs-header')).toBe(false);
+    expect(has(r, 'bill-row-r1')).toBe(true);
+    await press(r, 'bills-filter-subscriptions');
+    expect(has(r, 'bill-row-r1')).toBe(false);
+    expect(texts(r).some((t) => /^₹1,177(\.08)? a month$/.test(t))).toBe(true);
+    expect(texts(r)).toContain('Monthly equivalent: yearly ÷ 12, weekly × 52 ÷ 12, every 3 months ÷ 3');
+    expect(texts(r).some((t) => /^₹1,189(\.00)? a year · about ₹99(\.08)? a month$/.test(t))).toBe(true);
+    expect(has(r, 'bill-extra-n')).toBe(false); // a monthly bill has no extra phrase
+    await press(r, 'bills-filter-all');
+    expect(has(r, 'bills-subs-header')).toBe(false);
+  });
+
+  it('a paused subscription is listed but marked as not counted', async () => {
+    const paused = sub('g', 'Gym', { state: 'paused', status: { kind: 'paused', date: null, daysUntilDue: null, paidBy: null }, nextDue: null, cadence: 'annual', expectedAmountMinor: 120_000, monthlyEquivalentMinor: 10_000 });
+    const r = await mountNode(<BillsScreen api={fakeApi(list({ paused: [paused] }))} onBack={() => undefined} onOpenBill={() => undefined} />);
+    await press(r, 'bills-filter-subscriptions');
+    await press(r, 'bills-toggle-paused');
+    expect(texts(r).some((t) => t.endsWith('Not counted while paused'))).toBe(true);
+  });
+
+  it('with no subscriptions it says so, shows no header, and Add a bill opens the editor with Subscription chosen', async () => {
+    const api = fakeApi(data({ active: [row({ id: 'r1' })] }));
+    const r = await mountNode(<BillsScreen api={api} onBack={() => undefined} onOpenBill={() => undefined} />);
+    await press(r, 'bills-filter-subscriptions');
+    expect(texts(r)).toContain('No subscriptions yet.');
+    expect(has(r, 'bills-subs-header')).toBe(false);
+    await press(r, 'bills-add');
+    await type(r, 'bill-name', 'Netflix');
+    await type(r, 'bill-amount', '649');
+    await type(r, 'bill-due', '2026-12-05');
+    await press(r, 'bill-save');
+    expect(api.save).toHaveBeenCalledWith(expect.objectContaining({ kind: 'subscription', categoryId: 'cat_entertainment' }));
+  });
+
+  it('hidden amounts mask the header and the row phrases, and the spoken header says amount hidden', async () => {
+    const { useAmountsStore } = jest.requireActual('../../shared/state/amountsHidden') as typeof import('../../shared/state/amountsHidden');
+    act(() => useAmountsStore.setState({ hidden: true } as never));
+    try {
+      const r = await mountNode(<BillsScreen api={fakeApi(list())} onBack={() => undefined} onOpenBill={() => undefined} />);
+      await press(r, 'bills-filter-subscriptions');
+      expect(texts(r).join(' ')).not.toMatch(/1,177|1,189/);
+      expect(texts(r)).toContain('₹ •••• a month');
+      expect(r.root.findAll((n) => n.props.testID === 'bills-subs-header')[0]!.props.accessibilityLabel).toBe('Subscriptions, amount hidden');
+    } finally {
+      act(() => useAmountsStore.setState({ hidden: false } as never));
+    }
+  });
+
+  it('a subscription detail lists past charges: linked entries as Activity rows and marked ones as a line', async () => {
+    const d = detailData({
+      row: sub('n', 'Netflix', { hasPayments: true }),
+      canDelete: false,
+      history: [
+        { dueDate: '2026-11-05', status: 'paid', paidBy: 'linked', transactionId: 't1', paidOn: '2026-11-04', paidAmountMinor: 64_900, entry: { merchant: 'Netflix', categoryName: 'Entertainment', categoryIcon: 'FilmSlate', categoryColor: 'cat-indigo', accountName: 'HDFC' } },
+        { dueDate: '2026-10-05', status: 'paid', paidBy: 'marked', transactionId: null, paidOn: null, paidAmountMinor: null, entry: null },
+      ],
+    });
+    const opened: string[] = [];
+    const r = await mountNode(<BillDetailScreen ruleId="n" api={fakeApi(data(), d)} onBack={() => undefined} onOpenEntry={(id) => opened.push(id)} />);
+    expect(texts(r)).toEqual(expect.arrayContaining(['Past charges', 'Charges you linked to this subscription', 'Marked as paid · 5 Oct']));
+    await press(r, 'activity-row-t1');
+    expect(opened).toEqual(['t1']);
+  });
+
+  it('a subscription with no charges says to link one, and a plain bill has no Past charges', async () => {
+    const none = await mountNode(<BillDetailScreen ruleId="n" api={fakeApi(data(), detailData({ row: sub('n', 'Netflix') }))} onBack={() => undefined} />);
+    expect(texts(none)).toContain("No charges linked yet. Link one when it's paid.");
+    const plain = await mountNode(<BillDetailScreen ruleId="r1" api={fakeApi(data(), detailData())} onBack={() => undefined} />);
+    expect(has(plain, 'bill-past-charges')).toBe(false);
   });
 });
 
@@ -349,7 +439,7 @@ describe('Link an entry (Story 6.3)', () => {
 
   it('a linked bill reads Paid 4 Dec · linked and its history shows the actual amount', async () => {
     const paid = { kind: 'paid' as const, date: '2026-12-05', daysUntilDue: null, paidBy: 'linked' as const, paidOn: '2026-12-04' };
-    const d = detailData({ row: row({ status: paid, hasPayments: true }), canDelete: false, history: [{ dueDate: '2026-12-05', status: 'paid', paidBy: 'linked', transactionId: 't1', paidOn: '2026-12-04', paidAmountMinor: 1_850_000 }] });
+    const d = detailData({ row: row({ status: paid, hasPayments: true }), canDelete: false, history: [{ dueDate: '2026-12-05', status: 'paid', paidBy: 'linked', transactionId: 't1', paidOn: '2026-12-04', paidAmountMinor: 1_850_000, entry: null }] });
     const r = await mountNode(<BillDetailScreen ruleId="r1" api={fakeApi(data(), d)} onBack={() => undefined} />);
     expect(texts(r)).toContain('Paid 4 Dec · linked');
     expect(texts(r).some((t) => /^Paid ₹18,500(\.00)? · 4 Dec$/.test(t))).toBe(true);

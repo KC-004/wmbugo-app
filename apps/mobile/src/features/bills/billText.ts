@@ -47,5 +47,22 @@ export function statusText(s: BillStatusLine): StatusText {
   }
 }
 
+/** `₹1,189 a year · about ₹99 a month`: a non-monthly subscription's own cost, then its monthly equivalent; null for a monthly one. */
+export function subscriptionPhrase(r: { cadence: Cadence; customEvery: number | null; customUnit: CustomUnit | null }, amount: string, monthly: string): string | null {
+  const fill = (t: string) => t.replace('{amount}', amount).replace('{monthly}', monthly);
+  switch (r.cadence) {
+    case 'monthly':
+      return null;
+    case 'weekly':
+      return fill(b.subsRowWeek);
+    case 'annual':
+      return fill(b.subsRowYear);
+    case 'quarterly':
+      return fill(b.subsRowQuarter);
+    case 'custom':
+      return fill(b.subsRowCustom).replace('{n}', String(r.customEvery ?? '')).replace('{unit}', (r.customUnit === 'weeks' ? b.weeks : r.customUnit === 'months' ? b.months : b.days).toLowerCase());
+  }
+}
+
 /** `Monthly · HDFC · Rent`. */
 export const captionText = (r: BillRowModel): string => [cadenceText(r), r.accountName, KIND_LABEL[r.kind]].filter(Boolean).join(' · ');

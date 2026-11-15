@@ -11,6 +11,7 @@ import { textStyle } from '../../shared/theme/typography';
 import { Amount } from '../../shared/ui/Amount';
 import { Button } from '../../shared/ui/Button';
 import { TopBar } from '../../shared/ui/TopBar';
+import { ActivityRowView } from '../activity/ActivityRowView';
 import { BillRow } from './BillRow';
 import { billDetailKey, realBillsApi, type BillsApi } from './billsApi';
 import { cadenceText, KIND_LABEL } from './billText';
@@ -30,7 +31,7 @@ const historyText = (h: BillHistoryItem, currency: CurrencyCode, locale: string)
  * A bill's detail (Story 6.2): its fields, next due date, the history of its due dates and the actions Edit, Mark as paid,
  * Pause or Resume, End this bill and (only without payment history) Delete.
  */
-export function BillDetailScreen({ ruleId, onBack, api = realBillsApi }: { ruleId: string; onBack: () => void; api?: BillsApi }) {
+export function BillDetailScreen({ ruleId, onBack, onOpenEntry, api = realBillsApi }: { ruleId: string; onBack: () => void; /** Opens a linked entry (a subscription's past charge). */ onOpenEntry?: (transactionId: string) => void; api?: BillsApi }) {
   useAmountsHidden(); // re-render when Hide amounts is toggled: the history builds amount text
   const theme = useTheme();
   const actions = useBillActions(api);
@@ -84,6 +85,34 @@ export function BillDetailScreen({ ruleId, onBack, api = realBillsApi }: { ruleI
             ))}
           </View>
         )}
+
+        {row.kind === 'subscription' ? (
+          <View testID="bill-past-charges" style={styles.gap}>
+            <Text accessibilityRole="header" style={[textStyle('label'), muted]}>{b.pastCharges}</Text>
+            <Text style={[textStyle('caption'), muted]}>{b.pastChargesCaption}</Text>
+            {d.history.filter((h) => h.status === 'paid').length === 0 ? (
+              <Text testID="bill-past-none" style={[textStyle('body'), muted]}>{b.pastNone}</Text>
+            ) : (
+              d.history
+                .filter((h) => h.status === 'paid')
+                .map((h) =>
+                  h.paidBy === 'linked' && h.transactionId && h.entry ? (
+                    <ActivityRowView
+                      key={h.dueDate}
+                      row={{ id: h.transactionId, kind: 'expense', amountMinor: h.paidAmountMinor ?? 0, localDate: h.paidOn ?? h.dueDate, merchant: h.entry.merchant, categoryName: h.entry.categoryName, categoryIcon: h.entry.categoryIcon, categoryColor: h.entry.categoryColor, accountName: h.entry.accountName }}
+                      date={d.today}
+                      currency={data.currency}
+                      locale={data.locale}
+                      showDate
+                      {...(onOpenEntry ? { onPress: () => onOpenEntry(h.transactionId!) } : {})}
+                    />
+                  ) : (
+                    <Text key={h.dueDate} testID={`bill-past-marked-${h.dueDate}`} style={[textStyle('body'), ink]}>{b.markedAsPaidOn.replace('{date}', dayMonthLabel(h.dueDate))}</Text>
+                  ),
+                )
+            )}
+          </View>
+        ) : null}
 
         <View style={styles.actions}>
           {d.markableDate ? <Button label={b.markAsPaid} testID="bill-detail-mark" onPress={() => actions.confirmMarkPaid(rule, d.markableDate!)} /> : null}

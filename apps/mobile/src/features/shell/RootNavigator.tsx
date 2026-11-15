@@ -232,11 +232,11 @@ function BillsRoute() {
 }
 
 function BillDetailRoute() {
-  const nav = useNavigation<{ goBack: () => void }>();
+  const nav = useNavigation<{ goBack: () => void; navigate: (s: 'TransactionDetail', p: { transactionId: string }) => void }>();
   const route = useRoute<RouteProp<RootParams, 'BillDetail'>>();
   return (
     <ScreenFrame>
-      <BillDetailScreen ruleId={route.params.ruleId} onBack={() => nav.goBack()} />
+      <BillDetailScreen ruleId={route.params.ruleId} onBack={() => nav.goBack()} onOpenEntry={(transactionId) => nav.navigate('TransactionDetail', { transactionId })} />
     </ScreenFrame>
   );
 }

@@ -19,14 +19,14 @@ import { captionText, cadenceText, statusText } from './billText';
  * amount right-aligned and one status line. A due-soon bill shows a warning icon with its text; a bill not seen yet offers
  * `Mark as paid`. The row is one TalkBack node; at large font sizes the amount wraps below the name.
  */
-export function BillRow({ row, currency, locale, onPress, onMarkPaid, onLink }: { row: BillRowModel; currency: CurrencyCode; locale: string; onPress: () => void; onMarkPaid?: () => void; onLink?: () => void }) {
+export function BillRow({ row, currency, locale, onPress, onMarkPaid, onLink, extraCaption }: { row: BillRowModel; /** Under the status line: the subscription cost phrase. */ extraCaption?: string; currency: CurrencyCode; locale: string; onPress: () => void; onMarkPaid?: () => void; onLink?: () => void }) {
   useAmountsHidden(); // re-render when Hide amounts is toggled: this component builds amount labels
   const theme = useTheme();
   const { fontScale } = useWindowDimensions();
   const s = statusText(row.status);
   const stack = fontScale >= 1.3;
   const tone: ColorName = s.tone === 'warning' ? 'semantic-warning' : s.tone === 'muted' ? 'text-secondary' : 'text-primary';
-  const spoken = [row.title, amountLabel({ amountMinor: row.expectedAmountMinor, currency, locale, inline: true }), `${cadenceText(row).toLowerCase()}${row.accountName ? ` from ${row.accountName}` : ''}`, s.text].filter(Boolean).join(', ');
+  const spoken = [row.title, amountLabel({ amountMinor: row.expectedAmountMinor, currency, locale, inline: true }), `${cadenceText(row).toLowerCase()}${row.accountName ? ` from ${row.accountName}` : ''}`, s.text, extraCaption].filter(Boolean).join(', ');
   return (
     <View style={[styles.card, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
       <Pressable testID={`bill-row-${row.id}`} accessible accessibilityRole="button" accessibilityLabel={spoken} onPress={onPress} style={styles.row}>
@@ -41,6 +41,7 @@ export function BillRow({ row, currency, locale, onPress, onMarkPaid, onLink }: 
               {s.tone === 'warning' ? <Icon icon={Warning} size={16} color="semantic-warning" /> : s.tone === 'paid' ? <Icon icon={CheckCircle} size={16} color="semantic-income" /> : null}
               <Text testID={`bill-status-${row.id}`} style={[textStyle('caption'), { color: theme.color(tone) }]}>{s.text}</Text>
             </View>
+            {extraCaption ? <Text testID={`bill-extra-${row.id}`} style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{extraCaption}</Text> : null}
           </View>
           <Amount amountMinor={row.expectedAmountMinor} currency={currency} locale={locale} direction="neutral" role="amount" />
         </View>
