@@ -1,3 +1,4 @@
+import { isHomeLayout, sanitizeHomeLayout, type HomeLayoutEntry } from './homeLayout';
 import type { PaydayRule, PeriodMode } from './payday';
 
 /** Settings keys (the `settings` table holds one JSON value per key). */
@@ -11,6 +12,8 @@ export const SETTING_BLOCK_TRANSFERS_KEY = 'finance.block_transfers_above_balanc
 export const SETTING_SHOW_NET_WORTH = 'ui.show_net_worth';
 /** Hide amounts (Story 5.3): every amount in the app is masked while it is on. Per device; the setting is the source of truth. */
 export const SETTING_HIDE_AMOUNTS = 'ui.hide_amounts';
+/** The Home card layout (Story 5.6): a list of `{cardId, hidden, size}` in display order, or null for the PRD order. */
+export const SETTING_HOME_LAYOUT = 'ui.home_layout';
 export const SETTING_THEME_KEY = 'theme';
 
 export type ThemeChoice = 'system' | 'light' | 'dark';
@@ -33,6 +36,7 @@ export interface AppSettings {
   readonly blockTransfers: boolean;
   readonly showNetWorth: boolean;
   readonly hideAmounts: boolean;
+  readonly homeLayout: readonly HomeLayoutEntry[] | null;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -46,6 +50,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   blockTransfers: false,
   showNetWorth: false,
   hideAmounts: false,
+  homeLayout: null,
 };
 
 export const SETTINGS_SQL = 'SELECT key, value_json FROM settings';
@@ -68,6 +73,8 @@ export function validateSetting(key: string, value: unknown): { ok: true; value:
     case SETTING_SHOW_NET_WORTH:
     case SETTING_HIDE_AMOUNTS:
       return typeof value === 'boolean' ? { ok: true, value } : { ok: false };
+    case SETTING_HOME_LAYOUT:
+      return value === null ? { ok: true, value } : isHomeLayout(value) ? { ok: true, value: sanitizeHomeLayout(value) } : { ok: false };
     case SETTING_DEFAULT_ACCOUNT:
       return value === null || (typeof value === 'string' && value.length > 0 && value.length <= 64) ? { ok: true, value } : { ok: false };
     default:
@@ -101,6 +108,7 @@ export function parseSettings(rows: readonly (readonly unknown[])[]): AppSetting
     blockTransfers: pick(SETTING_BLOCK_TRANSFERS_KEY, DEFAULT_SETTINGS.blockTransfers),
     showNetWorth: pick(SETTING_SHOW_NET_WORTH, DEFAULT_SETTINGS.showNetWorth),
     hideAmounts: pick(SETTING_HIDE_AMOUNTS, DEFAULT_SETTINGS.hideAmounts),
+    homeLayout: pick<readonly HomeLayoutEntry[] | null>(SETTING_HOME_LAYOUT, null),
   };
 }
 

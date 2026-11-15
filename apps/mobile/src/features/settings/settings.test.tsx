@@ -70,7 +70,8 @@ function fakeApi(initial: SettingsData) {
   const timezoneCheck = jest.fn(async () => null as { deviceTz: string } | null);
   const answerTimezone = jest.fn(async () => ({ ok: true }));
   const setHideAmounts = jest.fn(async () => ({ ok: true }));
-  const api: SettingsApi = { load: async () => current, changeSetting, setHideAmounts, changeProfile, timezoneCheck, answerTimezone };
+  const saveHomeLayout = jest.fn(async () => ({ ok: true }));
+  const api: SettingsApi = { load: async () => current, changeSetting, setHideAmounts, saveHomeLayout, changeProfile, timezoneCheck, answerTimezone };
   return { api, changeSetting, changeProfile, timezoneCheck, answerTimezone };
 }
 
@@ -327,7 +328,7 @@ describe('time zone prompt on Home', () => {
     f.timezoneCheck.mockResolvedValue({ deviceTz: 'Asia/Dubai' });
     const r = mount(
       <SheetHost>
-        <HomeScreen api={homeApi} settingsApi={f.api} onAccounts={jest.fn()} onProfile={jest.fn()} onAddAccount={jest.fn()} onOpenBudget={jest.fn()} onOpenPlan={jest.fn()} onSetLimit={jest.fn()} onSortIt={jest.fn()} onOpenReview={jest.fn()} onOpenActivity={jest.fn()} />
+        <HomeScreen api={homeApi} settingsApi={f.api} onAccounts={jest.fn()} onProfile={jest.fn()} onAddAccount={jest.fn()} onOpenBudget={jest.fn()} onOpenPlan={jest.fn()} onSetLimit={jest.fn()} onSortIt={jest.fn()} onOpenReview={jest.fn()} onOpenActivity={jest.fn()} onEditHome={jest.fn()} />
       </SheetHost>,
     );
     await settle();
@@ -348,7 +349,7 @@ describe('time zone prompt on Home', () => {
         <QueryClientProvider client={qc}>
           <ThemeProvider>
             <SheetHost>
-              <HomeScreen api={homeApi} settingsApi={f.api} onAccounts={jest.fn()} onProfile={jest.fn()} onAddAccount={jest.fn()} onOpenBudget={jest.fn()} onOpenPlan={jest.fn()} onSetLimit={jest.fn()} onSortIt={jest.fn()} onOpenReview={jest.fn()} onOpenActivity={jest.fn()} />
+              <HomeScreen api={homeApi} settingsApi={f.api} onAccounts={jest.fn()} onProfile={jest.fn()} onAddAccount={jest.fn()} onOpenBudget={jest.fn()} onOpenPlan={jest.fn()} onSetLimit={jest.fn()} onSortIt={jest.fn()} onOpenReview={jest.fn()} onOpenActivity={jest.fn()} onEditHome={jest.fn()} />
             </SheetHost>
           </ThemeProvider>
         </QueryClientProvider>,
@@ -366,7 +367,7 @@ describe('time zone prompt on Home', () => {
     const f = fakeApi(data());
     const r = mount(
       <SheetHost>
-        <HomeScreen api={homeApi} settingsApi={f.api} onAccounts={jest.fn()} onProfile={jest.fn()} onAddAccount={jest.fn()} onOpenBudget={jest.fn()} onOpenPlan={jest.fn()} onSetLimit={jest.fn()} onSortIt={jest.fn()} onOpenReview={jest.fn()} onOpenActivity={jest.fn()} />
+        <HomeScreen api={homeApi} settingsApi={f.api} onAccounts={jest.fn()} onProfile={jest.fn()} onAddAccount={jest.fn()} onOpenBudget={jest.fn()} onOpenPlan={jest.fn()} onSetLimit={jest.fn()} onSortIt={jest.fn()} onOpenReview={jest.fn()} onOpenActivity={jest.fn()} onEditHome={jest.fn()} />
       </SheetHost>,
     );
     await settle();

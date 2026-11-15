@@ -7,7 +7,8 @@ import { parsePaydayTransitions, readPaydayRule, samePayday, SETTING_PAYDAY_TRAN
 import { planPaydayChange } from './period';
 import { rebuildPeriods } from '../planning/budgetStore';
 import type { Region } from './regions';
-import { SETTING_DEFAULT_ACCOUNT, SETTING_HIDE_AMOUNTS, SETTINGS_SQL, validateSetting } from './settings';
+import { sameHomeLayout, type HomeLayoutEntry } from './homeLayout';
+import { parseSettings, SETTING_DEFAULT_ACCOUNT, SETTING_HIDE_AMOUNTS, SETTING_HOME_LAYOUT, SETTINGS_SQL, validateSetting } from './settings';
 import { nextLocalDate, offsetMinutes, PROMPT_TIMEZONE, SETTING_TZ_MISMATCH_SINCE, SETTING_TZ_PENDING, TIMEZONE_GAP_MINUTES } from './timezone';
 
 async function upsertSetting(ctx: WriterContext, key: string, value: unknown): Promise<void> {
@@ -57,6 +58,25 @@ export const SetHideAmounts: UseCase<{ hidden: boolean }, void, 'SETTING_INVALID
     ctx.touch('settings', SETTING_HIDE_AMOUNTS, { changed: true });
     ctx.emit('ProfileChanged', { fields: [SETTING_HIDE_AMOUNTS] });
     return ok(undefined);
+  },
+};
+
+/**
+ * Saves the Home card layout (Story 5.6, HOM-003): the whole list in one writer transaction with an audit row and `ProfileChanged`.
+ * `null` resets to the PRD order. Saving what is already stored writes nothing. The audit row records the key, never the list.
+ */
+export const SaveHomeLayout: UseCase<{ layout: readonly HomeLayoutEntry[] | null }, { changed: boolean }, 'LAYOUT_INVALID'> = {
+  name: 'SaveHomeLayout',
+  async execute(ctx, input) {
+    const v = validateSetting(SETTING_HOME_LAYOUT, input.layout);
+    if (!v.ok) return err('LAYOUT_INVALID');
+    const current = parseSettings(await ctx.query(SETTINGS_SQL)).homeLayout;
+    const next = v.value as readonly HomeLayoutEntry[] | null;
+    if (next === null ? current === null : current !== null && sameHomeLayout(current, next)) return ok({ changed: false });
+    await upsertSetting(ctx, SETTING_HOME_LAYOUT, next);
+    ctx.touch('settings', SETTING_HOME_LAYOUT, { changed: true });
+    ctx.emit('ProfileChanged', { fields: [SETTING_HOME_LAYOUT] });
+    return ok({ changed: true });
   },
 };
 

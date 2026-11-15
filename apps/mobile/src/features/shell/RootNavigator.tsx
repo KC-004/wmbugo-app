@@ -19,6 +19,7 @@ import { useReviewDot } from '../activity/reviewDot';
 import { useEntryActions } from '../activity/useEntryActions';
 import { HomeScreen } from '../home/HomeScreen';
 import { homeHeroNav } from '../home/homeNav';
+import { HomeEditScreen } from '../home/HomeEditScreen';
 import type { ActivityQuery } from '@wmbugo/core';
 import { useUiStore } from '../../shared/state/uiStore';
 import { BudgetsScreen } from '../budgets/BudgetsScreen';
@@ -32,7 +33,7 @@ import { ScreenHeader } from './ScreenHeader';
 import { TabBar, type TabRoute } from './TabBar';
 import { markTabFirstFrame } from './navTiming';
 
-type RootParams = { Tabs: undefined; BudgetDetail: { budgetId: string; periodStart?: string }; Accounts: undefined; AccountDetail: { accountId: string }; TransactionDetail: { transactionId: string }; ReviewQueue: { focusId?: string }; Settings: undefined };
+type RootParams = { Tabs: undefined; BudgetDetail: { budgetId: string; periodStart?: string }; Accounts: undefined; AccountDetail: { accountId: string }; TransactionDetail: { transactionId: string }; ReviewQueue: { focusId?: string }; Settings: undefined; HomeEdit: undefined };
 const RootStack = createNativeStackNavigator<RootParams>();
 const Tabs = createBottomTabNavigator();
 const TabStack = createNativeStackNavigator();
@@ -191,6 +192,17 @@ function AccountDetailRoute() {
   );
 }
 
+function HomeEditRoute() {
+  const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  const nav = useNavigation<{ goBack: () => void }>();
+  return (
+    <View style={[styles.fill, { backgroundColor: theme.color('bg-canvas'), paddingTop: insets.top }]}>
+      <HomeEditScreen onBack={() => nav.goBack()} />
+    </View>
+  );
+}
+
 function ReviewQueueRoute() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -269,6 +281,7 @@ export function RootNavigator() {
             <RootStack.Screen name="TransactionDetail" component={TransactionDetailRoute} />
             <RootStack.Screen name="ReviewQueue" component={ReviewQueueRoute} />
             <RootStack.Screen name="Settings" component={SettingsRoute} />
+            <RootStack.Screen name="HomeEdit" component={HomeEditRoute} />
           </RootStack.Navigator>
         </SheetHost>
       </ToastHost>

@@ -1,7 +1,7 @@
 import { AccessibilityInfo, StyleSheet, Text } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { budgetStatus, type BudgetListRow, type HomeBudgetCards, type IncomeExpense, type Spend7d, type TopCategories } from '@wmbugo/core';
+import { budgetStatus, DEFAULT_SETTINGS, type BudgetListRow, type HomeBudgetCards, type HomeLayoutEntry, type IncomeExpense, type Spend7d, type TopCategories } from '@wmbugo/core';
 import { SheetHost } from '../../shared/feedback/SheetHost';
 import { ToastHost } from '../../shared/feedback/ToastHost';
 import { MemorySeenStore } from '../../shared/feedback/tooltipController';
@@ -46,7 +46,7 @@ const host = (r: ReactTestRenderer, id: string) => r.root.findAll((n) => typeof 
 const press = (r: ReactTestRenderer, id: string) => act(() => r.root.findAll((n) => n.props.testID === id && typeof n.props.onPress === 'function')[0]!.props.onPress());
 
 const NOV = { start: '2026-11-01', end: '2026-11-30' };
-const nav = () => ({ onAccounts: jest.fn(), onProfile: jest.fn(), onAddAccount: jest.fn(), onOpenBudget: jest.fn(), onOpenPlan: jest.fn(), onSetLimit: jest.fn(), onSortIt: jest.fn(), onOpenReview: jest.fn(), onOpenActivity: jest.fn() });
+const nav = () => ({ onAccounts: jest.fn(), onProfile: jest.fn(), onAddAccount: jest.fn(), onOpenBudget: jest.fn(), onOpenPlan: jest.fn(), onSetLimit: jest.fn(), onSortIt: jest.fn(), onOpenReview: jest.fn(), onOpenActivity: jest.fn(), onEditHome: jest.fn() });
 
 const income = (over: Partial<IncomeExpense> = {}): IncomeExpense => ({ incomeMinor: 8_500_000, spentMinor: 814_000, net: { kind: 'in', minor: 7_686_000 }, period: NOV, ...over });
 const row = (over: Partial<BudgetListRow> & { id: string; name: string }): BudgetListRow => {
@@ -65,6 +65,8 @@ interface Setup {
   budgets?: HomeBudgetCards | null | (() => Promise<HomeBudgetCards | null>);
   topCategories?: TopCategories | null | (() => Promise<TopCategories | null>);
   spend7d?: Spend7d | null | (() => Promise<Spend7d | null>);
+  /** The saved Home layout (Story 5.6); none is the PRD order. */
+  layout?: HomeLayoutEntry[] | null;
 }
 
 async function mountCards(s: Setup = {}) {
@@ -82,7 +84,7 @@ async function mountCards(s: Setup = {}) {
     loadBudgetCards: jest.fn(loadBudgets as () => Promise<HomeBudgetCards | null>),
   };
   const n = nav();
-  const Harness = () => <HomeScreen api={api} settingsApi={{ setHideAmounts: async () => ({ ok: true }), timezoneCheck: async () => null } as never} {...n} />;
+  const Harness = () => <HomeScreen api={api} settingsApi={{ setHideAmounts: async () => ({ ok: true }), timezoneCheck: async () => null, load: async () => ({ settings: { ...DEFAULT_SETTINGS, homeLayout: s.layout ?? null } }) } as never} {...n} />;
   let r!: ReactTestRenderer;
   act(() => {
     r = create(
@@ -334,6 +336,110 @@ describe('Spending, last 7 days (Story 5.5)', () => {
     press(r, 'spend-7d-chart-toggle');
     expect(host(r, 'spend-7d-chart-table')).toHaveLength(1);
     expect(host(r, 'spend-7d-chart-row-2026-11-18')[0]!.props.accessibilityLabel).toBe('Today, 3,500 rupees');
+  });
+});
+
+const entry = (cardId: string, over: Partial<HomeLayoutEntry> = {}): HomeLayoutEntry => ({ cardId, hidden: false, size: 'full', ...over });
+const allCards = {
+  // In the order core delivers them: the highest percent used first.
+  budgets: cards({ categoryBudgets: [5, 4, 3, 2, 1].map((n) => row({ id: `b${n}`, name: `Budget ${n}`, usedMinor: 100_000 * n, targetMinor: 1_000_000 })), nws: { rows: [row({ id: 'n', name: 'Needs', group: '50_30_20', scope: 'budget_type', budgetType: 'need' })], typeSummary: null } }),
+  topCategories: tc({ rows: [1, 2, 3, 4, 5].map((n) => ({ categoryId: `c${n}`, name: `Cat ${n}`, icon: 'Tag', colorToken: 'cat-rose', amountMinor: 100_000 * (6 - n), sharePercent: 20, categoryIds: [`c${n}`] })) }),
+  spend7d: sp(),
+};
+const order = (r: ReactTestRenderer) => host(r, 'home-cards')[0]!.findAll((x) => typeof x.type === 'string' && /^home-card-/.test(String(x.props.testID))).map((x) => String(x.props.testID).replace('home-card-', ''));
+
+describe('Home follows the saved layout (Story 5.6)', () => {
+  it('shows the PRD order with nothing saved', async () => {
+    const { r } = await mountCards({ data: withToCheck(1), ...allCards });
+    expect(order(r)).toEqual(['to_check', 'income_expense', 'budgets', 'nws', 'top_categories', 'spend_7d']);
+  });
+
+  it('puts the saved order under the hero, leaves hidden cards out, and keeps N to check first', async () => {
+    const layout = [entry('nws'), entry('income_expense'), entry('spend_7d', { hidden: true }), entry('budgets'), entry('top_categories')];
+    const { r } = await mountCards({ data: withToCheck(2), layout, ...allCards });
+    expect(order(r)).toEqual(['to_check', 'nws', 'income_expense', 'budgets', 'top_categories']);
+  });
+
+  it('ignores a saved card that no longer exists and places a card the saved list lacks at its default spot', async () => {
+    const layout = [entry('gone'), entry('spend_7d'), entry('budgets'), entry('income_expense'), entry('top_categories')];
+    const { r } = await mountCards({ layout, ...allCards });
+    expect(order(r)).toEqual(['spend_7d', 'budgets', 'nws', 'income_expense', 'top_categories']);
+  });
+
+  it('Compact Budgets shows the three with the highest percent used and See all budgets; Full shows all', async () => {
+    const compact = await mountCards({ layout: [entry('income_expense'), entry('budgets', { size: 'compact' }), entry('nws'), entry('top_categories'), entry('spend_7d')], ...allCards });
+    const ids = host(compact.r, 'home-card-budgets')[0]!.findAll((x) => typeof x.type === 'string' && /^home-budget-/.test(String(x.props.testID))).map((x) => x.props.testID);
+    expect(ids).toEqual(['home-budget-b5', 'home-budget-b4', 'home-budget-b3']); // the three highest, not the lowest
+    expect(texts(compact.r)).toContain('See all budgets');
+    press(compact.r, 'home-see-all-budgets');
+    expect(compact.n.onOpenPlan).toHaveBeenCalled();
+    const full = await mountCards({ ...allCards });
+    expect(host(full.r, 'home-card-budgets')[0]!.findAll((x) => typeof x.type === 'string' && /^home-budget-/.test(String(x.props.testID)))).toHaveLength(5);
+    expect(texts(full.r)).not.toContain('See all budgets');
+  });
+
+  it('Compact Budgets with three or fewer budgets offers no See all budgets', async () => {
+    const few = cards({ categoryBudgets: [row({ id: 'a', name: 'A' }), row({ id: 'b', name: 'B' })] });
+    const { r } = await mountCards({ layout: [entry('income_expense'), entry('budgets', { size: 'compact' }), entry('nws'), entry('top_categories'), entry('spend_7d')], budgets: few });
+    expect(texts(r)).not.toContain('See all budgets');
+  });
+
+  it('Compact Top categories shows the top three; Full shows five', async () => {
+    const compact = await mountCards({ layout: [entry('income_expense'), entry('budgets'), entry('nws'), entry('top_categories', { size: 'compact' }), entry('spend_7d')], ...allCards });
+    expect(host(compact.r, 'top-categories-chart')[0]!.findAll((x) => typeof x.type === 'string' && /^top-categories-chart-bar-/.test(String(x.props.testID))).map((x) => x.props.testID)).toEqual(['top-categories-chart-bar-c1', 'top-categories-chart-bar-c2', 'top-categories-chart-bar-c3']);
+    press(compact.r, 'top-categories-chart-toggle');
+    expect(host(compact.r, 'top-categories-chart-table')[0]!.findAll((x) => typeof x.type === 'string' && /^top-categories-chart-row-/.test(String(x.props.testID)))).toHaveLength(3); // the table shows the same three
+    const full = await mountCards({ ...allCards });
+    expect(host(full.r, 'top-categories-chart')[0]!.findAll((x) => typeof x.type === 'string' && /^top-categories-chart-bar-/.test(String(x.props.testID)))).toHaveLength(5);
+  });
+
+  it('holds the cards until the saved layout is known, so they never jump from the PRD order', async () => {
+    let release!: () => void;
+    const qc = createQueryClient();
+    clients.push(qc);
+    const api = { load: async () => homeData({ currency: 'INR' }), seen: new MemorySeenStore(), loadIncomeExpense: async () => income(), loadBudgetCards: async () => cards() } as unknown as HomeApi;
+    const slowSettings = { setHideAmounts: async () => ({ ok: true }), timezoneCheck: async () => null, load: () => new Promise((res) => { release = () => res({ settings: { ...DEFAULT_SETTINGS, homeLayout: null } }); }) } as never;
+    let r!: ReactTestRenderer;
+    act(() => {
+      r = create(<QueryClientProvider client={qc}><ThemeProvider><ToastHost bottomOffset={0}><SheetHost><HomeScreen api={api} settingsApi={slowSettings} {...nav()} /></SheetHost></ToastHost></ThemeProvider></QueryClientProvider>);
+    });
+    live.push(r);
+    await settle();
+    expect(host(r, 'home-card-income_expense')).toHaveLength(0); // not yet
+    await act(async () => release());
+    await settle();
+    expect(host(r, 'home-card-income_expense')).toHaveLength(1);
+  });
+
+  it('a hidden card does not load its data', async () => {
+    const { api } = await mountCards({ layout: [entry('income_expense', { hidden: true }), entry('budgets', { hidden: true }), entry('nws', { hidden: true }), entry('top_categories', { hidden: true }), entry('spend_7d')], ...allCards });
+    expect(api.loadIncomeExpense).not.toHaveBeenCalled();
+    expect(api.loadBudgetCards).not.toHaveBeenCalled();
+    expect(api.loadTopCategories).not.toHaveBeenCalled();
+    expect(api.loadSpend7d).toHaveBeenCalled();
+  });
+
+  it('Edit Home is reachable even while Home data fails to load', async () => {
+    const qc = createQueryClient();
+    clients.push(qc);
+    const n = nav();
+    const api = { load: async () => { throw new Error('boom'); }, seen: new MemorySeenStore() } as unknown as HomeApi;
+    let r!: ReactTestRenderer;
+    act(() => {
+      r = create(<QueryClientProvider client={qc}><ThemeProvider><ToastHost bottomOffset={0}><SheetHost><HomeScreen api={api} settingsApi={{ setHideAmounts: async () => ({ ok: true }), timezoneCheck: async () => null } as never} {...n} /></SheetHost></ToastHost></ThemeProvider></QueryClientProvider>);
+    });
+    live.push(r);
+    await settle();
+    press(r, 'home-edit-home');
+    expect(n.onEditHome).toHaveBeenCalled();
+  });
+
+  it('a 48dp Edit Home button sits after the last card and opens the editor', async () => {
+    const { r, n } = await mountCards({ ...allCards });
+    const btn = host(r, 'home-edit-home')[0]!;
+    expect(StyleSheet.flatten(btn.props.style)).toMatchObject({ minHeight: 48 });
+    press(r, 'home-edit-home');
+    expect(n.onEditHome).toHaveBeenCalled();
   });
 });
 

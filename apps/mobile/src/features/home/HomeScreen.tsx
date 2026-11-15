@@ -2,7 +2,7 @@ import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { greetingFor, shortDate, type ActivityQuery } from '@wmbugo/core';
+import { greetingFor, resolveHomeLayout, shortDate, type ActivityQuery } from '@wmbugo/core';
 import { copy } from '../../shared/copy';
 import { tabBarClearance } from '../../shared/feedback/layout';
 import { ErrorBlock, Reveal, Skeleton, Tooltip } from '../../shared/feedback/Feedback';
@@ -13,7 +13,8 @@ import { radii } from '../../shared/theme/tokens';
 import { textStyle } from '../../shared/theme/typography';
 import { Button } from '../../shared/ui/Button';
 import { ScreenHeader } from '../shell/ScreenHeader';
-import { realSettingsApi, TIMEZONE_QUERY_KEY, type SettingsApi } from '../settings/settingsApi';
+import { realSettingsApi, SETTINGS_QUERY_KEY, TIMEZONE_QUERY_KEY, type SettingsApi } from '../settings/settingsApi';
+import { REGISTERED_FOR_LAYOUT } from './cardRegistry';
 import { useAmountsHidden } from '../../shared/state/amountsHidden';
 import { HeroCard } from './HeroCard';
 import { HomeCards, type HomeCardsNav } from './HomeCards';
@@ -33,18 +34,23 @@ export interface HomeNav extends HomeCardsNav {
   onOpenPlan: () => void;
   onSetLimit: () => void;
   onSortIt: (query: ActivityQuery) => void;
+  /** Opens Edit Home (SCR-05). */
+  onEditHome: () => void;
 }
 
 /**
  * Home: the greeting, today's date and the period chip, then the "Am I okay?" hero (Story 5.2) on the brand band (light) or
  * the glows (dark). It refreshes by itself: events, returning to the app and a new day all recompute it (Story 5.1).
  */
-export function HomeScreen({ api = realHomeApi, settingsApi = realSettingsApi, onAccounts, onProfile, onAddAccount, onOpenBudget, onOpenPlan, onSetLimit, onSortIt, onOpenReview, onOpenActivity }: HomeNav & { api?: HomeApi; settingsApi?: SettingsApi }) {
+export function HomeScreen({ api = realHomeApi, settingsApi = realSettingsApi, onAccounts, onProfile, onAddAccount, onOpenBudget, onOpenPlan, onSetLimit, onSortIt, onOpenReview, onOpenActivity, onEditHome }: HomeNav & { api?: HomeApi; settingsApi?: SettingsApi }) {
   const theme = useTheme();
   const sheet = useSheet();
   const insets = useContext(SafeAreaInsetsContext);
   const home = useQuery({ queryKey: HOME_QUERY_KEY, queryFn: () => api.load() });
   const d = home.data ?? null;
+  // The saved layout (Story 5.6): a missing or unreadable value is the PRD order.
+  const settingsQ = useQuery({ queryKey: SETTINGS_QUERY_KEY, queryFn: async () => (settingsApi.load ? await settingsApi.load() : null), retryOnMount: false });
+  const layout = resolveHomeLayout(REGISTERED_FOR_LAYOUT, settingsQ.data?.settings.homeLayout);
   const tz = useQuery({ queryKey: TIMEZONE_QUERY_KEY, queryFn: () => settingsApi.timezoneCheck() });
   const qc = useQueryClient();
   // Hide amounts (Story 5.3): the eye flips the one app-wide flag and saves it.
@@ -126,7 +132,7 @@ export function HomeScreen({ api = realHomeApi, settingsApi = realSettingsApi, o
                 onSortIt={() => d.summary.sortIt && onSortIt({ categoryIds: d.summary.sortIt.categoryIds, fromDate: d.summary.sortIt.fromDate, toDate: d.summary.sortIt.toDate })}
                 onAddAccount={onAddAccount}
               />
-              <HomeCards api={api} toCheckCount={d.summary.toCheckCount} currency={d.currency} locale={d.locale} nav={{ onOpenReview, onOpenBudget, onOpenPlan, onOpenActivity }} />
+              <HomeCards layout={layout} layoutReady={!settingsQ.isPending} api={api} toCheckCount={d.summary.toCheckCount} currency={d.currency} locale={d.locale} nav={{ onOpenReview, onOpenBudget, onOpenPlan, onOpenActivity }} />
               {tip ? <Tooltip text={copy.home.tip} onAcknowledge={() => void tips.current?.acknowledge().catch(() => undefined)} /> : null}
             </View>
           ) : home.isError ? (
@@ -137,6 +143,8 @@ export function HomeScreen({ api = realHomeApi, settingsApi = realSettingsApi, o
           ) : null}
         </Reveal>
       </View>
+
+      <Button label={copy.home.edit.editHome} variant="text" onPress={onEditHome} testID="home-edit-home" />
 
       {/* Its own query: a failing Home load never hides it. */}
       {tz.data ? (

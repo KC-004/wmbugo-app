@@ -49,7 +49,7 @@ const host = (r: ReactTestRenderer, id: string) => r.root.findAll((n) => typeof 
 const press = (r: ReactTestRenderer, id: string) => act(() => r.root.findAll((n) => n.props.testID === id && typeof n.props.onPress === 'function')[0]!.props.onPress());
 
 const settingsFake = (ok = true) => ({ setHideAmounts: jest.fn(async () => ({ ok })), timezoneCheck: async () => null }) as unknown as SettingsApi & { setHideAmounts: jest.Mock };
-const nav = () => ({ onAccounts: jest.fn(), onProfile: jest.fn(), onAddAccount: jest.fn(), onOpenBudget: jest.fn(), onOpenPlan: jest.fn(), onSetLimit: jest.fn(), onSortIt: jest.fn(), onOpenReview: jest.fn(), onOpenActivity: jest.fn() });
+const nav = () => ({ onAccounts: jest.fn(), onProfile: jest.fn(), onAddAccount: jest.fn(), onOpenBudget: jest.fn(), onOpenPlan: jest.fn(), onSetLimit: jest.fn(), onSortIt: jest.fn(), onOpenReview: jest.fn(), onOpenActivity: jest.fn(), onEditHome: jest.fn() });
 
 async function mountHero(d: HomeData, mode: ThemeMode = 'light', settings = settingsFake()) {
   const qc = createQueryClient();
@@ -404,6 +404,12 @@ describe('homeHeroNav (Story 5.2)', () => {
     expect(d.navigate).toHaveBeenLastCalledWith('ReviewQueue', {});
     n.onOpenActivity({ types: ['income'], fromDate: '2026-11-01', toDate: '2026-11-30' });
     expect(d.openActivity).toHaveBeenLastCalledWith({ types: ['income'], fromDate: '2026-11-01', toDate: '2026-11-30' });
+  });
+
+  it('opens Edit Home', () => {
+    const d = deps();
+    homeHeroNav(d).onEditHome();
+    expect(d.navigate).toHaveBeenLastCalledWith('HomeEdit');
   });
 
   it('Set a limit asks for the editor first, then goes to the Plan tab', () => {

@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { CaretRight } from 'phosphor-react-native';
-import { shortDate, type ActivityQuery, type BudgetListRow, type CurrencyCode, type HomeBudgetCards, type IncomeExpense, type Spend7d, type TopCategories } from '@wmbugo/core';
+import { defaultHomeLayout, shortDate, type ActivityQuery, type HomeLayoutEntry, type BudgetListRow, type CurrencyCode, type HomeBudgetCards, type IncomeExpense, type Spend7d, type TopCategories } from '@wmbugo/core';
 import { amountLabel, controlA11y, spokenAmount } from '../../shared/a11y/labels';
 import { useAmountsHidden } from '../../shared/state/amountsHidden';
 import { copy } from '../../shared/copy';
@@ -15,9 +15,10 @@ import { Amount } from '../../shared/ui/Amount';
 import { BarChart, type BarDatum } from '../../shared/ui/BarChart';
 import type { ColorName } from '../../shared/theme/colors';
 import { categoryIcon } from '../add/categoryIcons';
+import { Button } from '../../shared/ui/Button';
 import { LimitBar, limitBarLabel, savingsLabel } from '../../shared/ui/LimitBar';
 import { moneyText } from '../../shared/ui/moneyText';
-import { HOME_CARDS, visibleCards, type CardId } from './cardRegistry';
+import { REGISTERED_FOR_LAYOUT, visibleCards, type CardId } from './cardRegistry';
 import type { HomeApi } from './homeApi';
 
 export const HOME_INCOME_KEY = ['home', 'income'] as const;
@@ -123,15 +124,20 @@ function BudgetRow({ row, currency, locale, ownPeriod, onOpen }: { row: BudgetLi
   );
 }
 
-function BudgetsCard({ cards, currency, locale, onOpenBudget }: { cards: HomeBudgetCards; currency: CurrencyCode; locale: string; onOpenBudget: HomeCardsNav['onOpenBudget'] }) {
+/** Compact Budgets shows the three with the highest percent used and a way to the rest. */
+export const COMPACT_BUDGETS = 3;
+
+function BudgetsCard({ cards, currency, locale, compact, onOpenBudget, onOpenPlan }: { cards: HomeBudgetCards; currency: CurrencyCode; locale: string; compact: boolean; onOpenBudget: HomeCardsNav['onOpenBudget']; onOpenPlan: () => void }) {
   const own = (r: BudgetListRow) => r.period.start !== cards.defaultPeriod.start || r.period.end !== cards.defaultPeriod.end;
+  const rows = compact ? cards.categoryBudgets.slice(0, COMPACT_BUDGETS) : cards.categoryBudgets;
   return (
     <CardFrame id="budgets" title={copy.home.cards.budgets}>
       <View style={styles.rows}>
-        {cards.categoryBudgets.map((r) => (
+        {rows.map((r) => (
           <BudgetRow key={r.id} row={r} currency={currency} locale={locale} ownPeriod={own(r)} onOpen={() => onOpenBudget(r.id, r.period.start)} />
         ))}
       </View>
+      {compact && cards.categoryBudgets.length > COMPACT_BUDGETS ? <Button label={copy.home.edit.seeAllBudgets} variant="text" onPress={onOpenPlan} testID="home-see-all-budgets" /> : null}
     </CardFrame>
   );
 }
@@ -170,7 +176,10 @@ function CategoryChip({ icon, colorToken }: { icon: string; colorToken: string }
   );
 }
 
-function TopCategoriesCard({ d, currency, locale, table, onToggleTable, onOpenActivity }: { d: TopCategories; currency: CurrencyCode; locale: string; table: boolean; onToggleTable: () => void; onOpenActivity: (q: ActivityQuery) => void }) {
+/** Compact Top categories shows the top three. */
+export const COMPACT_TOP_CATEGORIES = 3;
+
+function TopCategoriesCard({ d, currency, locale, compact, table, onToggleTable, onOpenActivity }: { d: TopCategories; currency: CurrencyCode; locale: string; compact: boolean; table: boolean; onToggleTable: () => void; onOpenActivity: (q: ActivityQuery) => void }) {
   const theme = useTheme();
   if (d.rows.length === 0) {
     return (
@@ -181,7 +190,7 @@ function TopCategoriesCard({ d, currency, locale, table, onToggleTable, onOpenAc
       </CardFrame>
     );
   }
-  const data: BarDatum[] = d.rows.map((r) => ({ id: r.categoryId, label: r.name, valueMinor: r.amountMinor, sharePercent: r.sharePercent, leading: <CategoryChip icon={r.icon} colorToken={r.colorToken} /> }));
+  const data: BarDatum[] = (compact ? d.rows.slice(0, COMPACT_TOP_CATEGORIES) : d.rows).map((r) => ({ id: r.categoryId, label: r.name, valueMinor: r.amountMinor, sharePercent: r.sharePercent, leading: <CategoryChip icon={r.icon} colorToken={r.colorToken} /> }));
   return (
     <CardFrame id="top_categories" title={copy.home.cards.topCategories} scope={null}>
       <BarChart
@@ -241,15 +250,17 @@ function CardError({ id, title, onRetry }: { id: CardId; title: string; onRetry:
  * The cards under the hero, in registry order (Story 5.4). Each card reads its own query, so one that fails shows its own
  * error with Retry and the others carry on. The `N to check` count comes with the hero snapshot.
  */
-export function HomeCards({ api, toCheckCount, currency, locale, nav }: { api: HomeApi; toCheckCount: number; currency: CurrencyCode; locale: string; nav: HomeCardsNav }) {
+export function HomeCards({ api, toCheckCount, currency, locale, nav, layout = defaultHomeLayout(REGISTERED_FOR_LAYOUT), layoutReady = true }: { api: HomeApi; toCheckCount: number; currency: CurrencyCode; locale: string; nav: HomeCardsNav; /** The resolved layout (Story 5.6): order, hidden and size per editable card. */ layout?: readonly HomeLayoutEntry[]; /** False until the saved layout is known, so the cards never show in the PRD order and then jump. */ layoutReady?: boolean }) {
+  const compactOf = (id: CardId) => layout.find((e) => e.cardId === id)?.size === 'compact';
   // `View as table` is remembered per chart for as long as Home is open: opening an entry list from a bar and coming back
   // leaves Home unchanged (Story 5.5). A new Home (the app reopened) starts on the bars.
   const [tables, setTables] = useState<Partial<Record<CardId, boolean>>>({});
   const toggle = (id: CardId) => () => setTables((t) => ({ ...t, [id]: !t[id] }));
-  const income = useQuery({ queryKey: HOME_INCOME_KEY, queryFn: async () => (api.loadIncomeExpense ? await api.loadIncomeExpense() : null) });
-  const topCategories = useQuery({ queryKey: HOME_TOP_CATEGORIES_KEY, queryFn: async () => (api.loadTopCategories ? await api.loadTopCategories() : null) });
-  const spend7d = useQuery({ queryKey: HOME_SPEND_7D_KEY, queryFn: async () => (api.loadSpend7d ? await api.loadSpend7d() : null) });
-  const budgets = useQuery({ queryKey: HOME_BUDGETS_KEY, queryFn: async () => (api.loadBudgetCards ? await api.loadBudgetCards() : null) });
+  const isOn = (id: CardId) => !layout.find((e) => e.cardId === id)?.hidden;
+  const income = useQuery({ queryKey: HOME_INCOME_KEY, enabled: isOn('income_expense'), queryFn: async () => (api.loadIncomeExpense ? await api.loadIncomeExpense() : null) });
+  const topCategories = useQuery({ queryKey: HOME_TOP_CATEGORIES_KEY, enabled: isOn('top_categories'), queryFn: async () => (api.loadTopCategories ? await api.loadTopCategories() : null) });
+  const spend7d = useQuery({ queryKey: HOME_SPEND_7D_KEY, enabled: isOn('spend_7d'), queryFn: async () => (api.loadSpend7d ? await api.loadSpend7d() : null) });
+  const budgets = useQuery({ queryKey: HOME_BUDGETS_KEY, enabled: isOn('budgets') || isOn('nws'), queryFn: async () => (api.loadBudgetCards ? await api.loadBudgetCards() : null) });
   // A card keeps its last good data when a refresh fails (the hero says so); an error shows only when there is nothing to show.
   const inputs = { toCheckCount, ...(income.data !== undefined ? { income: income.data } : {}), ...(budgets.data !== undefined ? { budgets: budgets.data } : {}), ...(topCategories.data !== undefined ? { topCategories: topCategories.data } : {}), ...(spend7d.data !== undefined ? { spend7d: spend7d.data } : {}) };
   const shown = new Set(visibleCards(inputs).map((c) => c.id));
@@ -264,11 +275,11 @@ export function HomeCards({ api, toCheckCount, currency, locale, nav }: { api: H
         if (income.isError) return <CardError key={id} id={id} title={copy.home.cards.incomeExpense} onRetry={() => void income.refetch()} />;
         return <Skeleton key={id} height={96} />;
       case 'budgets':
-        if (budgets.data) return <BudgetsCard key={id} cards={budgets.data} currency={currency} locale={locale} onOpenBudget={nav.onOpenBudget} />;
+        if (budgets.data) return <BudgetsCard key={id} cards={budgets.data} currency={currency} locale={locale} compact={compactOf('budgets')} onOpenBudget={nav.onOpenBudget} onOpenPlan={nav.onOpenPlan} />;
         if (budgetsFailed) return <CardError key={id} id={id} title={copy.home.cards.budgets} onRetry={() => void budgets.refetch()} />;
         return <Skeleton key={id} height={96} />;
       case 'top_categories':
-        if (topCategories.data) return <TopCategoriesCard key={id} d={topCategories.data} currency={currency} locale={locale} table={!!tables[id]} onToggleTable={toggle(id)} onOpenActivity={nav.onOpenActivity} />;
+        if (topCategories.data) return <TopCategoriesCard key={id} d={topCategories.data} currency={currency} locale={locale} compact={compactOf('top_categories')} table={!!tables[id]} onToggleTable={toggle(id)} onOpenActivity={nav.onOpenActivity} />;
         if (topCategories.isError) return <CardError key={id} id={id} title={copy.home.cards.topCategories} onRetry={() => void topCategories.refetch()} />;
         return <Skeleton key={id} height={120} />;
       case 'spend_7d':
@@ -281,10 +292,12 @@ export function HomeCards({ api, toCheckCount, currency, locale, nav }: { api: H
   };
 
   // Registry order. The Budgets slot also holds its skeleton while loading and its error if the load failed.
-  const slots = HOME_CARDS.filter((c) => (c.id === 'budgets' ? shown.has('budgets') || budgetsFailed || budgets.isPending : shown.has(c.id)));
+  // `N to check` is always first; the rest follow the saved order, hidden cards left out.
+  const order: CardId[] = layoutReady ? ['to_check', ...layout.filter((e) => !e.hidden).map((e) => e.cardId as CardId)] : ['to_check'];
+  const slots = order.filter((id) => (id === 'budgets' ? shown.has('budgets') || budgetsFailed || budgets.isPending : shown.has(id)));
   return (
     <View testID="home-cards" style={styles.stack}>
-      {slots.map((c) => render(c.id))}
+      {slots.map((id) => render(id))}
     </View>
   );
 }

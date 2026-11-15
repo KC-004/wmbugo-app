@@ -7,3 +7,4 @@ export * from './settings';
 export * from './settingsCommands';
 export * from './timezone';
 export * from './paydayChange';
+export * from './homeLayout';
