@@ -189,7 +189,7 @@ describe('leftInBudget (Story 4.11, for Home and Free to use)', () => {
     await spend('cat_food', 1_000_000, ist(11, 5));
     await refund(tv, 900_000);
     ok(await writer.run(SaveBudget, { scope: 'overall', categoryIds: [], accountIds: null, periodRule: 'default', targetMinor: 5_000_000, alertLevels: [75, 90, 100] }, 'user'));
-    expect(await leftInBudget(db, NOW)).toEqual({ kind: 'overall', period: expect.objectContaining({ start: '2026-11-01', end: '2026-11-30' }), targetMinor: 5_000_000, usedMinor: 1_000_000, leftMinor: 4_000_000, refundSurplusMinor: 700_000 });
+    expect(await leftInBudget(db, NOW)).toEqual({ kind: 'overall', budgetId: expect.any(String), period: expect.objectContaining({ start: '2026-11-01', end: '2026-11-30' }), targetMinor: 5_000_000, usedMinor: 1_000_000, leftMinor: 4_000_000, refundSurplusMinor: 700_000 });
   });
 
   it('with only 50/30/20: Needs + Wants targets minus Needs + Wants + Not classified spending, naming the Not classified part', async () => {

@@ -30,6 +30,10 @@ export interface UiState {
   readonly openSheet: string | null;
   readonly addDraft: AddDraft;
   readonly activityFilter: ActivityFilterState;
+  /** Set by Home's `Set a limit`: the budget list opens its editor with Overall chosen, then clears this. */
+  readonly pendingBudgetEditor: boolean;
+  requestBudgetEditor(): void;
+  clearBudgetEditorRequest(): void;
   setActivityFilter(next: ActivityFilterState): void;
   openSheetById(id: string): void;
   closeSheet(): void;
@@ -41,6 +45,9 @@ export const useUiStore = create<UiState>((set) => ({
   openSheet: null,
   addDraft: EMPTY_DRAFT,
   activityFilter: EMPTY_ACTIVITY_FILTER,
+  pendingBudgetEditor: false,
+  requestBudgetEditor: () => set({ pendingBudgetEditor: true }),
+  clearBudgetEditorRequest: () => set({ pendingBudgetEditor: false }),
   setActivityFilter: (next) => set({ activityFilter: next }),
   openSheetById: (id) => set({ openSheet: id }),
   closeSheet: () => set({ openSheet: null }),

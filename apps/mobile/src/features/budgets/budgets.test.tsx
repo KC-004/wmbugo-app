@@ -5,6 +5,7 @@ import { budgetStatus, mapCategoryRows, SEED_CATEGORIES, type BudgetListRow, typ
 import { SheetHost } from '../../shared/feedback/SheetHost';
 import { ToastHost } from '../../shared/feedback/ToastHost';
 import { createQueryClient } from '../../shared/queryClient';
+import { useUiStore } from '../../shared/state/uiStore';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
 import { BudgetsScreen } from './BudgetsScreen';
 import { barGeometry, limitBarLabel, LimitBar, OVERFLOW_CAP, savingsLabel, savingsStatusLine, statusLine } from '../../shared/ui/LimitBar';
@@ -215,6 +216,33 @@ describe('Budgets list (SCR-14, Story 4.6)', () => {
     expect(t).toEqual(expect.arrayContaining(['For', 'Everything', 'Some categories', 'Only these accounts', 'Period', 'Each pay cycle', 'Monthly', 'Weekly', 'Custom dates', 'Limit', 'Alert me at', '50%', '75%', '80%', '90%', '100%']));
     const selected = (id: string) => host(r, id).props.accessibilityState?.selected;
     expect([50, 75, 80, 90, 100].map((l) => selected(`budget-alert-${l}`))).toEqual([false, true, false, true, true]);
+  });
+
+  it("Home's Set a limit opens the editor once with Everything chosen", async () => {
+    useUiStore.getState().requestBudgetEditor();
+    const r = await mountNode(<BudgetsScreen api={fakeApi().api} />);
+    expect(has(r, 'budget-sheet')).toBe(true);
+    expect(host(r, 'budget-for-overall').props.accessibilityState?.selected).toBe(true);
+    expect(useUiStore.getState().pendingBudgetEditor).toBe(false);
+  });
+
+  it("Home's Set a limit opens the existing overall budget instead of a second one", async () => {
+    useUiStore.getState().requestBudgetEditor();
+    const f = fakeApi([row({ id: 'o', name: 'Overall', group: 'overall', scope: 'overall' })]);
+    await mountNode(<BudgetsScreen api={f.api} />);
+    expect(f.readForEdit).toHaveBeenCalledWith('o');
+    expect(useUiStore.getState().pendingBudgetEditor).toBe(false);
+  });
+
+  it("a failed load clears Home's Set a limit request instead of leaving it for a later visit", async () => {
+    useUiStore.getState().requestBudgetEditor();
+    const f = fakeApi();
+    f.api.load = async () => {
+      throw new Error('boom');
+    };
+    const r = await mountNode(<BudgetsScreen api={f.api} />);
+    expect(has(r, 'budget-sheet')).toBe(false);
+    expect(useUiStore.getState().pendingBudgetEditor).toBe(false);
   });
 
   it('Each month replaces Each pay cycle when the profile counts by month', async () => {

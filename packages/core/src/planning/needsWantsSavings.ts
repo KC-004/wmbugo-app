@@ -68,7 +68,7 @@ export async function categoryIdsUnder(q: Querier, topIds: readonly string[]): P
 }
 
 export type LeftInBudget =
-  | { readonly kind: 'overall'; readonly period: Period; readonly targetMinor: number; readonly usedMinor: number; readonly leftMinor: number; readonly refundSurplusMinor: number }
+  | { readonly kind: 'overall'; readonly budgetId: string; readonly period: Period; readonly targetMinor: number; readonly usedMinor: number; readonly leftMinor: number; readonly refundSurplusMinor: number }
   | { readonly kind: 'types'; readonly period: Period; readonly targetMinor: number; readonly usedMinor: number; readonly leftMinor: number; readonly notClassifiedMinor: number }
   | { readonly kind: 'none' };
 
@@ -92,7 +92,7 @@ export async function leftInBudget(q: Querier, nowMs: number): Promise<LeftInBud
   if (overall && op) {
     const f = await budgetFigures(q, overall, op);
     const target = await targetOf(overall, op);
-    return { kind: 'overall', period: op, targetMinor: target, usedMinor: f.usedMinor, leftMinor: target - f.usedMinor, refundSurplusMinor: f.refundSurplusMinor };
+    return { kind: 'overall', budgetId: overall.id, period: op, targetMinor: target, usedMinor: f.usedMinor, leftMinor: target - f.usedMinor, refundSurplusMinor: f.refundSurplusMinor };
   }
   const needs = budgets.find((b) => b.template === TEMPLATE_503020 && b.scope === 'budget_type' && b.budgetType === 'need');
   const wants = budgets.find((b) => b.template === TEMPLATE_503020 && b.scope === 'budget_type' && b.budgetType === 'want');

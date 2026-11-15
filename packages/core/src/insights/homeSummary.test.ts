@@ -50,7 +50,9 @@ describe('homeSummary (Story 5.1)', () => {
     await spend('cat_food', 814_000, ist(11, 3));
     const s = (await homeSummary(db, NOW))!;
     expect(s).toMatchObject({ today: '2026-11-18', heroMode: 'overall', leftMinor: 1_186_000, usedMinor: 814_000, targetMinor: 2_000_000, notClassifiedMinor: 0, spentThisPeriodMinor: 814_000, daysLeft: 13, daysToPayday: 13, toCheckCount: 0 });
-    expect(s.period).toMatchObject({ start: '2026-11-01', end: '2026-11-30', shortened: false });
+    expect(s.period).toMatchObject({ start: '2026-11-01', end: '2026-11-30', shortened: false, title: '1–30 Nov' });
+    expect(s.overallBudgetId).toEqual(expect.any(String));
+    expect(s.sortIt).toBeNull();
     expect(s.accounts.hasAccounts).toBe(true);
   });
 
@@ -66,7 +68,10 @@ describe('homeSummary (Story 5.1)', () => {
     await writer.run(CreateFiftyThirtyTwenty, { incomeMinor: 8_000_000, targets: { needsMinor: 2_500_000, wantsMinor: 1_500_000, savingsMinor: 500_000 } }, 'user');
     await spend('cat_groceries', 1_500_000, ist(11, 3));
     await spend('cat_uncategorised', 300_000, ist(11, 5));
-    expect(await homeSummary(db, NOW)).toMatchObject({ heroMode: 'nws_only', targetMinor: 4_000_000, usedMinor: 1_800_000, leftMinor: 2_200_000, notClassifiedMinor: 300_000 });
+    expect(await homeSummary(db, NOW)).toMatchObject({ heroMode: 'nws_only', targetMinor: 4_000_000, usedMinor: 1_800_000, leftMinor: 2_200_000, notClassifiedMinor: 300_000, overallBudgetId: null });
+    const s = (await homeSummary(db, NOW))!;
+    expect(s.sortIt).toMatchObject({ fromDate: '2026-11-01', toDate: '2026-11-30' });
+    expect(s.sortIt!.categoryIds).toContain('cat_uncategorised');
   });
 
   it('no budget: spent_only with the refund-net spent figure and no budget numbers', async () => {
@@ -105,7 +110,7 @@ describe('homeSummary (Story 5.1)', () => {
     if (!c.ok) throw new Error('change');
     const s = (await homeSummary(db, NOW))!;
     expect(s.period).toMatchObject({ start: '2026-11-01', end: '2026-11-24', shortened: true });
-    expect(s.period.label).toContain('Shortened cycle');
+    expect(s.period.title).toBe('1–24 Nov · Shortened cycle');
     expect(s.daysToPayday).toBe(7);
     expect(s.daysLeft).toBe(7);
   });

@@ -18,6 +18,7 @@ import { ReviewQueueScreen } from '../activity/ReviewQueueScreen';
 import { useReviewDot } from '../activity/reviewDot';
 import { useEntryActions } from '../activity/useEntryActions';
 import { HomeScreen } from '../home/HomeScreen';
+import { homeHeroNav } from '../home/homeNav';
 import type { ActivityQuery } from '@wmbugo/core';
 import { useUiStore } from '../../shared/state/uiStore';
 import { BudgetsScreen } from '../budgets/BudgetsScreen';
@@ -80,9 +81,16 @@ function PlanTab() {
 
 function HomeTab() {
   const nav = useNavigation<Nav>();
+  const tabs = useNavigation<{ navigate: (s: string, p?: unknown) => void }>();
+  const openActivity = useOpenActivityFilter();
   return (
     <TabFrame tab="Home">
-      <HomeScreen onAccounts={() => nav.navigate('Accounts')} onProfile={() => nav.navigate('Settings')} onAddAccount={() => nav.navigate('Accounts')} />
+      <HomeScreen
+        onAccounts={() => nav.navigate('Accounts')}
+        onProfile={() => nav.navigate('Settings')}
+        onAddAccount={() => nav.navigate('Accounts')}
+        {...homeHeroNav({ navigate: (s, p) => tabs.navigate(s, p), openActivity, requestBudgetEditor: () => useUiStore.getState().requestBudgetEditor() })}
+      />
     </TabFrame>
   );
 }

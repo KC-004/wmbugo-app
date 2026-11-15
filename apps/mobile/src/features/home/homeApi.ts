@@ -1,4 +1,4 @@
-import { getCurrency, homeSummary, MarkPromptSeen, SEEN_PROMPT_SQL, type CurrencyCode, type HomeAccounts, type HomeSummary } from '@wmbugo/core';
+import { getCurrency, homeSummary, MarkPromptSeen, SEEN_PROMPT_SQL, type CurrencyCode, type HomeSummary } from '@wmbugo/core';
 import { getServices, systemClock } from '../../adapters/startApp';
 import { readProfile } from '../../adapters/readProfile';
 import type { SeenStore } from '../../shared/feedback/tooltipController';
@@ -11,12 +11,9 @@ export interface HomeData {
   /** Local date (YYYY-MM-DD) and hour (0-23) in the profile timezone. */
   readonly today: string;
   readonly hour: number;
-  readonly scope: string;
-  readonly spentMinor: number;
-  readonly accounts: HomeAccounts;
-  /** The whole snapshot and the hero view model built from it (the hero card itself arrives in Story 5.2). */
-  readonly summary?: HomeSummary;
-  readonly hero?: HeroView;
+  /** The whole snapshot and the hero view model built from it. */
+  readonly summary: HomeSummary;
+  readonly hero: HeroView;
 }
 
 export interface HomeApi {
@@ -56,9 +53,6 @@ export function homeDataFrom(profile: { currency: CurrencyCode; locale: string; 
     timezoneId: profile.timezoneId,
     today: summary.today,
     hour: hourIn(nowMs, profile.timezoneId),
-    scope: summary.period.label,
-    spentMinor: summary.spentThisPeriodMinor,
-    accounts: summary.accounts,
     summary,
     hero: presentHero(summary, cur.ok ? cur.value.exponent : 2),
   };

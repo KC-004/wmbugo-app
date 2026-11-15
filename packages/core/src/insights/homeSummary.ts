@@ -3,8 +3,8 @@ import { SPENT_EXPENSES_SQL, SPENT_REFUNDS_SQL, homeAccounts, spentMinor, type H
 import { TO_CHECK_SQL } from '../capture/reviewQueue';
 import { budgetStatus, type Querier } from '../planning/budgets';
 import { readPeriodProfile } from '../planning/budgetStore';
-import { leftInBudget } from '../planning/needsWantsSavings';
-import { addDays, daysBetween, periodFor, periodLabel } from '../profile/period';
+import { categoryIdsUnder, leftInBudget, needsWantsSavings } from '../planning/needsWantsSavings';
+import { addDays, daysBetween, periodFor, periodLabel, periodTitle } from '../profile/period';
 import { toLocalDate } from '../shared/clock';
 
 /**
@@ -19,7 +19,11 @@ export type HeroMode = 'overall' | 'nws_only' | 'spent_only';
 export interface HomeSummary {
   /** The profile's default period (from the period service) and the local date it was read for. */
   readonly today: string;
-  readonly period: { readonly start: string; readonly end: string; readonly label: string; readonly shortened: boolean };
+  readonly period: { readonly start: string; readonly end: string; readonly label: string; /** The header chip: `1–30 Nov` or `1–24 Nov · Shortened cycle`. */ readonly title: string; readonly shortened: boolean };
+  /** The overall budget behind the hero, when there is one (the hero opens it). */
+  readonly overallBudgetId: string | null;
+  /** What Activity filters to for `Sort it`: the categories behind the not-classified amount, over the budget's period. Null when there is none. */
+  readonly sortIt: { readonly categoryIds: readonly string[]; readonly fromDate: string; readonly toDate: string } | null;
   readonly heroMode: HeroMode;
   /** Null in `spent_only`. `leftMinor` can be below zero: the screen shows it as over budget, never as a negative. */
   readonly leftMinor: number | null;
@@ -54,12 +58,19 @@ export async function homeSummary(q: Querier, nowMs: number): Promise<HomeSummar
   const left = await leftInBudget(q, nowMs);
 
   const budgetPeriod = left.kind === 'none' ? period : left.period;
+  let sortIt: HomeSummary['sortIt'] = null;
+  if (left.kind === 'types' && left.notClassifiedMinor > 0) {
+    const nw = await needsWantsSavings(q, left.period);
+    sortIt = { categoryIds: await categoryIdsUnder(q, nw.notClassified.map((x) => x.categoryId)), fromDate: left.period.start, toDate: left.period.end };
+  }
   const daysLeft = budgetStatus({ usedMinor: 0, targetMinor: 0, period: budgetPeriod, today }).daysRemaining;
   const daysToPayday = read.profile.rule.kind === 'none' ? null : Math.max(0, daysBetween(today, addDays(period.end, 1)));
 
   return {
     today,
-    period: { start: period.start, end: period.end, label: periodLabel(period, today), shortened: period.shortened === true },
+    period: { start: period.start, end: period.end, label: periodLabel(period, today), title: periodTitle(period), shortened: period.shortened === true },
+    overallBudgetId: left.kind === 'overall' ? left.budgetId : null,
+    sortIt,
     heroMode: left.kind === 'overall' ? 'overall' : left.kind === 'types' ? 'nws_only' : 'spent_only',
     leftMinor: left.kind === 'none' ? null : left.leftMinor,
     usedMinor: left.kind === 'none' ? null : left.usedMinor,

@@ -11,6 +11,7 @@ import { ActivityScreen } from '../activity/ActivityScreen';
 import type { ActivityApi, ActivityData } from '../activity/activityApi';
 import { HomeScreen } from './HomeScreen';
 import type { HomeApi, HomeData } from './homeApi';
+import { homeData } from './homeTestKit';
 
 jest.mock('../../adapters/startApp', () => ({ getServices: jest.fn(), systemClock: { nowMs: () => 0, timezoneId: () => 'Asia/Singapore' } }));
 let mockFontScale = 1;
@@ -60,21 +61,20 @@ function mount(node: React.ReactElement) {
   return { r, qc };
 }
 
-const data = (over: Partial<HomeData> = {}, accounts: Partial<HomeData['accounts']> = {}): HomeData => ({
-  currency: 'SGD',
-  locale: 'en-SG',
-  timezoneId: 'Asia/Singapore',
-  today: '2026-11-07',
-  hour: 9,
-  scope: 'This month',
-  spentMinor: 1250,
-  accounts: { hasAccounts: true, inAccountsMinor: 320000, notSetCount: 0, cardDuesMinor: null, notSetCards: 0, ...accounts },
-  ...over,
-});
+type DataIn = { today?: string; scope?: string; spentMinor?: number };
+const data = (over: DataIn = {}, accounts: Partial<HomeData['summary']['accounts']> = {}): HomeData =>
+  homeData({
+    accounts,
+    summary: {
+      ...(over.today ? { today: over.today } : {}),
+      ...(over.spentMinor !== undefined ? { spentThisPeriodMinor: over.spentMinor } : {}),
+      period: { start: '2026-11-01', end: '2026-11-30', label: 'This month', title: over.scope ?? '1–30 Nov', shortened: false },
+    },
+  });
 const homeApi = (d: HomeData | null, seen = new MemorySeenStore()): HomeApi & { load: jest.Mock } => ({ load: jest.fn(async () => d), seen });
 const noop = () => undefined;
 const mountHome = async (api: HomeApi, onAddAccount = noop) => {
-  const m = mount(<HomeScreen api={api} onAccounts={noop} onProfile={noop} onAddAccount={onAddAccount} />);
+  const m = mount(<HomeScreen api={api} onAccounts={noop} onProfile={noop} onAddAccount={onAddAccount} onOpenBudget={noop} onOpenPlan={noop} onSetLimit={noop} onSortIt={noop} />);
   await settle();
   return m;
 };
@@ -83,15 +83,15 @@ describe('Home', () => {
   it('shows a greeting, today, Spent this period with the scope, and the accounts line', async () => {
     const { r } = await mountHome(homeApi(data()));
     const t = texts(r);
-    expect(t).toEqual(expect.arrayContaining(['Good morning', 'Sat 7 Nov', 'Spent this period', 'S$12.50', 'This month', 'In accounts', 'S$3,200.00']));
+    expect(t).toEqual(expect.arrayContaining(['Good morning', 'Sat 7 Nov', '1–30 Nov', 'Spent this period', 'S$12.50', 'In accounts', 'S$3,200.00']));
     expect(t).not.toContain('Card dues');
-    expect(t.join(' ')).not.toMatch(/set a limit/i);
+    expect(t).toContain('Set a limit →'); // no budget: the hero offers to set one
   });
 
   it('shows skeletons while loading, then the values', async () => {
     let release!: (d: HomeData) => void;
     const api: HomeApi = { load: () => new Promise((res) => { release = res; }), seen: new MemorySeenStore() };
-    const { r } = mount(<HomeScreen api={api} onAccounts={noop} onProfile={noop} onAddAccount={noop} />);
+    const { r } = mount(<HomeScreen api={api} onAccounts={noop} onProfile={noop} onAddAccount={noop} onOpenBudget={noop} onOpenPlan={noop} onSetLimit={noop} onSortIt={noop} />);
     await settle();
     expect(host(r, 'home-skeleton')).toHaveLength(1);
     await act(async () => release(data()));
@@ -104,10 +104,10 @@ describe('Home', () => {
     const a = await mountHome(homeApi(data({}, { cardDuesMinor: 25000 })));
     expect(texts(a.r)).toEqual(expect.arrayContaining(['In accounts', 'Card dues', 'S$3,200.00', 'S$250.00']));
     expect(texts(a.r)).not.toContain('S$3,450.00');
-    expect(host(a.r, 'accounts-line')[0]!.props.style.flat().some((s: { flexDirection?: string }) => s?.flexDirection === 'row')).toBe(true);
+    expect(host(a.r, 'hero-accounts')[0]!.props.style.flat().some((s: { flexDirection?: string }) => s?.flexDirection === 'row')).toBe(true);
     mockFontScale = 1.3;
     const b = await mountHome(homeApi(data({}, { cardDuesMinor: 25000 })));
-    expect(host(b.r, 'accounts-line')[0]!.props.style.flat().some((s: { flexDirection?: string }) => s?.flexDirection === 'column')).toBe(true);
+    expect(host(b.r, 'hero-accounts')[0]!.props.style.flat().some((s: { flexDirection?: string }) => s?.flexDirection === 'column')).toBe(true);
   });
 
   it('with no account, says to set one up and offers to add one', async () => {
@@ -131,7 +131,7 @@ describe('Home', () => {
     const { r } = await mountHome(homeApi(data({}, { cardDuesMinor: null, notSetCards: 1 })));
     const t = texts(r);
     expect(t).toEqual(expect.arrayContaining(['Card dues', 'Not set', '+1 card not set']));
-    expect(host(r, 'accounts-line')).toHaveLength(1);
+    expect(host(r, 'hero-accounts')).toHaveLength(1);
   });
 
   it('shows the In accounts tip once, and "Got it" records it so it never returns', async () => {
@@ -167,17 +167,17 @@ describe('Home', () => {
     });
 
     it('recomputes when the app returns to the foreground', async () => {
-      let onChange: ((s: string) => void) | undefined;
+      const handlers: ((s: string) => void)[] = [];
       jest.spyOn(AppState, 'addEventListener').mockImplementation(((_: string, fn: (s: string) => void) => {
-        onChange = fn;
+        handlers.push(fn);
         return { remove: () => undefined };
       }) as never);
       const api = homeApi(data());
       await mountHome(api);
-      await act(async () => onChange?.('background'));
+      await act(async () => handlers.forEach((h) => h('background')));
       await settle();
       expect(api.load).toHaveBeenCalledTimes(1);
-      await act(async () => onChange?.('active'));
+      await act(async () => handlers.forEach((h) => h('active')));
       await settle();
       expect(api.load).toHaveBeenCalledTimes(2);
     });
@@ -228,15 +228,13 @@ describe('Home', () => {
       api.load.mockImplementation(() => new Promise<HomeData>((res) => { release = res; }));
       await act(async () => { void qc.invalidateQueries({ queryKey: ['home'] }); });
       await act(async () => new Promise((res) => setTimeout(res, 100)));
-      expect(texts(r)).toContain('This month'); // quick so far: nothing flashes
+      expect(texts(r)).toContain('1–30 Nov'); // quick so far: nothing flashes
       await act(async () => new Promise((res) => setTimeout(res, 350)));
       expect(texts(r)).toContain('Updating…');
       expect(texts(r)).toContain('S$12.50'); // the previous value stays
-      // Both indicators: the spent card's scope caption (and its TalkBack label) and the accounts line.
-      const scope = host(r, 'spent-scope')[0]!;
-      expect([scope.props.children].flat().join('')).toBe('Updating…');
-      expect(host(r, 'accounts-updating')).toHaveLength(1);
-      expect(host(r, 'spent-card')[0]!.props.accessibilityLabel).toContain('Updating…');
+      // Both indicators: the period chip and the hero caption.
+      expect([host(r, 'period-chip')[0]!.props.children].flat().join('')).toBe('Updating…');
+      expect([host(r, 'hero-caption')[0]!.props.children].flat().join('')).toBe('Updating…');
       await act(async () => release(data({ spentMinor: 9900 })));
       await settle();
       expect(texts(r)).not.toContain('Updating…');
@@ -247,8 +245,8 @@ describe('Home', () => {
       const api = homeApi(data());
       api.load.mockRejectedValue(new Error('boom'));
       const { r } = await mountHome(api);
-      expect(host(r, 'error-block')).toHaveLength(2);
-      expect(texts(r).filter((x) => x === "Couldn't load this card")).toHaveLength(2);
+      expect(host(r, 'error-block')).toHaveLength(1);
+      expect(texts(r).filter((x) => x === "Couldn't load this card")).toHaveLength(1);
       expect(texts(r)).toContain('Home'); // the header is still there
       expect(texts(r).join(' ')).not.toMatch(/S\$0\.00/);
       // Retry really loads again, and the cards come back with data.

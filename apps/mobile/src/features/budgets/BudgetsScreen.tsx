@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useUiStore } from '../../shared/state/uiStore';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ActivityQuery, BudgetGroup, BudgetListRow } from '@wmbugo/core';
 import { controlA11y } from '../../shared/a11y/labels';
@@ -129,6 +131,22 @@ export function BudgetsScreen({ api = realBudgetsApi, onUseTemplate, onOpen, onO
       ),
     });
   };
+
+  // Home's `Set a limit` asks for the editor with Overall chosen; open it once the list has loaded, and only once.
+  const pendingEditor = useUiStore((s) => s.pendingBudgetEditor);
+  useEffect(() => {
+    if (!pendingEditor) return;
+    // A failed load must not leave the request waiting for a later visit.
+    if (q.isError) {
+      useUiStore.getState().clearBudgetEditorRequest();
+      return;
+    }
+    if (!data) return;
+    useUiStore.getState().clearBudgetEditorRequest();
+    // A stale Home can ask for a limit when an overall budget now exists: open that one instead of a second.
+    if (data.list.overallId) void edit(data.list.overallId, data);
+    else open({ mode: 'add', scope: 'overall' }, data);
+  }, [pendingEditor, data, q.isError]);
 
   const edit = async (id: string, d: BudgetsData) => {
     const budget = await api.readForEdit(id).catch(() => null);

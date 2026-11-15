@@ -7,8 +7,10 @@ const accounts = { hasAccounts: true, inAccountsMinor: 5_230_000, notSetCount: 0
 function summary(over: Partial<HomeSummary> = {}): HomeSummary {
   return {
     today: '2026-11-18',
-    period: { start: '2026-11-01', end: '2026-11-30', label: 'This month', shortened: false },
+    period: { start: '2026-11-01', end: '2026-11-30', label: 'This month', title: '1–30 Nov', shortened: false },
     heroMode: 'overall',
+    overallBudgetId: 'b1',
+    sortIt: null,
     leftMinor: 1_186_000,
     usedMinor: 814_000,
     targetMinor: 2_000_000,

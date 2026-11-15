@@ -5,8 +5,10 @@ jest.mock('../../adapters/startApp', () => ({ getServices: jest.fn(), systemCloc
 
 const summary: HomeSummary = {
   today: '2026-11-18',
-  period: { start: '2026-11-01', end: '2026-11-30', label: 'This month', shortened: false },
+  period: { start: '2026-11-01', end: '2026-11-30', label: 'This month', title: '1–30 Nov', shortened: false },
   heroMode: 'overall',
+  overallBudgetId: 'b1',
+  sortIt: null,
   leftMinor: 1_186_000,
   usedMinor: 814_000,
   targetMinor: 2_000_000,
@@ -22,8 +24,7 @@ const summary: HomeSummary = {
 describe('homeDataFrom (Story 5.1)', () => {
   it('maps the snapshot to what Home shows: today, scope, the spent figure and the accounts', () => {
     const d = homeDataFrom({ currency: 'INR', locale: 'en-IN', timezoneId: 'Asia/Kolkata' }, summary, Date.UTC(2026, 10, 18, 4, 0, 0));
-    expect(d).toMatchObject({ currency: 'INR', locale: 'en-IN', timezoneId: 'Asia/Kolkata', today: '2026-11-18', scope: 'This month', spentMinor: 700_000, hour: 9 });
-    expect(d.accounts).toBe(summary.accounts);
+    expect(d).toMatchObject({ currency: 'INR', locale: 'en-IN', timezoneId: 'Asia/Kolkata', today: '2026-11-18', hour: 9 });
     expect(d.summary).toBe(summary);
   });
 

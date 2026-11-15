@@ -10,7 +10,7 @@ import { Button } from '../../shared/ui/Button';
 import { Chip } from '../../shared/ui/Chip';
 import type { BudgetsData, EditableBudget, SaveBudgetOutcome } from './budgetsApi';
 
-export type BudgetSheetMode = { readonly mode: 'add' } | { readonly mode: 'edit'; readonly budget: EditableBudget };
+export type BudgetSheetMode = { readonly mode: 'add'; /** Home's `Set a limit` opens with Overall chosen. */ readonly scope?: 'overall' } | { readonly mode: 'edit'; readonly budget: EditableBudget };
 
 type Field = 'limit' | 'categories' | 'dates' | 'form';
 interface FieldError {
@@ -44,7 +44,7 @@ export function BudgetSheet({
 }) {
   const theme = useTheme();
   const editing = start.mode === 'edit' ? start.budget : null;
-  const [scope, setScope] = useState<'overall' | 'category'>(editing ? (editing.scope === 'overall' ? 'overall' : 'category') : 'category');
+  const [scope, setScope] = useState<'overall' | 'category'>(editing ? (editing.scope === 'overall' ? 'overall' : 'category') : start.mode === 'add' && start.scope === 'overall' ? 'overall' : 'category');
   const [categoryIds, setCategoryIds] = useState<string[]>(editing ? [...editing.categoryIds] : []);
   const [accountIds, setAccountIds] = useState<string[]>(editing?.accountIds ? [...editing.accountIds] : []);
   const [periodRule, setPeriodRule] = useState<'default' | 'monthly' | 'weekly' | 'custom'>(editing?.period.rule ?? 'monthly');

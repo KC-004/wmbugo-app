@@ -12,15 +12,20 @@ const UNIT: Readonly<Record<CurrencyCode, string>> = {
 
 export type AmountKind = 'plain' | 'spent' | 'income' | 'refund' | 'transfer' | 'over-budget';
 
-/** "85,000 rupees"; an all-zero fraction is not spoken ("85,000.00" becomes "85,000"). */
-export function spokenAmount(amountMinor: number, currency: CurrencyCode, locale?: string): string {
+/** The number alone, as spoken: "85,000" (for a sentence that names the unit once, like "8,140 of 20,000"). */
+export function spokenNumber(amountMinor: number, currency: CurrencyCode, locale?: string): string {
   const n = formatPlainNumber(amountMinor, currency, locale);
   if (!n.ok) return '';
   // Drop only the currency's exact minor digits when they are all zero; grouping zeros (1,000) stay.
   const cur = getCurrency(currency);
   const digits = cur.ok ? cur.value.exponent : 0;
-  const trimmed = digits > 0 ? n.value.replace(new RegExp(`[.,]0{${digits}}$`), '') : n.value;
-  return `${trimmed} ${UNIT[currency]}`;
+  return digits > 0 ? n.value.replace(new RegExp(`[.,]0{${digits}}$`), '') : n.value;
+}
+
+/** "85,000 rupees"; an all-zero fraction is not spoken ("85,000.00" becomes "85,000"). */
+export function spokenAmount(amountMinor: number, currency: CurrencyCode, locale?: string): string {
+  const n = spokenNumber(amountMinor, currency, locale);
+  return n === '' ? '' : `${n} ${UNIT[currency]}`;
 }
 
 export interface AmountLabelInput {

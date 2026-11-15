@@ -93,6 +93,12 @@ export const copy = {
       dayLeft: '1 day left',
       daysToPayday: '{n} days to payday',
       dayToPayday: '1 day to payday',
+      perDay: '{amount}/day · {days}',
+      setLimit: 'Set a limit →',
+      includesNotClassified: 'Includes {amount} not classified · ',
+      sortIt: 'Sort it',
+      hideAmounts: 'Hide amounts',
+      detailsHint: 'Double-tap for budget details',
     },
   },
   activity: {
