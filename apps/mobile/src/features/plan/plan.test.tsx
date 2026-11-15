@@ -292,7 +292,7 @@ describe('Free to use (Story 6.9)', () => {
     expect(tx.some((t) => /^Bills before payday take ₹18,000(\.00)? \(2 bills\)$/.test(t))).toBe(true);
     expect(tx.some((t) => /^Set aside for goals takes ₹12,000(\.00)?$/.test(t))).toBe(true);
     expect(tx.some((t) => /^Leaves ₹12,000(\.00)?$/.test(t))).toBe(true);
-    expect(tx.some((t) => /^includes ₹3,000(\.00)? not classified$/.test(t))).toBe(true);
+    expect(tx.some((t) => /^Includes ₹3,000(\.00)? not classified$/.test(t))).toBe(true);
     expect(has(r, 'free-how-accounts-smaller')).toBe(true);
     expect(has(r, 'free-how-left-smaller')).toBe(false);
     await press(r, 'free-how-left');
