@@ -17,7 +17,7 @@ import { Amount } from '../../shared/ui/Amount';
 import { Button } from '../../shared/ui/Button';
 import { LimitBar } from '../../shared/ui/LimitBar';
 import { ActivityRowView } from '../activity/ActivityRowView';
-import { ScreenHeader } from '../shell/ScreenHeader';
+import { TopBar } from '../../shared/ui/TopBar';
 import { BudgetSheet } from './BudgetSheet';
 import { BUDGETS_QUERY_KEY, realBudgetsApi, type BudgetDetailData, type BudgetsApi } from './budgetsApi';
 
@@ -63,7 +63,7 @@ export function BudgetDetailScreen({ budgetId, periodStart, onBack, onOpenEntry,
   const toast = useToast();
   const [back, setBack] = useState<number | string>(periodStart ?? 0);
   const q = useQuery({ queryKey: budgetDetailKey(budgetId, back), queryFn: () => api.loadDetail(budgetId, back) });
-  const header = <ScreenHeader title={copy.budgets.detailTitle} onBack={onBack} backTestID="budget-detail-back" />;
+  const header = <TopBar title={copy.budgets.detailTitle} onBack={onBack} backTestID="budget-detail-back" />;
 
   if (q.isError) return <View style={styles.fill}>{header}<ErrorBlock cause={copy.budgets.loadError} onRetry={() => void q.refetch()} /></View>;
   if (q.data === 'missing') {

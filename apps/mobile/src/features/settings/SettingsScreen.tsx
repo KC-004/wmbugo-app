@@ -27,7 +27,7 @@ import { layout, radii } from '../../shared/theme/tokens';
 import { textStyle } from '../../shared/theme/typography';
 import { Amount } from '../../shared/ui/Amount';
 import { Button } from '../../shared/ui/Button';
-import { ScreenHeader } from '../shell/ScreenHeader';
+import { TopBar } from '../../shared/ui/TopBar';
 import { Chip } from '../../shared/ui/Chip';
 import { useFocusRing } from '../../shared/ui/FocusRing';
 import { RegionPicker } from '../onboarding/OnboardingFlow';
@@ -105,7 +105,7 @@ export function SettingsScreen({ api = realSettingsApi, onBack }: { api?: Settin
 
   return (
     <View style={styles.fill}>
-      <ScreenHeader title={title} onBack={back} backTestID="settings-back" />
+      <TopBar title={title} onBack={back} backTestID="settings-back" />
       <ScrollView contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
       {!d ? null : page === 'hub' ? (
         <>

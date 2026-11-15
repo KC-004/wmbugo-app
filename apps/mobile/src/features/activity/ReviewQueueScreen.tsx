@@ -17,7 +17,7 @@ import { textStyle } from '../../shared/theme/typography';
 import { Amount } from '../../shared/ui/Amount';
 import { Button } from '../../shared/ui/Button';
 import { Chip } from '../../shared/ui/Chip';
-import { ScreenHeader } from '../shell/ScreenHeader';
+import { TopBar } from '../../shared/ui/TopBar';
 import { realAddApi, type AddApi } from '../add/addApi';
 import { HeldRowActions } from './HeldRowActions';
 import { REVIEW_QUEUE_KEY, realReviewQueueApi, type ReviewApi, type ReviewData } from './reviewApi';
@@ -131,7 +131,7 @@ export function ReviewQueueScreen({
       });
     });
 
-  const header = <ScreenHeader title={data ? copy.review.title.replace('{n}', String(data.items.length)) : copy.review.titleLoading} onBack={onBack} backTestID="review-back" />;
+  const header = <TopBar title={data ? copy.review.title.replace('{n}', String(data.items.length)) : copy.review.titleLoading} onBack={onBack} backTestID="review-back" />;
 
   let body = null;
   if (data) {

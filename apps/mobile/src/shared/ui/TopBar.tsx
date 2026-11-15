@@ -1,20 +1,23 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { ArrowLeft, UserCircle, Wallet } from 'phosphor-react-native';
-import { controlA11y } from '../../shared/a11y/labels';
-import { copy } from '../../shared/copy';
-import { headerSplits } from '../../shared/feedback/layout';
-import { Icon } from '../../shared/theme/Icon';
-import { useTheme } from '../../shared/theme/ThemeProvider';
-import { layout, radii } from '../../shared/theme/tokens';
-import { FocusRing, useFocusRing } from '../../shared/ui/FocusRing';
-import { textStyle } from '../../shared/theme/typography';
+import { controlA11y } from '../a11y/labels';
+import { CoinMark } from '../brand/CoinMark';
+import { copy } from '../copy';
+import { headerSplits } from '../feedback/layout';
+import { Icon } from '../theme/Icon';
+import { useTheme } from '../theme/ThemeProvider';
+import { layout, radii } from '../theme/tokens';
+import { FocusRing, useFocusRing } from './FocusRing';
+import { textStyle } from '../theme/typography';
 
 /**
- * Screen header: screen actions first, then the Accounts icon and the avatar (which opens
- * Settings). At font scale 1.3 and above it becomes two rows and the title wraps; it is never truncated.
+ * The top bar: one reusable component used by every screen, so the height, the insets and the place of the title never differ.
+ * It is the same on every screen: a 48dp leading slot, the title, then the screen actions, the Accounts icon and the avatar
+ * (which opens Settings). The leading slot holds the Back arrow on pages opened from a tab and the logo on the tabs themselves, so
+ * every title starts at the same place. At font scale 1.3 and above it becomes two rows and the title wraps; it is never truncated.
  */
-export function ScreenHeader({
+export function TopBar({
   title,
   actions,
   onAccounts,
@@ -39,7 +42,11 @@ export function ScreenHeader({
         <IconButton label={copy.nav.back} onPress={onBack} testID={backTestID}>
           <Icon icon={ArrowLeft} />
         </IconButton>
-      ) : null}
+      ) : (
+        <View testID="header-logo" style={styles.logo}>
+          <CoinMark size={32} />
+        </View>
+      )}
       <Text accessibilityRole="header" style={[textStyle('title'), styles.title, { color: theme.color('text-primary') }]}>
         {title}
       </Text>
@@ -90,5 +97,6 @@ const styles = StyleSheet.create({
   titleWrap: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 },
   title: { flexShrink: 1 },
   actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' },
+  logo: { width: layout.touchMin, height: layout.touchMin, alignItems: 'center', justifyContent: 'center' },
   icon: { minWidth: layout.touchMin, minHeight: layout.touchMin, alignItems: 'center', justifyContent: 'center' },
 });

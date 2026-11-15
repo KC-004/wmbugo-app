@@ -7,7 +7,7 @@ import { ThemeProvider } from '../../shared/theme/ThemeProvider';
 import { colorTokens } from '../../shared/theme/colors';
 import { setNavTimingSink, markTabFirstFrame, markTabPress } from './navTiming';
 import { RootNavigator } from './RootNavigator';
-import { ScreenHeader } from './ScreenHeader';
+import { TopBar } from '../../shared/ui/TopBar';
 
 // The Add sheet reads through the ledger; the shell tests only care that it opens and closes.
 jest.mock('../add/addApi', () => ({ realAddApi: { load: async () => null, defaultAccountFor: async () => null, record: async () => ({ ok: false, code: 'x' }), remove: async () => ({ ok: true }) } }));
@@ -187,7 +187,7 @@ describe('root navigator', () => {
 describe('screen header', () => {
   function Header() {
     useWindowDimensions();
-    return <ScreenHeader title="Activity with a long title" onAccounts={() => undefined} onProfile={() => undefined} />;
+    return <TopBar title="Activity with a long title" onAccounts={() => undefined} onProfile={() => undefined} />;
   }
   const mount = (): ReactTestRenderer => {
     let r!: ReactTestRenderer;

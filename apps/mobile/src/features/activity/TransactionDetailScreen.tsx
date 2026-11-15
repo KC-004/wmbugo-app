@@ -19,7 +19,7 @@ import { textStyle } from '../../shared/theme/typography';
 import { Amount } from '../../shared/ui/Amount';
 import { Button } from '../../shared/ui/Button';
 import { categoryIcon } from '../add/categoryIcons';
-import { ScreenHeader } from '../shell/ScreenHeader';
+import { TopBar } from '../../shared/ui/TopBar';
 import { duplicatePresetOf, editSpecOf, realTransactionApi, transactionKey, type TransactionApi } from './transactionApi';
 import type { AddPreset, EditSpec } from '../add/AddSheet';
 import { realAddApi, type AddApi } from '../add/addApi';
@@ -98,7 +98,7 @@ export function TransactionDetailScreen({
   const [leftError, setLeftError] = useState<number | null>(null);
   const ink = { color: theme.color('text-primary') };
   const muted = { color: theme.color('text-secondary') };
-  const header = <ScreenHeader title={copy.detail.title} onBack={onBack} backTestID="detail-back" />;
+  const header = <TopBar title={copy.detail.title} onBack={onBack} backTestID="detail-back" />;
 
   if (q.data === 'missing') {
     return (

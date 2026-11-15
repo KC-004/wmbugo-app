@@ -29,7 +29,8 @@ import { SettingsScreen } from '../settings/SettingsScreen';
 import { AccountDetailScreen } from '../accounts/AccountDetailScreen';
 import { AccountsScreen } from '../accounts/AccountsScreen';
 import { usePayBill } from '../accounts/payBill';
-import { ScreenHeader } from './ScreenHeader';
+import { ScreenFrame } from '../../shared/ui/ScreenFrame';
+import { TopBar } from '../../shared/ui/TopBar';
 import { TabBar, type TabRoute } from './TabBar';
 import { markTabFirstFrame } from './navTiming';
 
@@ -42,26 +43,29 @@ type Nav = { navigate: (s: keyof RootParams, p?: RootParams[keyof RootParams]) =
 
 /** The frame every tab shares: safe area, a centred column, and the first-frame timing mark. */
 function TabFrame({ tab, children }: { tab?: TabRoute; children: ReactNode }) {
-  const theme = useTheme();
   const { width } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
   const column = navLayout(width).contentWidth;
   useEffect(() => {
     if (tab) requestAnimationFrame(() => markTabFirstFrame(tab));
   }, [tab]);
   return (
-    <View style={[styles.screen, { backgroundColor: theme.color('bg-canvas'), paddingTop: insets.top }]}>
+    <ScreenFrame style={styles.screen}>
       <View style={[styles.column, { maxWidth: column, flex: 1 }]}>{children}</View>
-    </View>
+    </ScreenFrame>
   );
+}
+
+/** The top bar of a tab: the shared TopBar with the Accounts icon and the avatar already wired, so a tab only gives a title. */
+function TabTopBar({ title }: { title: string }) {
+  const nav = useNavigation<Nav>();
+  return <TopBar title={title} onAccounts={() => nav.navigate('Accounts')} onProfile={() => nav.navigate('Settings')} />;
 }
 
 /** Header only: Insights and Plan show nothing else until their epics land. */
 function HeaderOnly({ title, tab }: { title: string; tab: TabRoute }) {
-  const nav = useNavigation<Nav>();
   return (
     <TabFrame tab={tab}>
-      <ScreenHeader title={title} onAccounts={() => nav.navigate('Accounts')} onProfile={() => nav.navigate('Settings')} />
+      <TabTopBar title={title} />
     </TabFrame>
   );
 }
@@ -72,7 +76,7 @@ function PlanTab() {
   const openActivity = useOpenActivityFilter();
   return (
     <TabFrame tab="Plan">
-      <ScreenHeader title={copy.nav.plan} onAccounts={() => nav.navigate('Accounts')} onProfile={() => nav.navigate('Settings')} />
+      <TabTopBar title={copy.nav.plan} />
       <ScrollView contentContainerStyle={styles.planScroll} keyboardShouldPersistTaps="handled">
         <BudgetsScreen onOpen={(budgetId) => nav.navigate('BudgetDetail', { budgetId })} onOpenActivity={openActivity} />
       </ScrollView>
@@ -154,31 +158,25 @@ function TabsWithAdd() {
 }
 
 function SettingsRoute() {
-  const theme = useTheme();
-  const insets = useSafeAreaInsets();
   const nav = useNavigation<{ goBack: () => void }>();
   return (
-    <View style={[styles.fill, { backgroundColor: theme.color('bg-canvas'), paddingTop: insets.top }]}>
+    <ScreenFrame>
       <SettingsScreen onBack={() => nav.goBack()} />
-    </View>
+    </ScreenFrame>
   );
 }
 
 function AccountsRoute() {
-  const theme = useTheme();
-  const insets = useSafeAreaInsets();
   const nav = useNavigation<{ navigate: (s: 'AccountDetail', p: { accountId: string }) => void; goBack: () => void }>();
   const payBill = usePayBill();
   return (
-    <View style={[styles.fill, { backgroundColor: theme.color('bg-canvas'), paddingTop: insets.top }]}>
+    <ScreenFrame>
       <AccountsScreen onPayBill={payBill} onBack={() => nav.goBack()} onOpen={(accountId) => nav.navigate('AccountDetail', { accountId })} />
-    </View>
+    </ScreenFrame>
   );
 }
 
 function AccountDetailRoute() {
-  const theme = useTheme();
-  const insets = useSafeAreaInsets();
   const nav = useNavigation<{ goBack: () => void; navigate: (s: 'TransactionDetail', p: { transactionId: string }) => void }>();
   const route = useRoute<RouteProp<RootParams, 'AccountDetail'>>();
   const { accountId } = route.params;
@@ -186,32 +184,28 @@ function AccountDetailRoute() {
   const addExpense = useOpenAdd(undefined, { kind: 'expense', accountId });
   const payBill = usePayBill();
   return (
-    <View style={[styles.fill, { backgroundColor: theme.color('bg-canvas'), paddingTop: insets.top }]}>
+    <ScreenFrame>
       <AccountDetailScreen accountId={accountId} onBack={() => nav.goBack()} onMoveMoney={moveMoney} onAddExpense={addExpense} onPayBill={() => payBill(accountId)} onOpenTransaction={(transactionId) => nav.navigate('TransactionDetail', { transactionId })} />
-    </View>
+    </ScreenFrame>
   );
 }
 
 function HomeEditRoute() {
-  const theme = useTheme();
-  const insets = useSafeAreaInsets();
   const nav = useNavigation<{ goBack: () => void }>();
   return (
-    <View style={[styles.fill, { backgroundColor: theme.color('bg-canvas'), paddingTop: insets.top }]}>
+    <ScreenFrame>
       <HomeEditScreen onBack={() => nav.goBack()} />
-    </View>
+    </ScreenFrame>
   );
 }
 
 function ReviewQueueRoute() {
-  const theme = useTheme();
-  const insets = useSafeAreaInsets();
   const nav = useNavigation<{ goBack: () => void; navigate: (s: 'TransactionDetail', p: { transactionId: string }) => void }>();
   const route = useRoute<RouteProp<RootParams, 'ReviewQueue'>>();
   return (
-    <View style={[styles.fill, { backgroundColor: theme.color('bg-canvas'), paddingTop: insets.top }]}>
+    <ScreenFrame>
       <ReviewQueueScreen focusId={route.params?.focusId} onBack={() => nav.goBack()} onEdit={(transactionId) => nav.navigate('TransactionDetail', { transactionId })} />
-    </View>
+    </ScreenFrame>
   );
 }
 
@@ -225,27 +219,23 @@ function useOpenActivityFilter() {
 }
 
 function BudgetDetailRoute() {
-  const theme = useTheme();
   const openActivity = useOpenActivityFilter();
-  const insets = useSafeAreaInsets();
   const nav = useNavigation<{ goBack: () => void; navigate: (s: 'TransactionDetail', p: { transactionId: string }) => void }>();
   const route = useRoute<RouteProp<RootParams, 'BudgetDetail'>>();
   return (
-    <View style={[styles.fill, { backgroundColor: theme.color('bg-canvas'), paddingTop: insets.top }]}>
+    <ScreenFrame>
       <BudgetDetailScreen onOpenActivity={openActivity} budgetId={route.params.budgetId} {...(route.params.periodStart ? { periodStart: route.params.periodStart } : {})} onBack={() => nav.goBack()} onOpenEntry={(transactionId) => nav.navigate('TransactionDetail', { transactionId })} />
-    </View>
+    </ScreenFrame>
   );
 }
 
 function TransactionDetailRoute() {
-  const theme = useTheme();
-  const insets = useSafeAreaInsets();
   const nav = useNavigation<{ goBack: () => void }>();
   const route = useRoute<RouteProp<RootParams, 'TransactionDetail'>>();
   const openAdd = useOpenAddWith();
   const openSplit = useOpenSplit();
   return (
-    <View style={[styles.fill, { backgroundColor: theme.color('bg-canvas'), paddingTop: insets.top }]}>
+    <ScreenFrame>
       <TransactionDetailScreen
         transactionId={route.params.transactionId}
         onBack={() => nav.goBack()}
@@ -253,7 +243,7 @@ function TransactionDetailRoute() {
         onDuplicate={(preset) => openAdd(preset)}
         onSplit={(id) => openSplit(id)}
       />
-    </View>
+    </ScreenFrame>
   );
 }
 

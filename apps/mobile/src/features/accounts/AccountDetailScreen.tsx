@@ -17,7 +17,7 @@ import { textStyle } from '../../shared/theme/typography';
 import { Amount } from '../../shared/ui/Amount';
 import { Button } from '../../shared/ui/Button';
 import { ActivityRowView } from '../activity/ActivityRowView';
-import { ScreenHeader } from '../shell/ScreenHeader';
+import { TopBar } from '../../shared/ui/TopBar';
 import { AdjustBalancePanel } from './AdjustBalancePanel';
 import { ArchivePanel } from './ArchivePanel';
 import { CardDetailsPanel } from './CardDetailsPanel';
@@ -164,7 +164,7 @@ export function AccountDetailScreen({
     }
   };
 
-  const back = <ScreenHeader title={copy.nav.accounts} onBack={onBack} backTestID="account-detail-back" />;
+  const back = <TopBar title={copy.nav.accounts} onBack={onBack} backTestID="account-detail-back" />;
 
   if (q.data === 'missing') {
     return (

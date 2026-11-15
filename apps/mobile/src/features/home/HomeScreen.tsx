@@ -12,7 +12,7 @@ import { useTheme } from '../../shared/theme/ThemeProvider';
 import { radii } from '../../shared/theme/tokens';
 import { textStyle } from '../../shared/theme/typography';
 import { Button } from '../../shared/ui/Button';
-import { ScreenHeader } from '../shell/ScreenHeader';
+import { TopBar } from '../../shared/ui/TopBar';
 import { realSettingsApi, SETTINGS_QUERY_KEY, TIMEZONE_QUERY_KEY, type SettingsApi } from '../settings/settingsApi';
 import { REGISTERED_FOR_LAYOUT } from './cardRegistry';
 import { useAmountsHidden } from '../../shared/state/amountsHidden';
@@ -95,8 +95,10 @@ export function HomeScreen({ api = realHomeApi, settingsApi = realSettingsApi, o
   };
 
   return (
-    <ScrollView testID="home-scroll" contentContainerStyle={[styles.pad, { paddingBottom: 16 + tabBarClearance(insets?.bottom ?? 0) }]}>
-      <ScreenHeader title={d ? greetingFor(d.hour) : copy.nav.home} onAccounts={onAccounts} onProfile={onProfile} />
+    <>
+    {/* The header sits outside the scroll, like on every other tab: it stays put and is not inset twice by the scroll padding. */}
+    <TopBar title={d ? greetingFor(d.hour) : copy.nav.home} onAccounts={onAccounts} onProfile={onProfile} />
+    <ScrollView testID="home-scroll" contentContainerStyle={[styles.pad, { paddingTop: 0, paddingBottom: 16 + tabBarClearance(insets?.bottom ?? 0) }]}>
       {d ? (
         <View style={styles.dateRow}>
           <Text testID="home-date" style={[textStyle('caption'), muted]}>
@@ -157,10 +159,12 @@ export function HomeScreen({ api = realHomeApi, settingsApi = realSettingsApi, o
         </View>
       ) : null}
     </ScrollView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
+  fill: { flex: 1 },
   pad: { padding: 16, gap: 8 },
   gap: { gap: 12 },
   dateRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },

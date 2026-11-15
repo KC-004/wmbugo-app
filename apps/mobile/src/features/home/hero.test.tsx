@@ -224,12 +224,10 @@ describe('hero states (Story 5.2)', () => {
     expect(texts(s.r)).toContain('1–24 Nov · Shortened cycle');
   });
 
-  it('draws the brand band in light and the glows in dark', async () => {
+  it('draws the brand band behind the hero in light and none in dark (the dark glow comes from the screen frame)', async () => {
     const light = await mountHero(UNDER, 'light');
     expect(host(light.r, 'home-band')).toHaveLength(1);
-    expect(host(light.r, 'home-glows')).toHaveLength(0);
     const dark = await mountHero(UNDER, 'dark');
-    expect(host(dark.r, 'home-glows')).toHaveLength(1);
     expect(host(dark.r, 'home-band')).toHaveLength(0);
   });
 

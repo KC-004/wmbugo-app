@@ -29,7 +29,7 @@ import { layout, radii } from '../../shared/theme/tokens';
 import { textStyle } from '../../shared/theme/typography';
 import { Amount } from '../../shared/ui/Amount';
 import { Button } from '../../shared/ui/Button';
-import { ScreenHeader, IconButton } from '../shell/ScreenHeader';
+import { TopBar, IconButton } from '../../shared/ui/TopBar';
 import { realAddApi, type AddApi } from '../add/addApi';
 import { ActivityFilterSheet } from './ActivityFilterSheet';
 import { ActivityRowView } from './ActivityRowView';
@@ -293,13 +293,12 @@ export function ActivityScreen({
       {text !== '' ? <Button label={copy.activity.clear} variant="text" onPress={() => setText('')} testID="search-clear" /> : null}
     </View>
   ) : (
-    <ScreenHeader
+    <TopBar
       title={copy.nav.activity}
       onAccounts={onAccounts}
       onProfile={onProfile}
       actions={
         <View style={styles.headerActions}>
-          {api.bulkMove ? <Button label={copy.bulk.select} variant="text" onPress={() => setSelected(new Set())} testID="header-select" /> : null}
           <IconButton label={copy.activity.searchLabel} onPress={() => setSearching(true)} testID="header-search">
             <Icon icon={MagnifyingGlass} />
           </IconButton>
@@ -308,6 +307,9 @@ export function ActivityScreen({
     />
   ));
 
+  // The top bar has its own insets and height, identical to every other tab; only the search bar and the selection bar need the page padding.
+  const headerNode = selectionBar || searching ? <View style={styles.pad}>{header}</View> : header;
+
   const onAccent = theme.scheme === 'dark' ? theme.color('bg-canvas') : theme.color('bg-surface');
   const chipsRow = (
     <View testID="filter-row" style={styles.chipsRow}>
@@ -315,6 +317,12 @@ export function ActivityScreen({
         <Icon icon={FunnelSimple} size={18} />
         <Text style={[textStyle('label'), { color: theme.color('text-primary') }]}>{`${copy.activity.filters} · ${n}`}</Text>
       </Pressable>
+      {/* Select lives here, not in the header: the header keeps room for the whole title next to the logo, search, Accounts and the avatar. */}
+      {api.bulkMove ? (
+        <View style={styles.selectSlot}>
+          <Button label={copy.bulk.select} variant="text" onPress={() => setSelected(new Set())} testID="header-select" />
+        </View>
+      ) : null}
       {activeChips(query, filter.datePreset, options.data ?? null).map((c) => (
         <Pressable
           key={c.key}
@@ -358,7 +366,7 @@ export function ActivityScreen({
   if (d && resultCount === 0 && !filtered) {
     return (
       <View style={styles.fill}>
-        <View style={styles.pad}>{header}</View>
+        {headerNode}
         <EmptyState sentence={copy.activity.empty} actionLabel={copy.activity.addExpense} onAction={onAdd} />
       </View>
     );
@@ -368,7 +376,7 @@ export function ActivityScreen({
 
   return (
     <View style={styles.fill}>
-      <View style={styles.pad}>{header}</View>
+      {headerNode}
       {chipsRow}
       <Reveal loading={q.isLoading} skeleton={skeleton} fill>
         {d && resultCount === 0 ? (
@@ -442,6 +450,7 @@ const styles = StyleSheet.create({
   activeChip: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 48, paddingHorizontal: 12, borderRadius: radii.full },
   flex: { flex: 1 },
   headerActions: { flexDirection: 'row', alignItems: 'center' },
+  selectSlot: { marginLeft: 'auto' },
   selectionBar: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: radii.md, paddingHorizontal: 4 },
   noMatches: { padding: 16, gap: 12, alignItems: 'flex-start' },
 });

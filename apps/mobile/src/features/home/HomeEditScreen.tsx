@@ -13,7 +13,7 @@ import { radii } from '../../shared/theme/tokens';
 import { textStyle } from '../../shared/theme/typography';
 import { Button } from '../../shared/ui/Button';
 import { Chip } from '../../shared/ui/Chip';
-import { ScreenHeader } from '../shell/ScreenHeader';
+import { TopBar } from '../../shared/ui/TopBar';
 import { realSettingsApi, SETTINGS_QUERY_KEY, type SettingsApi, type SettingsData } from '../settings/settingsApi';
 import { EDITABLE_CARDS, REGISTERED_FOR_LAYOUT, type CardId, type HomeCardDef } from './cardRegistry';
 import { HOME_BUDGETS_KEY } from './HomeCards';
@@ -280,7 +280,7 @@ export function HomeEditScreen({ settingsApi = realSettingsApi, onBack }: { sett
 
   return (
     <View testID="home-edit" style={styles.fill}>
-      <ScreenHeader title={copy.home.edit.title} onBack={() => void back()} backTestID="home-edit-back" />
+      <TopBar title={copy.home.edit.title} onBack={() => void back()} backTestID="home-edit-back" />
       <ScrollView contentContainerStyle={styles.pad}>
         <View testID="edit-pinned" accessible accessibilityLabel={`${copy.home.edit.pinned}, ${copy.home.edit.pinnedCaption}`} style={[styles.row, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
           <Text style={[textStyle('body-medium'), { color: theme.color('text-primary') }]}>{copy.home.edit.pinned}</Text>

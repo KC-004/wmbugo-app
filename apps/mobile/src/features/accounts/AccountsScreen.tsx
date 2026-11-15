@@ -16,7 +16,7 @@ import { textStyle } from '../../shared/theme/typography';
 import { Amount } from '../../shared/ui/Amount';
 import { Button } from '../../shared/ui/Button';
 import { Chip } from '../../shared/ui/Chip';
-import { ScreenHeader } from '../shell/ScreenHeader';
+import { TopBar } from '../../shared/ui/TopBar';
 import { ArchivedSection } from './ArchivedSection';
 import { AccountForm, TYPE_LABEL } from './AccountForm';
 import { ACCOUNTS_QUERY_KEY, NET_WORTH_QUERY_KEY, PROFILE_QUERY_KEY, realAccountsApi, type AccountsApi } from './accountsApi';
@@ -93,7 +93,7 @@ export function AccountsScreen({
   if (mode.kind === 'add' && profile.data) {
     return (
       <View style={styles.fill}>
-        <ScreenHeader title={copy.accounts.add} onBack={() => setMode({ kind: 'list' })} backTestID="account-back" />
+        <TopBar title={copy.accounts.add} onBack={() => setMode({ kind: 'list' })} backTestID="account-back" />
         <ScrollView contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
           <AccountForm exponent={profile.data.exponent} submitLabel={copy.accounts.save} onSubmit={add} saveError={saveError} />
           <Button label={copy.common.cancel} variant="text" onPress={() => setMode({ kind: 'list' })} testID="account-cancel" />
@@ -104,7 +104,7 @@ export function AccountsScreen({
 
   return (
     <View style={styles.fill}>
-      <ScreenHeader
+      <TopBar
         title={copy.accounts.title}
         onBack={onBack}
         backTestID="accounts-back"
