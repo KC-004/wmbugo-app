@@ -205,6 +205,8 @@ export const goal_allocation = sqliteTable(
     transaction_id: text('transaction_id'),
     local_date: text('local_date').notNull(),
     created_at: integer('created_at').notNull(),
+    /** For a move into savings: how much of the goal's set-aside money it replaced, so the money is never counted twice (Story 6.7). */
+    converted_minor: integer('converted_minor').notNull().default(0),
   },
   (t) => [
     index('goal_allocation_goal_idx').on(t.goal_id),

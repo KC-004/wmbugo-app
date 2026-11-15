@@ -31,7 +31,7 @@ export function GoalSheet({
 }: {
   goal: GoalRow | null;
   exponent: number;
-  accounts: readonly { id: string; name: string }[];
+  accounts: readonly { id: string; name: string; isPot?: boolean }[];
   /** The profile's current month, `YYYY-MM`: the earliest month `By` accepts. */
   thisMonth: string;
   onSave: (input: SaveGoalInput) => Promise<SaveGoalOutcome>;

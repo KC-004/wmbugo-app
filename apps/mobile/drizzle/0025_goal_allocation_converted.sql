@@ -1,0 +1,1 @@
+ALTER TABLE `goal_allocation` ADD `converted_minor` integer DEFAULT 0 NOT NULL;

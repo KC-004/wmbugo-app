@@ -5,6 +5,7 @@ import {
   EvaluateBudgetAlerts,
   RebuildBudgetPeriods,
   ReleaseBillLinks,
+  ReleaseGoalMoves,
   syncBillReminders,
   RunDailyPurge,
   createIdGenerator,
@@ -145,6 +146,8 @@ async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
       // A linked entry was deleted, rejected or excluded: its bill's due date is unpaid again (Story 6.3).
       const w = services?.writer;
       if (w) await w.run(ReleaseBillLinks, {}, 'system');
+      // A savings move that was deleted, rejected or excluded stops counting toward its goal (Story 6.7).
+      if (w) await w.run(ReleaseGoalMoves, {}, 'system');
     }, log), () => syncBillReminders(started.value.db, appNotifier, systemClock.nowMs()).then(() => undefined), log),
   });
   const newId = createIdGenerator(systemClock, secureRandom);

@@ -9,6 +9,7 @@ import { toLocalDate } from '../shared/clock';
 import { categoryFits, UNCATEGORISED_ID } from '../ledger/categories';
 import { noSuggester, type CategorySuggester } from '../ports/categorySuggester';
 import { matchItem, type CaptureItem } from './match';
+import { tagMoveForGoal, type TagMoveError } from '../planning/goals';
 
 /**
  * The shared capture pipeline (Story 3.2, AD-6, LIR-06): parse, normalize, match (Story 3.1), classify, create. Every
@@ -25,10 +26,12 @@ export type SubmitInput = {
   readonly reference?: string;
   /** Import anyway: a tombstone does not suppress this submission (Epic 9's per-row Import anyway). */
   readonly ignoreTombstone?: boolean;
+  /** A transfer into a savings pot made for a goal (Story 6.7): the goal's allocation is written in the same transaction. */
+  readonly goalId?: string;
 } & ({ readonly entry: ManualEntry; readonly copiedFrom?: string } | { readonly transfer: TransferInput } | { readonly refund: RefundInput });
 
 export type SubmitResult = 'RECORDED' | 'ALREADY_SUBMITTED' | 'POSSIBLE_DUPLICATE' | 'SKIPPED_PREVIOUSLY_REJECTED' | 'SKIPPED_PREVIOUSLY_DELETED';
-export type SubmitError = RecordEntryError | TransferError | RefundError | 'SUBMISSION_INVALID';
+export type SubmitError = RecordEntryError | TransferError | RefundError | TagMoveError | 'SUBMISSION_INVALID';
 
 export interface Submitted {
   readonly transactionId: string;
@@ -108,6 +111,11 @@ export const createSubmitCapture = (deps: { readonly suggester?: CategorySuggest
       if (!t.ok) return t;
       await writeSource(ctx, t.value.transactionId, fingerprint, input.sourceKind, input.reference ?? null);
       if (t.value.feeTransactionId) await writeSource(ctx, t.value.feeTransactionId, `${fingerprint}:fee`, input.sourceKind);
+      // Capture hands a goal-tagged move to planning in the same writer transaction; a refusal rolls the whole transfer back.
+      if (input.goalId) {
+        const tagged = await tagMoveForGoal(ctx, input.goalId, t.value.transactionId);
+        if (typeof tagged === 'string') return err(tagged);
+      }
       ctx.emit('TransactionsChanged', { transactionIds: t.value.feeTransactionId ? [t.value.transactionId, t.value.feeTransactionId] : [t.value.transactionId] });
       ctx.emit('CapturesSubmitted', { transactionIds: [t.value.transactionId] });
       return ok({ transactionId: t.value.transactionId, accountId: input.transfer.fromAccountId, feeTransactionId: t.value.feeTransactionId, result: 'RECORDED' });

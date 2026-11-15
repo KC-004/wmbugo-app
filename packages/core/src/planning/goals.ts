@@ -1,6 +1,7 @@
 import { err, ok } from '../shared/result';
 import { toLocalDate } from '../shared/clock';
 import { readPaydayRule } from '../profile/paydayChange';
+import { addMonthsClamped, daysBetween, monthsBetween } from '../profile/period';
 import { CATEGORY_COLOURS } from '../ledger/categoryCommands';
 import type { UseCase, WriterContext } from '../writer/ledgerWriter';
 import type { Querier } from './budgets';
@@ -34,6 +35,18 @@ export interface GoalRow {
   /** The target minus contributed, never below zero. */
   readonly remainingMinor: number;
   readonly funded: boolean;
+  /** The account is a savings pot: a move into savings can go straight there. */
+  readonly accountIsPot: boolean;
+  /** Pace and projection; null until a clock is given (`loadGoals(q, nowMs)`). */
+  readonly progress: GoalProgress | null;
+}
+
+/** The planning query `goalProgress` (Story 6.7, GOAL-003). */
+export interface GoalProgress {
+  readonly contributedMinor: number;
+  readonly remainingMinor: number;
+  /** Only with contributions in at least two calendar months, the first 30 or more days old: contributed over whole months, and when that finishes the target. */
+  readonly pace: { readonly monthlyMinor: number; /** `YYYY-MM` */ readonly projectedMonth: string } | null;
 }
 
 export interface GoalAllocationRow {
@@ -45,10 +58,14 @@ export interface GoalAllocationRow {
   readonly createdAt: number;
 }
 
+/** A move into savings counts only while its entry is confirmed and not removed. */
+const COUNTED_MOVE = "x.kind = 'moved' AND EXISTS (SELECT 1 FROM \"transaction\" t WHERE t.id = x.transaction_id AND t.status = 'confirmed' AND t.removed_at IS NULL)";
+
 export const GOALS_SQL =
   'SELECT g.id, g.name, g.target_minor, g.due_date, g.icon, g.color, g.account_id, a.name, g.state, ' +
-  "COALESCE((SELECT SUM(CASE WHEN x.kind = 'set_aside' THEN x.amount_minor WHEN x.kind = 'taken_back' THEN -x.amount_minor ELSE 0 END) FROM goal_allocation x WHERE x.goal_id = g.id), 0), " +
-  "COALESCE((SELECT SUM(x.amount_minor) FROM goal_allocation x WHERE x.goal_id = g.id AND x.kind = 'moved'), 0) " +
+  "COALESCE((SELECT SUM(CASE WHEN x.kind = 'set_aside' THEN x.amount_minor WHEN x.kind = 'taken_back' THEN -x.amount_minor ELSE 0 END) FROM goal_allocation x WHERE x.goal_id = g.id), 0) - " +
+  "COALESCE((SELECT SUM(x.converted_minor) FROM goal_allocation x WHERE x.goal_id = g.id AND " + COUNTED_MOVE + '), 0), ' +
+  'COALESCE((SELECT SUM(x.amount_minor) FROM goal_allocation x WHERE x.goal_id = g.id AND ' + COUNTED_MOVE + '), 0), a.type ' +
   'FROM goal g LEFT JOIN account a ON a.id = g.account_id WHERE g.removed_at IS NULL ORDER BY g.created_at, g.id';
 
 export function mapGoals(rows: readonly (readonly unknown[])[]): GoalRow[] {
@@ -72,12 +89,45 @@ export function mapGoals(rows: readonly (readonly unknown[])[]): GoalRow[] {
       contributedMinor: contributed,
       remainingMinor: Math.max(0, target - contributed),
       funded: contributed >= target,
+      accountIsPot: r[11] !== null && String(r[11]) === 'savings_pot',
+      progress: null,
     };
   });
 }
 
-export async function loadGoals(q: Querier): Promise<GoalRow[]> {
-  return mapGoals(await q.query(GOALS_SQL));
+/** The goals; with `nowMs` each also carries its pace and projection (`goalProgress`). */
+export async function loadGoals(q: Querier, nowMs?: number): Promise<GoalRow[]> {
+  const goals = mapGoals(await q.query(GOALS_SQL));
+  if (nowMs === undefined) return goals;
+  const t = await today(q, nowMs);
+  if (t === null) return goals;
+  const out: GoalRow[] = [];
+  for (const g of goals) out.push({ ...g, progress: goalProgress(g, await contributionDates(q, g.id), t) });
+  return out;
+}
+
+/** The local dates of the contributions that count (set aside, and moves into savings that are confirmed), oldest first. */
+async function contributionDates(q: Querier, goalId: string): Promise<string[]> {
+  const rows = await q.query("SELECT x.local_date FROM goal_allocation x WHERE x.goal_id = ? AND (x.kind = 'set_aside' OR (" + COUNTED_MOVE + ')) ORDER BY x.local_date', [goalId]);
+  return rows.map((r) => String(r[0]));
+}
+
+/**
+ * The planning query `goalProgress(goal)`: what is contributed and what remains, and, only when there are contributions in at
+ * least two different calendar months and the first is 30 or more days old, a pace (contributed over the whole months since the
+ * first) and the month that pace finishes the target. Otherwise there is no pace, never a guess.
+ */
+export function goalProgress(goal: Pick<GoalRow, 'contributedMinor' | 'remainingMinor'>, dates: readonly string[], todayDate: string): GoalProgress {
+  const base = { contributedMinor: goal.contributedMinor, remainingMinor: goal.remainingMinor };
+  const first = dates[0];
+  if (!first || goal.contributedMinor <= 0) return { ...base, pace: null };
+  const months = new Set(dates.map((d) => d.slice(0, 7)));
+  if (months.size < 2 || daysBetween(first, todayDate) < 30) return { ...base, pace: null };
+  const whole = Math.max(1, monthsBetween(first, todayDate));
+  const monthly = Math.floor((2 * goal.contributedMinor + whole) / (2 * whole));
+  if (monthly <= 0) return { ...base, pace: null };
+  const needed = goal.remainingMinor === 0 ? 0 : Math.ceil(goal.remainingMinor / monthly);
+  return { ...base, pace: { monthlyMinor: monthly, projectedMonth: addMonthsClamped(`${todayDate.slice(0, 7)}-01`, needed).slice(0, 7) } };
 }
 
 /**
@@ -87,7 +137,7 @@ export async function loadGoals(q: Querier): Promise<GoalRow[]> {
 export async function setAsideTotal(q: Querier): Promise<number> {
   const r = (
     await q.query(
-      "SELECT COALESCE(SUM(CASE WHEN x.kind = 'set_aside' THEN x.amount_minor WHEN x.kind = 'taken_back' THEN -x.amount_minor ELSE 0 END), 0) FROM goal_allocation x JOIN goal g ON g.id = x.goal_id WHERE g.removed_at IS NULL AND g.state IN ('active', 'paused')",
+      "SELECT COALESCE(SUM(CASE WHEN x.kind = 'set_aside' THEN x.amount_minor WHEN x.kind = 'taken_back' THEN -x.amount_minor WHEN " + COUNTED_MOVE + " THEN -x.converted_minor ELSE 0 END), 0) FROM goal_allocation x JOIN goal g ON g.id = x.goal_id WHERE g.removed_at IS NULL AND g.state IN ('active', 'paused')",
     )
   )[0];
   return Number(r?.[0] ?? 0);
@@ -100,10 +150,11 @@ export interface GoalDetail {
 }
 
 /** One goal with every contribution it ever had: `Set aside` and `Moved to savings` entries, kept whatever the goal's state. */
-export async function loadGoalDetail(q: Querier, id: string): Promise<GoalDetail | 'missing'> {
-  const goal = (await loadGoals(q)).find((g) => g.id === id);
+export async function loadGoalDetail(q: Querier, id: string, nowMs?: number): Promise<GoalDetail | 'missing'> {
+  const goal = (await loadGoals(q, nowMs)).find((g) => g.id === id);
   if (!goal) return 'missing';
-  const rows = await q.query('SELECT id, kind, amount_minor, transaction_id, local_date, created_at FROM goal_allocation WHERE goal_id = ? ORDER BY created_at DESC, id DESC', [id]);
+  // A move into savings that is deleted, rejected or still waiting is not part of the history.
+  const rows = await q.query("SELECT x.id, x.kind, x.amount_minor, x.transaction_id, x.local_date, x.created_at FROM goal_allocation x WHERE x.goal_id = ? AND (x.kind <> 'moved' OR (" + COUNTED_MOVE + ')) ORDER BY x.created_at DESC, x.id DESC', [id]);
   return {
     goal,
     allocations: rows.map((r) => ({ id: String(r[0]), kind: String(r[1]) as AllocationKind, amountMinor: Number(r[2]), transactionId: r[3] === null ? null : String(r[3]), localDate: String(r[4]), createdAt: Number(r[5]) })),
@@ -286,5 +337,96 @@ export const ChangeGoalState: UseCase<{ goalId: string; to: GoalState }, { from:
     ctx.touch('goal', g.id, { state: input.to, from: g.state, label: g.name });
     ctx.emit('GoalsChanged', { goalIds: [g.id] });
     return ok({ from: g.state });
+  },
+};
+
+// ---- Moves into savings (Story 6.7, GOAL-002/003/004) ------------------------------------------------------------------
+
+export type TagMoveError = 'GOAL_NOT_FOUND' | 'GOAL_NOT_ACTIVE' | 'NOT_A_SAVINGS_MOVE' | 'ALREADY_TAGGED';
+
+/** The transfer is from an ordinary account into a savings pot and not removed: the only kind that counts toward a goal. */
+async function savingsMove(ctx: Querier, transactionId: string): Promise<{ amountMinor: number; localDate: string } | null> {
+  const r = (
+    await ctx.query(
+      "SELECT t.amount_minor, t.local_date FROM \"transaction\" t JOIN posting pf ON pf.transaction_id = t.id AND pf.signed_amount_minor < 0 JOIN account afr ON afr.id = pf.account_id JOIN posting pt ON pt.transaction_id = t.id AND pt.signed_amount_minor > 0 JOIN account ato ON ato.id = pt.account_id WHERE t.id = ? AND t.event_type = 'transfer' AND t.removed_at IS NULL AND ato.type = 'savings_pot' AND afr.type <> 'savings_pot'",
+      [transactionId],
+    )
+  )[0];
+  return r ? { amountMinor: Number(r[0]), localDate: String(r[1]) } : null;
+}
+
+/**
+ * Writes the `moved` allocation for a savings transfer, in the writer transaction of whoever made the transfer (capture to
+ * planning). When the goal already has money set aside, the move replaces up to that much of it, so the goal's progress stays
+ * what it was and nothing is counted twice; removing the move gives the set-aside back.
+ */
+export async function tagMoveForGoal(ctx: WriterContext, goalId: string, transactionId: string): Promise<TagMoveError | { allocationId: string; convertedMinor: number }> {
+  const g = await readGoal(ctx, goalId);
+  if (!g) return 'GOAL_NOT_FOUND';
+  if (g.state !== 'active') return 'GOAL_NOT_ACTIVE';
+  const move = await savingsMove(ctx, transactionId);
+  if (!move) return 'NOT_A_SAVINGS_MOVE';
+  if ((await ctx.query('SELECT 1 FROM goal_allocation WHERE transaction_id = ?', [transactionId])).length > 0) return 'ALREADY_TAGGED';
+  const converted = Math.max(0, Math.min(g.setAsideMinor, move.amountMinor));
+  const id = ctx.newId();
+  await ctx.execute('INSERT INTO goal_allocation (id, goal_id, kind, amount_minor, transaction_id, local_date, created_at, converted_minor) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [id, goalId, 'moved', move.amountMinor, transactionId, move.localDate, ctx.nowMs(), converted]);
+  ctx.touch('goal_allocation', id, { moved: true, label: g.name });
+  ctx.emit('GoalsChanged', { goalIds: [goalId] });
+  return { allocationId: id, convertedMinor: converted };
+}
+
+/** `Count toward a goal` on a savings transfer that has no goal; one transfer counts toward one goal only. */
+export const CountTowardGoal: UseCase<{ transactionId: string; goalId: string }, { allocationId: string }, TagMoveError> = {
+  name: 'CountTowardGoal',
+  async execute(ctx, input) {
+    const r = await tagMoveForGoal(ctx, input.goalId, input.transactionId);
+    return typeof r === 'string' ? err(r) : ok({ allocationId: r.allocationId });
+  },
+};
+
+/** `Remove` on a tagged transfer: it stops counting toward the goal, and any set-aside it replaced is held again. */
+export const RemoveGoalTag: UseCase<{ transactionId: string }, { goalId: string }, 'NOT_TAGGED'> = {
+  name: 'RemoveGoalTag',
+  async execute(ctx, input) {
+    const r = (await ctx.query("SELECT id, goal_id FROM goal_allocation WHERE transaction_id = ? AND kind = 'moved'", [input.transactionId]))[0];
+    if (!r) return err('NOT_TAGGED');
+    await ctx.execute('DELETE FROM goal_allocation WHERE id = ?', [String(r[0])]);
+    ctx.touch('goal_allocation', String(r[0]), { untagged: true });
+    ctx.emit('GoalsChanged', { goalIds: [String(r[1])] });
+    return ok({ goalId: String(r[1]) });
+  },
+};
+
+/** The goal a transfer counts toward, for `For Goa trip` on its detail. */
+export async function goalOfTransaction(q: Querier, transactionId: string): Promise<{ goalId: string; name: string } | null> {
+  const r = (await q.query("SELECT g.id, g.name FROM goal_allocation x JOIN goal g ON g.id = x.goal_id WHERE x.transaction_id = ? AND x.kind = 'moved' AND g.removed_at IS NULL", [transactionId]))[0];
+  return r ? { goalId: String(r[0]), name: String(r[1]) } : null;
+}
+
+/** Whether a transfer could count toward a goal: a confirmed move into a savings pot that has no goal yet. */
+export async function canCountTowardGoal(q: Querier, transactionId: string): Promise<boolean> {
+  const st = (await q.query('SELECT status FROM "transaction" WHERE id = ?', [transactionId]))[0];
+  if (!st || String(st[0]) !== 'confirmed') return false;
+  return (await savingsMove(q, transactionId)) !== null && (await goalOfTransaction(q, transactionId)) === null;
+}
+
+/**
+ * Planning's handler of `TransactionsChanged`: the allocation of a move that was deleted, rejected or excluded is dropped, so any
+ * set-aside it replaced is held again. Running it with nothing to drop changes nothing and raises nothing, so a redelivered
+ * event is harmless.
+ */
+export const ReleaseGoalMoves: UseCase<Record<string, never>, { released: number }, never> = {
+  name: 'ReleaseGoalMoves',
+  async execute(ctx) {
+    const gone = await ctx.query("SELECT x.id, x.goal_id FROM goal_allocation x JOIN \"transaction\" t ON t.id = x.transaction_id WHERE x.kind = 'moved' AND (t.removed_at IS NOT NULL OR t.status = 'excluded')");
+    if (gone.length === 0) return ok({ released: 0 });
+    const goals = new Set<string>();
+    for (const r of gone) {
+      await ctx.execute('DELETE FROM goal_allocation WHERE id = ?', [String(r[0])]);
+      ctx.touch('goal_allocation', String(r[0]), { released: true });
+      goals.add(String(r[1]));
+    }
+    ctx.emit('GoalsChanged', { goalIds: [...goals] });
+    return ok({ released: gone.length });
   },
 };

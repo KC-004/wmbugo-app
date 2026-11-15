@@ -18,6 +18,24 @@ const g = copy.goals;
 /** `Mar 2027` from the first day of the month a goal is by. */
 export const dueLabel = (dueDate: string): string => `${monthName(dueDate).slice(0, 3)} ${dueDate.slice(0, 4)}`;
 
+const monthLabel = (month: string): string => dueLabel(`${month}-01`);
+
+/**
+ * The pace line of an active goal (GOAL-003): an honest `Not enough history for a pace yet` until there is a pace, then
+ * `About 5,000 a month · done by Mar 2027`, or with a date `On track for Mar 2027` / `At this pace, done by Jun 2027` in
+ * neutral text. A passed date reads `Your date has passed · 5,000 to go`, never alarm wording. Paused, funded and finished
+ * goals show none.
+ */
+export function paceLine(goal: GoalRow, thisMonth: string, money: (n: number) => string): string | null {
+  if (goal.state !== 'active' || goal.funded) return null;
+  const dueMonth = goal.dueDate ? goal.dueDate.slice(0, 7) : null;
+  if (dueMonth !== null && dueMonth < thisMonth) return g.paceDatePassed.replace('{amount}', money(goal.remainingMinor));
+  const pace = goal.progress?.pace;
+  if (!pace) return g.paceNoHistory;
+  if (dueMonth === null) return g.paceMonthly.replace('{amount}', money(pace.monthlyMinor)).replace('{date}', monthLabel(pace.projectedMonth));
+  return pace.projectedMonth <= dueMonth ? g.paceOnTrack.replace('{date}', monthLabel(dueMonth)) : g.paceAtThis.replace('{date}', monthLabel(pace.projectedMonth));
+}
+
 /** The goal's fill, 0 to 1. It never overflows: a funded goal is a full bar (UX-DR25, no overflow). */
 export const goalFill = (goal: Pick<GoalRow, 'contributedMinor' | 'targetMinor'>): number => (goal.targetMinor <= 0 ? 0 : Math.min(1, Math.max(0, goal.contributedMinor / goal.targetMinor)));
 
@@ -26,7 +44,7 @@ export const goalFill = (goal: Pick<GoalRow, 'contributedMinor' | 'targetMinor'>
  * 2027`. When amounts are hidden the bar is not drawn and every amount is masked. A funded goal shows the boat relief moment
  * with `Mark complete`, no confetti and no exclamation mark. The card is one TalkBack node.
  */
-export function GoalCard({ goal, currency, locale, onPress, onComplete }: { goal: GoalRow; currency: CurrencyCode; locale: string; onPress: () => void; onComplete?: () => void }) {
+export function GoalCard({ goal, currency, locale, thisMonth, onPress, onComplete }: { goal: GoalRow; currency: CurrencyCode; locale: string; /** The profile's current month (YYYY-MM), to tell a passed date. */ thisMonth?: string; onPress: () => void; onComplete?: () => void }) {
   useAmountsHidden(); // re-render when Hide amounts is toggled: this component builds amount text and labels
   const theme = useTheme();
   const hidden = isAmountsHidden();
@@ -41,6 +59,7 @@ export function GoalCard({ goal, currency, locale, onPress, onComplete }: { goal
         .replace('{target}', amountLabel({ amountMinor: goal.targetMinor, currency, locale, inline: true }))
         .replace('{togo}', amountLabel({ amountMinor: goal.remainingMinor, currency, locale, inline: true }))
         .replace('{date}', due ?? '');
+  const pace = thisMonth ? paceLine(goal, thisMonth, money) : null;
   const colour = goal.color as ColorName;
   const stateTag = goal.state === 'paused' ? g.paused : goal.state === 'completed' ? g.completed : goal.state === 'archived' ? g.archived : null;
   return (
@@ -58,6 +77,7 @@ export function GoalCard({ goal, currency, locale, onPress, onComplete }: { goal
           )}
           <Text testID={`goal-of-${goal.id}`} style={[textStyle('caption'), { color: theme.color('text-primary') }]}>{g.ofTarget.replace('{amount}', money(goal.contributedMinor)).replace('{target}', money(goal.targetMinor))}</Text>
           <Text testID={`goal-status-${goal.id}`} style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{goal.funded ? '' : toGo}</Text>
+          {pace ? <Text testID={`goal-pace-${goal.id}`} style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{pace}</Text> : null}
           {goal.setAsideMinor > 0 ? <Text testID={`goal-aside-${goal.id}`} style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{g.setAsideLine.replace('{amount}', money(goal.setAsideMinor))}</Text> : null}
           {goal.movedMinor > 0 ? <Text testID={`goal-moved-${goal.id}`} style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{g.movedLine.replace('{amount}', money(goal.movedMinor))}</Text> : null}
           {stateTag ? <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{stateTag}</Text> : null}

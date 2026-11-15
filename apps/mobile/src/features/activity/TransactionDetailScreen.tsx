@@ -29,6 +29,7 @@ import { ReceiptPhotos } from './ReceiptPhotos';
 import { usePermanentDelete } from './usePermanentDelete';
 import { realDeletedApi, type DeletedApi } from './deletedApi';
 import { TransactionBillSection } from '../bills/TransactionBillSection';
+import { TransactionGoalSection } from '../goals/TransactionGoalSection';
 import type { BillsApi } from '../bills/billsApi';
 
 const TYPE_LABEL: Readonly<Record<TransactionDetail['type'], string>> = {
@@ -444,6 +445,8 @@ export function TransactionDetailScreen({
         ) : null}
 
         {!d.removed && d.type === 'expense' ? <TransactionBillSection transactionId={d.id} {...(billsApi ? { api: billsApi } : {})} /> : null}
+
+        {!d.removed && d.type === 'transfer' ? <TransactionGoalSection transactionId={d.id} /> : null}
 
         {d.openDuplicate ? (
           <View testID="detail-check" style={styles.row}>

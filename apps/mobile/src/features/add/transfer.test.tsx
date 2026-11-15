@@ -241,3 +241,27 @@ describe('Pay card bill (Story 2.7)', () => {
     expect(has(r, 'transfer-warning')).toBe(true);
   });
 });
+
+describe('Move to savings for a goal (Story 6.7)', () => {
+  const hdfc = account('a1', 'HDFC', { balanceNotSet: false, postingsMinor: 9000000 });
+  const pot = account('p1', 'SIP Axis MF', { type: 'savings_pot', balanceNotSet: false, postingsMinor: 0 });
+  const goal = { id: 'g1', name: 'Goa trip', setAsideMinor: 500000 };
+
+  it('opens as a transfer into the pot with the header For Goa trip, and saving counts the move toward the goal', async () => {
+    const { r, recordTransfer } = await mountReady({ accounts: [hdfc, pot] }, undefined, undefined, { kind: 'transfer', accountId: 'a1', toAccountId: 'p1', goal });
+    expect(texts(r)).toContain('For Goa trip');
+    tap(r, '5000');
+    expect(texts(r).some((t) => /^The S\$5,000\.00 set aside for Goa trip moves with it$/.test(t))).toBe(true);
+    await act(async () => fire(r, 'save'));
+    expect(recordTransfer).toHaveBeenCalledWith(expect.objectContaining({ amountMinor: 500000, fromAccountId: 'a1', toAccountId: 'p1', goalId: 'g1' }));
+  });
+
+  it('notes only what is set aside when the move is bigger, and says nothing when nothing is set aside', async () => {
+    const { r } = await mountReady({ accounts: [hdfc, pot] }, undefined, undefined, { kind: 'transfer', accountId: 'a1', toAccountId: 'p1', goal });
+    tap(r, '8000');
+    expect(texts(r).some((t) => /^The S\$5,000\.00 set aside/.test(t))).toBe(true);
+    const none = await mountReady({ accounts: [hdfc, pot] }, undefined, undefined, { kind: 'transfer', accountId: 'a1', toAccountId: 'p1', goal: { ...goal, setAsideMinor: 0 } });
+    tap(none.r, '8000');
+    expect(has(none.r, 'add-goal-moves-with')).toBe(false);
+  });
+});

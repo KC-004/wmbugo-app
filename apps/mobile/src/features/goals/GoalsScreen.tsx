@@ -53,7 +53,7 @@ export function GoalsScreen({ api = realGoalsApi, onBack, onOpenGoal }: { api?: 
   const live = data.goals.filter((x) => x.state === 'active' || x.state === 'paused');
   const done = data.goals.filter((x) => x.state === 'completed');
   const archived = data.goals.filter((x) => x.state === 'archived');
-  const card = (x: GoalRow) => <GoalCard key={x.id} goal={x} currency={data.currency} locale={data.locale} onPress={() => onOpenGoal(x.id)} {...(x.state === 'active' && x.funded ? { onComplete: () => actions.confirmComplete(x) } : {})} />;
+  const card = (x: GoalRow) => <GoalCard key={x.id} goal={x} currency={data.currency} locale={data.locale} thisMonth={data.thisMonth} onPress={() => onOpenGoal(x.id)} {...(x.state === 'active' && x.funded ? { onComplete: () => actions.confirmComplete(x) } : {})} />;
   const group = (key: 'done' | 'archived', title: string, rows: readonly GoalRow[]) =>
     rows.length === 0 ? null : (
       <View key={key} testID={`goals-group-${key}`} style={styles.group}>

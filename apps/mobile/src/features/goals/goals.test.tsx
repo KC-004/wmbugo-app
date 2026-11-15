@@ -6,10 +6,11 @@ import { SheetHost } from '../../shared/feedback/SheetHost';
 import { ToastHost } from '../../shared/feedback/ToastHost';
 import { createQueryClient } from '../../shared/queryClient';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
-import { GoalCard, goalFill } from './GoalCard';
+import { GoalCard, goalFill, paceLine } from './GoalCard';
+import { TransactionGoalSection } from './TransactionGoalSection';
 import { GoalDetailScreen } from './GoalDetailScreen';
 import { GoalsScreen } from './GoalsScreen';
-import type { AllocationOutcome, GoalDetailData, GoalOutcome, GoalsApi, GoalsData } from './goalsApi';
+import type { AllocationOutcome, GoalDetailData, GoalOutcome, GoalsApi, GoalsData, TransferGoalState } from './goalsApi';
 
 jest.mock('../../adapters/startApp', () => ({ getServices: jest.fn(), systemClock: { nowMs: () => 0 } }));
 
@@ -61,12 +62,12 @@ const mountNode = async (node: React.ReactElement) => {
 
 const goal = (over: Partial<GoalRow> = {}): GoalRow => ({
   id: 'g1', name: 'Goa trip', targetMinor: 3_000_000, dueDate: '2027-03-01', icon: 'Airplane', color: 'cat-cyan', accountId: null, accountName: null, state: 'active',
-  setAsideMinor: 0, movedMinor: 0, contributedMinor: 0, remainingMinor: 3_000_000, funded: false, ...over,
+  setAsideMinor: 0, movedMinor: 0, contributedMinor: 0, remainingMinor: 3_000_000, funded: false, accountIsPot: false, progress: null, ...over,
 });
 const withMoney = (g: GoalRow, setAside: number, moved = 0): GoalRow => ({ ...g, setAsideMinor: setAside, movedMinor: moved, contributedMinor: setAside + moved, remainingMinor: Math.max(0, g.targetMinor - setAside - moved), funded: setAside + moved >= g.targetMinor });
 
-const data = (goals: GoalRow[] = []): GoalsData => ({ goals, currency: 'INR', locale: 'en-IN', exponent: 2, accounts: [{ id: 'a1', name: 'SIP' }], thisMonth: '2026-11' });
-const detail = (g: GoalRow, allocations: GoalAllocationRow[] = []): GoalDetailData => ({ detail: { goal: g, allocations }, currency: 'INR', locale: 'en-IN', exponent: 2, accounts: [{ id: 'a1', name: 'SIP' }], thisMonth: '2026-11' });
+const data = (goals: GoalRow[] = []): GoalsData => ({ goals, currency: 'INR', locale: 'en-IN', exponent: 2, accounts: [{ id: 'a1', name: 'SIP', isPot: true }], thisMonth: '2026-11' });
+const detail = (g: GoalRow, allocations: GoalAllocationRow[] = []): GoalDetailData => ({ detail: { goal: g, allocations }, currency: 'INR', locale: 'en-IN', exponent: 2, accounts: [{ id: 'a1', name: 'SIP', isPot: true }], thisMonth: '2026-11' });
 
 const fakeApi = (d: GoalsData, det?: GoalDetailData | 'missing') => {
   const ok: GoalOutcome = { ok: true };
@@ -80,6 +81,9 @@ const fakeApi = (d: GoalsData, det?: GoalDetailData | 'missing') => {
     takeBack: jest.fn(async (): Promise<AllocationOutcome> => alloc),
     undoAllocation: jest.fn(async () => ok),
     changeState: jest.fn(async () => ok),
+    forTransfer: jest.fn(async (): Promise<TransferGoalState> => ({ goal: null, canCount: false, goals: [] })),
+    countToward: jest.fn(async () => ok),
+    removeTag: jest.fn(async () => ok),
   };
   return api as typeof api & GoalsApi;
 };
@@ -239,5 +243,69 @@ describe('Goal detail (Story 6.6)', () => {
     expect(has(r, 'goal-detail-set-aside')).toBe(false);
     const gone = await mountNode(<GoalDetailScreen goalId="g1" api={fakeApi(data())} onBack={() => undefined} />);
     expect(texts(gone)).toContain('This goal was deleted.');
+  });
+});
+
+describe('Pace and moves (Story 6.7)', () => {
+  const money = (n: number) => `₹${n / 100}`;
+  const pace = { monthlyMinor: 500_000, projectedMonth: '2027-03' };
+  const withPace = (over: Partial<GoalRow> = {}) => goal({ progress: { contributedMinor: 1_000_000, remainingMinor: 2_000_000, pace }, ...over });
+
+  it('reads an honest line: no history, a pace, on track, at this pace, a passed date', () => {
+    expect(paceLine(goal(), '2026-11', money)).toBe('Not enough history for a pace yet');
+    expect(paceLine(withPace({ dueDate: null }), '2026-11', money)).toBe('About ₹5000 a month · done by Mar 2027');
+    expect(paceLine(withPace({ dueDate: '2027-03-01' }), '2026-11', money)).toBe('On track for Mar 2027');
+    expect(paceLine(withPace({ dueDate: '2027-02-01' }), '2026-11', money)).toBe('At this pace, done by Mar 2027');
+    expect(paceLine(withPace({ dueDate: '2026-10-01', remainingMinor: 2_000_000 }), '2026-11', money)).toBe('Your date has passed · ₹20000 to go');
+    expect(paceLine(withPace({ state: 'paused' }), '2026-11', money)).toBeNull();
+    expect(paceLine(withMoney(goal(), 3_000_000), '2026-11', money)).toBeNull();
+  });
+
+  it('the card shows the pace line and never alarm wording or an exclamation mark', async () => {
+    const r = await mountNode(<GoalCard goal={withPace({ dueDate: '2027-02-01' })} currency="INR" locale="en-IN" thisMonth="2026-11" onPress={() => undefined} />);
+    expect(texts(r)).toContain('At this pace, done by Mar 2027');
+    expect(texts(r).join(' ')).not.toMatch(/!|behind|late|overdue/i);
+  });
+
+  it('Move to savings hands the goal and its pot to the Add sheet; with no pot it says to add one first', async () => {
+    const onMove = jest.fn();
+    const r = await mountNode(<GoalDetailScreen goalId="g1" api={fakeApi(data(), detail(goal()))} onBack={() => undefined} onMove={onMove} onAddPot={() => undefined} />);
+    await press(r, 'goal-detail-move');
+    expect(onMove).toHaveBeenCalledWith(expect.objectContaining({ id: 'g1' }), 'a1');
+    expect(has(r, 'goal-detail-add-pot')).toBe(false);
+    const noPot = { ...detail(goal()), accounts: [{ id: 'b1', name: 'HDFC', isPot: false }] };
+    const onAddPot = jest.fn();
+    const r2 = await mountNode(<GoalDetailScreen goalId="g1" api={fakeApi(data(), noPot)} onBack={() => undefined} onMove={onMove} onAddPot={onAddPot} />);
+    expect(texts(r2)).toContain('Add a savings pot first');
+    expect(has(r2, 'goal-detail-move')).toBe(false);
+    await press(r2, 'goal-detail-add-pot');
+    expect(onAddPot).toHaveBeenCalled();
+  });
+
+  it('a savings transfer offers Count toward a goal and tags it once; a tagged one reads For Goa trip with Remove', async () => {
+    const api = fakeApi(data());
+    api.forTransfer.mockResolvedValue({ goal: null, canCount: true, goals: [{ id: 'g1', name: 'Goa trip' }, { id: 'g2', name: 'Bike' }] });
+    const r = await mountNode(<TransactionGoalSection transactionId="t1" api={api} />);
+    await press(r, 'transfer-goal-count');
+    await press(r, 'transfer-goal-pick-g1');
+    expect(api.countToward).toHaveBeenCalledWith('t1', 'g1');
+    expect(texts(r)).toContain('Counted toward Goa trip');
+    const tagged = fakeApi(data());
+    tagged.forTransfer.mockResolvedValue({ goal: { goalId: 'g1', name: 'Goa trip' }, canCount: false, goals: [] });
+    const r2 = await mountNode(<TransactionGoalSection transactionId="t1" api={tagged} />);
+    expect(texts(r2)).toContain('For Goa trip');
+    expect(has(r2, 'transfer-goal-count')).toBe(false);
+    await press(r2, 'transfer-goal-remove');
+    expect(tagged.removeTag).toHaveBeenCalledWith('t1');
+    expect(texts(r2)).toContain('Removed from Goa trip');
+  });
+
+  it('shows nothing for a transfer that cannot count toward a goal or when no goal is active', async () => {
+    const r = await mountNode(<TransactionGoalSection transactionId="t1" api={fakeApi(data())} />);
+    expect(has(r, 'transfer-goal-offer')).toBe(false);
+    const api = fakeApi(data());
+    api.forTransfer.mockResolvedValue({ goal: null, canCount: true, goals: [] });
+    const r2 = await mountNode(<TransactionGoalSection transactionId="t1" api={api} />);
+    expect(has(r2, 'transfer-goal-offer')).toBe(false);
   });
 });

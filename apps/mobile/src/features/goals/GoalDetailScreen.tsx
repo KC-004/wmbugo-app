@@ -1,7 +1,7 @@
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowsLeftRight, BookmarkSimple } from 'phosphor-react-native';
-import { dayMonthLabel, type CurrencyCode, type GoalAllocationRow } from '@wmbugo/core';
+import { dayMonthLabel, type CurrencyCode, type GoalAllocationRow, type GoalRow } from '@wmbugo/core';
 import { copy } from '../../shared/copy';
 import { EmptyState, ErrorBlock, Skeleton } from '../../shared/feedback/Feedback';
 import { useAmountsHidden } from '../../shared/state/amountsHidden';
@@ -26,7 +26,7 @@ const historyText = (a: GoalAllocationRow, currency: CurrencyCode, locale: strin
 };
 
 /** A goal's detail (Story 6.6): the card, the history of every contribution and Set aside, Take back, Edit, Pause, Mark complete and Archive. */
-export function GoalDetailScreen({ goalId, onBack, api = realGoalsApi }: { goalId: string; onBack: () => void; api?: GoalsApi }) {
+export function GoalDetailScreen({ goalId, onBack, onMove, onAddPot, api = realGoalsApi }: { goalId: string; onBack: () => void; /** Opens the Add sheet as a transfer into the goal's savings pot, for this goal. */ onMove?: (goal: GoalRow, potId: string) => void; /** No savings pot yet: goes to add one. */ onAddPot?: () => void; api?: GoalsApi }) {
   useAmountsHidden(); // re-render when Hide amounts is toggled: the history builds amount text
   const theme = useTheme();
   const q = useQuery({ queryKey: goalDetailKey(goalId), queryFn: () => api.loadDetail(goalId) });
@@ -52,12 +52,15 @@ export function GoalDetailScreen({ goalId, onBack, api = realGoalsApi }: { goalI
   const ink = { color: theme.color('text-primary') };
   const active = goal.state === 'active';
   const live = active || goal.state === 'paused';
+  const pots = data.accounts.filter((a) => a.isPot);
+  // The goal's own savings pot when it has one, otherwise the first pot.
+  const pot = pots.find((p) => p.id === goal.accountId) ?? pots[0] ?? null;
 
   return (
     <View style={styles.fill} testID="goal-detail">
       {header}
       <ScrollView contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
-        <GoalCard goal={goal} currency={data.currency} locale={data.locale} onPress={() => undefined} {...(active && goal.funded ? { onComplete: () => actions.confirmComplete(goal) } : {})} />
+        <GoalCard goal={goal} currency={data.currency} locale={data.locale} thisMonth={data.thisMonth} onPress={() => undefined} {...(active && goal.funded ? { onComplete: () => actions.confirmComplete(goal) } : {})} />
 
         <Text accessibilityRole="header" style={[textStyle('label'), muted]}>{g.historyHeading}</Text>
         {data.detail.allocations.length === 0 ? (
@@ -75,7 +78,9 @@ export function GoalDetailScreen({ goalId, onBack, api = realGoalsApi }: { goalI
         )}
 
         <View style={styles.actions}>
-          {active ? <Button label={g.setAside} testID="goal-detail-set-aside" onPress={() => actions.openAmount(goal, 'set_aside')} /> : null}
+          {active && pot && onMove ? <Button label={g.moveToSavings} testID="goal-detail-move" onPress={() => onMove(goal, pot.id)} /> : null}
+          {active && !pot && onAddPot ? <Button label={g.addPotFirst} variant="secondary" testID="goal-detail-add-pot" onPress={onAddPot} /> : null}
+          {active ? <Button label={g.setAside} variant={pot && onMove ? 'secondary' : 'primary'} testID="goal-detail-set-aside" onPress={() => actions.openAmount(goal, 'set_aside')} /> : null}
           {live && goal.setAsideMinor > 0 ? <Button label={g.takeBack} variant="secondary" testID="goal-detail-take-back" onPress={() => actions.openAmount(goal, 'take_back')} /> : null}
           <Button label={g.edit} variant="secondary" testID="goal-detail-edit" onPress={() => actions.openEditor(goal, data.accounts, data.thisMonth)} />
           {active ? <Button label={g.pause} variant="secondary" testID="goal-detail-pause" onPress={() => void actions.change(goal, 'paused')} /> : null}

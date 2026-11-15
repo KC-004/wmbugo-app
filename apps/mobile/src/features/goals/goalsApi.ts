@@ -1,5 +1,9 @@
 import {
   ACCOUNT_LIST_SQL,
+  canCountTowardGoal,
+  CountTowardGoal,
+  goalOfTransaction,
+  RemoveGoalTag,
   ChangeGoalState,
   loadGoalDetail,
   loadGoals,
@@ -25,9 +29,22 @@ export interface GoalsData {
   readonly locale: string;
   readonly exponent: number;
   /** Active asset accounts a goal can point at, savings pots first. */
-  readonly accounts: readonly { id: string; name: string }[];
+  readonly accounts: readonly GoalAccount[];
   /** Profile-local month, `YYYY-MM`: the earliest month `By` accepts. */
   readonly thisMonth: string;
+}
+
+export interface GoalAccount {
+  readonly id: string;
+  readonly name: string;
+  readonly isPot: boolean;
+}
+
+/** What a savings transfer's detail needs: the goal it counts toward, or the goals it could. */
+export interface TransferGoalState {
+  readonly goal: { goalId: string; name: string } | null;
+  readonly canCount: boolean;
+  readonly goals: readonly { id: string; name: string }[];
 }
 
 export interface GoalDetailData {
@@ -35,7 +52,7 @@ export interface GoalDetailData {
   readonly currency: CurrencyCode;
   readonly locale: string;
   readonly exponent: number;
-  readonly accounts: readonly { id: string; name: string }[];
+  readonly accounts: readonly GoalAccount[];
   readonly thisMonth: string;
 }
 
@@ -54,14 +71,19 @@ export interface GoalsApi {
   takeBack(goalId: string, amountMinor: number): Promise<AllocationOutcome>;
   undoAllocation(allocationId: string): Promise<GoalOutcome>;
   changeState(goalId: string, to: GoalState): Promise<GoalOutcome>;
+  /** Story 6.7: the goal a savings transfer counts toward, or the active goals it could. */
+  forTransfer(transactionId: string): Promise<TransferGoalState>;
+  countToward(transactionId: string, goalId: string): Promise<GoalOutcome>;
+  removeTag(transactionId: string): Promise<GoalOutcome>;
 }
 
 export const GOALS_QUERY_KEY = ['goals', 'list'] as const;
 export const goalDetailKey = (id: string) => ['goals', 'detail', id] as const;
+export const transferGoalKey = (transactionId: string) => ['goals', 'transfer', transactionId] as const;
 
 async function accounts() {
   const rows = mapAccountRows(await getServices().db.query(ACCOUNT_LIST_SQL)).filter((a) => a.status === 'active' && a.type !== 'card');
-  return [...rows.filter((a) => a.type === 'savings_pot'), ...rows.filter((a) => a.type !== 'savings_pot')].map((a) => ({ id: a.id, name: a.name }));
+  return [...rows.filter((a) => a.type === 'savings_pot'), ...rows.filter((a) => a.type !== 'savings_pot')].map((a) => ({ id: a.id, name: a.name, isPot: a.type === 'savings_pot' }));
 }
 
 const run = async (r: Promise<{ ok: true } | { ok: false; code: string }>): Promise<GoalOutcome> => {
@@ -74,13 +96,13 @@ export const realGoalsApi: GoalsApi = {
     const db = getServices().db;
     const p = await readProfile(db);
     if (!p) return null;
-    return { goals: await loadGoals(db), currency: p.currency, locale: p.locale, exponent: p.exponent, accounts: await accounts(), thisMonth: await thisMonth() };
+    return { goals: await loadGoals(db, systemClock.nowMs()), currency: p.currency, locale: p.locale, exponent: p.exponent, accounts: await accounts(), thisMonth: await thisMonth() };
   },
   async loadDetail(id) {
     const db = getServices().db;
     const p = await readProfile(db);
     if (!p) return null;
-    const detail = await loadGoalDetail(db, id);
+    const detail = await loadGoalDetail(db, id, systemClock.nowMs());
     if (detail === 'missing') return 'missing';
     return { detail, currency: p.currency, locale: p.locale, exponent: p.exponent, accounts: await accounts(), thisMonth: await thisMonth() };
   },
@@ -99,6 +121,15 @@ export const realGoalsApi: GoalsApi = {
   },
   undoAllocation: (allocationId) => run(getServices().writer.run(UndoGoalAllocation, { allocationId }, 'user')),
   changeState: (goalId, to) => run(getServices().writer.run(ChangeGoalState, { goalId, to }, 'user')),
+  async forTransfer(transactionId) {
+    const db = getServices().db;
+    const goal = await goalOfTransaction(db, transactionId);
+    const canCount = goal ? false : await canCountTowardGoal(db, transactionId);
+    const goals = canCount ? (await loadGoals(db)).filter((g) => g.state === 'active').map((g) => ({ id: g.id, name: g.name })) : [];
+    return { goal, canCount, goals };
+  },
+  countToward: (transactionId, goalId) => run(getServices().writer.run(CountTowardGoal, { transactionId, goalId }, 'user')),
+  removeTag: (transactionId) => run(getServices().writer.run(RemoveGoalTag, { transactionId }, 'user')),
 };
 
 /** The month the profile is in now (`YYYY-MM`), from the profile timezone. */

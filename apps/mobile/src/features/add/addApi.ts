@@ -58,7 +58,7 @@ export interface AddData {
 
 /** A save carries its submission id: saving again with the same id (a retry) returns the first save instead of writing twice. */
 export type EntryRequest = ManualEntry & { readonly submissionId: string; /** Made by Duplicate: never held against the entry it was copied from. */ readonly copiedFrom?: string };
-export type TransferRequest = TransferInput & { readonly submissionId: string };
+export type TransferRequest = TransferInput & { readonly submissionId: string; /** A move into a savings pot made for a goal (Story 6.7). */ readonly goalId?: string };
 
 export type RecordResult = { ok: true; value: { transactionId: string; accountId: string; result?: SubmitResult } } | { ok: false; code: string };
 
@@ -144,8 +144,8 @@ export const realAddApi: AddApi = {
     const r = await getServices().writer.run(SubmitCapture, { submissionId, sourceKind: 'manual', entry, ...(copiedFrom ? { copiedFrom } : {}) }, 'user');
     return r.ok ? { ok: true, value: { transactionId: r.value.transactionId, accountId: r.value.accountId ?? '', result: r.value.result } } : r;
   },
-  async recordTransfer({ submissionId, ...transfer }) {
-    const r = await getServices().writer.run(SubmitCapture, { submissionId, sourceKind: 'manual', transfer }, 'user');
+  async recordTransfer({ submissionId, goalId, ...transfer }) {
+    const r = await getServices().writer.run(SubmitCapture, { submissionId, sourceKind: 'manual', transfer, ...(goalId ? { goalId } : {}) }, 'user');
     return r.ok ? { ok: true, value: { transactionId: r.value.transactionId, feeTransactionId: r.value.feeTransactionId, result: r.value.result } } : r;
   },
   remove: (transactionId) => getServices().writer.run(RemoveEntry, { transactionId }, 'user'),

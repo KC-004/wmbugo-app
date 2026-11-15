@@ -257,11 +257,17 @@ function GoalsRoute() {
 }
 
 function GoalDetailRoute() {
-  const nav = useNavigation<{ goBack: () => void }>();
+  const nav = useNavigation<{ goBack: () => void; navigate: (s: 'Accounts') => void }>();
   const route = useRoute<RouteProp<RootParams, 'GoalDetail'>>();
+  const openAdd = useOpenAddWith();
   return (
     <ScreenFrame>
-      <GoalDetailScreen goalId={route.params.goalId} onBack={() => nav.goBack()} />
+      <GoalDetailScreen
+        goalId={route.params.goalId}
+        onBack={() => nav.goBack()}
+        onMove={(goal, potId) => openAdd({ kind: 'transfer', accountId: null, toAccountId: potId, goal: { id: goal.id, name: goal.name, setAsideMinor: goal.setAsideMinor } })}
+        onAddPot={() => nav.navigate('Accounts')}
+      />
     </ScreenFrame>
   );
 }

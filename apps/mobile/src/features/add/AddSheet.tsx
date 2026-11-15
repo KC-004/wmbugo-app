@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ComponentRef } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { moneyText } from '../../shared/ui/moneyText';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -55,6 +56,8 @@ export interface AddPreset {
   readonly note?: string | null;
   readonly paymentMethod?: PaymentMethod | null;
   readonly copiedFrom?: string;
+  /** A move into savings for a goal (Story 6.7): the header says `For Goa trip` and the transfer counts toward it. */
+  readonly goal?: { readonly id: string; readonly name: string; readonly setAsideMinor: number };
 }
 
 function wallParts(nowMs: number, tz: string): { date: string; time: string } {
@@ -455,6 +458,7 @@ export function AddSheet({
         ...(note.trim() ? { note } : {}),
         ...(occurredAtMs !== undefined ? { occurredAtMs } : {}),
         ...(fee ? { fee } : {}),
+        ...(preset?.goal ? { goalId: preset.goal.id } : {}),
       });
       if (!r.ok) {
         if (r.code === 'SAME_ACCOUNT') setError('same');
@@ -616,6 +620,16 @@ export function AddSheet({
       {error === 'from' ? (
         <Text testID="from-error" accessibilityRole="alert" accessibilityLiveRegion="assertive" style={[textStyle('body-medium'), { color: theme.color('on-glass-accent') }]}>
           {copy.add.payFromRequired}
+        </Text>
+      ) : null}
+      {preset?.goal ? (
+        <View testID="add-goal-chip" accessible accessibilityLabel={copy.goals.forGoal.replace('{name}', preset.goal.name)}>
+          <Text style={[textStyle('body-medium'), secondary]}>{copy.goals.forGoal.replace('{name}', preset.goal.name)}</Text>
+        </View>
+      ) : null}
+      {preset?.goal && preset.goal.setAsideMinor > 0 && parsed.ok && parsed.value > 0 ? (
+        <Text testID="add-goal-moves-with" accessibilityLiveRegion="polite" style={[textStyle('body'), secondary]}>
+          {copy.goals.movesWith.replace('{amount}', moneyText(Math.min(preset.goal.setAsideMinor, parsed.value), data?.currency ?? 'INR', locale)).replace('{name}', preset.goal.name)}
         </Text>
       ) : null}
       {preset?.hint && text === '' ? <Text testID="preset-hint" style={[textStyle('body'), secondary]}>{preset.hint}</Text> : null}

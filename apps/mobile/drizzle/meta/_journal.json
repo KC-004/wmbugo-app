@@ -176,6 +176,13 @@
       "when": 1794768785323,
       "tag": "0024_goals",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1794769265203,
+      "tag": "0025_goal_allocation_converted",
+      "breakpoints": true
     }
   ]
 }

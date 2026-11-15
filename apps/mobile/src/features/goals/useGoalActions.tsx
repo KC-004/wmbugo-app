@@ -85,7 +85,7 @@ export function useGoalActions(api: GoalsApi, display: { currency: CurrencyCode;
   const money = (n: number) => moneyText(n, display.currency, display.locale);
   const failed = () => toast.show({ message: g.actionFailed });
 
-  const openEditor = (goal: GoalRow | null, accounts: readonly { id: string; name: string }[], thisMonth: string) => {
+  const openEditor = (goal: GoalRow | null, accounts: readonly { id: string; name: string; isPot?: boolean }[], thisMonth: string) => {
     sheet.open({
       id: 'goal',
       title: goal ? g.editTitle : g.addTitle,
