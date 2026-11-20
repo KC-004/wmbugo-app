@@ -9,3 +9,4 @@ export * from './drilldown';
 export * from './csvExport';
 export * from './categoryView';
 export * from './trends';
+export * from './merchants';

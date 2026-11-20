@@ -1,5 +1,5 @@
 import type { Querier } from '../planning/budgets';
-import { categoryWhere, entryWhere, incomeOnly, marks, SPLIT_FROM, type DateRange, type LedgerEntryType, type LedgerFilters, type Param } from './spendingQueries';
+import { categoryWhere, entryWhere, incomeOnly, marks, MERCHANT_SQL, SPLIT_FROM, type DateRange, type LedgerEntryType, type LedgerFilters, type Param } from './spendingQueries';
 
 /**
  * The entries behind an Insights figure (Story 7.3, PRD 8.9): each row carries the part of the entry that counts, so adding
@@ -19,7 +19,7 @@ export interface SegmentEntry {
 }
 
 const ACCOUNT_NAME = "(SELECT a.name FROM posting p JOIN account a ON a.id = p.account_id WHERE p.transaction_id = t.id AND p.posting_kind = 'normal' ORDER BY p.signed_amount_minor LIMIT 1)";
-const MERCHANT = "CASE WHEN TRIM(COALESCE(t.original_description, '')) = '' THEN NULL ELSE t.original_description END";
+const MERCHANT = MERCHANT_SQL;
 const text = (v: unknown): string | null => (v === null || v === undefined ? null : String(v));
 
 /** One row per entry per top-level category, newest first. */

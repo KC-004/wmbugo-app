@@ -14,6 +14,7 @@ import {
   normalizeMerchant,
   resolveInsightsPeriod,
   spendingByCategory,
+  spendingByMerchant,
   spendingChange,
   spendingTotal,
   spendingTrend,
@@ -29,6 +30,7 @@ import {
   type Kept,
   type PeriodPreset,
   type SpendingByCategory,
+  type SpendingByMerchant,
   type SpendingChange,
   type SpendingTotal,
   type SpendingTrend,
@@ -103,6 +105,14 @@ export interface InOutData {
   readonly inOut: IncomeVsExpense;
 }
 
+export interface MerchantsData {
+  readonly currency: CurrencyCode;
+  readonly locale: string;
+  readonly merchants: SpendingByMerchant;
+  readonly scopeParts: readonly string[];
+}
+
+export const merchantsKey = (selection: InsightsSelection) => ['insights', 'merchants', selection] as const;
 export const trendKey = (selection: InsightsSelection, g: Granularity | undefined) => ['insights', 'trend', selection, g ?? null] as const;
 export const inOutKey = (selection: InsightsSelection) => ['insights', 'inout', selection] as const;
 export const categoriesKey = (selection: InsightsSelection) => ['insights', 'categories', selection] as const;
@@ -124,6 +134,8 @@ export interface InsightsApi {
   /** Story 7.5: spending over time for the scope, and money in and out over recent periods. */
   loadTrend(selection: InsightsSelection, granularity?: Granularity): Promise<TrendData | null>;
   loadInOut(selection: InsightsSelection): Promise<InOutData | null>;
+  /** Story 7.6: spending by merchant for the scope. */
+  loadMerchants(selection: InsightsSelection): Promise<MerchantsData | null>;
 }
 
 /** The copy key of a preset: `this_cycle` reads as `thisCycle`. */
@@ -226,6 +238,12 @@ export const realInsightsApi: InsightsApi = {
     const profile = await readProfile(getServices().db);
     if (!r || !profile) return null;
     return { currency: profile.currency, locale: profile.locale, trend: await spendingTrend(r.db, { period: r.period, filters: selection.filters }, r.ctx, granularity) };
+  },
+  async loadMerchants(selection) {
+    const r = await resolveSelection(selection);
+    const profile = await readProfile(getServices().db);
+    if (!r || !profile) return null;
+    return { currency: profile.currency, locale: profile.locale, merchants: await spendingByMerchant(r.db, { period: r.period, filters: selection.filters }), scopeParts: scopeParts(selection.filters, await filterNames(selection.filters, r.period)) };
   },
   async loadInOut(selection) {
     const r = await resolveSelection(selection);

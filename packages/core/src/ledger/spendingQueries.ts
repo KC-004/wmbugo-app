@@ -29,6 +29,9 @@ export interface LedgerFilters {
 }
 
 export type Param = string | number;
+/** A refund carries its original's merchant when it has none of its own, so a refund lands on the shop it came from. */
+export const MERCHANT_SQL = "CASE WHEN TRIM(COALESCE(t.original_description, '')) <> '' THEN t.original_description ELSE (SELECT CASE WHEN TRIM(COALESCE(o.original_description, '')) <> '' THEN o.original_description END FROM \"transaction\" o WHERE o.id = t.refund_of_transaction_id) END";
+
 export const marks = (n: number) => Array.from({ length: n }, () => '?').join(',');
 
 /** WHERE parts (and params) for confirmed, live entries of a range under the filters. `t` is the transaction alias. */
@@ -44,10 +47,10 @@ export function entryWhere(range: DateRange, f: LedgerFilters, kinds: readonly L
     const named = f.descriptions.filter((d): d is string => d !== null);
     const parts: string[] = [];
     if (named.length > 0) {
-      parts.push(`t.original_description IN (${marks(named.length)})`);
+      parts.push(`${MERCHANT_SQL} IN (${marks(named.length)})`);
       params.push(...named);
     }
-    if (f.descriptions.includes(null)) parts.push("(t.original_description IS NULL OR TRIM(t.original_description) = '')");
+    if (f.descriptions.includes(null)) parts.push(`(${MERCHANT_SQL} IS NULL)`);
     where.push(`(${parts.join(' OR ')})`);
   }
   if (f.tags && f.tags.length > 0) {
@@ -164,7 +167,7 @@ export async function merchantNets(q: Querier, range: DateRange, f: LedgerFilter
   const e = entryWhere(range, f, ['expense', 'refund']);
   const c = categoryWhere(f);
   const rows = await q.query(
-    `SELECT CASE WHEN TRIM(COALESCE(t.original_description, '')) = '' THEN NULL ELSE t.original_description END, ${NET}, COUNT(DISTINCT t.id) ${SPLIT_FROM} WHERE ${[...e.where, ...c.where].join(' AND ')} GROUP BY 1`,
+    `SELECT ${MERCHANT_SQL}, ${NET}, COUNT(DISTINCT t.id) ${SPLIT_FROM} WHERE ${[...e.where, ...c.where].join(' AND ')} GROUP BY 1`,
     [...e.params, ...c.params],
   );
   return rows.map((r) => ({ description: r[0] === null ? null : String(r[0]), netMinor: Number(r[1]), entries: Number(r[2]) }));

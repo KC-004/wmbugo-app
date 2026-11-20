@@ -22,6 +22,8 @@ export interface BarDatum {
   readonly sharePercent?: number | null;
   /** Spoken in place of `label` when it differs (`Today`, a full weekday). */
   readonly spokenLabel?: string;
+  /** A third table column (Insights: the entry count); read after the amount. */
+  readonly detail?: string;
 }
 
 export interface BarChartProps {
@@ -40,6 +42,9 @@ export interface BarChartProps {
   onPressDatum?: (datum: BarDatum) => void;
   /** Draw each bar's share next to its amount (Insights); Home leaves it to the table. */
   showShareInBars?: boolean;
+  /** Table column titles when the defaults (Name, Amount) do not fit: `Category`, `Merchant`; and the title of the detail column. */
+  nameColumn?: string;
+  detailColumn?: string;
   testID?: string;
 }
 
@@ -53,7 +58,7 @@ const fillPercent = (value: number, max: number): number => (value <= 0 ? 0 : Ma
  * the same drill-down, the scope label first. Built from plain views, so it needs no native chart library. Hide amounts keeps
  * the track, the names and the day labels and draws no fill and no percentage. It is never placed on raw gradient.
  */
-export function BarChart({ title, scope, data, currency, locale, orientation, table, onToggleTable, onPressDatum, showShareInBars = false, testID = 'bar-chart' }: BarChartProps) {
+export function BarChart({ title, scope, data, currency, locale, orientation, table, onToggleTable, onPressDatum, showShareInBars = false, nameColumn = copy.chart.nameColumn, detailColumn, testID = 'bar-chart' }: BarChartProps) {
   const theme = useTheme();
   const hidden = useAmountsHidden();
   const max = Math.max(1, ...data.map((d) => d.valueMinor));
@@ -64,7 +69,8 @@ export function BarChart({ title, scope, data, currency, locale, orientation, ta
     const name = d.spokenLabel ?? d.label;
     const amount = hidden ? 'amount hidden' : spokenAmount(d.valueMinor, currency, locale);
     const share = !hidden && d.sharePercent != null ? `, ${d.sharePercent} percent` : '';
-    return `${name}, ${amount}${share}`;
+    const detail = d.detail ? `, ${d.detail}` : '';
+    return `${name}, ${amount}${share}${detail}`;
   };
 
   const toggle = (
@@ -83,10 +89,11 @@ export function BarChart({ title, scope, data, currency, locale, orientation, ta
       <View testID={testID} style={styles.gap}>
         {head}
         <View testID={`${testID}-table`} accessibilityRole="list" style={styles.gap}>
-          <View testID={`${testID}-table-head`} accessible accessibilityRole="header" accessibilityLabel={`${copy.chart.nameColumn}, ${copy.chart.amountColumn}${showShare ? `, ${copy.chart.shareColumn}` : ''}`} style={styles.tableRow}>
-            <Text style={[textStyle('caption'), styles.nameCol, muted]}>{copy.chart.nameColumn}</Text>
+          <View testID={`${testID}-table-head`} accessible accessibilityRole="header" accessibilityLabel={`${nameColumn}, ${copy.chart.amountColumn}${showShare ? `, ${copy.chart.shareColumn}` : ''}${detailColumn ? `, ${detailColumn}` : ''}`} style={styles.tableRow}>
+            <Text style={[textStyle('caption'), styles.nameCol, muted]}>{nameColumn}</Text>
             <Text style={[textStyle('caption'), styles.amountCol, muted]}>{copy.chart.amountColumn}</Text>
             {showShare ? <Text style={[textStyle('caption'), styles.shareCol, muted]}>{copy.chart.shareColumn}</Text> : null}
+            {detailColumn ? <Text style={[textStyle('caption'), styles.shareCol, muted]}>{detailColumn}</Text> : null}
           </View>
           {data.map((d) => (
             <Pressable
@@ -100,6 +107,7 @@ export function BarChart({ title, scope, data, currency, locale, orientation, ta
                 <Amount amountMinor={d.valueMinor} currency={currency} direction="neutral" role="body" {...loc} />
               </View>
               {showShare ? <Text style={[textStyle('body'), styles.shareCol, { color: theme.color('text-primary') }]}>{d.sharePercent != null ? `${d.sharePercent}%` : ''}</Text> : null}
+              {detailColumn ? <Text style={[textStyle('body'), styles.shareCol, { color: theme.color('text-primary') }]}>{d.detail ?? ''}</Text> : null}
             </Pressable>
           ))}
         </View>

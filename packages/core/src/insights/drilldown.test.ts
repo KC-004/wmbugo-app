@@ -74,7 +74,7 @@ describe('the drill-down lists exactly what the figure counted (Story 7.3, PRD 8
     const sum = (d: Awaited<ReturnType<typeof drillDown>>) => d.days.flatMap((x) => x.entries).reduce((s, e) => s + (e.type === 'refund' ? -e.amountMinor : e.amountMinor), 0);
     const cases: { target: DrillTarget; expected: () => Promise<number>; scope?: InsightsScope }[] = [
       { target: { kind: 'category', id: 'cat_food', name: 'Food' }, expected: async () => (await spendingByCategory(db, { ...scope('this_cycle'), filters: { categoryIds: ['cat_food'] } })).rows.reduce((s, r) => s + r.displayMinor - r.backMinor, 0) },
-      { target: { kind: 'merchant', key: 'swiggy', name: 'Swiggy' }, expected: async () => 1_250_000 },
+      { target: { kind: 'merchant', key: 'swiggy', name: 'Swiggy' }, expected: async () => 1_150_000 /* the 100,000 refund follows its original to Swiggy */ },
       { target: { kind: 'bucket', start: '2026-11-03', end: '2026-11-03', label: 'Nov 3' }, expected: async () => 1_250_000 },
       { target: { kind: 'spent' }, scope: scope('this_cycle', { accountIds: [cash] }), expected: async () => 30_000 },
       { target: { kind: 'income' }, expected: async () => (await incomeTotal(db, scope('this_cycle'))).incomeMinor },
