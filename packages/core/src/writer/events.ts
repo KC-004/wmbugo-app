@@ -31,10 +31,10 @@ export const EVENT_CATALOGUE = {
   CapturesRejected: { areas: ['captures', 'ledger', 'home', 'widget'] },
   CategoryAssigned: { areas: ['learning', 'insights', 'budgets'] },
   CategoriesChanged: { areas: ['ledger', 'budgets', 'insights', 'home', 'plan', 'bills'] },
-  BudgetsChanged: { areas: ['budgets', 'home', 'plan'] },
+  BudgetsChanged: { areas: ['budgets', 'home', 'plan', 'insights'] },
   BudgetThresholdCrossed: { areas: ['notifications'] },
   RecurringChanged: { areas: ['bills', 'plan', 'home'] },
-  GoalsChanged: { areas: ['goals', 'plan', 'home'] },
+  GoalsChanged: { areas: ['goals', 'plan', 'home', 'insights'] },
 } as const satisfies Record<string, EventSpec>;
 
 export type EventName = keyof typeof EVENT_CATALOGUE;

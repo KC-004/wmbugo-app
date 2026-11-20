@@ -27,6 +27,7 @@ import { appNotifier } from '../../adapters/notifier';
 import { BudgetDetailScreen } from '../budgets/BudgetDetailScreen';
 import { BillsScreen } from '../bills/BillsScreen';
 import { BillDetailScreen } from '../bills/BillDetailScreen';
+import { InsightsScreen } from '../insights/InsightsScreen';
 import { PlanHubScreen } from '../plan/PlanHubScreen';
 import { GoalsScreen } from '../goals/GoalsScreen';
 import { GoalDetailScreen } from '../goals/GoalDetailScreen';
@@ -66,11 +67,14 @@ function TabTopBar({ title }: { title: string }) {
   return <TopBar title={title} onAccounts={() => nav.navigate('Accounts')} onProfile={() => nav.navigate('Settings')} />;
 }
 
-/** Header only: Insights and Plan show nothing else until their epics land. */
-function HeaderOnly({ title, tab }: { title: string; tab: TabRoute }) {
+/** Insights opens on the overview (SCR-11, Story 7.2): period and filters, the KPI tiles, then the question sections. */
+function InsightsTab() {
+  const nav = useNavigation<Nav>();
+  const openAdd = useOpenAdd();
   return (
-    <TabFrame tab={tab}>
-      <TabTopBar title={title} />
+    <TabFrame tab="Insights">
+      <TabTopBar title={copy.nav.insights} />
+      <InsightsScreen nav={{ onAdd: openAdd, onReview: () => nav.navigate('ReviewQueue', {}) }} />
     </TabFrame>
   );
 }
@@ -135,7 +139,7 @@ const stackOf = (name: string, Screen: () => ReactNode) =>
 
 const HomeStack = stackOf('HomeRoot', HomeTab);
 const ActivityStack = stackOf('ActivityRoot', ActivityTab);
-const InsightsStack = stackOf('InsightsRoot', () => <HeaderOnly title={copy.nav.insights} tab="Insights" />);
+const InsightsStack = stackOf('InsightsRoot', InsightsTab);
 const PlanStack = stackOf('PlanRoot', PlanTab);
 
 function TabsWithAdd() {

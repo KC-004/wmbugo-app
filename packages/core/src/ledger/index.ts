@@ -21,3 +21,4 @@ export * from './recentlyDeleted';
 export * from './categoryCommands';
 export * from './categoryArchive';
 export * from './categoryGuess';
+export * from './spendingQueries';

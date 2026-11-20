@@ -242,7 +242,7 @@ describe('event catalogue', () => {
     expect([...areasFor('ProfileChanged')]).toContain('plan');
     expect([...areasFor('CategoriesChanged')]).toEqual(expect.arrayContaining(['plan', 'bills']));
     expect([...areasFor('RecurringChanged')].sort()).toEqual(['bills', 'home', 'plan']);
-    expect([...areasFor('GoalsChanged')].sort()).toEqual(['goals', 'home', 'plan']);
+    expect([...areasFor('GoalsChanged')].sort()).toEqual(['goals', 'home', 'insights', 'plan']);
   });
 
   it('recognises only catalogue names', () => {
