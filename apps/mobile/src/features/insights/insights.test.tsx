@@ -102,6 +102,7 @@ const fakeApi = (o: InsightsOverview | ((s: InsightsSelection) => InsightsOvervi
     return typeof o === 'function' ? o(s) : o;
   }),
   loadFacets: jest.fn(async () => facets),
+  loadCategories: jest.fn(async () => null),
 });
 
 describe('Insights overview (Story 7.2)', () => {

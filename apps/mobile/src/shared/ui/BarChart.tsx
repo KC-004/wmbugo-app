@@ -38,6 +38,8 @@ export interface BarChartProps {
   onToggleTable: () => void;
   /** The same drill-down for a bar and for its table row. */
   onPressDatum?: (datum: BarDatum) => void;
+  /** Draw each bar's share next to its amount (Insights); Home leaves it to the table. */
+  showShareInBars?: boolean;
   testID?: string;
 }
 
@@ -51,7 +53,7 @@ const fillPercent = (value: number, max: number): number => (value <= 0 ? 0 : Ma
  * the same drill-down, the scope label first. Built from plain views, so it needs no native chart library. Hide amounts keeps
  * the track, the names and the day labels and draws no fill and no percentage. It is never placed on raw gradient.
  */
-export function BarChart({ title, scope, data, currency, locale, orientation, table, onToggleTable, onPressDatum, testID = 'bar-chart' }: BarChartProps) {
+export function BarChart({ title, scope, data, currency, locale, orientation, table, onToggleTable, onPressDatum, showShareInBars = false, testID = 'bar-chart' }: BarChartProps) {
   const theme = useTheme();
   const hidden = useAmountsHidden();
   const max = Math.max(1, ...data.map((d) => d.valueMinor));
@@ -140,6 +142,7 @@ export function BarChart({ title, scope, data, currency, locale, orientation, ta
               <View style={styles.hHead}>
                 <Text style={[textStyle('body-medium'), styles.nameCol, { color: theme.color('text-primary') }]}>{d.label}</Text>
                 <Amount amountMinor={d.valueMinor} currency={currency} direction="neutral" role="body-medium" {...loc} />
+                {showShareInBars && !hidden && d.sharePercent != null ? <Text testID={`${testID}-share-${d.id}`} style={[textStyle('caption'), muted]}>{`${d.sharePercent}%`}</Text> : null}
               </View>
               <View style={[styles.hTrack, { backgroundColor: track }]}>
                 {hidden ? null : <View testID={`${testID}-fill-${d.id}`} style={[styles.hFill, { width: `${fillPercent(d.valueMinor, max)}%`, backgroundColor: fill }]} />}

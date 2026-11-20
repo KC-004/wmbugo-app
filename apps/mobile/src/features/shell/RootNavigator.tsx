@@ -30,6 +30,7 @@ import { BillDetailScreen } from '../bills/BillDetailScreen';
 import { InsightsScreen } from '../insights/InsightsScreen';
 import { DrillScreen } from '../insights/DrillScreen';
 import { useInsightsStore } from '../insights/insightsStore';
+import { registerInsightsSections } from '../insights/sections';
 import { PlanHubScreen } from '../plan/PlanHubScreen';
 import { GoalsScreen } from '../goals/GoalsScreen';
 import { GoalDetailScreen } from '../goals/GoalDetailScreen';
@@ -43,6 +44,7 @@ import { TabBar, type TabRoute } from './TabBar';
 import { markTabFirstFrame } from './navTiming';
 
 type RootParams = { Tabs: undefined; BudgetDetail: { budgetId: string; periodStart?: string }; Accounts: undefined; AccountDetail: { accountId: string }; TransactionDetail: { transactionId: string }; ReviewQueue: { focusId?: string }; Settings: undefined; HomeEdit: undefined; Bills: { focusRuleId?: string } | undefined; BillDetail: { ruleId: string }; Goals: undefined; GoalDetail: { goalId: string }; Budgets: undefined; InsightsDrill: { target: DrillTarget } };
+registerInsightsSections();
 const RootStack = createNativeStackNavigator<RootParams>();
 const Tabs = createBottomTabNavigator();
 const TabStack = createNativeStackNavigator();

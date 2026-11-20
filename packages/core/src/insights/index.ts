@@ -7,3 +7,4 @@ export * from './scope';
 export * from './spending';
 export * from './drilldown';
 export * from './csvExport';
+export * from './categoryView';

@@ -74,8 +74,9 @@ export function InsightsScreen({ api = realInsightsApi, nav = {} }: { api?: Insi
     sheet.open({ id: 'insights-filters', title: i.filterTitle, body: (close) => <InsightsFilterSheet facets={facets} value={selection.filters} onApply={setFilters} close={close} />, });
   };
 
+  const sectionCtx = { overview: o, api, selection, ...(nav.onDrill ? { onDrill: nav.onDrill } : {}) };
   const count = o.filterChips.length;
-  const sections = insightsSections().filter((s) => s.visible({ overview: o, ...(nav.onDrill ? { onDrill: nav.onDrill } : {}) }));
+  const sections = insightsSections().filter((s) => s.visible(sectionCtx));
   const empty = o.entries === 0;
   const before = o.period.start < o.firstDay;
 
@@ -113,7 +114,7 @@ export function InsightsScreen({ api = realInsightsApi, nav = {} }: { api?: Insi
           {sections.map((s) => (
             <View key={s.id} testID={`insights-section-${s.id}`} style={styles.section}>
               <Text accessibilityRole="header" style={[textStyle('title'), { color: theme.color('text-primary') }]}>{s.heading}</Text>
-              {s.render({ overview: o, ...(nav.onDrill ? { onDrill: nav.onDrill } : {}) })}
+              {s.render(sectionCtx)}
             </View>
           ))}
         </>

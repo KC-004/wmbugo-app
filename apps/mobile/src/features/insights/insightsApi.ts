@@ -1,6 +1,7 @@
 import {
   ACCOUNT_LIST_SQL,
   availablePresets,
+  categoryView,
   defaultPreset,
   entriesInScope,
   filterFacets,
@@ -11,9 +12,11 @@ import {
   merchantDescriptions,
   normalizeMerchant,
   resolveInsightsPeriod,
+  spendingByCategory,
   spendingChange,
   spendingTotal,
   waitingInScope,
+  type CategoryView,
   type CurrencyCode,
   type IncomeTotal,
   type InsightsFilters,
@@ -21,6 +24,7 @@ import {
   type InsightsScope,
   type Kept,
   type PeriodPreset,
+  type SpendingByCategory,
   type SpendingChange,
   type SpendingTotal,
 } from '@wmbugo/core';
@@ -73,6 +77,17 @@ export interface FilterChip {
   readonly label: string;
 }
 
+export interface CategoriesData {
+  readonly currency: CurrencyCode;
+  readonly locale: string;
+  readonly byCategory: SpendingByCategory;
+  readonly total: SpendingTotal;
+  readonly view: CategoryView;
+  readonly scopeParts: readonly string[];
+}
+
+export const categoriesKey = (selection: InsightsSelection) => ['insights', 'categories', selection] as const;
+
 export interface InsightsFacets {
   readonly accounts: readonly { id: string; name: string }[];
   readonly categories: readonly { id: string; name: string }[];
@@ -85,6 +100,8 @@ export interface InsightsFacets {
 export interface InsightsApi {
   loadOverview(selection: InsightsSelection): Promise<InsightsOverview | null>;
   loadFacets(selection: InsightsSelection): Promise<InsightsFacets | null>;
+  /** Story 7.4: spending by category for the scope. */
+  loadCategories(selection: InsightsSelection): Promise<CategoriesData | null>;
 }
 
 /** The copy key of a preset: `this_cycle` reads as `thisCycle`. */
@@ -172,6 +189,15 @@ export const realInsightsApi: InsightsApi = {
       entriesInScope(db, bare),
     ]);
     return { currency: profile.currency, locale: profile.locale, today: ctx.today, firstDay: ctx.firstDay, period, preset: period.preset, presets: availablePresets(ctx.profile), scope, scopeParts: scopeParts(selection.filters, names), filterChips: filterChips(selection.filters, names), spent, income, change, kept: keptV, waiting, entries };
+  },
+  async loadCategories(selection) {
+    const r = await resolveSelection(selection);
+    const profile = await readProfile(getServices().db);
+    if (!r || !profile) return null;
+    const scope: InsightsScope = { period: r.period, filters: selection.filters };
+    const byCategory = await spendingByCategory(r.db, scope);
+    const total = await spendingTotal(r.db, scope);
+    return { currency: profile.currency, locale: profile.locale, byCategory, total, view: categoryView(byCategory.rows), scopeParts: scopeParts(selection.filters, await filterNames(selection.filters, r.period)) };
   },
   async loadFacets(selection) {
     const r = await resolveSelection(selection);

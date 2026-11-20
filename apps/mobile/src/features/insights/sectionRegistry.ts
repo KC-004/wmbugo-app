@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { InsightsOverview } from './insightsApi';
+import type { InsightsApi, InsightsOverview, InsightsSelection } from './insightsApi';
 
 /**
  * The Insights question sections (Story 7.2, INS-007). Each later story registers one in its own file, so adding a section
@@ -7,6 +7,8 @@ import type { InsightsOverview } from './insightsApi';
  */
 export interface InsightsSectionContext {
   readonly overview: InsightsOverview;
+  readonly api: InsightsApi;
+  readonly selection: InsightsSelection;
   /** Opens SCR-12 for a segment (Story 7.3). Absent until that screen exists. */
   readonly onDrill?: (target: unknown) => void;
 }
