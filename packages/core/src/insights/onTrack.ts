@@ -27,6 +27,9 @@ export interface NwsView {
   readonly savings: BudgetListRow | null;
   /** What to open in Activity for `Sort it`. */
   readonly notClassifiedCategoryIds: readonly string[];
+  /** The categories behind the Needs and Wants bars, so a tap on a bar can open exactly those entries in Activity. */
+  readonly needsCategoryIds: readonly string[];
+  readonly wantsCategoryIds: readonly string[];
   readonly period: { readonly start: string; readonly end: string };
 }
 
@@ -46,7 +49,9 @@ export async function onTrack(q: Querier, scope: InsightsScope, ctx: InsightsCon
   if (!isBudgetPeriod(scope, ctx)) return { scope: scopeEcho(scope), budgetsState: 'not_budget_period', budgets: [], nws: null, goals };
 
   const selected: Period = periodFor(scope.period.start, ctx.profile.rule);
-  const list = await budgetListAt(q, ctx.profile, ctx.today, scope.period.end, selected);
+  // A period still running is read as of today, the way Plan reads it; an ended one as of its last day.
+  const anchor = scope.period.end < ctx.today ? scope.period.end : ctx.today;
+  const list = await budgetListAt(q, ctx.profile, ctx.today, anchor, selected);
   const overall = list.rows.filter((r) => r.group === 'overall');
   const categories = list.rows.filter((r) => r.group === 'categories').sort((a, b) => b.status.percentUsed - a.status.percentUsed || a.name.localeCompare(b.name));
   const templateRows = list.rows.filter((r) => r.group === '50_30_20');
@@ -59,6 +64,8 @@ export async function onTrack(q: Querier, scope: InsightsScope, ctx: InsightsCon
     wants: templateRows.find((r) => r.budgetType === 'want') ?? null,
     savings: templateRows.find((r) => r.scope === 'savings') ?? null,
     notClassifiedCategoryIds: await categoryIdsUnder(q, split.notClassified.map((x) => x.categoryId)),
+    needsCategoryIds: await categoryIdsUnder(q, split.needs.map((x) => x.categoryId)),
+    wantsCategoryIds: await categoryIdsUnder(q, split.wants.map((x) => x.categoryId)),
     period: { start: period.start, end: period.end },
   };
   return { scope: scopeEcho(scope), budgetsState: 'ok', budgets: [...overall, ...categories], nws, goals };

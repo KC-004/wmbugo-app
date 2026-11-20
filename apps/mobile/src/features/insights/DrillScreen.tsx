@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowUUpLeft } from 'phosphor-react-native';
@@ -6,6 +6,7 @@ import { dayHeading, type ActivityQuery, type ActivityRow, type DrillTarget } fr
 import { copy } from '../../shared/copy';
 import { ErrorBlock, Skeleton } from '../../shared/feedback/Feedback';
 import { useToast } from '../../shared/feedback/ToastHost';
+import { useAmountsHidden } from '../../shared/state/amountsHidden';
 import { Icon } from '../../shared/theme/Icon';
 import { useTheme } from '../../shared/theme/ThemeProvider';
 import { radii } from '../../shared/theme/tokens';
@@ -22,7 +23,7 @@ import { scopeLabel } from './KpiTiles';
 
 const i = copy.insights;
 
-export const drillTitle = (t: DrillTarget): string => (t.kind === 'spent' ? i.drillTitleSpent : t.kind === 'income' ? i.drillTitleIncome : t.kind === 'bucket' ? t.label : t.name);
+export const drillTitle = (t: DrillTarget): string => (t.kind === 'spent' ? i.drillTitleSpent : t.kind === 'income' ? i.drillTitleIncome : t.kind === 'bucket' ? (t.income ? `${t.label} · ${i.inLabel}` : t.label) : t.name);
 
 /** The category ids a drill-down for this target stands on, for `See in Activity`. */
 const categoriesOf = (t: DrillTarget): readonly string[] | undefined => (t.kind === 'category' ? [t.id] : t.kind === 'categories' ? t.ids : undefined);
@@ -36,6 +37,8 @@ const categoriesOf = (t: DrillTarget): readonly string[] | undefined => (t.kind 
 export function DrillScreen({ selection, target, api = realDrillApi, saver = shareCsvSaver, onBack, onOpenEntry, onSeeInActivity }: { selection: InsightsSelection; target: DrillTarget; api?: DrillApi; saver?: CsvSaver; onBack: () => void; onOpenEntry: (transactionId: string) => void; onSeeInActivity: (q: ActivityQuery) => void }) {
   const theme = useTheme();
   const toast = useToast();
+  useAmountsHidden(); // re-render when Hide amounts is toggled: the money in the strings below is masked as it is built
+  const exporting = useRef(false);
   const [table, setTable] = useState(false);
   const q = useQuery({ queryKey: drillKey(selection, target), queryFn: () => api.loadDrill(selection, target) });
   const title = drillTitle(target);
@@ -76,10 +79,22 @@ export function DrillScreen({ selection, target, api = realDrillApi, saver = sha
   ];
 
   const exportCsv = async () => {
-    const { fileName, text } = csvFor(d, title);
-    const r = await saver.save(fileName, text);
-    if (r === 'saved') toast.show({ message: drill.explanation.entryCount === 1 ? i.exportedOne : i.exported.replace('{n}', String(drill.explanation.entryCount)) });
-    else if (r === 'failed') toast.show({ message: i.exportFailed });
+    if (exporting.current) return;
+    exporting.current = true;
+    try {
+      let file: { fileName: string; text: string };
+      try {
+        file = csvFor(d, title);
+      } catch {
+        // A file with a blank amount would give wrong sums, so none is made.
+        toast.show({ message: i.exportFailed });
+        return;
+      }
+      // The share sheet cannot say whether the file was kept, so nothing claims it was: only a failure is reported.
+      if ((await saver.save(file.fileName, file.text)) === 'failed') toast.show({ message: i.exportFailed });
+    } finally {
+      exporting.current = false;
+    }
   };
 
   return (
@@ -117,9 +132,9 @@ export function DrillScreen({ selection, target, api = realDrillApi, saver = sha
                     <Text style={[textStyle('label'), ink]}>{dayHeading(day.date, d.today)}</Text>
                     {net ? <Text style={[textStyle('caption'), muted]}>{net}</Text> : null}
                   </View>
-                  {day.entries.map((e) => {
+                  {day.entries.map((e, idx) => {
                     const row: ActivityRow = { id: e.id, kind: e.type, amountMinor: e.amountMinor, localDate: e.localDate, merchant: e.merchant, categoryName: e.categoryName, categoryIcon: e.categoryIcon, categoryColor: e.categoryColor, accountName: e.accountName };
-                    return <ActivityRowView key={`${e.id}-${e.categoryName}`} row={row} date={d.today} currency={d.currency} locale={d.locale} onPress={() => onOpenEntry(e.id)} />;
+                    return <ActivityRowView key={`${e.id}-${e.categoryName}-${idx}`} row={row} date={d.today} currency={d.currency} locale={d.locale} onPress={() => onOpenEntry(e.id)} />;
                   })}
                 </View>
               );
@@ -128,7 +143,7 @@ export function DrillScreen({ selection, target, api = realDrillApi, saver = sha
         )}
 
         <Button label={i.seeInActivity} variant="text" testID="drill-see-activity" onPress={() => onSeeInActivity(activityQueryFor(d, categoriesOf(target)))} />
-        <Button label={i.exportCsv} variant="text" testID="drill-export" onPress={() => void exportCsv()} />
+        {empty ? null : <Button label={i.exportCsv} variant="text" testID="drill-export" onPress={() => void exportCsv()} />}
       </ScrollView>
     </View>
   );

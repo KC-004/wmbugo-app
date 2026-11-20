@@ -65,17 +65,17 @@ export function Gauge({ percent, size = 56 }: { percent: number; size?: number }
   );
 }
 
-function KeptTable({ kept, money, scope }: { kept: Kept; money: (n: number) => string; scope: string }) {
+function KeptTable({ kept, money, scope, hidden }: { kept: Kept; money: (n: number) => string; scope: string; hidden: boolean }) {
   const theme = useTheme();
   const rows: [string, string, string][] = [];
   if (kept.kind !== 'no_income') rows.push([i.tableIncome, money(kept.incomeMinor), '']);
   rows.push([i.tableSpent, money(kept.spentMinor), '']);
-  if (kept.kind === 'kept') rows.push([i.tableKept, money(kept.keptMinor), `${kept.keptPercent}%`]);
+  if (kept.kind === 'kept') rows.push([i.tableKept, money(kept.keptMinor), hidden ? '' : `${kept.keptPercent}%`]);
   if (kept.kind === 'short') rows.push([i.tableShort, money(kept.shortMinor), '']);
   const ink = { color: theme.color('text-primary') };
   return (
     <View testID="kept-table" accessible={false} style={styles.table}>
-      <Text accessibilityRole="header" style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{scope}</Text>
+      <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{scope}</Text>
       <View accessible accessibilityRole="header" style={styles.row}>
         <Text style={[textStyle('label'), ink]}>{i.tableHeaderItem}</Text>
         <Text style={[textStyle('label'), ink]}>{i.tableHeaderAmount}</Text>
@@ -95,13 +95,28 @@ function KeptTable({ kept, money, scope }: { kept: Kept; money: (n: number) => s
  * that names its scope first. A refund surplus reads `₹X back` with the refund icon and never a minus sign; an increase is
  * never red or called bad. Hidden amounts keep the labels and drop every figure, percent, arrow and the gauge.
  */
-export function KpiTiles({ overview, onOpenSpent, onOpenIncome }: { overview: InsightsOverview; onOpenSpent?: () => void; onOpenIncome?: () => void }) {
+/** A tile whose figure could not be read: it says so and offers Retry, while the other tiles carry on. Nothing is shown as zero. */
+function FailedTile({ id, label, onRetry }: { id: string; label: string; onRetry?: () => void }) {
+  const theme = useTheme();
+  return (
+    <View testID={`tile-${id}-failed`} accessibilityRole="alert" style={[styles.tile, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
+      <View style={styles.inner}>
+        <Text style={[textStyle('label'), { color: theme.color('text-secondary') }]}>{label}</Text>
+        <Text style={[textStyle('body'), { color: theme.color('text-primary') }]}>{i.sectionError}</Text>
+        {onRetry ? <Button label={i.retry} variant="text" testID={`tile-${id}-retry`} onPress={onRetry} /> : null}
+      </View>
+    </View>
+  );
+}
+
+export function KpiTiles({ overview, onOpenSpent, onOpenIncome, onRetry }: { overview: InsightsOverview; onOpenSpent?: () => void; onOpenIncome?: () => void; onRetry?: () => void }) {
   const theme = useTheme();
   const hidden = useAmountsHidden();
   const { fontScale, width } = useWindowDimensions();
   const [table, setTable] = useState(false);
   const stack = fontScale >= 1.3 || width < 360;
   const o = overview;
+  const failed = o.failed ?? [];
   const money = (n: number) => moneyText(n, o.currency, o.locale);
   const spoken = (n: number) => amountLabel({ amountMinor: n, currency: o.currency, locale: o.locale, inline: true });
   const caption = o.period.title;
@@ -153,7 +168,7 @@ export function KpiTiles({ overview, onOpenSpent, onOpenIncome }: { overview: In
         k.kind === 'no_income' && k.spentMinor === 0 ? null : (
           <View>
             <Button label={table ? i.viewChart : i.viewTable} variant="text" testID="kept-toggle" onPress={() => setTable((t) => !t)} />
-            {table ? <KeptTable kept={k} money={money} scope={scopeLabel(i.kept, o.scopeParts)} /> : null}
+            {table ? <KeptTable kept={k} money={money} scope={scopeLabel(i.kept, o.scopeParts)} hidden={hidden} /> : null}
           </View>
         )
       }>
@@ -166,10 +181,10 @@ export function KpiTiles({ overview, onOpenSpent, onOpenIncome }: { overview: In
 
   return (
     <View testID="kpi-tiles" style={stack ? styles.column : styles.grid}>
-      <View style={stack ? styles.full : styles.cell}>{spentTile}</View>
-      <View style={stack ? styles.full : styles.cell}>{incomeTile}</View>
-      <View style={stack ? styles.full : styles.cell}>{changeTile}</View>
-      <View style={stack ? styles.full : styles.cell}>{keptTile}</View>
+      <View style={stack ? styles.full : styles.cell}>{failed.includes('spent') ? <FailedTile id="spent" label={i.spent} {...(onRetry ? { onRetry } : {})} /> : spentTile}</View>
+      <View style={stack ? styles.full : styles.cell}>{failed.includes('income') ? <FailedTile id="income" label={i.income} {...(onRetry ? { onRetry } : {})} /> : incomeTile}</View>
+      <View style={stack ? styles.full : styles.cell}>{failed.includes('change') ? <FailedTile id="change" label={i.change} {...(onRetry ? { onRetry } : {})} /> : changeTile}</View>
+      <View style={stack ? styles.full : styles.cell}>{failed.includes('kept') ? <FailedTile id="kept" label={i.kept} {...(onRetry ? { onRetry } : {})} /> : keptTile}</View>
     </View>
   );
 }

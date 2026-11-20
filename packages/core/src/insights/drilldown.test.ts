@@ -97,7 +97,7 @@ describe('the drill-down lists exactly what the figure counted (Story 7.3, PRD 8
     expect(none.days).toEqual([]);
   });
 
-  it('a split entry shows only the portion in the category being drilled', async () => {
+  it('a plain entry lists its whole amount with its merchant and account', async () => {
     const { db, expense, ctx, scope } = await setup();
     await expense(100_000, ist(11, 4));
     const d = await drillDown(db, scope('this_cycle'), { kind: 'category', id: 'cat_food', name: 'Food' }, ctx);

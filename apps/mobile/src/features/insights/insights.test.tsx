@@ -1,4 +1,4 @@
-import { AccessibilityInfo, Text } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, Text } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { resolveInsightsPeriod, type InsightsPeriod, type PeriodPreset, type PeriodProfile } from '@wmbugo/core';
@@ -192,7 +192,7 @@ describe('Insights overview (Story 7.2)', () => {
   it('a failing load says so with Retry and shows nothing as zero; loading shows skeletons, never a spinner', async () => {
     const r = await mountNode(<InsightsScreen api={fakeApi('error')} />);
     expect(has(r, 'tile-spent')).toBe(false);
-    expect(r.root.findAll((n) => String(n.type) === 'ActivityIndicator').length).toBe(0);
+    expect(r.root.findAll((n) => n.type === ActivityIndicator).length).toBe(0);
     expect(texts(r).join(' ')).toMatch(/Couldn't load/);
   });
 });

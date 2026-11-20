@@ -23,7 +23,7 @@ const track = (over: Partial<OnTrackData['track']> = {}): OnTrackData => ({
   thisMonth: '2026-11',
   track: { scope: echo, budgetsState: 'ok', budgets: [row('o', 'Overall', 1_230_000, 5_000_000, { group: 'overall', scope: 'overall' }), row('f', 'Food', 850_000, 1_000_000, { overlapsOverall: true })], nws: null, goals: [goal()], ...over },
 });
-const nws = (over: Partial<NwsView> = {}): NwsView => ({ amounts: { needsMinor: 2_200_000, wantsMinor: 900_000, savingsMinor: 0, notClassifiedMinor: 300_000 }, needs: null, wants: null, savings: null, notClassifiedCategoryIds: ['cat_other'], period: { start: '2026-11-01', end: '2026-11-30' }, ...over });
+const nws = (over: Partial<NwsView> = {}): NwsView => ({ amounts: { needsMinor: 2_200_000, wantsMinor: 900_000, savingsMinor: 0, notClassifiedMinor: 300_000 }, needs: null, wants: null, savings: null, notClassifiedCategoryIds: ['cat_other'], needsCategoryIds: ['cat_groceries'], wantsCategoryIds: ['cat_shopping'], period: { start: '2026-11-01', end: '2026-11-30' }, ...over });
 
 const screen = (d: OnTrackData | null | 'error', nav: Record<string, jest.Mock> = {}, ov = overview()) => {
   registerInsightsSection(amIOnTrack);

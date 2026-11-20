@@ -10,3 +10,4 @@ export * from './paydayChange';
 export * from './homeLayout';
 export * from './insightsPeriods';
 export * from './insightsBuckets';
+export * from './profileDates';

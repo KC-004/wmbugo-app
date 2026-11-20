@@ -13,11 +13,12 @@ describe('the insights module boundaries (Story 7.1)', () => {
   });
 
   it('does not import the capture module', () => {
-    for (const f of files) expect(f.text).not.toMatch(/from '\.\.\/capture/);
+    // Single or double quotes, any depth of `../`, and `require` or a dynamic `import()` as well as a static import.
+    for (const f of files) expect(f.text).not.toMatch(/(?:from\s+|require\(\s*|import\(\s*)['"](?:\.\.?\/)+capture/);
   });
 
   it('reads no other module\'s table: tables are read through the ledger, planning and profile queries', () => {
-    for (const f of files) expect(f.text).not.toMatch(/\b(FROM|JOIN)\s+("transaction"|\\"transaction\\"|split|posting|category|account|goal|goal_allocation|recurring_rule|budget|source_record)\b/);
+    for (const f of files) expect(f.text).not.toMatch(/\b(FROM|JOIN)\s+("transaction"|\\"transaction\\"|split|posting|category|account|goal|goal_allocation|recurring_rule|budget|source_record|tag|profile)\b/i);
   });
 
   it('does no date arithmetic on period boundaries: the period service owns them', () => {

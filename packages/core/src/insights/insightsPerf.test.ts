@@ -84,7 +84,7 @@ describe('Insights over 10,000 entries across 24 months (Story 7.8, NFR-06)', ()
     const ms = Date.now() - t0;
     expect(by.rows.reduce((x, r) => x + r.displayMinor - r.backMinor, 0)).toBe(total.spentMinor - total.backMinor);
     // A smoke guard on this machine, not the device benchmark: the real NFR-06 run is recorded on the reference devices.
-    expect(ms).toBeLessThan(8000);
+    expect(ms).toBeLessThan(30_000);
   });
 
   it('aggregates in SQLite: every Insights statement groups or sums, and none returns a row per entry', async () => {

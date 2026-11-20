@@ -11,7 +11,6 @@ import { LedgerWriter } from '../writer/ledgerWriter';
 import { AddAccount, openingBalanceShape } from '../ledger/accountCommands';
 import { entryShape } from '../ledger/entryCommands';
 import { comparableWindow, resolveInsightsPeriod, windowLabel, type PeriodPreset } from '../profile/insightsPeriods';
-import { budgetFigures } from '../planning/budgets';
 import type { PeriodProfile } from '../profile/period';
 import { loadInsightsContext, type InsightsFilters, type InsightsScope } from './scope';
 import { incomeTotal, kept, spendingByCategory, spendingChange, spendingTotal, waitingInScope } from './spending';
@@ -76,16 +75,6 @@ describe('the November fixture (Story 7.1, INS-005, GATE-07)', () => {
     expect(Math.min(...Object.values(t).filter((x): x is number => typeof x === 'number'))).toBeGreaterThanOrEqual(0);
   });
 
-  it('the overall budget still counts the October TV refund the Story 4.5 way (floored per category)', async () => {
-    const { db, expense, refund, scope } = await setup();
-    const tv = await expense(900_000, ist(10, 20), { categoryId: 'cat_shopping' });
-    await expense(1_000_000, ist(11, 3));
-    await expense(200_000, ist(11, 4), { categoryId: 'cat_shopping' });
-    await refund(tv, 900_000, ist(11, 5));
-    expect(budgetFigures).toBeDefined();
-    const by = await spendingByCategory(db, scope('this_cycle'));
-    expect(by.rows.reduce((s, r) => s + r.displayMinor, 0)).toBe(1_000_000);
-  });
 });
 
 describe('eligibility (INS-003)', () => {

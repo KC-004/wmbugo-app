@@ -82,8 +82,9 @@ describe('spendingByMerchant (Story 7.6, INS-014)', () => {
     const r = await spendingByMerchant(db, scope('this_cycle', { merchantKeys: ['swiggy'] }));
     expect(r.ranked.map((m) => m.key)).toEqual(['swiggy']);
     const d = await drillDown(db, scope('this_cycle'), { kind: 'merchant', key: 'swiggy', name: 'Swiggy' }, ctx);
+    expect(d.spentMinor).toBe(r.ranked[0]!.displayMinor);
     expect(d.spentMinor).toBe(550_000);
-    expect(d.days.flatMap((x) => x.entries)).toHaveLength(2);
+    expect(d.days.flatMap((x) => x.entries)).toHaveLength(r.ranked[0]!.entries);
   });
 
   it('No merchant opens its entries the same way, and the groups add up to the period total', async () => {

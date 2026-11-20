@@ -101,7 +101,7 @@ describe('incomeVsExpense (Story 7.5, INS-011)', () => {
     for (const p of r.periods) expect(Math.min(p.incomeMinor, p.spentMinor, p.backMinor, p.netMinor)).toBeGreaterThanOrEqual(0);
   });
 
-  it('only the current period when nothing earlier is known, and transfers are never in or out', async () => {
+  it('only the current period when nothing earlier is known', async () => {
     const { db, income, ctx, scope } = await setup(11, 1);
     await income(500_000, ist(11, 2));
     const r = await incomeVsExpense(db, scope('this_cycle'), ctx);

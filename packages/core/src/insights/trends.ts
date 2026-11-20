@@ -95,7 +95,8 @@ export async function incomeVsExpense(q: Querier, scope: InsightsScope, ctx: Ins
     const income = await incomeNet(q, span, f);
     const net = await spendingNet(q, span, f);
     const v = view(net);
-    const diff = income - v.spentMinor;
+    // Net is income minus the exact refund-net spending, so a refund surplus adds to what was kept.
+    const diff = income - net;
     periods.push({ start: span.start, end: span.end, label: labelOf(span, scope.period), incomeMinor: income, ...v, netMinor: Math.abs(diff), net: diff > 0 ? 'kept' : diff < 0 ? 'short' : 'even' });
   }
   return { scope: scopeEcho(scope), periods: periods.reverse() };

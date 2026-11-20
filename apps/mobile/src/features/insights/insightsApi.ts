@@ -14,6 +14,7 @@ import {
   merchantDescriptions,
   normalizeMerchant,
   resolveInsightsPeriod,
+  scopeEcho,
   spendingByCategory,
   spendingByMerchant,
   spendingChange,
@@ -75,6 +76,8 @@ export interface InsightsOverview {
   readonly income: IncomeTotal;
   readonly change: SpendingChange;
   readonly kept: Kept;
+  /** The tiles whose figure could not be read, each shown as `Couldn't load this` with Retry while the rest carry on. */
+  readonly failed?: readonly ('spent' | 'income' | 'change' | 'kept')[];
   readonly waiting: number;
   /** Confirmed entries in the period under no filters: zero shows the empty prompt. */
   readonly entries: number;
@@ -193,7 +196,7 @@ export function filterChips(filters: InsightsFilters, names: FilterNames): Filte
   return out;
 }
 
-/** The merchants seen in a period, folded by their normalized key, with the commonest spelling as the display name. */
+/** The merchants seen in a period, folded by their normalized key, with the shortest spelling as the display name. */
 export async function merchantsSeen(from: string, to: string): Promise<{ key: string; name: string }[]> {
   const db = getServices().db;
   const seen = await merchantDescriptions(db, { start: from, end: to });
@@ -226,15 +229,22 @@ export const realInsightsApi: InsightsApi = {
     const scope: InsightsScope = { period, filters: selection.filters };
     const names = await filterNames(selection.filters, period);
     const bare: InsightsScope = { period, filters: {} };
-    const [spent, income, change, keptV, waiting, entries] = await Promise.all([
-      spendingTotal(db, scope),
-      incomeTotal(db, scope),
-      spendingChange(db, scope, ctx),
-      kept(db, scope),
-      waitingInScope(db, bare),
-      entriesInScope(db, bare),
-    ]);
-    return { currency: profile.currency, locale: profile.locale, today: ctx.today, firstDay: ctx.firstDay, period, preset: period.preset, presets: availablePresets(ctx.profile), scope, scopeParts: scopeParts(selection.filters, names), filterChips: filterChips(selection.filters, names), spent, income, change, kept: keptV, waiting, entries };
+    const echo = scopeEcho(scope);
+    const [rSpent, rIncome, rChange, rKept, rWaiting, rEntries] = await Promise.allSettled([spendingTotal(db, scope), incomeTotal(db, scope), spendingChange(db, scope, ctx), kept(db, scope), waitingInScope(db, bare), entriesInScope(db, bare)]);
+    const failed: ('spent' | 'income' | 'change' | 'kept')[] = [];
+    const pick = <T,>(r: PromiseSettledResult<T>, key: 'spent' | 'income' | 'change' | 'kept', placeholder: T): T => {
+      if (r.status === 'fulfilled') return r.value;
+      failed.push(key);
+      return placeholder;
+    };
+    const spent = pick(rSpent, 'spent', { scope: echo, spentMinor: 0, backMinor: 0 });
+    const income = pick(rIncome, 'income', { scope: echo, incomeMinor: 0 });
+    const change = pick<SpendingChange>(rChange, 'change', { kind: 'no_baseline', scope: echo });
+    const keptV = pick<Kept>(rKept, 'kept', { kind: 'no_income', scope: echo, spentMinor: 0 });
+    const waiting = rWaiting.status === 'fulfilled' ? rWaiting.value : 0;
+    // If the count itself failed, assume there are entries so the tiles (and their error) show rather than a false empty prompt.
+    const entries = rEntries.status === 'fulfilled' ? rEntries.value : 1;
+    return { currency: profile.currency, locale: profile.locale, today: ctx.today, firstDay: ctx.firstDay, period, preset: period.preset, presets: availablePresets(ctx.profile), scope, scopeParts: scopeParts(selection.filters, names), filterChips: filterChips(selection.filters, names), ...(failed.length > 0 ? { failed } : {}), spent, income, change, kept: keptV, waiting, entries };
   },
   async loadCategories(selection) {
     const r = await resolveSelection(selection);

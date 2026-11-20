@@ -22,12 +22,12 @@ const entriesText = (n: number) => (n === 1 ? i.entryOne : i.entriesCount.replac
 
 function WhoBody({ ctx }: { ctx: InsightsSectionContext }) {
   const theme = useTheme();
-  useAmountsHidden();
+  const hidden = useAmountsHidden();
   const [table, setTable] = useState(false);
   const [all, setAll] = useState(false);
   const q = useQuery({ queryKey: merchantsKey(ctx.selection), queryFn: () => ctx.api.loadMerchants(ctx.selection) });
   const d = q.data;
-  if (q.isError) {
+  if (q.isError || q.data === null) {
     return (
       <View testID="who-error" accessibilityRole="alert" style={styles.gap}>
         <Text style={[textStyle('body'), { color: theme.color('text-secondary') }]}>{i.sectionError}</Text>
@@ -51,7 +51,7 @@ function WhoBody({ ctx }: { ctx: InsightsSectionContext }) {
     label: x.displayMinor === 0 && x.backMinor > 0 ? `${x.name} · ${i.back.replace('{amount}', money(x.backMinor))}` : x.name,
     valueMinor: x.displayMinor,
     detail: entriesText(x.entries),
-    spokenLabel: x.displayMinor === 0 && x.backMinor > 0 ? `${x.name}, ${i.back.replace('{amount}', amountLabel({ amountMinor: x.backMinor, currency: d.currency, locale: d.locale, inline: true }))}` : x.name,
+    spokenLabel: x.displayMinor === 0 && x.backMinor > 0 && !hidden ? `${x.name}, ${i.back.replace('{amount}', amountLabel({ amountMinor: x.backMinor, currency: d.currency, locale: d.locale, inline: true }))}` : x.name,
   }));
   const merchantFilter = (ctx.selection.filters.merchantKeys?.length ?? 0) > 0;
   const scope = merchantFilter ? d.scopeParts.join(' · ') : [o.period.title, ...d.scopeParts].join(' · ');

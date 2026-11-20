@@ -1,9 +1,10 @@
 import { normalizeMerchant } from '../shared/merchant';
 import { toLocalDate } from '../shared/clock';
-import { merchantDescriptions, type LedgerEntryType, type LedgerFilters } from '../ledger/spendingQueries';
+import { allMerchantDescriptions, firstEntryDate, type LedgerEntryType, type LedgerFilters } from '../ledger/spendingQueries';
 import type { Querier } from '../planning/budgets';
 import { readPeriodProfile } from '../planning/budgetStore';
 import { exclusiveEnd, type InsightsPeriod } from '../profile/insightsPeriods';
+import { profileCreatedAtMs } from '../profile/profileDates';
 import type { PeriodProfile } from '../profile/period';
 
 /**
@@ -53,10 +54,9 @@ export async function loadInsightsContext(q: Querier, nowMs: number): Promise<In
   if (!read) return null;
   const today = toLocalDate(nowMs, read.timezoneId);
   if (!today.ok) return null;
-  const created = Number((await q.query('SELECT created_at FROM profile LIMIT 1'))[0]?.[0] ?? 0);
-  const made = toLocalDate(created, read.timezoneId);
-  const firstEntry = (await q.query('SELECT MIN(local_date) FROM "transaction"'))[0]?.[0];
-  const candidates = [made.ok ? made.value : null, firstEntry === null || firstEntry === undefined ? null : String(firstEntry)].filter((x): x is string => x !== null);
+  const made = toLocalDate(await profileCreatedAtMs(q), read.timezoneId);
+  const firstEntry = await firstEntryDate(q);
+  const candidates = [made.ok ? made.value : null, firstEntry].filter((x): x is string => x !== null);
   const firstDay = candidates.length === 0 ? today.value : candidates.reduce((m, x) => (x < m ? x : m));
   return { today: today.value, profile: read.profile, timezoneId: read.timezoneId, firstDay: firstDay > today.value ? today.value : firstDay };
 }
@@ -67,7 +67,7 @@ export async function ledgerFilters(q: Querier, scope: InsightsScope): Promise<L
   let descriptions: (string | null)[] | undefined;
   if (f.merchantKeys && f.merchantKeys.length > 0) {
     const wanted = new Set(f.merchantKeys);
-    const all = await merchantDescriptions(q, { start: scope.period.start, end: scope.period.end });
+    const all = await allMerchantDescriptions(q);
     descriptions = all.filter((d) => wanted.has(normalizeMerchant(d)));
     if (wanted.has('')) descriptions.push(null);
     if (descriptions.length === 0) descriptions = ['__no_such_merchant__'];

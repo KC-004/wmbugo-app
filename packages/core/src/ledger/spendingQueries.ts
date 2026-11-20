@@ -54,8 +54,9 @@ export function entryWhere(range: DateRange, f: LedgerFilters, kinds: readonly L
     where.push(`(${parts.join(' OR ')})`);
   }
   if (f.tags && f.tags.length > 0) {
-    where.push(`(${f.tags.map(() => 't.tags_json LIKE ?').join(' OR ')})`);
-    params.push(...f.tags.map((tag) => `%${JSON.stringify(tag)}%`));
+    // An exact match on a tag, not a pattern: `_` and `%` in a tag are just characters.
+    where.push(`EXISTS (SELECT 1 FROM json_each(t.tags_json) j WHERE j.value IN (${marks(f.tags.length)}))`);
+    params.push(...f.tags);
   }
   if (f.sources && f.sources.length > 0) {
     where.push(`EXISTS (SELECT 1 FROM source_record sr WHERE sr.transaction_id = t.id AND sr.source_kind IN (${marks(f.sources.length)}))`);
@@ -142,9 +143,9 @@ export async function waitingCount(q: Querier, range: DateRange): Promise<number
   return Number(r?.[0] ?? 0);
 }
 
-/** The earliest local date of any entry, or null for an empty ledger (the profile's first day for Insights). */
+/** The earliest local date of a confirmed, live entry, or null for an empty ledger (a rejected or deleted one does not move it). */
 export async function firstEntryDate(q: Querier): Promise<string | null> {
-  const r = (await q.query('SELECT MIN(local_date) FROM "transaction"'))[0];
+  const r = (await q.query("SELECT MIN(local_date) FROM \"transaction\" WHERE status = 'confirmed' AND removed_at IS NULL"))[0];
   return r?.[0] === null || r?.[0] === undefined ? null : String(r[0]);
 }
 
@@ -173,10 +174,19 @@ export async function merchantNets(q: Querier, range: DateRange, f: LedgerFilter
   return rows.map((r) => ({ description: r[0] === null ? null : String(r[0]), netMinor: Number(r[1]), entries: Number(r[2]) }));
 }
 
-/** The distinct raw descriptions seen in a range (to resolve a normalized merchant key to the descriptions behind it). */
+/** The distinct merchants seen in a range, a refund counted under its original's merchant (the filter sheet lists these). */
 export async function merchantDescriptions(q: Querier, range: DateRange): Promise<string[]> {
-  const rows = await q.query("SELECT DISTINCT t.original_description FROM \"transaction\" t WHERE t.status = 'confirmed' AND t.removed_at IS NULL AND t.event_type IN ('expense','refund') AND t.original_description IS NOT NULL AND TRIM(t.original_description) <> '' AND t.local_date BETWEEN ? AND ?", [range.start, range.end]);
-  return rows.map((r) => String(r[0]));
+  const rows = await q.query(`SELECT DISTINCT ${MERCHANT_SQL} FROM "transaction" t WHERE t.status = 'confirmed' AND t.removed_at IS NULL AND t.event_type IN ('expense','refund','income') AND t.local_date BETWEEN ? AND ?`, [range.start, range.end]);
+  return rows.filter((r) => r[0] !== null).map((r) => String(r[0]));
+}
+
+/**
+ * Every merchant the ledger has ever had, for resolving a merchant filter: the spellings behind a key are not only those of the
+ * period on screen, because a refund can belong to an earlier purchase and a comparison reaches into other periods.
+ */
+export async function allMerchantDescriptions(q: Querier): Promise<string[]> {
+  const rows = await q.query(`SELECT DISTINCT ${MERCHANT_SQL} FROM "transaction" t WHERE t.status = 'confirmed' AND t.removed_at IS NULL AND t.event_type IN ('expense','refund','income')`);
+  return rows.filter((r) => r[0] !== null).map((r) => String(r[0]));
 }
 
 /** Income per source and the other facets a filter sheet offers: tags and sources actually present. */

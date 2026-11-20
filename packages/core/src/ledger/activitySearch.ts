@@ -1,3 +1,4 @@
+import { MERCHANT_SQL } from './spendingQueries';
 import type { SqlParam } from '../ports/storage';
 import type { TouchedEntity, WriterContext } from '../writer/ledgerWriter';
 
@@ -44,6 +45,12 @@ export interface ActivityQuery {
   readonly accountIds?: readonly string[];
   readonly categoryIds?: readonly string[];
   readonly types?: readonly ActivityType[];
+  /** Insights drill-down (Story 7.2): the raw merchant spellings to match (a refund counts under its original's merchant); `null` is no merchant. */
+  readonly descriptions?: readonly (string | null)[];
+  /** Insights drill-down: entries carrying any of these tags. */
+  readonly tags?: readonly string[];
+  /** Insights drill-down: entries from any of these sources (`manual`, `csv` ...). */
+  readonly sources?: readonly string[];
   readonly statuses?: readonly ActivityStatusFilter[];
   /** Local dates, inclusive. */
   readonly fromDate?: string;
@@ -66,6 +73,9 @@ export function activeFilterCount(q: ActivityQuery): number {
     (q.accountIds?.length ?? 0) +
     (q.categoryIds?.length ?? 0) +
     (q.types?.length ?? 0) +
+    (q.descriptions?.length ?? 0) +
+    (q.tags?.length ?? 0) +
+    (q.sources?.length ?? 0) +
     (q.statuses?.length ?? 0) +
     (q.minMinor !== undefined || q.maxMinor !== undefined ? 1 : 0) +
     (q.showRejected ? 1 : 0)
@@ -150,6 +160,25 @@ export function activityWhere(q: ActivityQuery, ctx: { exponent: number; nowMs: 
   if (q.categoryIds?.length) {
     parts.push(`EXISTS (SELECT 1 FROM split sf WHERE sf.transaction_id = t2.id AND sf.category_id IN (${marks(q.categoryIds.length)}))`);
     params.push(...q.categoryIds);
+  }
+  if (q.descriptions?.length) {
+    const merchant = MERCHANT_SQL.replace(/(?<![\w.])t\./g, 't2.');
+    const named = q.descriptions.filter((d): d is string => d !== null);
+    const ors: string[] = [];
+    if (named.length > 0) {
+      ors.push(`${merchant} IN (${marks(named.length)})`);
+      params.push(...named);
+    }
+    if (q.descriptions.includes(null)) ors.push(`(${merchant} IS NULL)`);
+    parts.push(`(${ors.join(' OR ')})`);
+  }
+  if (q.tags?.length) {
+    parts.push(`EXISTS (SELECT 1 FROM json_each(t2.tags_json) jt WHERE jt.value IN (${marks(q.tags.length)}))`);
+    params.push(...q.tags);
+  }
+  if (q.sources?.length) {
+    parts.push(`EXISTS (SELECT 1 FROM source_record sr WHERE sr.transaction_id = t2.id AND sr.source_kind IN (${marks(q.sources.length)}))`);
+    params.push(...q.sources);
   }
   if (q.types?.length) {
     parts.push(`t2.event_type IN (${marks(q.types.length)})`);

@@ -7,7 +7,7 @@ import { layout } from '../../shared/theme/tokens';
 import { textStyle } from '../../shared/theme/typography';
 import { Button } from '../../shared/ui/Button';
 import { Chip } from '../../shared/ui/Chip';
-import type { InsightsFacets } from './insightsApi';
+import type { FilterChip, InsightsFacets } from './insightsApi';
 
 const i = copy.insights;
 
@@ -21,7 +21,7 @@ const toggle = <T extends string>(list: readonly T[] | undefined, value: T): T[]
  * when an entry has one; Source lists only the sources present. There is no status filter: waiting and rejected entries can
  * never be included from Insights.
  */
-export function InsightsFilterSheet({ facets, value, onApply, close }: { facets: InsightsFacets; value: InsightsFilters; onApply: (f: InsightsFilters) => void; close: () => void }) {
+export function InsightsFilterSheet({ facets, known = [], value, onApply, close }: { facets: InsightsFacets; /** The chips already on screen: the names of selected values that the lists below do not offer. */ known?: readonly FilterChip[]; value: InsightsFilters; onApply: (f: InsightsFilters) => void; close: () => void }) {
   const theme = useTheme();
   const [draft, setDraft] = useState<InsightsFilters>(value);
   const [search, setSearch] = useState('');
@@ -38,6 +38,8 @@ export function InsightsFilterSheet({ facets, value, onApply, close }: { facets:
     </Text>
   );
   const merchants = facets.merchants.filter((m) => m.name.toLowerCase().includes(search.trim().toLowerCase())).slice(0, 30);
+  // A value chosen earlier that this period's lists no longer offer (an archived account, a merchant past the first 30) stays visible, so it can be taken off.
+  const missing = (key: keyof InsightsFilters, offered: readonly string[]) => known.filter((k) => k.key === key && (draft[key] as readonly string[] | undefined)?.includes(k.value) && !offered.includes(k.value));
   const types: { id: LedgerEntryType; label: string }[] = [
     { id: 'expense', label: i.typeExpense },
     { id: 'income', label: i.typeIncome },
@@ -48,12 +50,18 @@ export function InsightsFilterSheet({ facets, value, onApply, close }: { facets:
       <ScrollView style={styles.scroll} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.gap}>
         {heading(i.filterAccounts)}
         <View style={styles.row}>
+          {missing('accountIds', facets.accounts.map((a) => a.id)).map((k) => (
+            <Chip key={k.value} onGlass variant="account" label={k.label} testID={`ifilter-account-${k.value}`} selected onPress={() => set('accountIds', toggle(draft.accountIds, k.value))} />
+          ))}
           {facets.accounts.map((a) => (
             <Chip key={a.id} onGlass variant="account" label={a.name} testID={`ifilter-account-${a.id}`} selected={draft.accountIds?.includes(a.id) ?? false} onPress={() => set('accountIds', toggle(draft.accountIds, a.id))} />
           ))}
         </View>
         {heading(i.filterCategories)}
         <View style={styles.row}>
+          {missing('categoryIds', facets.categories.map((c) => c.id)).map((k) => (
+            <Chip key={k.value} onGlass label={k.label} testID={`ifilter-category-${k.value}`} selected onPress={() => set('categoryIds', toggle(draft.categoryIds, k.value))} />
+          ))}
           {facets.categories.map((c) => (
             <Chip key={c.id} onGlass label={c.name} testID={`ifilter-category-${c.id}`} selected={draft.categoryIds?.includes(c.id) ?? false} onPress={() => set('categoryIds', toggle(draft.categoryIds, c.id))} />
           ))}
@@ -62,6 +70,9 @@ export function InsightsFilterSheet({ facets, value, onApply, close }: { facets:
         <TextInput testID="ifilter-merchant-search" accessibilityLabel={i.filterMerchantSearch} placeholder={i.filterMerchantSearch} placeholderTextColor={theme.color('on-glass-secondary')} value={search} onChangeText={setSearch} style={[styles.input, textStyle('body'), ink, { borderColor: theme.color('on-glass-secondary') }]} />
         {facets.merchants.length === 0 ? <Text style={[textStyle('caption'), { color: theme.color('on-glass-secondary') }]}>{i.filterNoMerchants}</Text> : null}
         <View style={styles.row}>
+          {missing('merchantKeys', merchants.map((x) => x.key)).map((k) => (
+            <Chip key={k.value} onGlass label={k.label} testID={`ifilter-merchant-${k.value}`} selected onPress={() => set('merchantKeys', toggle(draft.merchantKeys, k.value))} />
+          ))}
           {merchants.map((m) => (
             <Chip key={m.key} onGlass label={m.name} testID={`ifilter-merchant-${m.key}`} selected={draft.merchantKeys?.includes(m.key) ?? false} onPress={() => set('merchantKeys', toggle(draft.merchantKeys, m.key))} />
           ))}

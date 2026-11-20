@@ -1,5 +1,5 @@
 import { Share } from 'react-native';
-import { buildDrillCsv, csvFileName, drillDown, type ActivityQuery, type CurrencyCode, type DrillDown, type DrillTarget, type InsightsFilters } from '@wmbugo/core';
+import { allMerchantDescriptions, buildDrillCsv, csvFileName, drillDown, normalizeMerchant, type ActivityQuery, type CurrencyCode, type DrillDown, type DrillTarget, type InsightsFilters } from '@wmbugo/core';
 import { getServices } from '../../adapters/startApp';
 import { readProfile } from '../../adapters/readProfile';
 import { copy } from '../../shared/copy';
@@ -18,6 +18,8 @@ export interface DrillData {
   readonly filtersText: string;
   /** The scope words for the active filters (`HDFC only`). */
   readonly scopeParts: readonly string[];
+  /** The raw merchant spellings behind a merchant drill or filter, so Activity can list the same entries. */
+  readonly descriptions?: readonly (string | null)[];
 }
 
 /** What the drill-down needs. The real one goes through core; tests pass a fake. */
@@ -52,7 +54,15 @@ export const realDrillApi: DrillApi = {
     const { db, ctx, period } = r;
     const names = await filterNames(selection.filters, period);
     const drill = await drillDown(db, { period, filters: selection.filters }, target, ctx);
-    return { drill, currency: profile.currency, locale: profile.locale, exponent: profile.exponent, today: ctx.today, timezoneId: ctx.timezoneId, filtersText: filtersText(selection.filters, names), scopeParts: scopeParts(selection.filters, names) };
+    // A merchant drill narrows to its merchant; otherwise an active merchant filter carries over. Activity matches raw spellings, so the keys are resolved here.
+    const keys = target.kind === 'merchant' ? [target.key] : (selection.filters.merchantKeys ?? []);
+    let descriptions: (string | null)[] | undefined;
+    if (keys.length > 0) {
+      const wanted = new Set(keys);
+      descriptions = (await allMerchantDescriptions(db)).filter((x) => wanted.has(normalizeMerchant(x)));
+      if (wanted.has('')) descriptions.push(null);
+    }
+    return { ...(descriptions ? { descriptions } : {}), drill, currency: profile.currency, locale: profile.locale, exponent: profile.exponent, today: ctx.today, timezoneId: ctx.timezoneId, filtersText: filtersText(selection.filters, names), scopeParts: scopeParts(selection.filters, names) };
   },
 };
 
@@ -83,11 +93,17 @@ export const shareCsvSaver: CsvSaver = {
 /** The Activity filter that lists the same entries as a drill-down (Story 3.6 filters). */
 export function activityQueryFor(d: DrillData, categoryIds: readonly string[] | undefined): ActivityQuery {
   const f = d.drill.scope.filters;
+  const base: readonly ('income' | 'expense' | 'refund')[] = d.drill.mode === 'income' ? ['income'] : ['expense', 'refund'];
+  // A Type filter the person chose narrows the slice; it is never widened back to the whole kind.
+  const types = f.types?.length ? base.filter((t) => f.types!.includes(t)) : base;
   return {
     fromDate: d.drill.scope.start,
     toDate: d.drill.scope.end,
     ...(f.accountIds?.length ? { accountIds: f.accountIds } : {}),
     ...(categoryIds?.length ? { categoryIds } : f.categoryIds?.length ? { categoryIds: f.categoryIds } : {}),
-    types: d.drill.mode === 'income' ? ['income'] : ['expense', 'refund'],
+    ...(d.descriptions?.length ? { descriptions: d.descriptions } : {}),
+    ...(f.tags?.length ? { tags: f.tags } : {}),
+    ...(f.sources?.length ? { sources: f.sources } : {}),
+    types,
   };
 }

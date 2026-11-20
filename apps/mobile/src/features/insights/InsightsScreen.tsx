@@ -6,6 +6,7 @@ import { controlA11y } from '../../shared/a11y/labels';
 import { copy } from '../../shared/copy';
 import { ErrorBlock, Skeleton } from '../../shared/feedback/Feedback';
 import { useSheet } from '../../shared/feedback/SheetHost';
+import { useToast } from '../../shared/feedback/ToastHost';
 import { useTheme } from '../../shared/theme/ThemeProvider';
 import { radii } from '../../shared/theme/tokens';
 import { textStyle } from '../../shared/theme/typography';
@@ -41,6 +42,8 @@ export function InsightsScreen({ api = realInsightsApi, nav = {} }: { api?: Insi
   const { setPreset, setFilters, clearFilters } = useInsightsStore.getState();
   const q = useQuery({ queryKey: insightsKey(selection), queryFn: () => api.loadOverview(selection) });
   const announced = useRef<string | null>(null);
+  const opening = useRef(false);
+  const toast = useToast();
 
   const o = q.data;
   useEffect(() => {
@@ -69,9 +72,18 @@ export function InsightsScreen({ api = realInsightsApi, nav = {} }: { api?: Insi
     });
 
   const openFilters = async () => {
-    const facets: InsightsFacets | null = await api.loadFacets(selection).catch(() => null);
-    if (!facets) return;
-    sheet.open({ id: 'insights-filters', title: i.filterTitle, body: (close) => <InsightsFilterSheet facets={facets} value={selection.filters} onApply={setFilters} close={close} />, });
+    if (opening.current) return;
+    opening.current = true;
+    try {
+      const facets: InsightsFacets | null = await api.loadFacets(selection).catch(() => null);
+      if (!facets) {
+        toast.show({ message: i.filtersFailed });
+        return;
+      }
+      sheet.open({ id: 'insights-filters', title: i.filterTitle, body: (close) => <InsightsFilterSheet facets={facets} known={o.filterChips} value={selection.filters} onApply={setFilters} close={close} /> });
+    } finally {
+      opening.current = false;
+    }
   };
 
   const sectionCtx = { overview: o, api, selection, nav, ...(nav.onDrill ? { onDrill: nav.onDrill } : {}) };
@@ -79,6 +91,14 @@ export function InsightsScreen({ api = realInsightsApi, nav = {} }: { api?: Insi
   const sections = insightsSections().filter((s) => s.visible(sectionCtx));
   const empty = o.entries === 0;
   const before = o.period.start < o.firstDay;
+  const waitingText = o.waiting === 1 ? i.waitingOne : i.waitingMany.replace('{n}', String(o.waiting));
+  // Entries waiting for the user are never counted, so the way to them stays even when nothing else is recorded for the period.
+  const waitingRow =
+    o.waiting > 0 ? (
+      <Pressable testID="insights-waiting" {...(nav.onReview ? controlA11y({ label: waitingText, role: 'button' }) : { accessible: true, accessibilityLabel: waitingText })} {...(nav.onReview ? { onPress: nav.onReview } : {})} style={[styles.waiting, { borderColor: theme.color('border-hairline') }]}>
+        <Text style={[textStyle('body'), { color: theme.color('text-primary') }]}>{waitingText}</Text>
+      </Pressable>
+    ) : null;
 
   return (
     <ScrollView testID="insights-screen" contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
@@ -102,15 +122,12 @@ export function InsightsScreen({ api = realInsightsApi, nav = {} }: { api?: Insi
           <Text style={[textStyle('body'), styles.center, { color: theme.color('text-secondary') }]}>{i.nothingRecorded.replace('{range}', o.period.title)}</Text>
           {before ? <Text style={[textStyle('caption'), styles.center, { color: theme.color('text-secondary') }]}>{i.sinceCaption.replace('{date}', shortDate(o.firstDay))}</Text> : null}
           {nav.onAdd ? <Button label={i.addExpense} variant="text" testID="insights-add" onPress={nav.onAdd} /> : null}
+          {waitingRow}
         </View>
       ) : (
         <>
-          <KpiTiles overview={o} {...(nav.onDrill ? { onOpenSpent: () => nav.onDrill!({ kind: 'spent' }), onOpenIncome: () => nav.onDrill!({ kind: 'income' }) } : {})} />
-          {o.waiting > 0 ? (
-            <Pressable testID="insights-waiting" {...controlA11y({ label: (o.waiting === 1 ? i.waitingOne : i.waitingMany).replace('{n}', String(o.waiting)), role: 'button' })} onPress={nav.onReview} style={[styles.waiting, { borderColor: theme.color('border-hairline') }]}>
-              <Text style={[textStyle('body'), { color: theme.color('text-primary') }]}>{(o.waiting === 1 ? i.waitingOne : i.waitingMany).replace('{n}', String(o.waiting))}</Text>
-            </Pressable>
-          ) : null}
+          <KpiTiles overview={o} onRetry={() => void q.refetch()} {...(nav.onDrill ? { onOpenSpent: () => nav.onDrill!({ kind: 'spent' }), onOpenIncome: () => nav.onDrill!({ kind: 'income' }) } : {})} />
+          {waitingRow}
           {sections.map((s) => (
             <View key={s.id} testID={`insights-section-${s.id}`} style={styles.section}>
               <Text accessibilityRole="header" style={[textStyle('title'), { color: theme.color('text-primary') }]}>{s.heading}</Text>

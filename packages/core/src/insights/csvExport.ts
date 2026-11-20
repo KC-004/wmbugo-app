@@ -26,16 +26,23 @@ export function csvFileName(name: string, startDate: string, endDate: string): s
 
 export const CSV_COLUMNS = ['date', 'merchant', 'category', 'account', 'type', 'amount', 'currency', 'note'] as const;
 
+/** A header value on one line: a name with a line break or a leading formula character must not start a row or run as a formula. */
+const headerText = (s: string): string => s.replace(/[\r\n\t]+/g, ' ').trim();
+
+/** Thrown when an amount cannot be written: a file with a blank amount would give wrong sums, so none is made. */
+export class CsvAmountError extends Error {}
+
 export function buildDrillCsv(drill: DrillDown, info: CsvInfo): string {
   const rows: (string | number | null)[][] = [];
   for (const day of drill.days) {
     for (const e of day.entries) {
       const amount = formatMinorPlain(e.amountMinor, info.exponent);
-      rows.push([e.localDate, e.merchant, e.categoryName, e.accountName, e.type, amount.ok ? amount.value : '', info.currencyCode, '']);
+      if (!amount.ok) throw new CsvAmountError('AMOUNT_NOT_WRITABLE');
+      rows.push([e.localDate, e.merchant, e.categoryName, e.accountName, e.type, amount.value, info.currencyCode, e.note]);
     }
   }
   return buildCsv(
-    [`# Period ${drill.scope.start} to ${drill.scope.end} (inclusive)`, `# Filters: ${info.filtersText === '' ? 'none' : info.filtersText}`, `# Timezone ${info.timezoneId}`, `# Currency ${info.currencyCode}`, `# Schema ${INSIGHTS_CSV_SCHEMA}`],
+    [`# Period ${drill.scope.start} to ${drill.scope.end} (inclusive)`, `# Filters: ${info.filtersText === '' ? 'none' : headerText(info.filtersText)}`, `# Timezone ${headerText(info.timezoneId)}`, `# Currency ${headerText(info.currencyCode)}`, `# Schema ${INSIGHTS_CSV_SCHEMA}`],
     CSV_COLUMNS,
     rows,
   );

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Polygon, Polyline } from 'react-native-svg';
 import { useQuery } from '@tanstack/react-query';
@@ -70,12 +70,16 @@ function Line({ buckets }: { buckets: readonly TrendBucket[] }) {
 
 function Trend({ ctx }: { ctx: InsightsSectionContext }) {
   const theme = useTheme();
-  useAmountsHidden();
+  const hidden = useAmountsHidden();
   const [g, setG] = useState<Granularity | undefined>(undefined);
   const [table, setTable] = useState(false);
   const q = useQuery({ queryKey: trendKey(ctx.selection, g), queryFn: () => ctx.api.loadTrend(ctx.selection, g) });
   const d = q.data;
-  if (q.isError) return <Failed id="trend-error" onRetry={() => void q.refetch()} />;
+  // After a period or filter change the scope may not offer the granularity chosen before: fall back to its default.
+  useEffect(() => {
+    if (g && d && !d.trend.options.includes(g)) setG(undefined);
+  }, [g, d]);
+  if (q.isError || q.data === null) return <Failed id="trend-error" onRetry={() => void q.refetch()} />;
   if (!d) return <Skeleton height={160} />;
   const money = (n: number) => moneyText(n, d.currency, d.locale);
   const t = d.trend;
@@ -96,13 +100,13 @@ function Trend({ ctx }: { ctx: InsightsSectionContext }) {
   }
   const top = t.buckets.reduce((m, b) => (b.spentMinor > m.spentMinor ? b : m), t.buckets[0]!);
   const today = t.buckets.find((b) => b.start === t.todayStart);
-  const summary = i.trendSummary.replace('{unit}', UNIT[t.granularity]).replace('{range}', ctx.overview.period.title).replace('{label}', top.label).replace('{amount}', amountLabel({ amountMinor: top.spentMinor, currency: d.currency, locale: d.locale, inline: true }));
+  const summary = hidden || top.spentMinor === 0 ? i.trendSummaryHidden.replace('{unit}', UNIT[t.granularity]).replace('{range}', ctx.overview.period.title) : i.trendSummary.replace('{unit}', UNIT[t.granularity]).replace('{range}', ctx.overview.period.title).replace('{label}', top.label).replace('{amount}', amountLabel({ amountMinor: top.spentMinor, currency: d.currency, locale: d.locale, inline: true }));
   const first = t.buckets[0]!;
   const last = t.buckets.at(-1)!;
 
   return (
     <View testID="trend-body" style={styles.gap}>
-      <Text accessibilityRole="header" style={[textStyle('caption'), muted]}>{scope}</Text>
+      <Text style={[textStyle('caption'), muted]}>{scope}</Text>
       {t.options.length > 1 ? (
         <View testID="trend-seg" accessibilityRole="radiogroup" style={styles.seg}>
           {t.options.map((o) => (
@@ -137,7 +141,7 @@ function Trend({ ctx }: { ctx: InsightsSectionContext }) {
             <Text style={[textStyle('caption'), muted]}>{first.label}</Text>
             <Text style={[textStyle('caption'), muted]}>{last.label}</Text>
           </View>
-          <Text testID="trend-highest" style={[textStyle('caption'), ink]}>{i.highestPoint.replace('{label}', top.label).replace('{amount}', showing(top))}</Text>
+          {top.spentMinor > 0 ? <Text testID="trend-highest" style={[textStyle('caption'), ink]}>{i.highestPoint.replace('{label}', top.label).replace('{amount}', showing(top))}</Text> : null}
           {today && today.start !== top.start ? <Text testID="trend-today" style={[textStyle('caption'), ink]}>{i.todayPoint.replace('{amount}', showing(today))}</Text> : null}
           {t.buckets.some((b) => b.backMinor > 0 && b.spentMinor === 0) ? <Icon icon={ArrowUUpLeft} size={14} color="semantic-income" /> : null}
         </View>
@@ -174,11 +178,11 @@ function Group({ p, max, money, onIn, onOut }: { p: InOutPeriod; max: number; mo
 
 function InOut({ ctx }: { ctx: InsightsSectionContext }) {
   const theme = useTheme();
-  useAmountsHidden();
+  const hidden = useAmountsHidden();
   const [table, setTable] = useState(false);
   const q = useQuery({ queryKey: inOutKey(ctx.selection), queryFn: () => ctx.api.loadInOut(ctx.selection) });
   const d = q.data;
-  if (q.isError) return <Failed id="inout-error" onRetry={() => void q.refetch()} />;
+  if (q.isError || q.data === null) return <Failed id="inout-error" onRetry={() => void q.refetch()} />;
   if (!d) return <Skeleton height={160} />;
   const money = (n: number) => moneyText(n, d.currency, d.locale);
   const ps = d.inOut.periods;
@@ -186,13 +190,13 @@ function InOut({ ctx }: { ctx: InsightsSectionContext }) {
   const muted = { color: theme.color('text-secondary') };
   const ink = { color: theme.color('text-primary') };
   const dirOf = (p: InOutPeriod) => (p.net === 'kept' ? 'kept' : p.net === 'short' ? 'out' : 'even');
-  const spoken = (p: InOutPeriod) => i.inOutSummary.replace('{label}', p.label).replace('{inAmount}', amountLabel({ amountMinor: p.incomeMinor, currency: d.currency, locale: d.locale, inline: true })).replace('{outAmount}', amountLabel({ amountMinor: p.spentMinor, currency: d.currency, locale: d.locale, inline: true })).replace('{netAmount}', amountLabel({ amountMinor: p.netMinor, currency: d.currency, locale: d.locale, inline: true })).replace('{dir}', dirOf(p));
+  const spoken = (p: InOutPeriod) => (hidden ? i.inOutSummaryHidden.replace('{label}', p.label) : i.inOutSummary.replace('{label}', p.label).replace('{inAmount}', amountLabel({ amountMinor: p.incomeMinor, currency: d.currency, locale: d.locale, inline: true })).replace('{outAmount}', amountLabel({ amountMinor: p.spentMinor, currency: d.currency, locale: d.locale, inline: true })).replace('{netAmount}', amountLabel({ amountMinor: p.netMinor, currency: d.currency, locale: d.locale, inline: true })).replace('{dir}', dirOf(p)));
   const drillIn = (p: InOutPeriod) => ctx.onDrill?.({ kind: 'bucket', start: p.start, end: p.end, label: p.label, income: true });
   const drillOut = (p: InOutPeriod) => ctx.onDrill?.({ kind: 'bucket', start: p.start, end: p.end, label: p.label });
 
   return (
     <View testID="inout-body" style={styles.gap}>
-      <Text accessibilityRole="header" style={[textStyle('caption'), muted]}>{i.inOutScope.replace('{range}', ctx.overview.period.title)}</Text>
+      <Text style={[textStyle('caption'), muted]}>{i.inOutScope.replace('{range}', ctx.overview.period.title)}</Text>
       <View style={styles.legend}>
         <Text style={[textStyle('caption'), { color: theme.color('semantic-income') }]}>{i.inLabel}</Text>
         <Text style={[textStyle('caption'), { color: theme.color('semantic-expense') }]}>{i.outLabel}</Text>
@@ -204,10 +208,10 @@ function InOut({ ctx }: { ctx: InsightsSectionContext }) {
             <Text style={[textStyle('label'), ink]}>{`${i.inLabel} · ${i.outLabel} · ${i.tableNet}`}</Text>
           </View>
           {ps.map((p) => (
-            <View key={p.start} accessible accessibilityLabel={spoken(p)} style={styles.row}>
+            <Pressable key={p.start} testID={`inout-row-${p.start}`} accessible accessibilityRole="button" accessibilityLabel={spoken(p)} onPress={() => drillOut(p)} style={styles.row}>
               <Text style={[textStyle('body'), ink]}>{p.label}</Text>
               <Text style={[textStyle('body'), ink]}>{`${money(p.incomeMinor)} · ${money(p.spentMinor)} · ${money(p.netMinor)}`}</Text>
-            </View>
+            </Pressable>
           ))}
         </View>
       ) : (

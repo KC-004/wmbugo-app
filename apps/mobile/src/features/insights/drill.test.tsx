@@ -70,8 +70,8 @@ const drill = (over: Partial<DrillDown> = {}): DrillDown => ({
     { start: '2026-11-04', end: '2026-11-04', label: 'Nov 4', spentMinor: 400_000, backMinor: 0 },
   ],
   days: [
-    { date: '2026-11-04', spentMinor: 400_000, backMinor: 0, entries: [{ id: 't2', localDate: '2026-11-04', type: 'expense', merchant: 'Zomato', categoryName: 'Food & Drinks', categoryIcon: 'ForkKnife', categoryColor: 'cat-rose', accountName: 'HDFC', amountMinor: 400_000 }] },
-    { date: '2026-11-03', spentMinor: 600_000, backMinor: 0, entries: [{ id: 't1', localDate: '2026-11-03', type: 'expense', merchant: 'Swiggy', categoryName: 'Food & Drinks', categoryIcon: 'ForkKnife', categoryColor: 'cat-rose', accountName: 'HDFC', amountMinor: 600_000 }] },
+    { date: '2026-11-04', spentMinor: 400_000, backMinor: 0, entries: [{ id: 't2', localDate: '2026-11-04', type: 'expense', merchant: 'Zomato', categoryName: 'Food & Drinks', categoryIcon: 'ForkKnife', categoryColor: 'cat-rose', accountName: 'HDFC', note: null, amountMinor: 400_000 }] },
+    { date: '2026-11-03', spentMinor: 600_000, backMinor: 0, entries: [{ id: 't1', localDate: '2026-11-03', type: 'expense', merchant: 'Swiggy', categoryName: 'Food & Drinks', categoryIcon: 'ForkKnife', categoryColor: 'cat-rose', accountName: 'HDFC', note: null, amountMinor: 600_000 }] },
   ],
   explanation: { formula: 'spent', timeframe: '1–30 Nov', entryCount: 2, baseline: null },
   ...over,
@@ -123,7 +123,7 @@ describe('the drill-down screen (Story 7.3, SCR-12)', () => {
   });
 
   it('a refund surplus reads ₹X back with no minus sign anywhere; a zero segment says nothing was spent and draws no chart', async () => {
-    const back = drill({ spentMinor: 0, backMinor: 700_000, days: [{ date: '2026-11-05', spentMinor: 0, backMinor: 700_000, entries: [{ id: 'r1', localDate: '2026-11-05', type: 'refund', merchant: 'Amazon', categoryName: 'Shopping', categoryIcon: 'ShoppingBag', categoryColor: 'cat-fuchsia', accountName: 'HDFC', amountMinor: 700_000 }] }], buckets: [{ start: '2026-11-05', end: '2026-11-05', label: 'Nov 5', spentMinor: 0, backMinor: 700_000 }] });
+    const back = drill({ spentMinor: 0, backMinor: 700_000, days: [{ date: '2026-11-05', spentMinor: 0, backMinor: 700_000, entries: [{ id: 'r1', localDate: '2026-11-05', type: 'refund', merchant: 'Amazon', categoryName: 'Shopping', categoryIcon: 'ShoppingBag', categoryColor: 'cat-fuchsia', accountName: 'HDFC', note: null, amountMinor: 700_000 }] }], buckets: [{ start: '2026-11-05', end: '2026-11-05', label: 'Nov 5', spentMinor: 0, backMinor: 700_000 }] });
     const a = await mountNode(show(fakeApi(data(back)), { t: { kind: 'category', id: 'cat_shopping', name: 'Shopping' } }));
     expect(texts(a).some((x) => /^Shopping · ₹7,000(\.00)? back$/.test(x))).toBe(true);
     expect(texts(a).some((x) => /^₹7,000(\.00)? back$/.test(x))).toBe(true);
@@ -149,12 +149,13 @@ describe('the drill-down screen (Story 7.3, SCR-12)', () => {
     expect(see).toHaveBeenCalledWith({ fromDate: '2026-11-01', toDate: '2026-11-30', accountIds: ['a1'], categoryIds: ['cat_food'], types: ['expense', 'refund'] });
   });
 
-  it('Export as CSV hands the file to the saver and says how many entries; cancelling says nothing; a failure says nothing was changed', async () => {
+  it('Export as CSV hands the file to the saver and claims nothing it cannot know; only a failure is reported', async () => {
     const save = jest.fn(async () => 'saved' as const);
     const r = await mountNode(show(fakeApi(), { saver: { save } }));
     await press(r, 'drill-export');
     expect(save).toHaveBeenCalledWith('wmbugo-food-2026-11-01-to-2026-11-30.csv', expect.stringContaining('# Schema wmbugo-insights-1'));
-    expect(texts(r)).toContain('Exported 2 entries');
+    // The share sheet cannot say whether the file was kept, so no toast says it was.
+    expect(texts(r).join(' ')).not.toMatch(/Exported/);
     const cancel = await mountNode(show(fakeApi(), { saver: { save: jest.fn(async () => 'cancelled' as const) } }));
     await press(cancel, 'drill-export');
     expect(texts(cancel).join(' ')).not.toMatch(/Exported/);

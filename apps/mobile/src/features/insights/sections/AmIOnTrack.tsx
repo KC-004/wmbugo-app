@@ -119,7 +119,7 @@ function BudgetsCard({ d, ctx }: { d: OnTrackData; ctx: InsightsSectionContext }
 
 function NwsCard({ d, ctx }: { d: OnTrackData; ctx: InsightsSectionContext }) {
   const theme = useTheme();
-  useAmountsHidden();
+  const hidden = useAmountsHidden();
   const [table, setTable] = useState(false);
   const nws = d.track.nws;
   const o = ctx.overview;
@@ -144,18 +144,34 @@ function NwsCard({ d, ctx }: { d: OnTrackData; ctx: InsightsSectionContext }) {
             <Text style={[textStyle('label'), ink]}>{`${i.tableUsed} · ${i.tableTarget} · ${i.tablePercent}`}</Text>
           </View>
           {[...rows, { key: 'nc' as const, label: copy.insights.notClassifiedLabel, amount: a.notClassifiedMinor, row: null }].map((x) => (
-            <View key={x.key} accessible accessibilityLabel={`${x.label}, ${money(x.amount)}${x.row ? ` of ${money(x.row.targetMinor)}, ${x.row.status.percentUsed} percent` : ''}`} style={styles.row}>
+            <View key={x.key} accessible accessibilityLabel={`${x.label}, ${money(x.amount)}${x.row ? ` of ${money(x.row.targetMinor)}${hidden ? '' : `, ${x.row.status.percentUsed} percent`}` : ''}`} style={styles.row}>
               <Text style={[textStyle('body'), ink]}>{x.label}</Text>
-              <Text style={[textStyle('body'), ink]}>{`${money(x.amount)}${x.row ? ` · ${money(x.row.targetMinor)} · ${x.row.status.percentUsed}%` : ''}`}</Text>
+              <Text style={[textStyle('body'), ink]}>{`${money(x.amount)}${x.row ? ` · ${money(x.row.targetMinor)}${hidden ? '' : ` · ${x.row.status.percentUsed}%`}` : ''}`}</Text>
             </View>
           ))}
         </View>
       ) : hasTargets ? (
-        rows.map((x) =>
-          x.row ? (
-            <LimitBar key={x.key} testID={`nws-limit-${x.key}`} name={x.label} status={x.row.status} currency={d.currency} locale={d.locale} tone={x.key === 'savings' ? 'savings' : x.key} {...(x.key === 'savings' ? { savings: true } : {})} />
-          ) : null,
-        )
+        rows.map((x) => {
+          // A bar with a target is drawn; one without keeps its amount as a plain row, so nothing spent is left out of the view.
+          if (!x.row) {
+            return (
+              <View key={x.key} testID={`nws-plain-${x.key}`} style={styles.row}>
+                <Text style={[textStyle('body'), ink]}>{x.label}</Text>
+                <Text style={[textStyle('body'), ink]}>{money(x.amount)}</Text>
+              </View>
+            );
+          }
+          const bar = <LimitBar testID={`nws-limit-${x.key}`} name={x.label} status={x.row.status} currency={d.currency} locale={d.locale} tone={x.key === 'savings' ? 'savings' : x.key} {...(x.key === 'savings' ? { savings: true } : {})} />;
+          // Needs and Wants open exactly the entries behind the bar in Activity; Savings is transfers, which Activity lists elsewhere.
+          const ids = x.key === 'needs' ? nws.needsCategoryIds : x.key === 'wants' ? nws.wantsCategoryIds : [];
+          return ids.length > 0 && ctx.nav?.onSortIt ? (
+            <Pressable key={x.key} testID={`nws-bar-${x.key}`} {...controlA11y({ label: `${x.label}, ${money(x.amount)}`, role: 'button' })} onPress={() => ctx.nav?.onSortIt?.({ categoryIds: ids, fromDate: nws.period.start, toDate: nws.period.end })}>
+              {bar}
+            </Pressable>
+          ) : (
+            <View key={x.key}>{bar}</View>
+          );
+        })
       ) : (
         <View testID="nws-amounts" style={styles.gap}>
           {rows.map((x) => (
@@ -219,12 +235,18 @@ function GoalsCard({ d, ctx }: { d: OnTrackData; ctx: InsightsSectionContext }) 
 }
 
 function TrackBody({ ctx }: { ctx: InsightsSectionContext }) {
+  const theme = useTheme();
   const q = useQuery({ queryKey: onTrackKey(ctx.selection), queryFn: () => ctx.api.loadOnTrack(ctx.selection) });
   const d = q.data;
-  if (q.isError) return <Failed id="track-error" onRetry={() => void q.refetch()} />;
+  if (q.isError || q.data === null) return <Failed id="track-error" onRetry={() => void q.refetch()} />;
   if (!d) return <Skeleton height={160} />;
+  const t = d.track;
+  const a = t.nws?.amounts;
+  const nwsShown = t.budgetsState === 'ok' && !!t.nws && ((a ? a.needsMinor + a.wantsMinor + a.savingsMinor + a.notClassifiedMinor > 0 : false) || !!t.nws.needs || !!t.nws.wants || !!t.nws.savings);
+  const nothing = t.budgetsState === 'ok' && t.budgets.length === 0 && !nwsShown && t.goals.length === 0;
   return (
     <View style={styles.gap}>
+      {nothing ? <Text testID="track-empty" style={[textStyle('body'), { color: theme.color('text-secondary') }]}>{i.trackEmpty}</Text> : null}
       <BudgetsCard d={d} ctx={ctx} />
       <NwsCard d={d} ctx={ctx} />
       <GoalsCard d={d} ctx={ctx} />

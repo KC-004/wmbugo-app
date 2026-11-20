@@ -88,6 +88,7 @@ describe('onTrack budgets (Story 7.7, INS-013)', () => {
     await expense(500_000, ist(11, 3));
     const plain = await onTrack(db, scope('this_cycle'), ctx, clock.nowMs());
     const filtered = await onTrack(db, scope('this_cycle', { accountIds: [cash] }), ctx, clock.nowMs());
+    expect(plain.budgets.length).toBeGreaterThan(0);
     expect(filtered.budgets.map((x) => x.usedMinor)).toEqual(plain.budgets.map((x) => x.usedMinor));
   });
 

@@ -17,7 +17,14 @@ interface InsightsState {
 
 export const useInsightsStore = create<InsightsState>((set) => ({
   selection: DEFAULT_SELECTION,
-  setPreset: (preset, custom) => set((s) => ({ selection: { ...s.selection, preset, ...(custom ? { custom } : {}) } })),
+  setPreset: (preset, custom) =>
+    set((s) => {
+      // A custom range belongs to the Custom preset only: picking anything else forgets it, so it never lingers in a query key.
+      const next: Record<string, unknown> = { ...s.selection, preset };
+      if (custom) next.custom = custom;
+      else delete next.custom;
+      return { selection: next as unknown as InsightsSelection };
+    }),
   setFilters: (filters) => set((s) => ({ selection: { ...s.selection, filters } })),
   clearFilters: () => set((s) => ({ selection: { ...s.selection, filters: {} } })),
   reset: () => set({ selection: DEFAULT_SELECTION }),

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { useQuery } from '@tanstack/react-query';
 import { OTHER_SEGMENT_ID, type CategoryView, type DonutSegment, type DrillTarget } from '@wmbugo/core';
@@ -71,16 +71,16 @@ export function Donut({ view, size = 160 }: { view: CategoryView; size?: number 
 }
 
 /** The labels around the donut: each segment's name and share, in order. Shares are not shown while amounts are hidden. */
-function DonutLabels({ view }: { view: CategoryView }) {
+function DonutLabels({ view, onPick }: { view: CategoryView; onPick: (id: string) => void }) {
   const theme = useTheme();
   const hidden = useAmountsHidden();
   return (
     <View testID="where-donut-labels" style={styles.labels}>
       {view.donut.map((d) => (
-        <View key={d.id} style={styles.labelRow}>
-          <View style={[styles.swatch, { backgroundColor: d.id === OTHER_SEGMENT_ID ? theme.color('bg-muted') : theme.color(d.colorToken as ColorName), borderColor: theme.color('text-secondary') }]} />
+        <Pressable key={d.id} testID={`where-donut-label-${d.id}`} accessible accessibilityRole="button" onPress={() => onPick(d.id)} style={styles.labelRow}>
+          <View style={[styles.swatch, { backgroundColor: d.id === OTHER_SEGMENT_ID ? theme.color('text-secondary') : theme.color(d.colorToken as ColorName), borderColor: theme.color('text-secondary') }]} />
           <Text style={[textStyle('caption'), { color: theme.color('text-primary') }]}>{`${d.id === OTHER_SEGMENT_ID ? i.otherCategories.replace('{n}', String(d.members?.length ?? 0)) : d.name}${hidden ? '' : ` · ${d.sharePercent}%`}`}</Text>
-        </View>
+        </Pressable>
       ))}
     </View>
   );
@@ -88,12 +88,12 @@ function DonutLabels({ view }: { view: CategoryView }) {
 
 function WhereBody({ ctx }: { ctx: InsightsSectionContext }) {
   const theme = useTheme();
-  useAmountsHidden();
+  const hidden = useAmountsHidden();
   const [table, setTable] = useState(false);
   const o = ctx.overview;
   const q = useQuery({ queryKey: categoriesKey(ctx.selection), queryFn: () => ctx.api.loadCategories(ctx.selection) });
   const d: CategoriesData | null | undefined = q.data;
-  if (q.isError) {
+  if (q.isError || q.data === null) {
     return (
       <View testID="where-error" accessibilityRole="alert" style={styles.gap}>
         <Text style={[textStyle('body'), { color: theme.color('text-secondary') }]}>{i.sectionError}</Text>
@@ -110,14 +110,14 @@ function WhereBody({ ctx }: { ctx: InsightsSectionContext }) {
 
   const bars: BarDatum[] = [
     ...v.ranked.map<BarDatum>((r) => ({ id: r.categoryId, label: r.name, valueMinor: r.displayMinor, sharePercent: r.sharePercent, leading: <Chip40 icon={r.icon} colorToken={r.colorToken} /> })),
-    ...v.surplus.map<BarDatum>((s) => ({ id: s.categoryId, label: `${s.name} · ${i.back.replace('{amount}', money(s.backMinor))}`, valueMinor: 0, leading: <Chip40 icon={s.icon} colorToken={s.colorToken} />, spokenLabel: `${s.name}, ${i.back.replace('{amount}', amountLabel({ amountMinor: s.backMinor, currency: d.currency, locale: d.locale, inline: true }))}` })),
+    ...v.surplus.map<BarDatum>((s) => ({ id: s.categoryId, label: `${s.name} · ${i.back.replace('{amount}', money(s.backMinor))}`, valueMinor: 0, leading: <Chip40 icon={s.icon} colorToken={s.colorToken} />, spokenLabel: hidden ? s.name : `${s.name}, ${i.back.replace('{amount}', amountLabel({ amountMinor: s.backMinor, currency: d.currency, locale: d.locale, inline: true }))}` })),
   ];
   const back = d.total.backMinor;
   const totalLine = d.total.spentMinor === 0 && back > 0 ? i.totalBackOnly.replace('{back}', money(back)) : back > 0 ? i.totalSpentAfter.replace('{amount}', money(d.total.spentMinor)).replace('{back}', money(back)) : i.totalSpent.replace('{amount}', money(d.total.spentMinor));
   const top = v.ranked[0];
-  const summary = top
+  const summary = top && !hidden
     ? i.donutSummary.replace('{range}', o.period.title).replace('{n}', String(v.ranked.length)).replace('{name}', top.name).replace('{amount}', amountLabel({ amountMinor: top.displayMinor, currency: d.currency, locale: d.locale, inline: true }))
-    : i.donutSummaryHidden.replace('{range}', o.period.title).replace('{n}', '0');
+    : i.donutSummaryHidden.replace('{range}', o.period.title).replace('{n}', String(v.ranked.length));
 
   const drill = (id: string) => {
     if (!ctx.onDrill) return;
@@ -136,10 +136,10 @@ function WhereBody({ ctx }: { ctx: InsightsSectionContext }) {
       {table ? null : (
         <View accessible accessibilityLabel={summary} style={styles.donutRow}>
           <Donut view={v} />
-          <DonutLabels view={v} />
+          <DonutLabels view={v} onPick={drill} />
         </View>
       )}
-      <BarChart testID="where-chart" title={i.spentByCategoryTitle} scope={o.period.title} showShareInBars data={bars} currency={d.currency} locale={d.locale} orientation="horizontal" table={table} onToggleTable={() => setTable((t) => !t)} onPressDatum={(b) => drill(b.id)} />
+      <BarChart testID="where-chart" title={i.spentByCategoryTitle} scope={o.period.title} showShareInBars data={bars} currency={d.currency} locale={d.locale} orientation="horizontal" table={table} onToggleTable={() => setTable((t) => !t)} onPressDatum={(b) => drill(b.id)} nameColumn={i.categoryColumn} />
       <Text testID="where-total" style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{totalLine}</Text>
     </View>
   );

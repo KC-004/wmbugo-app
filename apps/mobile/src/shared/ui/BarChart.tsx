@@ -106,7 +106,7 @@ export function BarChart({ title, scope, data, currency, locale, orientation, ta
               <View style={styles.amountCol}>
                 <Amount amountMinor={d.valueMinor} currency={currency} direction="neutral" role="body" {...loc} />
               </View>
-              {showShare ? <Text style={[textStyle('body'), styles.shareCol, { color: theme.color('text-primary') }]}>{d.sharePercent != null ? `${d.sharePercent}%` : ''}</Text> : null}
+              {showShare ? <Text style={[textStyle('body'), styles.shareCol, { color: theme.color('text-primary') }]}>{d.sharePercent != null ? `${d.sharePercent}%` : '—'}</Text> : null}
               {detailColumn ? <Text style={[textStyle('body'), styles.shareCol, { color: theme.color('text-primary') }]}>{d.detail ?? ''}</Text> : null}
             </Pressable>
           ))}

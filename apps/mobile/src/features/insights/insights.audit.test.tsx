@@ -1,4 +1,4 @@
-import { Text } from 'react-native';
+import { ActivityIndicator, Text } from 'react-native';
 import { act, type ReactTestRenderer } from 'react-test-renderer';
 import { budgetStatus, categoryView, type BudgetListRow, type CategorySpend, type GoalRow, type MerchantSpend } from '@wmbugo/core';
 import { copy } from '../../shared/copy';
@@ -44,7 +44,7 @@ function everything() {
       currency: 'INR' as const,
       locale: 'en-IN',
       thisMonth: '2026-11',
-      track: { scope: echo, budgetsState: 'ok' as const, budgets: [brow('o', 'Overall', 1_230_000, 5_000_000, { group: 'overall', scope: 'overall', refundSurplusMinor: 700_000 })], nws: { amounts: { needsMinor: 2_200_000, wantsMinor: 900_000, savingsMinor: 0, notClassifiedMinor: 300_000 }, needs: null, wants: null, savings: null, notClassifiedCategoryIds: [], period: { start: '2026-11-01', end: '2026-11-30' } }, goals: [goal] },
+      track: { scope: echo, budgetsState: 'ok' as const, budgets: [brow('o', 'Overall', 1_230_000, 5_000_000, { group: 'overall', scope: 'overall', refundSurplusMinor: 700_000 })], nws: { amounts: { needsMinor: 2_200_000, wantsMinor: 900_000, savingsMinor: 0, notClassifiedMinor: 300_000 }, needs: null, wants: null, savings: null, notClassifiedCategoryIds: [], needsCategoryIds: [], wantsCategoryIds: [], period: { start: '2026-11-01', end: '2026-11-30' } }, goals: [goal] },
     })),
   });
   return { api, node: <InsightsScreen api={api} nav={{ onDrill: jest.fn() }} /> };
@@ -124,6 +124,6 @@ describe('the Insights audit (Story 7.8)', () => {
 
   it('the screen never shows a spinner', async () => {
     const r = await mountNode(everything().node);
-    expect(r.root.findAll((n) => String(n.type) === 'ActivityIndicator').length).toBe(0);
+    expect(r.root.findAll((n) => n.type === ActivityIndicator).length).toBe(0);
   });
 });
