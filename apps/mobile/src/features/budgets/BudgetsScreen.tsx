@@ -176,7 +176,7 @@ export function BudgetsScreen({ api = realBudgetsApi, onUseTemplate, onOpen, onO
 
   if (compact) {
     const template = rows.filter((r) => r.group === '50_30_20');
-    const others = rows.filter((r) => r.group !== '50_30_20').sort((a, b) => b.status.percentUsed - a.status.percentUsed).slice(0, 3);
+    const others = rows.filter((r) => r.group !== '50_30_20').sort((a, b) => (Number.isFinite(b.status.percentUsed) ? b.status.percentUsed : 0) - (Number.isFinite(a.status.percentUsed) ? a.status.percentUsed : 0)).slice(0, 3);
     return (
       <View testID="budgets-compact" style={styles.list}>
         <SetupCard data={data} onSetUp={() => openTemplate(data, data.template.onboardingIncomeMinor)} onDismiss={() => void dismissCard()} />

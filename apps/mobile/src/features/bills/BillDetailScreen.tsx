@@ -38,7 +38,7 @@ export function BillDetailScreen({ ruleId, onBack, onOpenEntry, api = realBillsA
   const q = useQuery({ queryKey: billDetailKey(ruleId), queryFn: () => api.loadDetail(ruleId) });
   const header = <TopBar title={b.detailTitle} onBack={onBack} backTestID="bill-detail-back" />;
 
-  if (q.isError) return <View style={styles.fill}>{header}<ErrorBlock cause={b.loadError} onRetry={() => void q.refetch()} /></View>;
+  if (q.isError || q.data === null) return <View style={styles.fill}>{header}<ErrorBlock cause={b.loadError} onRetry={() => void q.refetch()} /></View>;
   if (q.data === 'missing') return <View style={styles.fill}>{header}<EmptyState sentence={b.deletedElsewhere} actionLabel={b.backToBills} onAction={onBack} /></View>;
   if (!q.data) {
     return (
@@ -65,7 +65,7 @@ export function BillDetailScreen({ ruleId, onBack, onOpenEntry, api = realBillsA
     <View style={styles.fill} testID="bill-detail">
       {header}
       <ScrollView contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
-        <BillRow row={row} currency={data.currency} locale={data.locale} onPress={() => undefined} />
+        <BillRow row={row} currency={data.currency} locale={data.locale} />
         <View style={[styles.card, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
           <Text testID="bill-detail-repeats" style={[textStyle('body'), ink]}>{`${cadenceText(row)} · ${KIND_LABEL[row.kind]}`}</Text>
           {row.accountName ? <Text style={[textStyle('body'), ink]}>{row.accountName}</Text> : null}

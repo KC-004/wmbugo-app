@@ -19,7 +19,7 @@ import { captionText, cadenceText, statusText } from './billText';
  * amount right-aligned and one status line. A due-soon bill shows a warning icon with its text; a bill not seen yet offers
  * `Mark as paid`. The row is one TalkBack node; at large font sizes the amount wraps below the name.
  */
-export function BillRow({ row, currency, locale, onPress, onMarkPaid, onLink, extraCaption, lead, caption, dim }: { row: BillRowModel; /** A leading date label (`Today`, `5 Dec`): the Plan timeline. */ lead?: string; /** Replaces the caption under the name. */ caption?: string; /** Reads in secondary text: a paid due date that stays in place. */ dim?: boolean; /** Under the status line: the subscription cost phrase. */ extraCaption?: string; currency: CurrencyCode; locale: string; onPress: () => void; onMarkPaid?: () => void; onLink?: () => void }) {
+export function BillRow({ row, currency, locale, onPress, onMarkPaid, onLink, extraCaption, lead, caption, dim }: { row: BillRowModel; /** A leading date label (`Today`, `5 Dec`): the Plan timeline. */ lead?: string; /** Replaces the caption under the name. */ caption?: string; /** Reads in secondary text: a paid due date that stays in place. */ dim?: boolean; /** Under the status line: the subscription cost phrase. */ extraCaption?: string; currency: CurrencyCode; locale: string; /** Without it the row is a plain summary, not a button (a bill's own detail screen). */ onPress?: () => void; onMarkPaid?: () => void; onLink?: () => void }) {
   useAmountsHidden(); // re-render when Hide amounts is toggled: this component builds amount labels
   const theme = useTheme();
   const { fontScale } = useWindowDimensions();
@@ -29,7 +29,7 @@ export function BillRow({ row, currency, locale, onPress, onMarkPaid, onLink, ex
   const spoken = [lead, row.title, amountLabel({ amountMinor: row.expectedAmountMinor, currency, locale, inline: true }), `${cadenceText(row).toLowerCase()}${row.accountName ? ` from ${row.accountName}` : ''}`, s.text, extraCaption].filter(Boolean).join(', ');
   return (
     <View style={[styles.card, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
-      <Pressable testID={`bill-row-${row.id}`} accessible accessibilityRole="button" accessibilityLabel={spoken} onPress={onPress} style={styles.row}>
+      <Pressable testID={`bill-row-${row.id}`} accessible {...(onPress ? { accessibilityRole: 'button' as const } : {})} accessibilityLabel={spoken} {...(onPress ? { onPress } : { disabled: true })} style={styles.row}>
         <View style={[styles.chip, { backgroundColor: theme.color('bg-muted') }]}>
           <Icon icon={row.categoryIcon ? categoryIcon(row.categoryIcon) : DotsThree} size={22} color={(row.categoryColor as ColorName | null) ?? 'text-secondary'} />
         </View>

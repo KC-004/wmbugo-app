@@ -99,7 +99,7 @@ export function useGoalActions(api: GoalsApi, display: { currency: CurrencyCode;
           onSave={async (input) => {
             const r = await api.save(input);
             if (!r.ok) return r;
-            await refresh();
+            void refresh();
             const saved = r.value;
             toast.show({
               message: saved.created ? g.added : g.savedToast,
@@ -136,10 +136,17 @@ export function useGoalActions(api: GoalsApi, display: { currency: CurrencyCode;
           onSubmit={async (minor) => {
             const r = await (kind === 'set_aside' ? api.setAside(goal.id, minor) : api.takeBack(goal.id, minor));
             if (!r.ok) return r;
-            await refresh();
+            void refresh();
             toast.show({
               message: (kind === 'set_aside' ? g.setAsideToast : g.takeBackToast).replace('{amount}', money(minor)).replace('{name}', goal.name),
-              undo: { label: copy.common.undo, onUndo: () => void api.undoAllocation(r.value.allocationId).then(refresh).catch(() => toast.show({ message: g.undoFailed })) },
+              undo: {
+                label: copy.common.undo,
+                onUndo: () =>
+                  void api
+                    .undoAllocation(r.value.allocationId)
+                    .then(async (u) => (u.ok ? refresh() : toast.show({ message: u.code === 'PART_MOVED' ? g.partMoved : g.undoFailed })))
+                    .catch(() => toast.show({ message: g.undoFailed })),
+              },
             });
             return r;
           }}
@@ -149,15 +156,16 @@ export function useGoalActions(api: GoalsApi, display: { currency: CurrencyCode;
   };
 
   const change = async (goal: GoalRow, to: GoalState) => {
+    // Restoring a goal that holds money again can leave Free to use short: the same warning, never a block. Free to use is read
+    // before the change, while the goal's money is still counted as free; read afterwards it would already include it.
+    const free = to === 'active' && (goal.state === 'completed' || goal.state === 'archived') && goal.setAsideMinor > 0 ? await api.freeToUse?.().catch(() => null) : null;
     const r = await api.changeState(goal.id, to).catch(() => ({ ok: false as const }));
     if (!r.ok) return failed();
-    await refresh();
+    void refresh();
     const word = to === 'paused' ? g.paused.toLowerCase() : to === 'completed' ? g.completed.toLowerCase() : to === 'archived' ? g.archived.toLowerCase() : 'is active';
-    // Restoring a goal that holds money again can leave Free to use short: the same warning, never a block.
-    const free = to === 'active' && (goal.state === 'completed' || goal.state === 'archived') && goal.setAsideMinor > 0 ? await api.freeToUse?.().catch(() => null) : null;
     const short = free ? shortfallAfterHolding(free, goal.setAsideMinor) : null;
     const base = g.stateToast.replace('{name}', goal.name).replace('{state}', to === 'active' ? 'is active again' : word);
-    toast.show({ message: short === null ? base : `${base} · ${g.shortWarn.replace('{amount}', money(short))}`, undo: { label: copy.common.undo, onUndo: () => void api.changeState(goal.id, goal.state).then(refresh).catch(() => toast.show({ message: g.undoFailed })) } });
+    toast.show({ message: short === null ? base : `${base} · ${g.shortWarn.replace('{amount}', money(short))}`, undo: { label: copy.common.undo, onUndo: () => void api.changeState(goal.id, goal.state).then(async (u) => (u.ok ? refresh() : toast.show({ message: g.undoFailed }))).catch(() => toast.show({ message: g.undoFailed })) } });
   };
 
   const confirmComplete = (goal: GoalRow) => {

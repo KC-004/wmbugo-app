@@ -126,11 +126,16 @@ export const recurring_rule = sqliteTable(
     created_at: integer('created_at').notNull(),
     /** Remind me: days before the due date (0, 1 or 3); null is Off (Story 6.5). */
     remind_days: integer('remind_days'),
+    /** Earlier pauses that have ended, as a JSON array of [from, to) local-date pairs; the current pause is paused_on (Story 6 review). */
+    pause_gaps: text('pause_gaps').notNull().default('[]'),
   },
   (t) => [
     check('recurring_rule_cadence_check', sql`${t.cadence} IN ('weekly','monthly','quarterly','annual','custom')`),
     check('recurring_rule_kind_check', sql`${t.kind} IN ('subscription','rent','emi','utility','other')`),
     check('recurring_rule_amount_check', sql`${t.expected_amount_minor} > 0`),
+    check('recurring_rule_dates_check', sql`length(${t.anchor_date}) = 10 AND (${t.ends_on} IS NULL OR length(${t.ends_on}) = 10) AND (${t.paused_on} IS NULL OR length(${t.paused_on}) = 10) AND (${t.resumed_on} IS NULL OR length(${t.resumed_on}) = 10) AND (${t.ended_on} IS NULL OR length(${t.ended_on}) = 10)`),
+    check('recurring_rule_remind_check', sql`${t.remind_days} IS NULL OR ${t.remind_days} IN (0,1,3)`),
+    check('recurring_rule_pause_gaps_check', sql`json_valid(${t.pause_gaps})`),
     check('recurring_rule_custom_check', sql`(${t.cadence} <> 'custom' AND ${t.custom_every} IS NULL AND ${t.custom_unit} IS NULL) OR (${t.cadence} = 'custom' AND ${t.custom_every} BETWEEN 1 AND 99 AND ${t.custom_unit} IN ('days','weeks','months'))`),
   ],
 );
@@ -154,6 +159,8 @@ export const recurring_payment = sqliteTable(
     primaryKey({ columns: [t.rule_id, t.due_date] }),
     uniqueIndex('recurring_payment_transaction_idx').on(t.transaction_id).where(sql`${t.transaction_id} IS NOT NULL`),
     check('recurring_payment_kind_check', sql`${t.payment_kind} IN ('linked','marked')`),
+    check('recurring_payment_date_check', sql`length(${t.due_date}) = 10`),
+    check('recurring_payment_transaction_check', sql`(${t.payment_kind} = 'linked') = (${t.transaction_id} IS NOT NULL)`),
   ],
 );
 
@@ -189,7 +196,11 @@ export const goal = sqliteTable(
     updated_at: integer('updated_at').notNull(),
     removed_at: integer('removed_at'),
   },
-  (t) => [check('goal_state_check', sql`${t.state} IN ('active','paused','completed','archived')`), check('goal_target_check', sql`${t.target_minor} > 0`)],
+  (t) => [
+    check('goal_state_check', sql`${t.state} IN ('active','paused','completed','archived')`),
+    check('goal_target_check', sql`${t.target_minor} > 0`),
+    check('goal_due_date_check', sql`${t.due_date} IS NULL OR length(${t.due_date}) = 10`),
+  ],
 );
 
 /** One contribution to a goal: money set aside (nothing moves), taken back, or moved into a savings pot (Story 6.7). Always a positive amount. */
@@ -213,5 +224,8 @@ export const goal_allocation = sqliteTable(
     uniqueIndex('goal_allocation_transaction_idx').on(t.transaction_id).where(sql`${t.transaction_id} IS NOT NULL`),
     check('goal_allocation_kind_check', sql`${t.kind} IN ('set_aside','taken_back','moved')`),
     check('goal_allocation_amount_check', sql`${t.amount_minor} > 0`),
+    check('goal_allocation_date_check', sql`length(${t.local_date}) = 10`),
+    check('goal_allocation_converted_check', sql`${t.converted_minor} >= 0 AND ${t.converted_minor} <= ${t.amount_minor}`),
+    check('goal_allocation_transaction_check', sql`(${t.kind} = 'moved') = (${t.transaction_id} IS NOT NULL)`),
   ],
 );

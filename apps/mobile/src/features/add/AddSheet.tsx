@@ -128,6 +128,8 @@ export function AddSheet({
   const [categoryId, setCategoryId] = useState<string | null>(edit ? edit.categoryId : preset ? (preset.categoryId ?? null) : draft.categoryId);
   const [accountId, setAccountId] = useState<string | null>(edit?.accountId ?? preset?.accountId ?? null);
   const [toAccountId, setToAccountId] = useState<string | null>(edit?.toAccountId ?? preset?.toAccountId ?? null);
+  // The goal tag only applies while this is still a transfer into the goal's own pot; change either and it drops away.
+  const goalTag = preset?.goal && kind === 'transfer' && (!preset.toAccountId || toAccountId === preset.toAccountId) ? preset.goal : null;
   const [owedWarned, setOwedWarned] = useState<string | null>(null);
   const presetApplied = useRef(false);
   const [feeText, setFeeText] = useState('');
@@ -458,7 +460,7 @@ export function AddSheet({
         ...(note.trim() ? { note } : {}),
         ...(occurredAtMs !== undefined ? { occurredAtMs } : {}),
         ...(fee ? { fee } : {}),
-        ...(preset?.goal ? { goalId: preset.goal.id } : {}),
+        ...(goalTag ? { goalId: goalTag.id } : {}),
       });
       if (!r.ok) {
         if (r.code === 'SAME_ACCOUNT') setError('same');
@@ -622,14 +624,14 @@ export function AddSheet({
           {copy.add.payFromRequired}
         </Text>
       ) : null}
-      {preset?.goal ? (
-        <View testID="add-goal-chip" accessible accessibilityLabel={copy.goals.forGoal.replace('{name}', preset.goal.name)}>
-          <Text style={[textStyle('body-medium'), secondary]}>{copy.goals.forGoal.replace('{name}', preset.goal.name)}</Text>
+      {goalTag ? (
+        <View testID="add-goal-chip" accessible accessibilityLabel={copy.goals.forGoal.replace('{name}', goalTag.name)}>
+          <Text style={[textStyle('body-medium'), secondary]}>{copy.goals.forGoal.replace('{name}', goalTag.name)}</Text>
         </View>
       ) : null}
-      {preset?.goal && preset.goal.setAsideMinor > 0 && parsed.ok && parsed.value > 0 ? (
+      {goalTag && data && goalTag.setAsideMinor > 0 && parsed.ok && parsed.value > 0 ? (
         <Text testID="add-goal-moves-with" accessibilityLiveRegion="polite" style={[textStyle('body'), secondary]}>
-          {copy.goals.movesWith.replace('{amount}', moneyText(Math.min(preset.goal.setAsideMinor, parsed.value), data?.currency ?? 'INR', locale)).replace('{name}', preset.goal.name)}
+          {copy.goals.movesWith.replace('{amount}', moneyText(Math.min(goalTag.setAsideMinor, parsed.value), data.currency, locale)).replace('{name}', goalTag.name)}
         </Text>
       ) : null}
       {preset?.hint && text === '' ? <Text testID="preset-hint" style={[textStyle('body'), secondary]}>{preset.hint}</Text> : null}

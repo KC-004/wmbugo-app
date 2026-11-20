@@ -34,7 +34,7 @@ export function GoalDetailScreen({ goalId, onBack, onMove, onAddPot, api = realG
   const actions = useGoalActions(api, display);
   const header = <TopBar title={g.detailTitle} onBack={onBack} backTestID="goal-detail-back" />;
 
-  if (q.isError) return <View style={styles.fill}>{header}<ErrorBlock cause={g.loadError} onRetry={() => void q.refetch()} /></View>;
+  if (q.isError || q.data === null) return <View style={styles.fill}>{header}<ErrorBlock cause={g.loadError} onRetry={() => void q.refetch()} /></View>;
   if (q.data === 'missing') return <View style={styles.fill}>{header}<EmptyState sentence={g.deletedElsewhere} actionLabel={g.backToGoals} onAction={onBack} /></View>;
   if (!q.data) {
     return (
@@ -60,7 +60,7 @@ export function GoalDetailScreen({ goalId, onBack, onMove, onAddPot, api = realG
     <View style={styles.fill} testID="goal-detail">
       {header}
       <ScrollView contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
-        <GoalCard goal={goal} currency={data.currency} locale={data.locale} thisMonth={data.thisMonth} onPress={() => undefined} {...(active && goal.funded ? { onComplete: () => actions.confirmComplete(goal) } : {})} />
+        <GoalCard goal={goal} currency={data.currency} locale={data.locale} thisMonth={data.thisMonth} {...(active && goal.funded ? { onComplete: () => actions.confirmComplete(goal) } : {})} />
 
         <Text accessibilityRole="header" style={[textStyle('label'), muted]}>{g.historyHeading}</Text>
         {data.detail.allocations.length === 0 ? (
@@ -71,7 +71,7 @@ export function GoalDetailScreen({ goalId, onBack, onMove, onAddPot, api = realG
               <View key={a.id} testID={`goal-history-${a.id}`} style={styles.histRow}>
                 <Icon icon={a.kind === 'moved' ? ArrowsLeftRight : BookmarkSimple} size={18} color="text-secondary" />
                 <Text style={[textStyle('body'), ink, styles.histText]}>{historyText(a, data.currency, data.locale)}</Text>
-                <Text testID={`goal-tag-${a.id}`} style={[textStyle('caption'), muted]}>{a.kind === 'moved' ? g.tagMoved : g.tagSetAside}</Text>
+                <Text testID={`goal-tag-${a.id}`} style={[textStyle('caption'), muted]}>{a.kind === 'moved' ? g.tagMoved : a.kind === 'taken_back' ? g.tagTakenBack : g.tagSetAside}</Text>
               </View>
             ))}
           </View>

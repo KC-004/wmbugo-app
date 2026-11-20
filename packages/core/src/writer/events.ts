@@ -24,13 +24,13 @@ export interface EventSpec {
 }
 
 export const EVENT_CATALOGUE = {
-  TransactionsChanged: { areas: ['ledger', 'budgets', 'insights', 'home', 'widget', 'plan'] },
-  AccountsChanged: { areas: ['ledger', 'insights', 'home', 'widget', 'plan'] },
+  TransactionsChanged: { areas: ['ledger', 'budgets', 'insights', 'home', 'widget', 'plan', 'bills', 'goals'] },
+  AccountsChanged: { areas: ['ledger', 'insights', 'home', 'widget', 'plan', 'bills', 'goals'] },
   ProfileChanged: { areas: ['ledger', 'budgets', 'insights', 'home', 'periods', 'notifications', 'widget', 'plan'] },
   CapturesSubmitted: { areas: ['captures', 'ledger', 'home', 'widget'] },
   CapturesRejected: { areas: ['captures', 'ledger', 'home', 'widget'] },
   CategoryAssigned: { areas: ['learning', 'insights', 'budgets'] },
-  CategoriesChanged: { areas: ['ledger', 'budgets', 'insights', 'home'] },
+  CategoriesChanged: { areas: ['ledger', 'budgets', 'insights', 'home', 'plan', 'bills'] },
   BudgetsChanged: { areas: ['budgets', 'home', 'plan'] },
   BudgetThresholdCrossed: { areas: ['notifications'] },
   RecurringChanged: { areas: ['bills', 'plan', 'home'] },
@@ -59,11 +59,11 @@ export interface EventPayloads {
   CategoriesChanged: { readonly categoryIds: readonly string[] };
   /** Budget ids only: the budget list, Home and Plan refresh. */
   BudgetsChanged: { readonly budgetIds: readonly string[] };
-  /** The highest alert level a budget crossed in a period (Story 4.9): ids and the percentage only, never an amount. */
   /** Bill rule ids only (Story 6.1): the bills list, Plan and Home refresh; never an amount or a title. */
   RecurringChanged: { readonly ruleIds: readonly string[] };
   /** Goal ids only (Story 6.6): the goals list, Plan and Home refresh; never an amount or a name. */
   GoalsChanged: { readonly goalIds: readonly string[] };
+  /** The highest alert level a budget crossed in a period (Story 4.9): ids and the percentage only, never an amount. */
   BudgetThresholdCrossed: { readonly budgetId: string; readonly periodStart: string; readonly thresholdPct: number };
 }
 

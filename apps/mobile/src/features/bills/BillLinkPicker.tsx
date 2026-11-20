@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Button } from '../../shared/ui/Button';
 import { dayMonthLabel, type ActivityRow, type CurrencyCode, type LinkCandidate } from '@wmbugo/core';
 import { copy } from '../../shared/copy';
 import { useTheme } from '../../shared/theme/ThemeProvider';
@@ -28,16 +29,19 @@ export function BillLinkPicker({ api, ruleId, dueDate, currency, locale, today, 
   const theme = useTheme();
   const [search, setSearch] = useState('');
   const [list, setList] = useState<readonly LinkCandidate[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let live = true;
+    setFailed(false);
     void api
       .candidates(ruleId, dueDate, search)
       .then((r) => live && setList(r))
-      .catch(() => live && setList([]));
+      .catch(() => live && (setFailed(true), setList([])));
     return () => {
       live = false;
     };
-  }, [api, ruleId, dueDate, search]);
+  }, [api, ruleId, dueDate, search, attempt]);
   const ink = { color: theme.color('on-glass-primary') };
   return (
     <View testID="bill-link-picker" style={styles.root}>
@@ -50,7 +54,12 @@ export function BillLinkPicker({ api, ruleId, dueDate, currency, locale, today, 
         onChangeText={setSearch}
         style={[styles.input, textStyle('body'), ink, { borderColor: theme.color('on-glass-secondary') }]}
       />
-      {list !== null && list.length === 0 ? (
+      {failed ? (
+        <View testID="bill-link-error" style={styles.gap}>
+          <Text accessibilityRole="alert" style={[textStyle('body'), ink]}>{copy.bills.pickerError}</Text>
+          <Button label={copy.bills.pickerRetry} variant="secondary" onGlass testID="bill-link-retry" onPress={() => setAttempt((n) => n + 1)} />
+        </View>
+      ) : list !== null && list.length === 0 ? (
         <Text testID="bill-link-empty" style={[textStyle('body'), ink]}>{copy.bills.pickerEmpty.replace('{date}', dayMonthLabel(dueDate))}</Text>
       ) : (
         <ScrollView style={styles.scroll} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.gap}>

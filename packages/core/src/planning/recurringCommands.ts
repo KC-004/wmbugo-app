@@ -111,7 +111,10 @@ export const PauseRecurringRule: UseCase<{ ruleId: string }, void, RuleError | '
     if (rule.pausedAt !== null || rule.endedAt !== null) return err('NOT_ACTIVE');
     const today = await localToday(ctx, ctx.nowMs());
     if (today === null) return err('NO_PROFILE');
-    await ctx.execute('UPDATE recurring_rule SET paused_at = ?, paused_on = ? WHERE id = ?', [ctx.nowMs(), today, rule.id]);
+    // A pause that was resumed is kept as a gap before the new pause overwrites it, so its skipped dates stay skipped.
+    const gaps = [...(rule.pauseGaps ?? [])];
+    if (rule.pausedOn !== null && rule.resumedOn !== null) gaps.push([rule.pausedOn, rule.resumedOn]);
+    await ctx.execute('UPDATE recurring_rule SET paused_at = ?, paused_on = ?, resumed_on = NULL, pause_gaps = ? WHERE id = ?', [ctx.nowMs(), today, JSON.stringify(gaps), rule.id]);
     ctx.touch('recurring_rule', rule.id, { paused: true, label: rule.title });
     ctx.emit('RecurringChanged', { ruleIds: [rule.id] });
     return ok(undefined);
@@ -146,7 +149,8 @@ export const EndRecurringRule: UseCase<{ ruleId: string }, void, RuleError | 'AL
     if (rule.endedAt !== null) return err('ALREADY_ENDED');
     const today = await localToday(ctx, ctx.nowMs());
     if (today === null) return err('NO_PROFILE');
-    await ctx.execute('UPDATE recurring_rule SET ended_at = ?, ended_on = ?, paused_at = NULL WHERE id = ?', [ctx.nowMs(), today, rule.id]);
+    // Ending a paused bill closes its pause at the end date, so the dates in between stay skipped.
+    await ctx.execute('UPDATE recurring_rule SET ended_at = ?, ended_on = ?, paused_at = NULL, resumed_on = CASE WHEN paused_at IS NOT NULL THEN ? ELSE resumed_on END WHERE id = ?', [ctx.nowMs(), today, today, rule.id]);
     ctx.touch('recurring_rule', rule.id, { ended: true, label: rule.title });
     ctx.emit('RecurringChanged', { ruleIds: [rule.id] });
     return ok(undefined);

@@ -233,8 +233,16 @@ describe('event catalogue', () => {
     for (const n of names) expect(n).toMatch(/(Changed|Submitted|AutoApproved|Rejected|Linked|Unlinked|Assigned|Crossed|Restored)$/);
   });
 
-  it('maps TransactionsChanged to ledger, budgets, insights, home, widget and plan only', () => {
-    expect([...areasFor('TransactionsChanged')].sort()).toEqual(['budgets', 'home', 'insights', 'ledger', 'plan', 'widget']);
+  it('maps TransactionsChanged to ledger, budgets, insights, home, widget, plan, bills and goals only', () => {
+    expect([...areasFor('TransactionsChanged')].sort()).toEqual(['bills', 'budgets', 'goals', 'home', 'insights', 'ledger', 'plan', 'widget']);
+  });
+
+  it('refreshes the Plan, Bills, Goals and Home screens when a bill, a goal, an account or a category changes', () => {
+    expect([...areasFor('AccountsChanged')]).toEqual(expect.arrayContaining(['plan', 'bills', 'goals', 'home']));
+    expect([...areasFor('ProfileChanged')]).toContain('plan');
+    expect([...areasFor('CategoriesChanged')]).toEqual(expect.arrayContaining(['plan', 'bills']));
+    expect([...areasFor('RecurringChanged')].sort()).toEqual(['bills', 'home', 'plan']);
+    expect([...areasFor('GoalsChanged')].sort()).toEqual(['goals', 'home', 'plan']);
   });
 
   it('recognises only catalogue names', () => {

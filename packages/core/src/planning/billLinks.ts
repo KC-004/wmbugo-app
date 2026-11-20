@@ -168,7 +168,7 @@ export const LinkBillPayment: UseCase<{ ruleId: string; dueDate: string; transac
     if (!rule || rule.removedAt !== null) return err('RULE_NOT_FOUND');
     const entry = await readEntry(ctx, input.transactionId);
     if (!entry || entry.removed) return err('ENTRY_NOT_FOUND');
-    if (entry.type !== 'expense') return err('NOT_AN_EXPENSE');
+    if (entry.type !== 'expense' || entry.status === 'excluded') return err('NOT_AN_EXPENSE');
     const mine = await billLinkOf(ctx, entry.id);
     if (mine) return err(`ALREADY_LINKED:${mine.dueDate}:${mine.title}`);
     if (!isLocalDate(input.dueDate) || ruleOccurrences(rule, input.dueDate, input.dueDate).length === 0) return err('NOT_A_DUE_DATE');
@@ -194,12 +194,14 @@ export const UnlinkBillPayment: UseCase<{ transactionId: string }, { ruleId: str
 };
 
 /** `Not this one`: the bill is never offered for this entry again. */
-export const DismissBillMatch: UseCase<{ ruleId: string; transactionId: string }, void, 'RULE_NOT_FOUND'> = {
+export const DismissBillMatch: UseCase<{ ruleId: string; transactionId: string }, void, 'RULE_NOT_FOUND' | 'ENTRY_NOT_FOUND'> = {
   name: 'DismissBillMatch',
   async execute(ctx, input) {
-    if ((await ctx.query('SELECT 1 FROM recurring_rule WHERE id = ?', [input.ruleId])).length === 0) return err('RULE_NOT_FOUND');
+    if ((await ctx.query('SELECT 1 FROM recurring_rule WHERE id = ? AND removed_at IS NULL', [input.ruleId])).length === 0) return err('RULE_NOT_FOUND');
+    if (!(await readEntry(ctx, input.transactionId))) return err('ENTRY_NOT_FOUND');
     await ctx.execute('INSERT OR IGNORE INTO recurring_match_dismissed (rule_id, transaction_id, dismissed_at) VALUES (?, ?, ?)', [input.ruleId, input.transactionId, ctx.nowMs()]);
     ctx.touch('recurring_match_dismissed', `${input.ruleId}:${input.transactionId}`, { dismissed: true });
+    ctx.emit('RecurringChanged', { ruleIds: [input.ruleId] });
     return ok(undefined);
   },
 };

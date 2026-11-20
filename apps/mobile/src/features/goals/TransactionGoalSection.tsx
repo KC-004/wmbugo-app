@@ -41,8 +41,8 @@ export function TransactionGoalSection({ transactionId, api = realGoalsApi }: { 
               .removeTag(transactionId)
               .then(async (r) => {
                 if (!r.ok) return toast.show({ message: g.tagFailed });
-                await refresh();
-                toast.show({ message: g.untagToast.replace('{name}', goal.name), undo: { label: copy.common.undo, onUndo: () => void api.countToward(transactionId, goal.goalId).then(refresh) } });
+                void refresh();
+                toast.show({ message: g.untagToast.replace('{name}', goal.name), undo: { label: copy.common.undo, onUndo: () => void api.countToward(transactionId, goal.goalId).then(async (u) => (u.ok ? refresh() : toast.show({ message: g.undoFailed }))).catch(() => toast.show({ message: g.undoFailed })) } });
               })
               .catch(() => toast.show({ message: g.tagFailed }))
           }
@@ -56,9 +56,9 @@ export function TransactionGoalSection({ transactionId, api = realGoalsApi }: { 
     void api
       .countToward(transactionId, goalId)
       .then(async (r) => {
-        if (!r.ok) return toast.show({ message: g.tagFailed });
-        await refresh();
-        toast.show({ message: g.tagToast.replace('{name}', name), undo: { label: copy.common.undo, onUndo: () => void api.removeTag(transactionId).then(refresh) } });
+        if (!r.ok) return toast.show({ message: r.code === 'NOT_GOALS_ACCOUNT' ? g.wrongPot : g.tagFailed });
+        void refresh();
+        toast.show({ message: g.tagToast.replace('{name}', name), undo: { label: copy.common.undo, onUndo: () => void api.removeTag(transactionId).then(async (u) => (u.ok ? refresh() : toast.show({ message: g.undoFailed }))).catch(() => toast.show({ message: g.undoFailed })) } });
       })
       .catch(() => toast.show({ message: g.tagFailed }));
   };

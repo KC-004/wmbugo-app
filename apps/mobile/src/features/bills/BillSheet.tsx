@@ -79,9 +79,12 @@ export function BillSheet({ start, pickers, onSave, close }: { start: BillSheetM
     if (error?.field === f) setError(null);
   };
 
+  // A category the user picked by hand (or an edited bill's own) stays when the kind changes.
+  const [categoryPicked, setCategoryPicked] = useState(rule !== null && rule !== undefined);
   const chooseKind = (k: BillKind) => {
     setKind(k);
     // A new kind pre-selects its category, which can still be changed.
+    if (categoryPicked) return;
     const c = categoryFor(k, pickers.categories);
     if (c) setCategoryId(c);
   };
@@ -178,6 +181,7 @@ export function BillSheet({ start, pickers, onSave, close }: { start: BillSheetM
           <>
             <Text accessibilityRole="header" style={[textStyle('label'), ink]}>{b.fromAccount}</Text>
             <View style={styles.row} accessibilityRole="radiogroup" accessibilityLabel={b.fromAccount}>
+              <Chip onGlass role="radio" label={b.accountNone} testID="bill-account-none" selected={accountId === null} onPress={() => setAccountId(null)} />
               {pickers.accounts.map((a) => (
                 <Chip key={a.id} onGlass role="radio" variant="account" label={a.name} testID={`bill-account-${a.id}`} selected={accountId === a.id} onPress={() => setAccountId(a.id)} />
               ))}
@@ -195,7 +199,7 @@ export function BillSheet({ start, pickers, onSave, close }: { start: BillSheetM
         <Text accessibilityRole="header" style={[textStyle('label'), ink]}>{b.category}</Text>
         <View style={styles.row} accessibilityRole="radiogroup" accessibilityLabel={b.category}>
           {tops.map((c) => (
-            <Chip key={c.id} onGlass role="radio" label={c.name} testID={`bill-category-${c.id}`} selected={categoryId === c.id} onPress={() => setCategoryId(c.id)} />
+            <Chip key={c.id} onGlass role="radio" label={c.name} testID={`bill-category-${c.id}`} selected={categoryId === c.id} onPress={() => { setCategoryPicked(true); setCategoryId(c.id); }} />
           ))}
         </View>
 
@@ -226,7 +230,7 @@ export function BillSheet({ start, pickers, onSave, close }: { start: BillSheetM
         {errorText('end')}
         <View ref={errRef} accessible={error?.field === 'form'}>{errorText('form')}</View>
       </ScrollView>
-      <Button label={b.save} testID="bill-save" onPress={() => void submit()} />
+      <Button label={busy ? b.saving : b.save} testID="bill-save" {...(busy ? { disabledReason: b.saving } : {})} onPress={() => void submit()} />
     </View>
   );
 }

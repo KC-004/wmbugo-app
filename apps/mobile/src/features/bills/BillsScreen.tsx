@@ -1,4 +1,4 @@
-import { useRef, useState, type ComponentRef } from 'react';
+import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { isAmountsHidden, useAmountsHidden } from '../../shared/state/amountsHidden';
@@ -32,14 +32,27 @@ export function BillsScreen({ api = realBillsApi, onBack, onOpenBill, focusRuleI
   const theme = useTheme();
   const actions = useBillActions(api);
   const scroller = useRef<ComponentRef<typeof ScrollView>>(null);
-  const ys = useRef<Record<string, number>>({});
+  // Where each row and each collapsed group sits, so a tapped reminder can scroll to a bill inside Paused or Ended too.
+  const rowAt = useRef<Record<string, { y: number; group: 'paused' | 'ended' | null }>>({});
+  const groupY = useRef<Record<string, number>>({});
   const scrolled = useRef(false);
   const [filter, setFilter] = useState<'all' | 'subscriptions'>('all');
   const q = useQuery({ queryKey: BILLS_QUERY_KEY, queryFn: () => api.load() });
   const [open, setOpen] = useState<{ paused: boolean; ended: boolean }>({ paused: false, ended: false });
+  // A new reminder tap scrolls again; the bill's group opens and the filter shows every bill so its row exists.
+  useEffect(() => {
+    scrolled.current = false;
+  }, [focusRuleId]);
+  useEffect(() => {
+    if (!focusRuleId || !q.data) return;
+    const list = q.data.list;
+    setFilter('all');
+    if (list.paused.some((r) => r.id === focusRuleId)) setOpen((o) => ({ ...o, paused: true }));
+    else if (list.ended.some((r) => r.id === focusRuleId)) setOpen((o) => ({ ...o, ended: true }));
+  }, [focusRuleId, q.data]);
   const header = <TopBar title={b.title} onBack={onBack} backTestID="bills-back" />;
 
-  if (q.isError) return <View style={styles.fill}>{header}<ErrorBlock cause={b.loadError} onRetry={() => void q.refetch()} /></View>;
+  if (q.isError || q.data === null) return <View style={styles.fill}>{header}<ErrorBlock cause={b.loadError} onRetry={() => void q.refetch()} /></View>;
   if (!q.data) {
     return (
       <View style={styles.fill} testID="bills-loading">
@@ -67,8 +80,8 @@ export function BillsScreen({ api = realBillsApi, onBack, onOpenBill, focusRuleI
     const note = r.state === 'paused' ? b.notCountedPaused : r.state === 'ended' ? b.notCountedEnded : null;
     return [base, note].filter(Boolean).join(' · ') || undefined;
   };
-  const row = (r: BillRowModel) => (
-    <View key={r.id} onLayout={(e) => { ys.current[r.id] = e.nativeEvent.layout.y; }}>
+  const row = (r: BillRowModel, group: 'paused' | 'ended' | null) => (
+    <View key={r.id} onLayout={(e) => { rowAt.current[r.id] = { y: e.nativeEvent.layout.y, group }; }}>
     <BillRow
       row={r}
       currency={data.currency}
@@ -83,7 +96,7 @@ export function BillsScreen({ api = realBillsApi, onBack, onOpenBill, focusRuleI
   );
   const group = (key: 'paused' | 'ended', title: string, rows: readonly BillRowModel[]) =>
     rows.length === 0 ? null : (
-      <View key={key} testID={`bills-group-${key}`} style={styles.group}>
+      <View key={key} testID={`bills-group-${key}`} style={styles.group} onLayout={(e) => { groupY.current[key] = e.nativeEvent.layout.y; }}>
         <Pressable
           testID={`bills-toggle-${key}`}
           {...controlA11y({ label: `${title}, ${rows.length}`, role: 'button', selected: open[key] })}
@@ -92,12 +105,12 @@ export function BillsScreen({ api = realBillsApi, onBack, onOpenBill, focusRuleI
           <Icon icon={open[key] ? CaretDown : CaretRight} size={18} color="text-secondary" />
           <Text accessibilityRole="header" style={[textStyle('label'), { color: theme.color('text-secondary') }]}>{`${title} (${rows.length})`}</Text>
         </Pressable>
-        {open[key] ? rows.map(row) : null}
+        {open[key] ? rows.map((r) => row(r, key)) : null}
       </View>
     );
 
   const filters = (
-    <View style={styles.filters} accessibilityRole="radiogroup" accessibilityLabel={b.title}>
+    <View style={styles.filters} accessibilityRole="radiogroup" accessibilityLabel={b.filterLabel}>
       <Chip role="radio" variant="period" label={b.allBills} testID="bills-filter-all" selected={!subsOnly} onPress={() => setFilter('all')} />
       <Chip role="radio" variant="period" label={b.subscriptions} testID="bills-filter-subscriptions" selected={subsOnly} onPress={() => setFilter('subscriptions')} />
     </View>
@@ -120,9 +133,10 @@ export function BillsScreen({ api = realBillsApi, onBack, onOpenBill, focusRuleI
         contentContainerStyle={styles.pad}
         keyboardShouldPersistTaps="handled"
         onContentSizeChange={() => {
-          const y = focusRuleId ? ys.current[focusRuleId] : undefined;
-          if (y !== undefined && !scrolled.current) {
+          const at = focusRuleId ? rowAt.current[focusRuleId] : undefined;
+          if (at !== undefined && !scrolled.current) {
             scrolled.current = true;
+            const y = at.y + (at.group ? (groupY.current[at.group] ?? 0) : 0);
             scroller.current?.scrollTo({ y: Math.max(0, y - 8), animated: false });
           }
         }}>
@@ -139,7 +153,7 @@ export function BillsScreen({ api = realBillsApi, onBack, onOpenBill, focusRuleI
         ) : null}
         {subsOnly && active.length + paused.length + ended.length === 0 ? <Text testID="bills-subs-empty" style={[textStyle('body'), { color: theme.color('text-secondary') }]}>{b.subsEmpty}</Text> : null}
         <Button label={b.add} variant="secondary" testID="bills-add" onPress={add} />
-        {active.map(row)}
+        {active.map((r) => row(r, null))}
         {group('paused', b.groupPaused, paused)}
         {group('ended', b.groupEnded, ended)}
       </ScrollView>

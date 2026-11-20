@@ -41,7 +41,7 @@ export async function homeSavingsGoal(q: Querier, nowMs: number): Promise<Saving
   const dated = active.filter((g) => g.dueDate !== null).sort((a, b) => (a.dueDate! < b.dueDate! ? -1 : a.dueDate! > b.dueDate! ? 1 : 0));
   let goal = dated[0];
   if (!goal) {
-    const last = new Map((await q.query('SELECT goal_id, MAX(created_at) FROM goal_allocation GROUP BY goal_id')).map((r) => [String(r[0]), Number(r[1])]));
+    const last = new Map((await q.query("SELECT x.goal_id, MAX(x.created_at) FROM goal_allocation x WHERE x.kind = 'set_aside' OR (x.kind = 'moved' AND EXISTS (SELECT 1 FROM \"transaction\" t WHERE t.id = x.transaction_id AND t.status = 'confirmed' AND t.removed_at IS NULL)) GROUP BY x.goal_id")).map((r) => [String(r[0]), Number(r[1])]));
     goal = [...active].sort((a, b) => (last.get(b.id) ?? 0) - (last.get(a.id) ?? 0))[0]!;
   }
   return { goal, moreCount: active.length - 1 };

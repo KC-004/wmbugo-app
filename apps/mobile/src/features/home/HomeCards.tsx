@@ -262,7 +262,7 @@ function ComingUpCard({ d, currency, locale, nav }: { d: ComingUp; currency: Cur
             const s = statusText(timelineAsRow(i).status);
             const label = `${i.title}, ${dayMonthLabel(i.dueDate)}, ${amountLabel({ amountMinor: i.expectedAmountMinor, currency, locale, inline: true })}, ${s.text}`;
             return (
-              <Pressable key={`${i.ruleId}-${i.dueDate}`} testID={`coming-up-${i.ruleId}-${i.dueDate}`} {...controlA11y({ label, role: 'button' })} onPress={() => nav.onOpenBill?.(i.ruleId)} style={styles.comingRow}>
+              <Pressable key={`${i.ruleId}-${i.dueDate}`} testID={`coming-up-${i.ruleId}-${i.dueDate}`} {...(nav.onOpenBill ? { ...controlA11y({ label, role: 'button' }), onPress: () => nav.onOpenBill!(i.ruleId) } : { accessible: true, accessibilityLabel: label, disabled: true })} style={styles.comingRow}>
                 <View style={styles.comingText}>
                   <Text style={[textStyle('body-medium'), { color: theme.color('text-primary') }]}>{`${i.title} · ${dayMonthLabel(i.dueDate)}`}</Text>
                   <Text style={[textStyle('caption'), { color: theme.color(s.tone === 'warning' ? 'semantic-warning' : 'text-secondary') }]}>{s.text}</Text>
@@ -282,7 +282,7 @@ function SavingsGoalHomeCard({ d, currency, locale, nav }: { d: SavingsGoalCard;
   const c = copy.home.cards;
   return (
     <CardFrame id="savings_goal" title={c.savingsGoal} scope={null}>
-      <GoalCard bare goal={d.goal} currency={currency} locale={locale} onPress={() => nav.onOpenGoal?.(d.goal.id)} />
+      <GoalCard bare goal={d.goal} currency={currency} locale={locale} {...(nav.onOpenGoal ? { onPress: () => nav.onOpenGoal!(d.goal.id) } : {})} />
       {d.moreCount > 0 ? <Button label={d.moreCount === 1 ? c.moreGoalOne : c.moreGoals.replace('{n}', String(d.moreCount))} variant="text" testID="savings-goal-more" onPress={() => nav.onOpenGoals?.()} /> : null}
     </CardFrame>
   );
@@ -317,6 +317,9 @@ export function HomeCards({ api, toCheckCount, currency, locale, nav, layout = d
   const inputs = { toCheckCount, ...(income.data !== undefined ? { income: income.data } : {}), ...(budgets.data !== undefined ? { budgets: budgets.data } : {}), ...(topCategories.data !== undefined ? { topCategories: topCategories.data } : {}), ...(spend7d.data !== undefined ? { spend7d: spend7d.data } : {}), ...(comingUp.data !== undefined ? { comingUp: comingUp.data } : {}), ...(savingsGoal.data !== undefined ? { savingsGoal: savingsGoal.data } : {}) };
   const shown = new Set(visibleCards(inputs).map((c) => c.id));
   const budgetsFailed = budgets.isError && budgets.data === undefined;
+  // These two cards are hidden when there is nothing to show, so they get no skeleton (most people would see it flash); a failed load is still said.
+  const comingUpFailed = comingUp.isError && comingUp.data === undefined;
+  const savingsGoalFailed = savingsGoal.isError && savingsGoal.data === undefined;
 
   const render = (id: CardId): ReactNode => {
     switch (id) {
@@ -339,9 +342,11 @@ export function HomeCards({ api, toCheckCount, currency, locale, nav, layout = d
         if (spend7d.isError) return <CardError key={id} id={id} title={copy.home.cards.spendLastWeek} onRetry={() => void spend7d.refetch()} />;
         return <Skeleton key={id} height={160} />;
       case 'coming_up':
-        return comingUp.data ? <ComingUpCard key={id} d={comingUp.data} currency={currency} locale={locale} nav={nav} /> : null;
+        if (comingUp.data) return <ComingUpCard key={id} d={comingUp.data} currency={currency} locale={locale} nav={nav} />;
+        return comingUpFailed ? <CardError key={id} id={id} title={copy.home.cards.comingUp} onRetry={() => void comingUp.refetch()} /> : null;
       case 'savings_goal':
-        return savingsGoal.data ? <SavingsGoalHomeCard key={id} d={savingsGoal.data} currency={currency} locale={locale} nav={nav} /> : null;
+        if (savingsGoal.data) return <SavingsGoalHomeCard key={id} d={savingsGoal.data} currency={currency} locale={locale} nav={nav} />;
+        return savingsGoalFailed ? <CardError key={id} id={id} title={copy.home.cards.savingsGoal} onRetry={() => void savingsGoal.refetch()} /> : null;
       case 'nws':
         return budgets.data?.nws ? <NwsCard key={id} cards={budgets.data} currency={currency} locale={locale} onOpenPlan={nav.onOpenPlan} onOpenActivity={nav.onOpenActivity} /> : null;
     }
@@ -350,7 +355,7 @@ export function HomeCards({ api, toCheckCount, currency, locale, nav, layout = d
   // Registry order. The Budgets slot also holds its skeleton while loading and its error if the load failed.
   // `N to check` is always first; the rest follow the saved order, hidden cards left out.
   const order: CardId[] = layoutReady ? ['to_check', ...layout.filter((e) => !e.hidden).map((e) => e.cardId as CardId)] : ['to_check'];
-  const slots = order.filter((id) => (id === 'budgets' ? shown.has('budgets') || budgetsFailed || budgets.isPending : shown.has(id)));
+  const slots = order.filter((id) => (id === 'budgets' ? shown.has('budgets') || budgetsFailed || budgets.isPending : id === 'coming_up' ? shown.has(id) || comingUpFailed : id === 'savings_goal' ? shown.has(id) || savingsGoalFailed : shown.has(id)));
   return (
     <View testID="home-cards" style={styles.stack}>
       {slots.map((id) => render(id))}

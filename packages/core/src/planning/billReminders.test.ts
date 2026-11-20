@@ -51,12 +51,14 @@ describe('planBillReminders (Story 6.5, REC-003)', () => {
     expect(planBillReminders([r], [], '2026-12-03', 9 * 60)).toHaveLength(0);
   });
 
-  it('five reminders on one day post the two earliest due dates and one "3 more reminders"; three post all three', () => {
+  it('five reminders on one day post the two earliest due dates and one "3 more reminders"; three also keep the third slot for the overflow', () => {
     const five = ['Aa', 'Bb', 'Cc', 'Dd', 'Ee'].map((t, i) => rule({ id: `r${i}`, title: t }));
     const list = planBillReminders(five, [], '2026-12-03');
     expect(summary(list)).toEqual([['2026-12-04', 'Aa'], ['2026-12-04', 'Bb'], ['2026-12-04', '+3']]);
     expect(list[2]).toMatchObject({ kind: 'overflow', id: 'bills-more-2026-12-04' });
-    expect(summary(planBillReminders(five.slice(0, 3), [], '2026-12-03'))).toEqual([['2026-12-04', 'Aa'], ['2026-12-04', 'Bb'], ['2026-12-04', 'Cc']]);
+    // Exactly three: two go out singly and the third is "1 more reminder", so a folded budget alert never makes a fourth notification.
+    expect(summary(planBillReminders(five.slice(0, 3), [], '2026-12-03'))).toEqual([['2026-12-04', 'Aa'], ['2026-12-04', 'Bb'], ['2026-12-04', '+1']]);
+    expect(summary(planBillReminders(five.slice(0, 2), [], '2026-12-03'))).toEqual([['2026-12-04', 'Aa'], ['2026-12-04', 'Bb']]);
   });
 });
 

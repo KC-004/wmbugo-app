@@ -1,6 +1,6 @@
 import { addDays } from '../profile/period';
 import type { Querier } from './budgets';
-import { billOccurrences, monthlyEquivalent, nextDue, roundHalfUp, sumFractions, type BillKind, type BillPayment, type BillRule, type BillStatus, type Cadence, type CustomUnit } from './recurring';
+import { billOccurrences, isEffectivelyEnded, monthlyEquivalent, nextDue, roundHalfUp, sumFractions, type BillKind, type BillPayment, type BillRule, type BillStatus, type Cadence, type CustomUnit } from './recurring';
 import { localToday, mapPayments, mapRules, RECURRING_PAYMENTS_SQL, RECURRING_RULES_SQL, RECURRING_RULE_SQL } from './recurringStore';
 
 /**
@@ -84,7 +84,7 @@ async function readNames(q: Querier): Promise<Names> {
 
 /** The occurrence that matters now: the newest due date up to 3 days ahead, or the next one when nothing is that close. */
 function statusFor(rule: BillRule, payments: readonly BillPayment[], today: string, linked: LinkedEntries): { status: BillStatusLine; focusDate: string | null; focusStatus: BillStatus | null } {
-  if (rule.endedAt !== null) return { status: { kind: 'ended', date: null, daysUntilDue: null, paidBy: null }, focusDate: null, focusStatus: null };
+  if (isEffectivelyEnded(rule, today)) return { status: { kind: 'ended', date: null, daysUntilDue: null, paidBy: null }, focusDate: null, focusStatus: null };
   if (rule.pausedAt !== null) return { status: { kind: 'paused', date: null, daysUntilDue: null, paidBy: null }, focusDate: null, focusStatus: null };
   const from = rule.anchorDate > addDays(today, -LOOKBACK_DAYS) ? rule.anchorDate : addDays(today, -LOOKBACK_DAYS);
   const last = billOccurrences([rule], payments, from, addDays(today, 3), today).at(-1);
@@ -113,7 +113,7 @@ function toRow(rule: BillRule, payments: readonly BillPayment[], names: Names, t
     categoryName: cat?.name ?? null,
     categoryIcon: cat?.icon ?? null,
     categoryColor: cat?.color ?? null,
-    state: rule.endedAt !== null ? 'ended' : rule.pausedAt !== null ? 'paused' : 'active',
+    state: isEffectivelyEnded(rule, today) ? 'ended' : rule.pausedAt !== null ? 'paused' : 'active',
     nextDue: nextDue(rule, mine, today),
     status: statusFor(rule, mine, today, linked).status,
     hasPayments: mine.length > 0,
@@ -131,7 +131,7 @@ export async function loadBillsList(q: Querier, nowMs: number): Promise<BillsLis
   const linked = await readLinked(q, payments);
   const rows = rules.map((r) => toRow(r, payments, names, today, linked));
   const byDue = (a: BillRowModel, b: BillRowModel) => (a.nextDue ?? '9999') < (b.nextDue ?? '9999') ? -1 : (a.nextDue ?? '9999') > (b.nextDue ?? '9999') ? 1 : a.title.localeCompare(b.title);
-  const subs = rules.filter((r) => r.kind === 'subscription' && r.endedAt === null && r.pausedAt === null);
+  const subs = rules.filter((r) => r.kind === 'subscription' && !isEffectivelyEnded(r, today) && r.pausedAt === null);
   return {
     today,
     subscriptions: { totalMinor: roundHalfUp(sumFractions(subs.map(monthlyEquivalent))), counted: subs.length },
@@ -181,6 +181,6 @@ export async function loadBillDetail(q: Querier, nowMs: number, id: string): Pro
     .reverse()
     .slice(0, 24);
   const focus = statusFor(rule, payments, today, linked);
-  const markable = rule.pausedAt !== null || rule.endedAt !== null ? null : focus.focusDate !== null && focus.focusStatus !== 'paid' ? focus.focusDate : row.nextDue;
+  const markable = rule.pausedAt !== null || isEffectivelyEnded(rule, today) ? null : focus.focusDate !== null && focus.focusStatus !== 'paid' ? focus.focusDate : row.nextDue;
   return { rule, row, today, history, markableDate: markable, canDelete: !row.hasPayments };
 }

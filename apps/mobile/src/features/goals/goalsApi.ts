@@ -141,5 +141,7 @@ export const realGoalsApi: GoalsApi = {
 async function thisMonth(): Promise<string> {
   const p = (await getServices().db.query('SELECT timezone_id FROM profile LIMIT 1'))[0];
   const d = p ? toLocalDate(systemClock.nowMs(), String(p[0])) : null;
-  return d && d.ok ? d.value.slice(0, 7) : '0000-00';
+  // No guess: a month of 0000-00 would let any past month through the date check, so a failed read fails the screen's load.
+  if (!d || !d.ok) throw new Error('NO_PROFILE');
+  return d.value.slice(0, 7);
 }

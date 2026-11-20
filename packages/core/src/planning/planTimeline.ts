@@ -2,7 +2,7 @@ import { budgetPeriodFor, daysBetween, periodRangeLabel } from '../profile/perio
 import { toLocalDate } from '../shared/clock';
 import type { Querier } from './budgets';
 import { readPeriodProfile } from './budgetStore';
-import { billOccurrences, nextDue, type BillOccurrence } from './recurring';
+import { billOccurrences, isEffectivelyEnded, nextDue, type BillOccurrence } from './recurring';
 import { mapPayments, mapRules, RECURRING_PAYMENTS_SQL, RECURRING_RULES_SQL } from './recurringStore';
 
 /**
@@ -56,7 +56,7 @@ export async function loadPlanTimeline(q: Querier, nowMs: number): Promise<PlanT
   const txDates = new Map<string, string>();
   const linkedIds = payments.map((p) => p.transactionId).filter((x): x is string => x !== null);
   if (linkedIds.length > 0) for (const r of await q.query(`SELECT id, local_date FROM "transaction" WHERE id IN (${linkedIds.map(() => '?').join(',')})`, linkedIds)) txDates.set(String(r[0]), String(r[1]));
-  const active = rules.filter((r) => r.pausedAt === null && r.endedAt === null && r.removedAt === null);
+  const active = rules.filter((r) => r.pausedAt === null && !isEffectivelyEnded(r, today) && r.removedAt === null);
   const items: TimelineItem[] = billOccurrences(active, payments, period.start, period.end, today)
     // The history of older unpaid dates is not part of what is coming; only the one `Not seen yet` stays.
     .filter((o) => o.status !== 'not_marked_paid')

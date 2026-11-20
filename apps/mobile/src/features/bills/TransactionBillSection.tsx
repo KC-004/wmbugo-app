@@ -2,6 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { dayMonthLabel } from '@wmbugo/core';
 import { copy } from '../../shared/copy';
+import { useToast } from '../../shared/feedback/ToastHost';
 import { BillMatchPrompt } from '../../shared/BillMatchPrompt';
 import { useTheme } from '../../shared/theme/ThemeProvider';
 import { radii } from '../../shared/theme/tokens';
@@ -20,6 +21,7 @@ import { invalidateForEvent } from '../../shared/queryClient';
 export function TransactionBillSection({ transactionId, api = realBillsApi }: { transactionId: string; api?: BillsApi }) {
   const theme = useTheme();
   const qc = useQueryClient();
+  const toast = useToast();
   const actions = useBillActions(api);
   const q = useQuery({ queryKey: entryBillKey(transactionId), queryFn: () => api.forEntry(transactionId) });
   const state = q.data;
@@ -40,7 +42,7 @@ export function TransactionBillSection({ transactionId, api = realBillsApi }: { 
     <BillMatchPrompt
       billName={m.title}
       onLink={() => void actions.link({ id: m.ruleId, title: m.title }, m.dueDate, transactionId)}
-      onDismiss={() => void api.dismissMatch(m.ruleId, transactionId).then(() => invalidateForEvent(qc, 'RecurringChanged')).catch(() => undefined)}
+      onDismiss={() => void api.dismissMatch(m.ruleId, transactionId).then(async (r) => (r.ok ? invalidateForEvent(qc, 'RecurringChanged') : toast.show({ message: copy.bills.actionFailed }))).catch(() => toast.show({ message: copy.bills.actionFailed }))}
     />
   );
 }

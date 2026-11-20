@@ -172,6 +172,7 @@ export function PlanHubScreen({
     return (
       <View style={styles.gap}>
         <Text testID="plan-period" style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{p.periodCaption.replace('{label}', timeline.period.label).replace('{days}', daysText)}</Text>
+        {timeline.activeBills === 0 ? <Text testID="plan-no-active" style={[textStyle('body'), { color: theme.color('text-secondary') }]}>{p.noActiveBills}</Text> : null}
         {timeline.items.length === 0 && timeline.activeBills > 0 ? <Text testID="plan-nothing-due" style={[textStyle('body'), { color: theme.color('text-secondary') }]}>{p.nothingDue.replace('{when}', when)}</Text> : null}
         {timeline.items.map((i) => (
           <BillRow
@@ -188,7 +189,7 @@ export function PlanHubScreen({
         {timeline.activeBills > 0 ? (
           <View style={styles.footerRow}>
             <Text testID="plan-showing" style={[textStyle('caption'), { color: theme.color('text-secondary'), flexShrink: 1 }]}>{timeline.activeBills === 1 ? p.showingOne : p.showingMany.replace('{n}', String(timeline.activeBills))}</Text>
-            <Button label={p.addThem} variant="text" testID="plan-add-them" onPress={() => addBill()} />
+            {billsQ.data ? <Button label={p.addThem} variant="text" testID="plan-add-them" onPress={() => addBill()} /> : null}
           </View>
         ) : null}
       </View>
@@ -197,6 +198,7 @@ export function PlanHubScreen({
 
   const billsSummary = (): string | null => {
     if (!timeline) return null;
+    if (timeline.activeBills === 0) return p.billsPausedOnly;
     const count = timeline.activeBills === 1 ? p.billsCountOne : p.billsCountMany.replace('{n}', String(timeline.activeBills));
     return timeline.nextBill ? p.billsSummary.replace('{count}', count).replace('{name}', timeline.nextBill.title).replace('{date}', dayMonthLabel(timeline.nextBill.dueDate)) : count;
   };
@@ -248,6 +250,11 @@ export function PlanHubScreen({
             <GoalCard key={g.id} goal={g} currency={goalsQ.data!.currency} locale={goalsQ.data!.locale} thisMonth={goalsQ.data!.thisMonth} onPress={() => onOpenGoal(g.id)} />
           ))}
           <Button label={p.seeAllGoals} variant="text" testID="plan-see-all-goals" onPress={onOpenGoals} />
+        </Section>
+      ) : goalCount !== null && goalCount > 0 ? (
+        // Every goal is Done or Archived: the section stays, so they can still be reached.
+        <Section title={p.goalsSection} testID="plan-goals">
+          <LinkRow testID="plan-see-all-goals" label={p.seeAllGoals} onPress={onOpenGoals} />
         </Section>
       ) : null}
     </ScrollView>

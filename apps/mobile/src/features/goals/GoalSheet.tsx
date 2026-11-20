@@ -82,6 +82,7 @@ export function GoalSheet({
     }
     if (r.ok) return close();
     if (r.code === 'NAME_REQUIRED') return fail('name', g.errName);
+    if (r.code === 'NAME_TOO_LONG') return fail('name', g.errNameLong);
     if (r.code === 'AMOUNT_REQUIRED') return fail('amount', g.errAmount);
     if (r.code === 'DATE_PAST' || r.code === 'DATE_INVALID') return fail('date', g.errDate);
     setError({ field: 'form', text: g.saveFailed });
@@ -152,7 +153,7 @@ export function GoalSheet({
         ) : null}
         {errorText('form')}
       </ScrollView>
-      <Button label={g.save} testID="goal-save" onPress={() => void submit()} />
+      <Button label={busy ? g.saving : g.save} testID="goal-save" {...(busy ? { disabledReason: g.saving } : {})} onPress={() => void submit()} />
     </View>
   );
 }

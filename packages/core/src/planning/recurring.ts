@@ -44,6 +44,8 @@ export interface BillRule extends Recurrence {
   readonly removedAt: number | null;
   /** Remind me: days before the due date (0, 1 or 3); null is Off (Story 6.5). */
   readonly remindDays: number | null;
+  /** Earlier pauses that have ended, as [from, to) local-date pairs; the latest pause is pausedOn and resumedOn. */
+  readonly pauseGaps?: readonly (readonly [string, string])[];
 }
 
 interface Step {
@@ -127,11 +129,15 @@ export function lastDueDate(rule: Pick<BillRule, 'endsOn' | 'endedOn'>): string 
  * True for a due date lost to a pause: from the day the rule was paused until the day it resumed (still paused, it never
  * resumes). Missed dates while paused are never created, so they never become `not_seen_yet`.
  */
-function inPauseGap(rule: Pick<BillRule, 'pausedOn' | 'resumedOn' | 'pausedAt'>, date: string): boolean {
+function inPauseGap(rule: Pick<BillRule, 'pausedOn' | 'resumedOn' | 'pausedAt' | 'pauseGaps'>, date: string): boolean {
+  if (rule.pauseGaps?.some(([from, to]) => date >= from && date < to)) return true;
   if (rule.pausedOn === null || date < rule.pausedOn) return false;
   if (rule.pausedAt !== null) return true;
   return rule.resumedOn !== null && date < rule.resumedOn;
 }
+
+/** True once a bill has been ended, or its end date has passed: it is shown as Ended and counts nowhere, with no action needed. */
+export const isEffectivelyEnded = (rule: Pick<BillRule, 'endedAt' | 'endsOn'>, today: string): boolean => rule.endedAt !== null || (rule.endsOn !== null && rule.endsOn < today);
 
 /** The due dates a rule really has in a range: not removed, nothing after its end, nothing lost to a pause. */
 export function ruleOccurrences(rule: BillRule, fromDate: string, toDate: string): string[] {

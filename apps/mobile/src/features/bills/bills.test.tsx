@@ -8,6 +8,7 @@ import { createQueryClient } from '../../shared/queryClient';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
 import { BillsScreen } from './BillsScreen';
 import { BillDetailScreen } from './BillDetailScreen';
+import { ruleAsInput } from './useBillActions';
 import { TransactionBillSection } from './TransactionBillSection';
 import type { BillDetailData, BillOutcome, BillsApi, BillsData, EntryBillState } from './billsApi';
 import { cadenceText, statusText } from './billText';
@@ -498,6 +499,14 @@ describe('Rent paid? Yes, link it (Story 6.3)', () => {
     api.link.mockResolvedValueOnce({ ok: false, code: 'OCCURRENCE_PAID:2026-12-05:Rent' });
     await press(r, 'bill-match-link');
     expect(texts(r)).toContain('Rent for 5 Dec is already paid.');
+  });
+});
+
+describe('ruleAsInput (Undo of an edit)', () => {
+  it('carries the reminder setting, so Undo puts the old Remind me back', () => {
+    const rule = { id: 'r1', title: 'Rent', expectedAmountMinor: 1_800_000, cadence: 'monthly', customEvery: null, customUnit: null, anchorDate: '2026-12-05', accountId: null, categoryId: null, kind: 'rent', paidTo: null, endsOn: null, pausedAt: null, pausedOn: null, resumedOn: null, endedAt: null, endedOn: null, removedAt: null, remindDays: 3 } as const;
+    expect(ruleAsInput(rule)).toMatchObject({ id: 'r1', remindDays: 3 });
+    expect(ruleAsInput({ ...rule, remindDays: null }).remindDays).toBeNull();
   });
 });
 

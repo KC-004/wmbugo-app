@@ -127,6 +127,8 @@ export function goalProgress(goal: Pick<GoalRow, 'contributedMinor' | 'remaining
   const monthly = Math.floor((2 * goal.contributedMinor + whole) / (2 * whole));
   if (monthly <= 0) return { ...base, pace: null };
   const needed = goal.remainingMinor === 0 ? 0 : Math.ceil(goal.remainingMinor / monthly);
+  // A target a century or more away is not a projection worth showing.
+  if (needed > 1200) return { ...base, pace: null };
   return { ...base, pace: { monthlyMinor: monthly, projectedMonth: addMonthsClamped(`${todayDate.slice(0, 7)}-01`, needed).slice(0, 7) } };
 }
 
@@ -175,7 +177,7 @@ export interface SaveGoalInput {
   readonly accountId?: string | null;
 }
 
-export type SaveGoalError = 'NAME_REQUIRED' | 'AMOUNT_REQUIRED' | 'DATE_PAST' | 'DATE_INVALID' | 'COLOR_INVALID' | 'ICON_REQUIRED' | 'ACCOUNT_NOT_FOUND' | 'GOAL_NOT_FOUND' | 'NO_PROFILE';
+export type SaveGoalError = 'NAME_REQUIRED' | 'NAME_TOO_LONG' | 'AMOUNT_REQUIRED' | 'DATE_PAST' | 'DATE_INVALID' | 'COLOR_INVALID' | 'ICON_REQUIRED' | 'ACCOUNT_NOT_FOUND' | 'GOAL_NOT_FOUND' | 'NO_PROFILE';
 
 export const GOAL_NAME_MAX = 40;
 
@@ -202,6 +204,7 @@ export const SaveGoal: UseCase<SaveGoalInput, { goalId: string; created: boolean
   async execute(ctx, input) {
     const name = input.name.trim();
     if (name === '') return err('NAME_REQUIRED');
+    if (name.length > GOAL_NAME_MAX) return err('NAME_TOO_LONG');
     if (!Number.isSafeInteger(input.targetMinor) || input.targetMinor <= 0) return err('AMOUNT_REQUIRED');
     if (!(CATEGORY_COLOURS as readonly string[]).includes(input.color)) return err('COLOR_INVALID');
     if (input.icon.trim() === '') return err('ICON_REQUIRED');
@@ -255,14 +258,13 @@ async function readGoal(ctx: WriterContext, id: string): Promise<GoalRow | null>
 }
 
 /** `only ₹5,000 is set aside`: the code carries the amount so the message can say it. */
-export type TakeBackError = 'GOAL_NOT_FOUND' | 'AMOUNT_REQUIRED' | 'NOT_ACTIVE' | `EXCEEDS_SET_ASIDE:${number}`;
+export type TakeBackError = 'GOAL_NOT_FOUND' | 'AMOUNT_REQUIRED' | 'NOT_ACTIVE' | 'NO_PROFILE' | `EXCEEDS_SET_ASIDE:${number}`;
 export const parseExceedsSetAside = (code: string): number | null => {
   const m = /^EXCEEDS_SET_ASIDE:(\d+)$/.exec(code);
   return m ? Number(m[1]) : null;
 };
 
-async function addAllocation(ctx: WriterContext, goalId: string, kind: AllocationKind, amountMinor: number, transactionId: string | null = null): Promise<string> {
-  const t = (await today(ctx, ctx.nowMs())) ?? '1970-01-01';
+async function addAllocation(ctx: WriterContext, goalId: string, kind: AllocationKind, amountMinor: number, t: string, transactionId: string | null = null): Promise<string> {
   const id = ctx.newId();
   await ctx.execute('INSERT INTO goal_allocation (id, goal_id, kind, amount_minor, transaction_id, local_date, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)', [id, goalId, kind, amountMinor, transactionId, t, ctx.nowMs()]);
   return id;
@@ -272,14 +274,16 @@ async function addAllocation(ctx: WriterContext, goalId: string, kind: Allocatio
  * Sets money aside for a goal. Nothing moves: the money stays in its account and only stops counting as free to use. A
  * balance, `In accounts`, spending, the Savings bar and Left in budget are unchanged.
  */
-export const SetAsideForGoal: UseCase<{ goalId: string; amountMinor: number }, { allocationId: string }, 'GOAL_NOT_FOUND' | 'AMOUNT_REQUIRED' | 'NOT_ACTIVE'> = {
+export const SetAsideForGoal: UseCase<{ goalId: string; amountMinor: number }, { allocationId: string }, 'GOAL_NOT_FOUND' | 'AMOUNT_REQUIRED' | 'NOT_ACTIVE' | 'NO_PROFILE'> = {
   name: 'SetAsideForGoal',
   async execute(ctx, input) {
     if (!Number.isSafeInteger(input.amountMinor) || input.amountMinor <= 0) return err('AMOUNT_REQUIRED');
     const g = await readGoal(ctx, input.goalId);
     if (!g) return err('GOAL_NOT_FOUND');
     if (g.state !== 'active') return err('NOT_ACTIVE');
-    const allocationId = await addAllocation(ctx, g.id, 'set_aside', input.amountMinor);
+    const t = await today(ctx, ctx.nowMs());
+    if (t === null) return err('NO_PROFILE');
+    const allocationId = await addAllocation(ctx, g.id, 'set_aside', input.amountMinor, t);
     ctx.touch('goal_allocation', allocationId, { setAside: true, label: g.name });
     ctx.emit('GoalsChanged', { goalIds: [g.id] });
     return ok({ allocationId });
@@ -295,7 +299,9 @@ export const TakeBackFromGoal: UseCase<{ goalId: string; amountMinor: number }, 
     if (!g) return err('GOAL_NOT_FOUND');
     if (g.state !== 'active' && g.state !== 'paused') return err('NOT_ACTIVE');
     if (input.amountMinor > g.setAsideMinor) return err(`EXCEEDS_SET_ASIDE:${Math.max(0, g.setAsideMinor)}`);
-    const allocationId = await addAllocation(ctx, g.id, 'taken_back', input.amountMinor);
+    const t = await today(ctx, ctx.nowMs());
+    if (t === null) return err('NO_PROFILE');
+    const allocationId = await addAllocation(ctx, g.id, 'taken_back', input.amountMinor, t);
     ctx.touch('goal_allocation', allocationId, { takenBack: true, label: g.name });
     ctx.emit('GoalsChanged', { goalIds: [g.id] });
     return ok({ allocationId });
@@ -303,12 +309,18 @@ export const TakeBackFromGoal: UseCase<{ goalId: string; amountMinor: number }, 
 };
 
 /** Undo of a set aside or a take back: that one allocation is removed. A move into savings is undone through its entry instead. */
-export const UndoGoalAllocation: UseCase<{ allocationId: string }, void, 'ALLOCATION_NOT_FOUND' | 'NOT_UNDOABLE'> = {
+export const UndoGoalAllocation: UseCase<{ allocationId: string }, void, 'ALLOCATION_NOT_FOUND' | 'NOT_UNDOABLE' | 'PART_MOVED'> = {
   name: 'UndoGoalAllocation',
   async execute(ctx, input) {
-    const r = (await ctx.query('SELECT goal_id, kind FROM goal_allocation WHERE id = ?', [input.allocationId]))[0];
+    const r = (await ctx.query('SELECT goal_id, kind, amount_minor FROM goal_allocation WHERE id = ?', [input.allocationId]))[0];
     if (!r) return err('ALLOCATION_NOT_FOUND');
     if (String(r[1]) === 'moved') return err('NOT_UNDOABLE');
+    // Part of this set-aside was replaced by a move into savings: taking it away would leave less than zero held.
+    if (String(r[1]) === 'set_aside') {
+      const g = await readGoal(ctx, String(r[0]));
+      const converted = Number((await ctx.query('SELECT COALESCE(SUM(x.converted_minor), 0) FROM goal_allocation x WHERE x.goal_id = ? AND ' + COUNTED_MOVE, [String(r[0])]))[0]?.[0] ?? 0);
+      if (g && converted > 0 && g.setAsideMinor - Number(r[2]) < 0) return err('PART_MOVED');
+    }
     await ctx.execute('DELETE FROM goal_allocation WHERE id = ?', [input.allocationId]);
     ctx.touch('goal_allocation', input.allocationId, { undone: true });
     ctx.emit('GoalsChanged', { goalIds: [String(r[0])] });
@@ -342,17 +354,17 @@ export const ChangeGoalState: UseCase<{ goalId: string; to: GoalState }, { from:
 
 // ---- Moves into savings (Story 6.7, GOAL-002/003/004) ------------------------------------------------------------------
 
-export type TagMoveError = 'GOAL_NOT_FOUND' | 'GOAL_NOT_ACTIVE' | 'NOT_A_SAVINGS_MOVE' | 'ALREADY_TAGGED';
+export type TagMoveError = 'GOAL_NOT_FOUND' | 'GOAL_NOT_ACTIVE' | 'NOT_A_SAVINGS_MOVE' | 'NOT_GOALS_ACCOUNT' | 'ALREADY_TAGGED';
 
 /** The transfer is from an ordinary account into a savings pot and not removed: the only kind that counts toward a goal. */
-async function savingsMove(ctx: Querier, transactionId: string): Promise<{ amountMinor: number; localDate: string } | null> {
+async function savingsMove(ctx: Querier, transactionId: string): Promise<{ amountMinor: number; localDate: string; toAccountId: string } | null> {
   const r = (
     await ctx.query(
-      "SELECT t.amount_minor, t.local_date FROM \"transaction\" t JOIN posting pf ON pf.transaction_id = t.id AND pf.signed_amount_minor < 0 JOIN account afr ON afr.id = pf.account_id JOIN posting pt ON pt.transaction_id = t.id AND pt.signed_amount_minor > 0 JOIN account ato ON ato.id = pt.account_id WHERE t.id = ? AND t.event_type = 'transfer' AND t.removed_at IS NULL AND ato.type = 'savings_pot' AND afr.type <> 'savings_pot'",
+      "SELECT t.amount_minor, t.local_date, ato.id FROM \"transaction\" t JOIN posting pf ON pf.transaction_id = t.id AND pf.signed_amount_minor < 0 JOIN account afr ON afr.id = pf.account_id JOIN posting pt ON pt.transaction_id = t.id AND pt.signed_amount_minor > 0 JOIN account ato ON ato.id = pt.account_id WHERE t.id = ? AND t.event_type = 'transfer' AND t.removed_at IS NULL AND ato.type = 'savings_pot' AND afr.type <> 'savings_pot'",
       [transactionId],
     )
   )[0];
-  return r ? { amountMinor: Number(r[0]), localDate: String(r[1]) } : null;
+  return r ? { amountMinor: Number(r[0]), localDate: String(r[1]), toAccountId: String(r[2]) } : null;
 }
 
 /**
@@ -366,6 +378,8 @@ export async function tagMoveForGoal(ctx: WriterContext, goalId: string, transac
   if (g.state !== 'active') return 'GOAL_NOT_ACTIVE';
   const move = await savingsMove(ctx, transactionId);
   if (!move) return 'NOT_A_SAVINGS_MOVE';
+  // A goal that names its savings account only counts moves into that pot.
+  if (g.accountId !== null && g.accountId !== move.toAccountId) return 'NOT_GOALS_ACCOUNT';
   if ((await ctx.query('SELECT 1 FROM goal_allocation WHERE transaction_id = ?', [transactionId])).length > 0) return 'ALREADY_TAGGED';
   const converted = Math.max(0, Math.min(g.setAsideMinor, move.amountMinor));
   const id = ctx.newId();

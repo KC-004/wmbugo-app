@@ -393,6 +393,16 @@ describe('homeHeroNav (Story 5.2)', () => {
     n.onSortIt({ categoryIds: ['c1'], fromDate: '2026-11-01', toDate: '2026-11-30' });
     expect(d.openActivity).toHaveBeenCalledWith({ categoryIds: ['c1'], fromDate: '2026-11-01', toDate: '2026-11-30' });
   });
+  it('opens a bill, a goal and the goals list from the Coming up and Savings goal cards', () => {
+    const d = deps();
+    const n = homeHeroNav(d);
+    n.onOpenBill('r1');
+    expect(d.navigate).toHaveBeenLastCalledWith('BillDetail', { ruleId: 'r1' });
+    n.onOpenGoal('g1');
+    expect(d.navigate).toHaveBeenLastCalledWith('GoalDetail', { goalId: 'g1' });
+    n.onOpenGoals();
+    expect(d.navigate).toHaveBeenLastCalledWith('Goals');
+  });
   it('opens a budget at its period, the review queue, and Activity from a card', () => {
     const d = deps();
     const n = homeHeroNav(d);

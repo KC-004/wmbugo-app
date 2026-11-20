@@ -44,7 +44,7 @@ export const goalFill = (goal: Pick<GoalRow, 'contributedMinor' | 'targetMinor'>
  * 2027`. When amounts are hidden the bar is not drawn and every amount is masked. A funded goal shows the boat relief moment
  * with `Mark complete`, no confetti and no exclamation mark. The card is one TalkBack node.
  */
-export function GoalCard({ goal, currency, locale, thisMonth, onPress, onComplete, bare = false }: { goal: GoalRow; /** Drawn inside another card (Home's Savings goal): no outline or fill of its own. */ bare?: boolean; currency: CurrencyCode; locale: string; /** The profile's current month (YYYY-MM), to tell a passed date. */ thisMonth?: string; onPress: () => void; onComplete?: () => void }) {
+export function GoalCard({ goal, currency, locale, thisMonth, onPress, onComplete, bare = false }: { goal: GoalRow; /** Drawn inside another card (Home's Savings goal): no outline or fill of its own. */ bare?: boolean; currency: CurrencyCode; locale: string; /** The profile's current month (YYYY-MM), to tell a passed date. */ thisMonth?: string; /** Without it the card is a plain summary, not a button (a goal's own detail screen). */ onPress?: () => void; onComplete?: () => void }) {
   useAmountsHidden(); // re-render when Hide amounts is toggled: this component builds amount text and labels
   const theme = useTheme();
   const hidden = isAmountsHidden();
@@ -64,7 +64,7 @@ export function GoalCard({ goal, currency, locale, thisMonth, onPress, onComplet
   const stateTag = goal.state === 'paused' ? g.paused : goal.state === 'completed' ? g.completed : goal.state === 'archived' ? g.archived : null;
   return (
     <View style={bare ? styles.bare : [styles.card, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
-      <Pressable testID={`goal-card-${goal.id}`} accessible accessibilityRole="button" accessibilityLabel={[spoken, stateTag].filter(Boolean).join(', ')} onPress={onPress} style={styles.row}>
+      <Pressable testID={`goal-card-${goal.id}`} accessible {...(onPress ? { accessibilityRole: 'button' as const } : {})} accessibilityLabel={[spoken, stateTag].filter(Boolean).join(', ')} {...(onPress ? { onPress } : { disabled: true })} style={styles.row}>
         <View style={[styles.chip, { backgroundColor: theme.color('bg-muted') }]}>
           <Icon icon={categoryIcon(goal.icon)} size={22} color={colour} />
         </View>

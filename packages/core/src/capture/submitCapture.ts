@@ -97,6 +97,8 @@ export const createSubmitCapture = (deps: { readonly suggester?: CategorySuggest
       return ok({ transactionId, accountId: acc ? String(acc[0]) : null, feeTransactionId: fee ? String(fee[0]) : null, result: 'ALREADY_SUBMITTED' });
     }
 
+    // A goal tag belongs to a move into savings only; anywhere else it would be dropped without a word.
+    if (input.goalId && !('transfer' in input)) return err('SUBMISSION_INVALID');
     if ('refund' in input) {
       const f = await createRefund(ctx, input.refund);
       if (!f.ok) return f;

@@ -5,6 +5,7 @@ import type { CurrencyCode, FreeToUse } from '@wmbugo/core';
 import { amountLabel, controlA11y } from '../../shared/a11y/labels';
 import { copy } from '../../shared/copy';
 import { Skeleton } from '../../shared/feedback/Feedback';
+import { Button } from '../../shared/ui/Button';
 import { useSheet } from '../../shared/feedback/SheetHost';
 import { isAmountsHidden, useAmountsHidden } from '../../shared/state/amountsHidden';
 import { Icon } from '../../shared/theme/Icon';
@@ -96,7 +97,15 @@ export function FreeToUseTile({ plan = realPlanApi, nav }: { plan?: PlanApi; nav
   const sheet = useSheet();
   const q = useQuery({ queryKey: PLAN_FREE_KEY, queryFn: () => plan.loadFreeToUse() });
   const d = q.data;
-  if (q.isError || d === null) return null;
+  if (q.isError) {
+    return (
+      <View testID="plan-free-error" accessibilityRole="alert" style={{ gap: 4 }}>
+        <Text style={[textStyle('body'), { color: theme.color('text-secondary') }]}>{copy.plan.sectionError}</Text>
+        <Button label={copy.plan.retry} variant="text" testID="plan-free-error-retry" onPress={() => void q.refetch()} />
+      </View>
+    );
+  }
+  if (d === null) return null;
   if (!d) return <Skeleton height={72} />;
   const f = d.free;
   const need = (step: string, onPress: () => void, testID: string) => (

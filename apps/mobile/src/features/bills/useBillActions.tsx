@@ -29,6 +29,8 @@ export const ruleAsInput = (r: BillRule): SaveRecurringRuleInput => ({
   kind: r.kind,
   paidTo: r.paidTo,
   endsOn: r.endsOn,
+  // Undo of an edit puts the reminder back too: left out, core would keep the value the edit chose.
+  remindDays: r.remindDays as 0 | 1 | 3 | null,
 });
 
 function ConfirmBody({ text, action, actionTestID, cancelTestID, onConfirm, close }: { text: string; action: string; actionTestID: string; cancelTestID: string; onConfirm: () => void; close: () => void }) {
@@ -72,7 +74,7 @@ export function useBillActions(api: BillsApi) {
           onSave={async (input) => {
             const r = await api.save(input);
             if (!r.ok) return r;
-            await refresh();
+            void refresh();
             onSaved?.(r.value.ruleId);
             // A bill saved with a reminder on is the one place bill reminders ask for the notification permission, once. The
             // editor closes itself after this returns, so the ask opens just after.
@@ -115,7 +117,7 @@ export function useBillActions(api: BillsApi) {
             void (async () => {
               const r = await api.markPaid(rule.id, dueDate).catch(() => ({ ok: false as const }));
               if (!r.ok) return failed();
-              await refresh();
+              void refresh();
               onDone?.();
               toast.show({ message: b.markedToast, undo: { label: copy.common.undo, onUndo: () => void api.unmarkPaid(rule.id, dueDate).then(refresh).catch(() => toast.show({ message: b.undoFailed })) } });
             })()
@@ -140,7 +142,7 @@ export function useBillActions(api: BillsApi) {
             void (async () => {
               const r = await api.end(rule.id).catch(() => ({ ok: false as const }));
               if (!r.ok) return failed();
-              await refresh();
+              void refresh();
               onDone?.();
               toast.show({ message: b.endedToast });
             })()
@@ -165,7 +167,7 @@ export function useBillActions(api: BillsApi) {
             void (async () => {
               const r = await api.remove(rule.id).catch(() => ({ ok: false as const }));
               if (!r.ok) return failed();
-              await refresh();
+              void refresh();
               onDone?.();
               toast.show({ message: b.deletedToast, undo: { label: copy.common.undo, onUndo: () => void api.restore(rule.id).then(refresh).catch(() => toast.show({ message: b.undoFailed })) } });
             })()
@@ -183,7 +185,7 @@ export function useBillActions(api: BillsApi) {
       toast.show({ message: p ? (p.kind === 'entry' ? b.alreadyLinked : b.alreadyPaid).replace('{name}', p.title).replace('{date}', dayMonthLabel(p.dueDate)) : b.linkFailed });
       return false;
     }
-    await refresh();
+    void refresh();
     toast.show({ message: b.linkedToast.replace('{name}', rule.title), undo: { label: copy.common.undo, onUndo: () => void api.unlink(transactionId).then(refresh).catch(() => toast.show({ message: b.undoFailed })) } });
     return true;
   };
@@ -211,21 +213,21 @@ export function useBillActions(api: BillsApi) {
   const unlink = async (transactionId: string) => {
     const r = await api.unlink(transactionId).catch(() => ({ ok: false as const }));
     if (!r.ok) return failed();
-    await refresh();
+    void refresh();
     toast.show({ message: b.unlinkedToast });
   };
 
   const pause = async (rule: { id: string; title: string }) => {
     const r = await api.pause(rule.id).catch(() => ({ ok: false as const }));
     if (!r.ok) return failed();
-    await refresh();
+    void refresh();
     toast.show({ message: b.pausedToast.replace('{name}', rule.title), undo: { label: copy.common.undo, onUndo: () => void api.resume(rule.id).then(refresh).catch(() => toast.show({ message: b.undoFailed })) } });
   };
 
   const resume = async (rule: { id: string; title: string }) => {
     const r = await api.resume(rule.id).catch(() => ({ ok: false as const }));
     if (!r.ok) return failed();
-    await refresh();
+    void refresh();
     const d = await api.loadDetail(rule.id).catch(() => null);
     const next = d && d !== 'missing' ? d.detail.row.nextDue : null;
     toast.show({ message: next ? b.resumedToast.replace('{name}', rule.title).replace('{date}', dayMonthLabel(next)) : b.resumedPlain.replace('{name}', rule.title) });

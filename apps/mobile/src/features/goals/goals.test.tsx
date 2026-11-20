@@ -292,6 +292,16 @@ describe('Pace and moves (Story 6.7)', () => {
     expect(has(r, 'goal-amount-note')).toBe(false);
   });
 
+  it('Free to use: restoring reads Free to use before the state changes, so the goal money is not counted twice', async () => {
+    const api = fakeApi(data(), detail(withMoney(goal({ state: 'archived' }), 3_000_000)));
+    api.freeToUse = jest.fn(async () => freeOk);
+    const r = await mountNode(<GoalDetailScreen goalId="g1" api={api} onBack={() => undefined} />);
+    await press(r, 'goal-detail-restore');
+    const free = (api.freeToUse as jest.Mock).mock.invocationCallOrder[0]!;
+    const change = api.changeState.mock.invocationCallOrder[0]!;
+    expect(free).toBeLessThan(change);
+  });
+
   it('Free to use: restoring an archived goal that holds money warns when it would leave you short', async () => {
     const api = fakeApi(data(), detail(withMoney(goal({ state: 'archived' }), 3_000_000)));
     api.freeToUse = jest.fn(async () => freeOk);

@@ -1,5 +1,15 @@
 import type { HandlerMap, Logger } from '@wmbugo/core';
 
+/** Runs `fn` one call at a time, in the order asked: two overlapping reminder syncs must not let an older plan land last. */
+export function serialize<T>(fn: () => Promise<T>): () => Promise<T> {
+  let tail: Promise<unknown> = Promise.resolve();
+  return () => {
+    const next = tail.then(fn, fn);
+    tail = next.catch(() => undefined);
+    return next;
+  };
+}
+
 /**
  * Makes the scheduled bill reminders match the bills (Story 6.5): after a bill changes, an entry changes (a linked payment
  * cancels its reminder) or the profile changes (a new timezone moves 09:00). Idempotent, so a failure only waits for the next

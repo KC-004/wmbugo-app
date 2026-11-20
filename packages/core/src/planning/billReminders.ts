@@ -38,8 +38,8 @@ const relationOf = (days: number): Relation => (days === 0 ? 'today' : days === 
 /**
  * Reminder slots for the next 14 days at 09:00 profile-local time for every unpaid due date of an active rule that has a
  * reminder. `nowMinutes` is the local time of day now, so today's 09:00 is not planned once it has passed. Per day the first
- * two go out individually and the rest become one `N more reminders` (three notifications at most); a day with three or fewer
- * reminders posts them all.
+ * two go out individually and the rest become one `N more reminders` (three notifications at most); a day with fewer than
+ * three reminders posts them all. The third slot is always the overflow, so a budget alert that arrives that day can fold into it.
  */
 export function planBillReminders(rules: readonly BillRule[], payments: readonly BillPayment[], today: string, nowMinutes = 0): PlannedReminder[] {
   const paid = new Set(payments.map((p) => `${p.ruleId}|${p.dueDate}`));
@@ -60,9 +60,10 @@ export function planBillReminders(rules: readonly BillRule[], payments: readonly
   const out: PlannedReminder[] = [];
   for (const day of [...byDay.keys()].sort()) {
     const list = byDay.get(day)!.sort((a, b) => (a.dueDate < b.dueDate ? -1 : a.dueDate > b.dueDate ? 1 : a.rule.title < b.rule.title ? -1 : 1));
-    const single = list.length <= DAILY_NOTIFICATION_CAP ? list : list.slice(0, DAILY_NOTIFICATION_CAP - 1);
+    // With three or more the third slot is held back for the overflow line, so a folded budget alert always has a slot to join.
+    const single = list.length < DAILY_NOTIFICATION_CAP ? list : list.slice(0, DAILY_NOTIFICATION_CAP - 1);
     for (const s of single) out.push({ id: `bill-${s.rule.id}-${s.dueDate}`, remindOn: day, kind: 'bill', ruleId: s.rule.id, title: s.rule.title, dueDate: s.dueDate, relation: relationOf(s.days), moreCount: 0 });
-    if (list.length > DAILY_NOTIFICATION_CAP) out.push({ id: overflowId(day), remindOn: day, kind: 'overflow', ruleId: null, title: null, dueDate: null, relation: null, moreCount: list.length - single.length });
+    if (list.length >= DAILY_NOTIFICATION_CAP) out.push({ id: overflowId(day), remindOn: day, kind: 'overflow', ruleId: null, title: null, dueDate: null, relation: null, moreCount: list.length - single.length });
   }
   return out;
 }

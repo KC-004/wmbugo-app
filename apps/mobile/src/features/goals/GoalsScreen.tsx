@@ -29,7 +29,7 @@ export function GoalsScreen({ api = realGoalsApi, onBack, onOpenGoal }: { api?: 
   const actions = useGoalActions(api, display);
   const header = <TopBar title={g.title} onBack={onBack} backTestID="goals-back" />;
 
-  if (q.isError) return <View style={styles.fill}>{header}<ErrorBlock cause={g.loadError} onRetry={() => void q.refetch()} /></View>;
+  if (q.isError || q.data === null) return <View style={styles.fill}>{header}<ErrorBlock cause={g.loadError} onRetry={() => void q.refetch()} /></View>;
   if (!q.data) {
     return (
       <View style={styles.fill} testID="goals-loading">

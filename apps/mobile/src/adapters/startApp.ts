@@ -31,7 +31,7 @@ import { BENCH_TRIGGER, runSaveBenchmark } from './benchmark';
 import { keychainKeyStore } from './storage/keychainKeyStore';
 import { appNotifier } from './notifier';
 import { withBudgetHandlers } from './budgetHandlers';
-import { withBillHandlers, withReminderSync } from './billHandlers';
+import { serialize, withBillHandlers, withReminderSync } from './billHandlers';
 import { realReceiptFiles } from './files/receiptFiles';
 import { appStateScheduler } from './appStateScheduler';
 import { opSqliteOpener } from './storage/opSqliteOpener';
@@ -122,6 +122,8 @@ async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
   });
   if (!started.ok) return started;
 
+  // Every reminder sync (a change, the app starting or coming back) goes through one queue, so a slower older sync cannot land last.
+  const syncReminders = serialize(() => syncBillReminders(started.value.db, appNotifier, systemClock.nowMs()).then(() => undefined));
   const dispatcher = new OutboxDispatcher({
     db: started.value.db,
     clock: systemClock,
@@ -145,10 +147,12 @@ async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
     }), log), async () => {
       // A linked entry was deleted, rejected or excluded: its bill's due date is unpaid again (Story 6.3).
       const w = services?.writer;
-      if (w) await w.run(ReleaseBillLinks, {}, 'system');
+      if (!w) return;
+      // Each release stands alone: a failure in the first must not skip the second.
+      await w.run(ReleaseBillLinks, {}, 'system').catch(() => log.warn('bills.release_threw'));
       // A savings move that was deleted, rejected or excluded stops counting toward its goal (Story 6.7).
-      if (w) await w.run(ReleaseGoalMoves, {}, 'system');
-    }, log), () => syncBillReminders(started.value.db, appNotifier, systemClock.nowMs()).then(() => undefined), log),
+      await w.run(ReleaseGoalMoves, {}, 'system').catch(() => log.warn('goals.release_threw'));
+    }, log), syncReminders, log),
   });
   const newId = createIdGenerator(systemClock, secureRandom);
   const writer = new LedgerWriter({
@@ -180,7 +184,7 @@ async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
     if (r.ok) for (const name of r.value.fileNames) await realReceiptFiles.remove(name.replace(/\.enc$/, ''));
   });
   // Bill reminders are scheduled again at start and whenever the app comes back (Story 6.5): the window moves with the day.
-  appStateScheduler.onStartOrResume(() => syncBillReminders(started.value.db, appNotifier, systemClock.nowMs()).then(() => undefined));
+  appStateScheduler.onStartOrResume(() => syncReminders().catch(() => log.warn('bills.reminder_sync_threw')));
   // Events committed before the app was last killed are delivered now, without holding up the first screen.
   void dispatcher.deliverPending().catch(() => undefined);
   // NFR-04 benchmark: only when the trigger file was placed in the private directory (debuggable builds via run-as).
