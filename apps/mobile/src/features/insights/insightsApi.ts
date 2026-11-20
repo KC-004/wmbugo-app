@@ -3,6 +3,7 @@ import {
   availablePresets,
   categoryView,
   incomeVsExpense,
+  onTrack,
   defaultPreset,
   entriesInScope,
   filterFacets,
@@ -22,6 +23,7 @@ import {
   type CategoryView,
   type Granularity,
   type IncomeVsExpense,
+  type OnTrack,
   type CurrencyCode,
   type IncomeTotal,
   type InsightsFilters,
@@ -112,6 +114,14 @@ export interface MerchantsData {
   readonly scopeParts: readonly string[];
 }
 
+export interface OnTrackData {
+  readonly currency: CurrencyCode;
+  readonly locale: string;
+  readonly thisMonth: string;
+  readonly track: OnTrack;
+}
+
+export const onTrackKey = (selection: InsightsSelection) => ['insights', 'ontrack', selection] as const;
 export const merchantsKey = (selection: InsightsSelection) => ['insights', 'merchants', selection] as const;
 export const trendKey = (selection: InsightsSelection, g: Granularity | undefined) => ['insights', 'trend', selection, g ?? null] as const;
 export const inOutKey = (selection: InsightsSelection) => ['insights', 'inout', selection] as const;
@@ -136,6 +146,8 @@ export interface InsightsApi {
   loadInOut(selection: InsightsSelection): Promise<InOutData | null>;
   /** Story 7.6: spending by merchant for the scope. */
   loadMerchants(selection: InsightsSelection): Promise<MerchantsData | null>;
+  /** Story 7.7: budgets, Needs / Wants / Savings and goals. */
+  loadOnTrack(selection: InsightsSelection): Promise<OnTrackData | null>;
 }
 
 /** The copy key of a preset: `this_cycle` reads as `thisCycle`. */
@@ -238,6 +250,12 @@ export const realInsightsApi: InsightsApi = {
     const profile = await readProfile(getServices().db);
     if (!r || !profile) return null;
     return { currency: profile.currency, locale: profile.locale, trend: await spendingTrend(r.db, { period: r.period, filters: selection.filters }, r.ctx, granularity) };
+  },
+  async loadOnTrack(selection) {
+    const r = await resolveSelection(selection);
+    const profile = await readProfile(getServices().db);
+    if (!r || !profile) return null;
+    return { currency: profile.currency, locale: profile.locale, thisMonth: r.ctx.today.slice(0, 7), track: await onTrack(r.db, { period: r.period, filters: selection.filters }, r.ctx, systemClock.nowMs()) };
   },
   async loadMerchants(selection) {
     const r = await resolveSelection(selection);

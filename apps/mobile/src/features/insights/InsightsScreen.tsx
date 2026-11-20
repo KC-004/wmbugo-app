@@ -16,11 +16,11 @@ import { InsightsFilterSheet } from './InsightsFilterSheet';
 import { useInsightsStore, withoutFilterValue } from './insightsStore';
 import { KpiTiles } from './KpiTiles';
 import { PeriodSheet } from './PeriodSheet';
-import { insightsSections } from './sectionRegistry';
+import { insightsSections, type InsightsSectionNav } from './sectionRegistry';
 
 const i = copy.insights;
 
-export interface InsightsNav {
+export interface InsightsNav extends InsightsSectionNav {
   /** Opens the Add sheet (the empty-period prompt). */
   onAdd?: () => void;
   /** Opens the review queue (the waiting row). */
@@ -74,7 +74,7 @@ export function InsightsScreen({ api = realInsightsApi, nav = {} }: { api?: Insi
     sheet.open({ id: 'insights-filters', title: i.filterTitle, body: (close) => <InsightsFilterSheet facets={facets} value={selection.filters} onApply={setFilters} close={close} />, });
   };
 
-  const sectionCtx = { overview: o, api, selection, ...(nav.onDrill ? { onDrill: nav.onDrill } : {}) };
+  const sectionCtx = { overview: o, api, selection, nav, ...(nav.onDrill ? { onDrill: nav.onDrill } : {}) };
   const count = o.filterChips.length;
   const sections = insightsSections().filter((s) => s.visible(sectionCtx));
   const empty = o.entries === 0;

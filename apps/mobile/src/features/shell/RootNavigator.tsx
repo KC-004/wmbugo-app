@@ -75,10 +75,11 @@ function TabTopBar({ title }: { title: string }) {
 function InsightsTab() {
   const nav = useNavigation<Nav>();
   const openAdd = useOpenAdd();
+  const openActivity = useOpenActivityFilter();
   return (
     <TabFrame tab="Insights">
       <TabTopBar title={copy.nav.insights} />
-      <InsightsScreen nav={{ onAdd: openAdd, onReview: () => nav.navigate('ReviewQueue', {}), onDrill: (target) => nav.navigate('InsightsDrill', { target: target as DrillTarget }) }} />
+      <InsightsScreen nav={{ onAdd: openAdd, onReview: () => nav.navigate('ReviewQueue', {}), onDrill: (target) => nav.navigate('InsightsDrill', { target: target as DrillTarget }), onOpenBudget: (budgetId, periodStart) => nav.navigate('BudgetDetail', { budgetId, periodStart }), onOpenGoal: (goalId) => nav.navigate('GoalDetail', { goalId }), onSortIt: openActivity, onTryTemplate: () => nav.navigate('Budgets') }} />
     </TabFrame>
   );
 }

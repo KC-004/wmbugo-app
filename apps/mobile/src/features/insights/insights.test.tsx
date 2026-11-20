@@ -106,6 +106,7 @@ const fakeApi = (o: InsightsOverview | ((s: InsightsSelection) => InsightsOvervi
   loadTrend: jest.fn(async () => null),
   loadInOut: jest.fn(async () => null),
   loadMerchants: jest.fn(async () => null),
+  loadOnTrack: jest.fn(async () => null),
 });
 
 describe('Insights overview (Story 7.2)', () => {

@@ -1,5 +1,5 @@
 import { toLocalDate } from '../shared/clock';
-import { budgetPeriodFor, customPeriod, periodTitle, type Period } from '../profile/period';
+import { budgetPeriodFor, customPeriod, periodTitle, type Period, type PeriodProfile } from '../profile/period';
 import { budgetFigures, budgetStatus, DEFAULT_NEARING_PERCENT, type BudgetDef, type BudgetStatus, type Querier } from './budgets';
 import { BUDGETS_SQL, mapBudgets, mapTargetVersions, periodTarget, readPeriodProfile, TARGET_VERSIONS_SQL } from './budgetStore';
 import { categoryIdsUnder, needsWantsSavings } from './needsWantsSavings';
@@ -50,17 +50,26 @@ export async function loadBudgetList(q: Querier, nowMs: number): Promise<BudgetL
   if (!read) return null;
   const today = toLocalDate(nowMs, read.timezoneId);
   if (!today.ok) return null;
+  return budgetListAt(q, read.profile, today.value, today.value);
+}
+
+/**
+ * The budget list as of an anchor date: each budget in the period it has then. `selected` is a default period the caller picked
+ * (a past pay cycle, say): budgets that follow the default period use it, the others keep their own period around the anchor.
+ * `today` is the real today, for the status line.
+ */
+export async function budgetListAt(q: Querier, profile: PeriodProfile, today: string, anchor: string, selected?: Period): Promise<BudgetList> {
   const budgets = mapBudgets(await q.query(BUDGETS_SQL));
   const overall = budgets.find((b) => b.scope === 'overall') ?? null;
   const rows: BudgetListRow[] = [];
   for (const b of budgets) {
-    if (b.endedAfter && today.value > b.endedAfter) continue;
-    const period = budgetPeriodFor(b.period, today.value, read.profile) ?? (b.period.rule === 'custom' && b.period.customStart && b.period.customEnd ? customPeriod(b.period.customStart, b.period.customEnd) : null);
+    if (b.endedAfter && anchor > b.endedAfter) continue;
+    const period = (selected && b.period.rule === 'default' ? selected : budgetPeriodFor(b.period, anchor, profile)) ?? (b.period.rule === 'custom' && b.period.customStart && b.period.customEnd ? customPeriod(b.period.customStart, b.period.customEnd) : null);
     if (!period) continue;
     const versions = mapTargetVersions(await q.query(TARGET_VERSIONS_SQL, [b.id]));
     const target = periodTarget(b, versions, period) ?? versions[0]?.targetMinor ?? 0;
     const figures = await budgetFigures(q, b, period);
-    const status = budgetStatus({ usedMinor: figures.usedMinor, targetMinor: target, period, today: today.value, nearingPercent: b.alertThresholds?.[0] ?? DEFAULT_NEARING_PERCENT });
+    const status = budgetStatus({ usedMinor: figures.usedMinor, targetMinor: target, period, today, nearingPercent: b.alertThresholds?.[0] ?? DEFAULT_NEARING_PERCENT });
     const group: BudgetGroup = b.scope === 'overall' ? 'overall' : b.template === '50_30_20' ? '50_30_20' : 'categories';
     rows.push({
       id: b.id,
@@ -86,5 +95,5 @@ export async function loadBudgetList(q: Querier, nowMs: number): Promise<BudgetL
     const nw = await needsWantsSavings(q, templateRow.period);
     typeSummary = { notClassifiedMinor: nw.notClassifiedMinor, categoryIds: await categoryIdsUnder(q, nw.notClassified.map((x) => x.categoryId)), period: { start: templateRow.period.start, end: templateRow.period.end } };
   }
-  return { today: today.value, rows, overallId: overall?.id ?? null, typeSummary };
+  return { today, rows, overallId: overall?.id ?? null, typeSummary };
 }

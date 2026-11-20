@@ -99,6 +99,7 @@ export function fakeInsightsApi(parts: Partial<InsightsApi> = {}): InsightsApi {
     loadTrend: jest.fn(async () => null),
     loadInOut: jest.fn(async () => null),
     loadMerchants: jest.fn(async () => null),
+    loadOnTrack: jest.fn(async () => null),
     ...parts,
   } as InsightsApi;
 }

@@ -1,4 +1,5 @@
 import { registerInsightsSection } from '../sectionRegistry';
+import { amIOnTrack } from './AmIOnTrack';
 import { isItGoingUp } from './IsItGoingUp';
 import { whereDidItGo } from './WhereDidItGo';
 import { whoGotIt } from './WhoGotIt';
@@ -8,4 +9,5 @@ export function registerInsightsSections(): void {
   registerInsightsSection(whereDidItGo);
   registerInsightsSection(isItGoingUp);
   registerInsightsSection(whoGotIt);
+  registerInsightsSection(amIOnTrack);
 }
