@@ -7,7 +7,7 @@ import { ToastHost } from '../../shared/feedback/ToastHost';
 import { createQueryClient } from '../../shared/queryClient';
 import { useAmountsStore } from '../../shared/state/amountsHidden';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
-import type { InsightsApi, InsightsOverview, InsightsSelection } from './insightsApi';
+import type { InsightsApi, InsightsOverview } from './insightsApi';
 import { useInsightsStore } from './insightsStore';
 import { clearInsightsSections } from './sectionRegistry';
 
@@ -93,7 +93,7 @@ export const overview = (over: Partial<InsightsOverview> = {}): InsightsOverview
 /** A fake api: each loader returns what the test gives it (or null / throws for 'error'). */
 export function fakeInsightsApi(parts: Partial<InsightsApi> = {}): InsightsApi {
   return {
-    loadOverview: jest.fn(async (_s: InsightsSelection) => overview()),
+    loadOverview: jest.fn(async () => overview()),
     loadFacets: jest.fn(async () => ({ accounts: [], categories: [], merchants: [], tags: [], sources: [] })),
     loadCategories: jest.fn(async () => null),
     ...parts,
