@@ -28,11 +28,11 @@ export interface LedgerFilters {
   readonly sources?: readonly string[];
 }
 
-type Param = string | number;
-const marks = (n: number) => Array.from({ length: n }, () => '?').join(',');
+export type Param = string | number;
+export const marks = (n: number) => Array.from({ length: n }, () => '?').join(',');
 
 /** WHERE parts (and params) for confirmed, live entries of a range under the filters. `t` is the transaction alias. */
-function entryWhere(range: DateRange, f: LedgerFilters, kinds: readonly LedgerEntryType[]): { where: string[]; params: Param[] } {
+export function entryWhere(range: DateRange, f: LedgerFilters, kinds: readonly LedgerEntryType[]): { where: string[]; params: Param[] } {
   const allowed = f.types && f.types.length > 0 ? kinds.filter((k) => f.types!.includes(k)) : kinds;
   const where = ["t.status = 'confirmed'", 't.removed_at IS NULL', 't.local_date BETWEEN ? AND ?', `t.event_type IN (${marks(Math.max(1, allowed.length))})`];
   const params: Param[] = [range.start, range.end, ...(allowed.length > 0 ? allowed : ['__none__'])];
@@ -62,17 +62,17 @@ function entryWhere(range: DateRange, f: LedgerFilters, kinds: readonly LedgerEn
 }
 
 /** The split-level clause for a category filter: the category or any subcategory of it. */
-function categoryWhere(f: LedgerFilters): { where: string[]; params: Param[] } {
+export function categoryWhere(f: LedgerFilters): { where: string[]; params: Param[] } {
   if (!f.categoryIds || f.categoryIds.length === 0) return { where: [], params: [] };
   const n = f.categoryIds.length;
   return { where: [`(c.id IN (${marks(n)}) OR c.parent_id IN (${marks(n)}))`], params: [...f.categoryIds, ...f.categoryIds] };
 }
 
 const NET = "SUM(CASE WHEN t.event_type = 'expense' THEN s.amount_minor ELSE -s.amount_minor END)";
-const SPLIT_FROM = 'FROM split s JOIN "transaction" t ON t.id = s.transaction_id JOIN category c ON c.id = s.category_id';
+export const SPLIT_FROM = 'FROM split s JOIN "transaction" t ON t.id = s.transaction_id JOIN category c ON c.id = s.category_id';
 
 /** True when the filters leave only income (so there is no spending to count). */
-const incomeOnly = (f: LedgerFilters): boolean => f.types !== undefined && f.types.length > 0 && !f.types.includes('expense') && !f.types.includes('refund');
+export const incomeOnly = (f: LedgerFilters): boolean => f.types !== undefined && f.types.length > 0 && !f.types.includes('expense') && !f.types.includes('refund');
 
 export interface CategoryNetRow {
   /** The top-level category (a subcategory rolls into its parent). */

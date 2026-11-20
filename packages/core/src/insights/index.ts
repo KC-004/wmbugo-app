@@ -5,3 +5,5 @@ export * from './freeToUse';
 export * from './homeBillsGoals';
 export * from './scope';
 export * from './spending';
+export * from './drilldown';
+export * from './csvExport';

@@ -144,7 +144,7 @@ export async function merchantsSeen(from: string, to: string): Promise<{ key: st
   return [...byKey.entries()].map(([key, v]) => ({ key, name: v.name })).sort((a, b) => a.name.localeCompare(b.name));
 }
 
-async function resolve(selection: InsightsSelection) {
+export async function resolveSelection(selection: InsightsSelection) {
   const db = getServices().db;
   const ctx = await loadInsightsContext(db, systemClock.nowMs());
   if (!ctx) return null;
@@ -156,7 +156,7 @@ async function resolve(selection: InsightsSelection) {
 
 export const realInsightsApi: InsightsApi = {
   async loadOverview(selection) {
-    const r = await resolve(selection);
+    const r = await resolveSelection(selection);
     const profile = await readProfile(getServices().db);
     if (!r || !profile) return null;
     const { db, ctx, period } = r;
@@ -174,7 +174,7 @@ export const realInsightsApi: InsightsApi = {
     return { currency: profile.currency, locale: profile.locale, today: ctx.today, firstDay: ctx.firstDay, period, preset: period.preset, presets: availablePresets(ctx.profile), scope, scopeParts: scopeParts(selection.filters, names), filterChips: filterChips(selection.filters, names), spent, income, change, kept: keptV, waiting, entries };
   },
   async loadFacets(selection) {
-    const r = await resolve(selection);
+    const r = await resolveSelection(selection);
     if (!r) return null;
     const { db, period } = r;
     const accounts = mapAccountRows(await db.query(ACCOUNT_LIST_SQL)).filter((a) => a.status === 'active').map((a) => ({ id: a.id, name: a.name }));
@@ -184,7 +184,7 @@ export const realInsightsApi: InsightsApi = {
   },
 };
 
-async function filterNames(filters: InsightsFilters, period: InsightsPeriod): Promise<FilterNames> {
+export async function filterNames(filters: InsightsFilters, period: InsightsPeriod): Promise<FilterNames> {
   const db = getServices().db;
   const accounts: Record<string, string> = {};
   for (const a of mapAccountRows(await db.query(ACCOUNT_LIST_SQL))) accounts[a.id] = a.name;

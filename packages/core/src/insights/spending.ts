@@ -85,7 +85,7 @@ export async function entriesInScope(q: Querier, scope: InsightsScope): Promise<
 
 export type SpendingChange =
   | { readonly kind: 'no_baseline'; readonly scope: ScopeEcho }
-  | { readonly kind: 'change'; readonly scope: ScopeEcho; readonly direction: 'up' | 'down' | 'same'; /** Whole percent, never negative. */ readonly percent: number; /** `Oct 1–8`. */ readonly baselineLabel: string };
+  | { readonly kind: 'change'; readonly scope: ScopeEcho; readonly direction: 'up' | 'down' | 'same'; /** Whole percent, never negative. */ readonly percent: number; /** `Oct 1–8`. */ readonly baselineLabel: string; /** What the baseline window held: its refund-net spending, floored at zero. */ readonly previousMinor: number };
 
 /** Whole percent, rounded half away from zero. */
 const roundHalfAway = (num: number, den: number): number => {
@@ -104,7 +104,7 @@ export async function spendingChange(q: Querier, scope: InsightsScope, ctx: Insi
   const current = await spendingNet(q, w.current, f);
   const pct = Math.abs(roundHalfAway((current - previous) * 100, Math.abs(previous)));
   const direction = current === previous || pct === 0 ? 'same' : current > previous ? 'up' : 'down';
-  return { kind: 'change', scope: echo, direction, percent: pct, baselineLabel: w.label };
+  return { kind: 'change', scope: echo, direction, percent: pct, baselineLabel: w.label, previousMinor: Math.max(0, previous) };
 }
 
 export type Kept =

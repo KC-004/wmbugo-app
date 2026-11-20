@@ -29,13 +29,15 @@ export interface InsightsScope {
 /** The scope a result carries back: inclusive start, exclusive end, the label and the active filters. */
 export interface ScopeEcho {
   readonly start: string;
+  /** The last day, inclusive (what a CSV header prints). */
+  readonly end: string;
   readonly endExclusive: string;
   /** `1–30 Nov` or `1–24 Nov · Shortened cycle`. */
   readonly label: string;
   readonly filters: InsightsFilters;
 }
 
-export const scopeEcho = (scope: InsightsScope): ScopeEcho => ({ start: scope.period.start, endExclusive: exclusiveEnd(scope.period.end), label: scope.period.title, filters: scope.filters });
+export const scopeEcho = (scope: InsightsScope): ScopeEcho => ({ start: scope.period.start, end: scope.period.end, endExclusive: exclusiveEnd(scope.period.end), label: scope.period.title, filters: scope.filters });
 
 /** What a query needs besides the scope: today and the period rules, read once. */
 export interface InsightsContext {

@@ -20,7 +20,7 @@ import { useEntryActions } from '../activity/useEntryActions';
 import { HomeScreen } from '../home/HomeScreen';
 import { homeHeroNav } from '../home/homeNav';
 import { HomeEditScreen } from '../home/HomeEditScreen';
-import type { ActivityQuery } from '@wmbugo/core';
+import type { ActivityQuery, DrillTarget } from '@wmbugo/core';
 import { useUiStore } from '../../shared/state/uiStore';
 import { BudgetsScreen } from '../budgets/BudgetsScreen';
 import { appNotifier } from '../../adapters/notifier';
@@ -28,6 +28,8 @@ import { BudgetDetailScreen } from '../budgets/BudgetDetailScreen';
 import { BillsScreen } from '../bills/BillsScreen';
 import { BillDetailScreen } from '../bills/BillDetailScreen';
 import { InsightsScreen } from '../insights/InsightsScreen';
+import { DrillScreen } from '../insights/DrillScreen';
+import { useInsightsStore } from '../insights/insightsStore';
 import { PlanHubScreen } from '../plan/PlanHubScreen';
 import { GoalsScreen } from '../goals/GoalsScreen';
 import { GoalDetailScreen } from '../goals/GoalDetailScreen';
@@ -40,7 +42,7 @@ import { TopBar } from '../../shared/ui/TopBar';
 import { TabBar, type TabRoute } from './TabBar';
 import { markTabFirstFrame } from './navTiming';
 
-type RootParams = { Tabs: undefined; BudgetDetail: { budgetId: string; periodStart?: string }; Accounts: undefined; AccountDetail: { accountId: string }; TransactionDetail: { transactionId: string }; ReviewQueue: { focusId?: string }; Settings: undefined; HomeEdit: undefined; Bills: { focusRuleId?: string } | undefined; BillDetail: { ruleId: string }; Goals: undefined; GoalDetail: { goalId: string }; Budgets: undefined };
+type RootParams = { Tabs: undefined; BudgetDetail: { budgetId: string; periodStart?: string }; Accounts: undefined; AccountDetail: { accountId: string }; TransactionDetail: { transactionId: string }; ReviewQueue: { focusId?: string }; Settings: undefined; HomeEdit: undefined; Bills: { focusRuleId?: string } | undefined; BillDetail: { ruleId: string }; Goals: undefined; GoalDetail: { goalId: string }; Budgets: undefined; InsightsDrill: { target: DrillTarget } };
 const RootStack = createNativeStackNavigator<RootParams>();
 const Tabs = createBottomTabNavigator();
 const TabStack = createNativeStackNavigator();
@@ -74,7 +76,7 @@ function InsightsTab() {
   return (
     <TabFrame tab="Insights">
       <TabTopBar title={copy.nav.insights} />
-      <InsightsScreen nav={{ onAdd: openAdd, onReview: () => nav.navigate('ReviewQueue', {}) }} />
+      <InsightsScreen nav={{ onAdd: openAdd, onReview: () => nav.navigate('ReviewQueue', {}), onDrill: (target) => nav.navigate('InsightsDrill', { target: target as DrillTarget }) }} />
     </TabFrame>
   );
 }
@@ -270,6 +272,19 @@ function BudgetsRoute() {
   );
 }
 
+/** SCR-12 (Story 7.3): pushed over the Insights tab, so Back returns to the same overview, period and filters. */
+function InsightsDrillRoute() {
+  const nav = useNavigation<{ goBack: () => void; navigate: (s: 'TransactionDetail', p: { transactionId: string }) => void }>();
+  const route = useRoute<RouteProp<RootParams, 'InsightsDrill'>>();
+  const selection = useInsightsStore((s) => s.selection);
+  const openActivity = useOpenActivityFilter();
+  return (
+    <ScreenFrame>
+      <DrillScreen selection={selection} target={route.params.target} onBack={() => nav.goBack()} onOpenEntry={(transactionId) => nav.navigate('TransactionDetail', { transactionId })} onSeeInActivity={openActivity} />
+    </ScreenFrame>
+  );
+}
+
 function GoalsRoute() {
   const nav = useNavigation<{ goBack: () => void; navigate: (s: 'GoalDetail', p: { goalId: string }) => void }>();
   return (
@@ -349,6 +364,7 @@ export function RootNavigator() {
             <RootStack.Screen name="BillDetail" component={BillDetailRoute} />
             <RootStack.Screen name="Budgets" component={BudgetsRoute} />
             <RootStack.Screen name="Goals" component={GoalsRoute} />
+            <RootStack.Screen name="InsightsDrill" component={InsightsDrillRoute} />
             <RootStack.Screen name="GoalDetail" component={GoalDetailRoute} />
             <RootStack.Screen name="TransactionDetail" component={TransactionDetailRoute} />
             <RootStack.Screen name="ReviewQueue" component={ReviewQueueRoute} />
