@@ -2,6 +2,7 @@ import {
   ACCOUNT_LIST_SQL,
   availablePresets,
   categoryView,
+  incomeVsExpense,
   defaultPreset,
   entriesInScope,
   filterFacets,
@@ -15,8 +16,11 @@ import {
   spendingByCategory,
   spendingChange,
   spendingTotal,
+  spendingTrend,
   waitingInScope,
   type CategoryView,
+  type Granularity,
+  type IncomeVsExpense,
   type CurrencyCode,
   type IncomeTotal,
   type InsightsFilters,
@@ -27,6 +31,7 @@ import {
   type SpendingByCategory,
   type SpendingChange,
   type SpendingTotal,
+  type SpendingTrend,
 } from '@wmbugo/core';
 import { getServices, systemClock } from '../../adapters/startApp';
 import { readProfile } from '../../adapters/readProfile';
@@ -86,6 +91,20 @@ export interface CategoriesData {
   readonly scopeParts: readonly string[];
 }
 
+export interface TrendData {
+  readonly currency: CurrencyCode;
+  readonly locale: string;
+  readonly trend: SpendingTrend;
+}
+
+export interface InOutData {
+  readonly currency: CurrencyCode;
+  readonly locale: string;
+  readonly inOut: IncomeVsExpense;
+}
+
+export const trendKey = (selection: InsightsSelection, g: Granularity | undefined) => ['insights', 'trend', selection, g ?? null] as const;
+export const inOutKey = (selection: InsightsSelection) => ['insights', 'inout', selection] as const;
 export const categoriesKey = (selection: InsightsSelection) => ['insights', 'categories', selection] as const;
 
 export interface InsightsFacets {
@@ -102,6 +121,9 @@ export interface InsightsApi {
   loadFacets(selection: InsightsSelection): Promise<InsightsFacets | null>;
   /** Story 7.4: spending by category for the scope. */
   loadCategories(selection: InsightsSelection): Promise<CategoriesData | null>;
+  /** Story 7.5: spending over time for the scope, and money in and out over recent periods. */
+  loadTrend(selection: InsightsSelection, granularity?: Granularity): Promise<TrendData | null>;
+  loadInOut(selection: InsightsSelection): Promise<InOutData | null>;
 }
 
 /** The copy key of a preset: `this_cycle` reads as `thisCycle`. */
@@ -198,6 +220,18 @@ export const realInsightsApi: InsightsApi = {
     const byCategory = await spendingByCategory(r.db, scope);
     const total = await spendingTotal(r.db, scope);
     return { currency: profile.currency, locale: profile.locale, byCategory, total, view: categoryView(byCategory.rows), scopeParts: scopeParts(selection.filters, await filterNames(selection.filters, r.period)) };
+  },
+  async loadTrend(selection, granularity) {
+    const r = await resolveSelection(selection);
+    const profile = await readProfile(getServices().db);
+    if (!r || !profile) return null;
+    return { currency: profile.currency, locale: profile.locale, trend: await spendingTrend(r.db, { period: r.period, filters: selection.filters }, r.ctx, granularity) };
+  },
+  async loadInOut(selection) {
+    const r = await resolveSelection(selection);
+    const profile = await readProfile(getServices().db);
+    if (!r || !profile) return null;
+    return { currency: profile.currency, locale: profile.locale, inOut: await incomeVsExpense(r.db, { period: r.period, filters: selection.filters }, r.ctx) };
   },
   async loadFacets(selection) {
     const r = await resolveSelection(selection);

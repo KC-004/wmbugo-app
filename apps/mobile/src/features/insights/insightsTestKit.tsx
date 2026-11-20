@@ -96,6 +96,8 @@ export function fakeInsightsApi(parts: Partial<InsightsApi> = {}): InsightsApi {
     loadOverview: jest.fn(async () => overview()),
     loadFacets: jest.fn(async () => ({ accounts: [], categories: [], merchants: [], tags: [], sources: [] })),
     loadCategories: jest.fn(async () => null),
+    loadTrend: jest.fn(async () => null),
+    loadInOut: jest.fn(async () => null),
     ...parts,
   } as InsightsApi;
 }
