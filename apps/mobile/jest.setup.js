@@ -8,3 +8,7 @@ jest.mock('./src/adapters/startApp', () => ({
   setUpProfile: jest.fn(),
   systemClock: { timezoneId: () => 'Asia/Singapore', nowMs: () => 0 },
 }));
+
+// The libsodium binding is native (JSI) and ships untranspiled ESM; tests that need real crypto mock it with libsodium-wrappers-sumo
+// (see adapters/backup/rnCrypto.test.ts). Everywhere else it only has to import.
+jest.mock('react-native-libsodium', () => ({ __esModule: true, default: {} }));

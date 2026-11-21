@@ -9,7 +9,8 @@ export interface BackupFacts {
 }
 
 const SCHEMA_SQL = 'SELECT COALESCE(MAX(version), 0) FROM schema_migration';
-const ENTRIES_SQL = `SELECT COUNT(*) FROM "transaction" WHERE removed_at IS NULL AND status IN ('confirmed','reversed')`;
+// What the person sees as entries: not the opening balances accounts start with.
+const ENTRIES_SQL = `SELECT COUNT(*) FROM "transaction" WHERE removed_at IS NULL AND status IN ('confirmed','needs_review','reversed') AND event_type IN ('expense','income','transfer','refund','adjustment','reversal')`;
 const PHOTOS_SQL = 'SELECT COUNT(*) FROM attachment';
 
 /**

@@ -95,6 +95,20 @@ export class LedgerWriter {
     return result;
   }
 
+  /**
+   * Runs `fn` alone, in order, between use cases: everything submitted before it finishes first, and everything submitted while
+   * it runs waits and then runs, so nothing is rejected (Story 8.7: a consistent snapshot for a backup). `fn` must not call
+   * `run` itself, or it would wait for itself.
+   */
+  exclusive<T>(fn: () => Promise<T>): Promise<T> {
+    const result = this.tail.then(fn);
+    this.tail = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  }
+
   private async runOne<I, O, C extends string>(
     useCase: UseCase<I, O, C>,
     input: I,

@@ -3,3 +3,5 @@ export * from './writer';
 export * from './reader';
 export * from './secretstream';
 export * from './facts';
+export * from './policy';
+export * from './runBackup';

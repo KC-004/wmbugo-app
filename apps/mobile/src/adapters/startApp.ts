@@ -26,6 +26,7 @@ import type { Clock, CrashRecorder, Logger, Result, StartupErrorCode, StartupOk 
 import migrations from '../../drizzle/migrations';
 import { installCrashHandlers } from './crashHandlers';
 import { refreshPermissionViews } from './permissions';
+import { sweepStaging } from './backup/rnBackupPlatform';
 import { ensureDir, PRIVATE_DIR, rnFileStore } from './files/rnFileStore';
 import { setSaveTimingSink } from '../features/add/saveTiming';
 import { setNavTimingSink } from '../features/shell/navTiming';
@@ -233,6 +234,8 @@ async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
     await rnFileStore.remove(BENCH_TRIGGER);
     await runSaveBenchmark(log, systemClock);
   });
+  // A backup or restore that was interrupted leaves staging behind: it is swept at every start (Story 8.7).
+  void sweepStaging();
   // Debug-only fixture (Story 8.5): a file placed in the private directory posts the hidden capture notification once.
   void rnFileStore.exists(CAPTURE_FIXTURE_TRIGGER).then(async (on) => {
     if (!on) return;

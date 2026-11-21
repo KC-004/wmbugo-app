@@ -12,3 +12,8 @@ allowBuilds:
   simple-git-hooks: false
   # drizzle-kit pulls esbuild; its postinstall is only a binary sanity check.
   esbuild: false
+  # Unpacks the prebuilt libsodium for Android (libsodium/build.tgz); without it the native build has no libsodium.so (Story 8.6).
+  react-native-libsodium: true
+
+patchedDependencies:
+  react-native-libsodium@1.7.0: patches/react-native-libsodium@1.7.0.patch

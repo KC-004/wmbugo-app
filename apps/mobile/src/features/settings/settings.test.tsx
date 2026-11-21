@@ -497,6 +497,27 @@ describe('Notification detail (Story 8.5)', () => {
   });
 });
 
+describe('Data group and Back up (Story 8.7)', () => {
+  it('the Data summary reads No backup yet, then Last backup 3 Nov from last_backup_at', async () => {
+    const none = await open(data());
+    expect(host(none.r, 'group-data').props.accessibilityLabel).toBe('Data, No backup yet');
+    const made = await open(data({}, { lastBackupAt: Date.UTC(2026, 10, 3, 12, 0, 0) }));
+    expect(host(made.r, 'group-data').props.accessibilityLabel).toBe('Data, Last backup 3 Nov');
+  });
+
+  it('Data lists Back up and Recently deleted; Back up opens the Back up screen and Back returns to Data', async () => {
+    const { r } = await open(data({}, { lastBackupAt: Date.UTC(2026, 10, 3, 12, 0, 0) }));
+    act(() => fire(r, 'group-data'));
+    expect(host(r, 'row-backup').props.accessibilityLabel).toBe('Back up, Last backup 3 Nov');
+    expect(has(r, 'row-deleted')).toBe(true);
+    act(() => fire(r, 'row-backup'));
+    expect(has(r, 'backup-form')).toBe(true);
+    expect(texts(r)).toContain('Back up');
+    act(() => fire(r, 'settings-back'));
+    expect(has(r, 'row-backup')).toBe(true);
+  });
+});
+
 describe('Block transfers above the balance', () => {
   it('is a switch in You that saves the setting', async () => {
     const { r, changeSetting } = await open(data());

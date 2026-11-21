@@ -13,3 +13,9 @@ wmbugo asks for as little as it can. The release build declares no `INTERNET` an
 - Permissions listed here but not yet declared in the manifest (the notification adapter is not installed yet) are documented ahead of time so the row exists when the adapter arrives.
 - Android backup and phone-to-phone transfer exclude all wmbugo data (`allowBackup=false` and data-extraction rules).
 - Files the user saves (backups, CSV and diagnostics exports) leave wmbugo's control; where they are put decides who can reach them. Backups stay encrypted with the passphrase.
+
+## Backups and export files leave wmbugo's control (Story 8.7, BKP-006, BKP-007)
+
+- **Android's own backup does not include wmbugo.** `allowBackup="false"` plus `backup_rules.xml` (Android 11 and earlier) and `data_extraction_rules.xml` (Android 12 and later, cloud backup and phone-to-phone transfer) exclude the database, photos, logs, staging and keys. A static test in `os-backup.test.ts` fails if any of that changes. The on-device check (`adb shell bmgr backupnow app.wmbugo` and a device-to-device transfer, then looking for the database, photos, logs and keys) belongs to the release checklist.
+- **A backup the person saves is theirs to place.** Backup, CSV and diagnostics files are written through Android's save dialog (Storage Access Framework, no permission) to the place the person chose. Saved to a cloud folder, a file leaves the phone: it is still encrypted with the passphrase (a backup) or contains only what the person previewed (diagnostics), but where it goes decides who can reach it. wmbugo never keeps a copy.
+- **No permission is needed** to make or restore a backup: the save dialog and file picker hand over one document.

@@ -18,6 +18,7 @@ class MainApplication : Application(), ReactApplication {
           add(ReceiptFilesPackage())
           add(PrivacyPackage())
           add(AppLockPackage())
+          add(BackupFilesPackage())
         },
     )
   }

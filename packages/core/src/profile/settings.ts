@@ -20,6 +20,8 @@ export const SETTING_HIDE_IN_RECENTS = 'device.hide_in_recents';
 /** Notification detail (Story 8.5): `full` or `hidden`, and whether full details are still shown while app lock or hide amounts is on. */
 export const SETTING_NOTIFICATION_DETAIL = 'privacy.notification_detail';
 export const SETTING_FULL_NOTIFICATIONS_OPT_IN = 'privacy.full_notifications_opt_in';
+/** When the last backup was saved (Story 8.7): epoch milliseconds, or null for none. Written by `RecordBackupMade` only. */
+export const SETTING_LAST_BACKUP_AT = 'backup.last_backup_at';
 /** App lock (Story 8.3): a UI gate only, never bound to the database key (AD-9). A device setting: a restore keeps this phone's choice. */
 export const SETTING_APP_LOCK = 'device.app_lock_enabled';
 /** How long wmbugo may be in the background before it locks again (Story 8.3). */
@@ -54,6 +56,7 @@ export interface AppSettings {
   readonly hideInRecents: boolean;
   readonly appLockEnabled: boolean;
   readonly lockAfter: LockAfter;
+  readonly lastBackupAt: number | null;
   readonly notificationDetail: 'full' | 'hidden';
   readonly fullNotificationsOptIn: boolean;
   readonly homeLayout: readonly HomeLayoutEntry[] | null;
@@ -73,6 +76,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   hideInRecents: false,
   appLockEnabled: false,
   lockAfter: '1m',
+  lastBackupAt: null,
   notificationDetail: 'full',
   fullNotificationsOptIn: false,
   homeLayout: null,
@@ -105,6 +109,8 @@ export function validateSetting(key: string, value: unknown): { ok: true; value:
       return oneOf(LOCK_AFTER_CHOICES);
     case SETTING_NOTIFICATION_DETAIL:
       return oneOf(NOTIFICATION_DETAIL_CHOICES);
+    case SETTING_LAST_BACKUP_AT:
+      return value === null || (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) ? { ok: true, value } : { ok: false };
     case SETTING_HOME_LAYOUT:
       return value === null ? { ok: true, value } : isHomeLayout(value) ? { ok: true, value: sanitizeHomeLayout(value) } : { ok: false };
     case SETTING_DEFAULT_ACCOUNT:
@@ -143,6 +149,7 @@ export function parseSettings(rows: readonly (readonly unknown[])[]): AppSetting
     hideInRecents: pick(SETTING_HIDE_IN_RECENTS, DEFAULT_SETTINGS.hideInRecents),
     appLockEnabled: pick(SETTING_APP_LOCK, DEFAULT_SETTINGS.appLockEnabled),
     lockAfter: pick(SETTING_LOCK_AFTER, DEFAULT_SETTINGS.lockAfter),
+    lastBackupAt: pick<number | null>(SETTING_LAST_BACKUP_AT, null),
     notificationDetail: pick(SETTING_NOTIFICATION_DETAIL, DEFAULT_SETTINGS.notificationDetail),
     fullNotificationsOptIn: pick(SETTING_FULL_NOTIFICATIONS_OPT_IN, DEFAULT_SETTINGS.fullNotificationsOptIn),
     homeLayout: pick<readonly HomeLayoutEntry[] | null>(SETTING_HOME_LAYOUT, null),
