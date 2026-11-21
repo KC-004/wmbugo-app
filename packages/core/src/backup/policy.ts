@@ -6,11 +6,19 @@ import { DELETED_KEEP_DAYS } from '../ledger/purge';
 /** The shortest passphrase a backup accepts: counted in characters (code points), not bytes. */
 export const MIN_PASSPHRASE_CHARS = 12;
 
-export type PassphraseHint = 'too-short' | 'strong-enough';
+/** A passphrase needs at least this many different characters: twelve of the same one is not a passphrase. */
+export const MIN_PASSPHRASE_DISTINCT = 5;
 
-/** `Use at least 12 characters` until the passphrase has 12 or more characters, then `Strong enough`. */
+export type PassphraseHint = 'too-short' | 'low-variety' | 'strong-enough';
+
+/**
+ * `Use at least 12 characters` until the passphrase has 12 or more, `Use more different characters` while fewer than five of them
+ * differ, then `Strong enough`. Enforced by the backup itself, not only by the screen.
+ */
 export function passphraseHint(passphrase: string): PassphraseHint {
-  return [...passphrase].length >= MIN_PASSPHRASE_CHARS ? 'strong-enough' : 'too-short';
+  const chars = [...passphrase];
+  if (chars.length < MIN_PASSPHRASE_CHARS) return 'too-short';
+  return new Set(chars).size < MIN_PASSPHRASE_DISTINCT ? 'low-variety' : 'strong-enough';
 }
 
 export interface PassphraseCheck {

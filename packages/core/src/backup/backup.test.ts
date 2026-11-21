@@ -23,7 +23,7 @@ import {
   utf8Encode,
   VERIFIER_CONTEXT,
 } from './format';
-import { extractBackup, readManifest, type ByteSource, type EntryTarget } from './reader';
+import { extractBackup, inspectBackupHeader, readManifest, type ByteSource, type EntryTarget } from './reader';
 import { payloadChecksum, writeBackup, type BackupEntrySource, type BackupInput, type ByteSink } from './writer';
 
 let crypto: Crypto;
@@ -186,14 +186,22 @@ describe('backup file format (Story 8.6)', () => {
 });
 
 describe('typed read errors', () => {
-  it('NOT_A_WMBUGO_BACKUP for random bytes, a short file, a bad magic and an unknown format version', async () => {
+  it('NOT_A_WMBUGO_BACKUP for random bytes, a short file, a bad magic and a format version below the first', async () => {
     const { input } = inputOf(randomish(50, 1));
     const good = await backupBytes(input);
-    const cases = [randomish(10_000, 5), new Uint8Array(10), concat([bytesOf('WMBUGOXX'), good.subarray(8)]), concat([good.subarray(0, 8), u32(2), good.subarray(12)])];
+    const cases = [randomish(10_000, 5), new Uint8Array(10), concat([bytesOf('WMBUGOXX'), good.subarray(8)]), concat([good.subarray(0, 8), u32(0), good.subarray(12)])];
     for (const bytes of cases) {
       const r = await readManifest(crypto, sourceOf(bytes), PASS, { appSchemaVersion: SCHEMA });
       expect(r).toEqual({ ok: false, code: 'NOT_A_WMBUGO_BACKUP' });
     }
+  });
+
+  it('a file written by a newer format version is BACKUP_TOO_NEW before any passphrase work, so the person is told to update', async () => {
+    const { input } = inputOf(randomish(50, 1));
+    const good = await backupBytes(input);
+    const newer = concat([good.subarray(0, 8), u32(2), good.subarray(12)]);
+    expect(await readManifest(crypto, sourceOf(newer), PASS, { appSchemaVersion: SCHEMA })).toEqual({ ok: false, code: 'BACKUP_TOO_NEW' });
+    expect(await inspectBackupHeader(sourceOf(newer))).toEqual({ ok: false, code: 'BACKUP_TOO_NEW' });
   });
 
   it('WRONG_PASSPHRASE for a wrong passphrase, and no plaintext is ever produced', async () => {
@@ -265,7 +273,8 @@ describe('flipping any single byte never succeeds (property over every byte)', (
       const { r, got } = await extract(bad);
       expect({ at: i, ok: r.ok }).toEqual({ at: i, ok: false });
       if (r.ok) continue;
-      if (i < 8 || (i >= 8 && i < 12)) expect({ at: i, code: r.code }).toEqual({ at: i, code: 'NOT_A_WMBUGO_BACKUP' });
+      if (i < 8) expect({ at: i, code: r.code }).toEqual({ at: i, code: 'NOT_A_WMBUGO_BACKUP' });
+      else if (i < 12) expect(['NOT_A_WMBUGO_BACKUP', 'BACKUP_TOO_NEW']).toContain(r.code); // a version below or above this one
       else if (i < 20) expect(['WRONG_PASSPHRASE', 'BACKUP_DAMAGED']).toContain(r.code);
       else if (i < 52) expect({ at: i, code: r.code }).toEqual({ at: i, code: 'WRONG_PASSPHRASE' }); // salt and verifier
       else expect({ at: i, code: r.code }).toEqual({ at: i, code: 'BACKUP_DAMAGED' });
@@ -507,5 +516,110 @@ describe('the backup module writes nowhere on its own', () => {
     for (const f of fs.readdirSync(dir).filter((n) => n.endsWith('.ts') && !n.endsWith('.test.ts'))) {
       expect({ f, hit: forbidden.test(fs.readFileSync(path.join(dir, f), 'utf8')) }).toEqual({ f, hit: false });
     }
+  });
+});
+
+describe('hardening from the Epic 8 code review', () => {
+  it('a manifest needs the database first, a photo count that matches its entries, and sizes a file can hold', () => {
+    const zero = '0'.repeat(64);
+    const base = {
+      formatVersion: 1,
+      schemaVersion: 5,
+      appId: 'app.wmbugo',
+      appVersion: '1.0',
+      createdAt: { utcMs: 1, timezoneId: 'UTC' },
+      counts: { entries: 1, accounts: 1, photos: 0 },
+      accountBalances: [],
+      entries: [{ name: 'db', size: 10, sha256: zero }],
+      payloadChecksum: zero,
+      archiveKey: zero,
+    };
+    expect(parseManifest(JSON.stringify(base))).not.toBeNull();
+    expect(parseManifest(JSON.stringify({ ...base, entries: [] }))).toBeNull(); // no database at all
+    const photo = { name: 'attachments/0192a3b4-aaaa-7bbb-8ccc-000000000001', size: 5, sha256: zero };
+    expect(parseManifest(JSON.stringify({ ...base, entries: [photo, base.entries[0]] }))).toBeNull(); // the database is first
+    expect(parseManifest(JSON.stringify({ ...base, entries: [base.entries[0], photo] }))).toBeNull(); // 1 photo entry but counts.photos is 0
+    expect(parseManifest(JSON.stringify({ ...base, counts: { ...base.counts, photos: 1 }, entries: [base.entries[0], photo] }))).not.toBeNull();
+    expect(parseManifest(JSON.stringify({ ...base, entries: [{ ...base.entries[0], size: 5 * 1024 ** 3 }] }))).toBeNull(); // more than a file may hold
+  });
+
+  it('a phone that cannot write what it read is STORAGE_FAILED, not a damaged backup', async () => {
+    const { input } = inputOf(randomish(CHUNK_BYTES + 100, 4), [randomish(50, 9)]);
+    const bytes = await backupBytes(input);
+    for (const failAt of ['open', 'write', 'close'] as const) {
+      const r = await extractBackup(crypto, sourceOf(bytes), PASS, { appSchemaVersion: SCHEMA }, async () => {
+        if (failAt === 'open') throw new Error('ENOSPC');
+        return {
+          write: async () => {
+            if (failAt === 'write') throw new Error('ENOSPC');
+          },
+          close: async () => {
+            if (failAt === 'close') throw new Error('ENOSPC');
+          },
+        };
+      });
+      expect({ failAt, r }).toEqual({ failAt, r: { ok: false, code: 'STORAGE_FAILED' } });
+    }
+  });
+
+  it('a header that asks for more Argon2 memory than any real backup uses is refused before the key is derived', async () => {
+    const { input } = inputOf(randomish(50, 1));
+    const bytes = new Uint8Array(await backupBytes(input));
+    bytes.set(u32(KDF_LIMITS.maxMem + 1024), 16);
+    const argon = jest.spyOn(crypto, 'argon2id');
+    expect(await readManifest(crypto, sourceOf(bytes), PASS, { appSchemaVersion: SCHEMA })).toEqual({ ok: false, code: 'BACKUP_DAMAGED' });
+    expect(argon).not.toHaveBeenCalled();
+    argon.mockRestore();
+    expect(KDF_LIMITS.maxMem).toBeLessThanOrEqual(256 * 1024 * 1024);
+  });
+
+  it('the writer refuses counts that its own reader would refuse, and a source that reuses its read buffer still writes the right bytes', async () => {
+    const { input } = inputOf(randomish(50, 1), [randomish(10, 2)]);
+    expect(await writeBackup(crypto, { ...input, counts: { ...input.counts, photos: 0 } }, new MemSink())).toEqual({ ok: false, code: 'ENTRIES_INVALID' });
+    expect(await writeBackup(crypto, { ...input, entries: [{ ...input.entries[0]!, size: 5 * 1024 ** 3 }, input.entries[1]!] }, new MemSink())).toEqual({ ok: false, code: 'FILE_TOO_LARGE' });
+
+    // A source that yields the same buffer again and again, refilling it each time.
+    const data = randomish(CHUNK_BYTES * 2 + 777, 3);
+    const shared = new Uint8Array(1000);
+    const reused: BackupEntrySource = {
+      name: DB_NAME,
+      size: data.length,
+      sha256: crypto.sha256(data),
+      async *read() {
+        for (let at = 0; at < data.length; at += shared.length) {
+          const piece = data.subarray(at, at + shared.length);
+          shared.fill(0);
+          shared.set(piece);
+          yield shared.subarray(0, piece.length);
+        }
+      },
+    };
+    const bytes = await backupBytes({ ...input, counts: { ...input.counts, photos: 0 }, entries: [reused] });
+    const { r, got } = await extract(bytes);
+    expect(r.ok).toBe(true);
+    expect(concat(got.get(DB_NAME)!.data)).toEqual(data);
+  });
+});
+
+describe('an entry that is open when the read fails is told (Epic 8 review)', () => {
+  it('abort is called on the open target when the digest fails, and never on a target that closed cleanly', async () => {
+    const { input } = inputOf(randomish(100, 1), [randomish(60, 2)]);
+    const bytes = await backupBytes(input);
+    // Flip a byte late in the stream: it lands in an entry body, after the target for that entry is open.
+    const bad = new Uint8Array(bytes);
+    bad[bad.length - 40] = bad[bad.length - 40]! ^ 0x01;
+    const events: string[] = [];
+    const r = await extractBackup(crypto, sourceOf(bad), PASS, { appSchemaVersion: SCHEMA }, async (name) => ({
+      write: async () => void events.push(`write:${name}`),
+      close: async () => void events.push(`close:${name}`),
+      abort: async () => void events.push(`abort:${name}`),
+    }));
+    expect(r.ok).toBe(false);
+    const opened = events.filter((e) => e.startsWith('write:')).map((e) => e.slice(6));
+    const closed = events.filter((e) => e.startsWith('close:')).map((e) => e.slice(6));
+    const aborted = events.filter((e) => e.startsWith('abort:')).map((e) => e.slice(6));
+    // Every entry that was written to and not closed was aborted; nothing that closed was aborted.
+    expect(aborted.every((n) => !closed.includes(n))).toBe(true);
+    expect(new Set([...closed, ...aborted])).toEqual(new Set(opened));
   });
 });

@@ -39,6 +39,8 @@ export interface ByteSource {
 /** Where one decrypted entry goes while it is extracted (staging). `close` is called once the entry is complete and verified. */
 export interface EntryTarget extends ByteSink {
   close?(): Promise<void>;
+  /** Called when the read fails while this entry is open, so a half-written entry can release what it holds. Best effort. */
+  abort?(): Promise<void>;
 }
 
 export interface OpenOptions {
@@ -119,7 +121,10 @@ async function openStream(crypto: Crypto, source: ByteSource, passphrase: string
   const head = await source.read(0, HEADER_BYTES);
   if (head.length !== HEADER_BYTES) return err('NOT_A_WMBUGO_BACKUP');
   if (!equalBytes(head.subarray(0, 8), utf8Encode(MAGIC))) return err('NOT_A_WMBUGO_BACKUP');
-  if (readU32(head, 8) !== FORMAT_VERSION) return err('NOT_A_WMBUGO_BACKUP');
+  // A file written by a newer wmbugo is a real backup this version cannot read: say so (the person is told to update).
+  const version = readU32(head, 8);
+  if (version > FORMAT_VERSION) return err('BACKUP_TOO_NEW');
+  if (version !== FORMAT_VERSION) return err('NOT_A_WMBUGO_BACKUP');
   const ops = readU32(head, 12);
   const mem = readU32(head, 16);
   if (ops < KDF_LIMITS.minOps || ops > KDF_LIMITS.maxOps || mem < KDF_LIMITS.minMem || mem > KDF_LIMITS.maxMem || mem % 1024 !== 0) return err(BAD);
@@ -190,33 +195,54 @@ export async function extractBackup(
     const order: { name: string; size: number; sha256: Uint8Array }[] = [];
     let total = 0;
     const declaredTotal = manifest.entries.reduce((n, e) => n + e.size, 0);
-    while (!(await reader.atEnd())) {
-      const { header } = await readHeaderAndData(reader, false);
-      const want = declared.get(header.name);
-      if (!want || seen.has(header.name)) return err(BAD); // not in the manifest, or a duplicate
-      if (header.size !== want.size || toHex(header.sha256) !== want.sha256) return err(BAD);
-      if (header.size > reader.remainingUpperBound) return err(BAD); // a declared size larger than what is left
-      total += header.size;
-      if (total > declaredTotal) return err(BAD);
-      seen.add(header.name);
-      const target = await open(header.name, header.size);
-      const hash = crypto.sha256Stream();
-      let left = header.size;
-      while (left > 0) {
-        const piece = await reader.take(Math.min(left, 64 * 1024));
-        hash.update(piece);
-        await target.write(piece);
-        left -= piece.length;
+    // Whatever the phone's storage throws while an entry is written (a full disk) is the storage's fault, not the file's.
+    let storageFailed = false;
+    const onStorage = async <T>(f: () => Promise<T>): Promise<T> => {
+      try {
+        return await f();
+      } catch (e) {
+        storageFailed = true;
+        throw e;
       }
-      if (toHex(hash.final()) !== want.sha256) return err(BAD);
-      await target.close?.();
-      order.push({ name: header.name, size: header.size, sha256: fromHex(want.sha256)! });
+    };
+    // The entry being written when a read fails is told, so a half-written one can release its handle.
+    let current: EntryTarget | null = null;
+    try {
+      while (!(await reader.atEnd())) {
+        const { header } = await readHeaderAndData(reader, false);
+        const want = declared.get(header.name);
+        if (!want || seen.has(header.name)) return err(BAD); // not in the manifest, or a duplicate
+        if (header.size !== want.size || toHex(header.sha256) !== want.sha256) return err(BAD);
+        if (header.size > reader.remainingUpperBound) return err(BAD); // a declared size larger than what is left
+        total += header.size;
+        if (total > declaredTotal) return err(BAD);
+        seen.add(header.name);
+        const target = await onStorage(() => open(header.name, header.size));
+        current = target;
+        const hash = crypto.sha256Stream();
+        let left = header.size;
+        while (left > 0) {
+          const piece = await reader.take(Math.min(left, 64 * 1024));
+          hash.update(piece);
+          await onStorage(() => target.write(piece));
+          left -= piece.length;
+        }
+        if (toHex(hash.final()) !== want.sha256) return err(BAD);
+        await onStorage(async () => target.close?.());
+        current = null;
+        order.push({ name: header.name, size: header.size, sha256: fromHex(want.sha256)! });
+      }
+      if (seen.size !== declared.size) return err(BAD); // an entry the manifest lists is missing
+      const sorted = manifest.entries.map((e) => ({ name: e.name, size: e.size, sha256: fromHex(e.sha256)! }));
+      if (order.some((o, i) => o.name !== sorted[i]!.name)) return err(BAD); // entries out of manifest order
+      if (toHex(payloadChecksum(crypto, order)) !== manifest.payloadChecksum) return err(BAD);
+      return ok(manifest);
+    } catch (e) {
+      if (storageFailed) return err('STORAGE_FAILED');
+      throw e;
+    } finally {
+      if (current) await (current as EntryTarget).abort?.().catch(() => undefined);
     }
-    if (seen.size !== declared.size) return err(BAD); // an entry the manifest lists is missing
-    const sorted = manifest.entries.map((e) => ({ name: e.name, size: e.size, sha256: fromHex(e.sha256)! }));
-    if (order.some((o, i) => o.name !== sorted[i]!.name)) return err(BAD); // entries out of manifest order
-    if (toHex(payloadChecksum(crypto, order)) !== manifest.payloadChecksum) return err(BAD);
-    return ok(manifest);
   } catch {
     return err(BAD);
   }
@@ -226,12 +252,15 @@ export async function extractBackup(
  * Looks only at a file's header (Story 8.9): is it a wmbugo backup at all? Nothing is derived or decrypted, so it is instant and
  * works before any passphrase is typed. `FILE_TOO_LARGE` comes first, as for a full read.
  */
-export async function inspectBackupHeader(source: ByteSource): Promise<Result<{ readonly size: number }, 'NOT_A_WMBUGO_BACKUP' | 'FILE_TOO_LARGE'>> {
+export async function inspectBackupHeader(source: ByteSource): Promise<Result<{ readonly size: number }, 'NOT_A_WMBUGO_BACKUP' | 'FILE_TOO_LARGE' | 'BACKUP_TOO_NEW'>> {
   if (source.size > MAX_FILE_BYTES) return err('FILE_TOO_LARGE');
   if (source.size < HEADER_BYTES) return err('NOT_A_WMBUGO_BACKUP');
   try {
     const head = await source.read(0, 12);
-    if (head.length < 12 || !equalBytes(head.subarray(0, 8), utf8Encode(MAGIC)) || readU32(head, 8) !== FORMAT_VERSION) return err('NOT_A_WMBUGO_BACKUP');
+    if (head.length < 12 || !equalBytes(head.subarray(0, 8), utf8Encode(MAGIC))) return err('NOT_A_WMBUGO_BACKUP');
+    const version = readU32(head, 8);
+    if (version > FORMAT_VERSION) return err('BACKUP_TOO_NEW');
+    if (version !== FORMAT_VERSION) return err('NOT_A_WMBUGO_BACKUP');
     return ok({ size: source.size });
   } catch {
     return err('NOT_A_WMBUGO_BACKUP');

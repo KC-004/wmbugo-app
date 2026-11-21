@@ -185,11 +185,66 @@ describe('runBackup (Story 8.7)', () => {
     expect(parseSettings(await s.db.query(SETTINGS_SQL)).lastBackupAt).toBeNull();
   });
 
-  it('an empty passphrase is refused before the file is finished and nothing is kept', async () => {
+  it('an empty or weak passphrase is refused before the save dialog opens, so no document is ever created', async () => {
+    const s = await setup();
+    for (const weak of ['', 'short', 'aaaaaaaaaaaa', 'abababababab']) {
+      const r = rig();
+      expect(await runBackup(deps(s, r), weak)).toEqual({ ok: false, code: 'PASSPHRASE_TOO_WEAK' });
+      expect(r.events).toEqual([]); // not even the dialog
+    }
+  });
+
+  it('progress and Cancel start as soon as a place is chosen, before the export, and a cancel during the export deletes the document', async () => {
     const s = await setup();
     const r = rig();
-    expect(await runBackup(deps(s, r), '')).toEqual({ ok: false, code: 'BACKUP_FAILED' });
+    const seen: string[] = [];
+    let cancelled = false;
+    const base = r.platform.exportDatabase.bind(r.platform);
+    r.platform.exportDatabase = async (k) => {
+      seen.push('export');
+      cancelled = true; // Cancel pressed while the database is being exported
+      return base(k);
+    };
+    const res = await runBackup(deps(s, r, { onProgress: () => void seen.push('progress'), isCancelled: () => cancelled }), PASS);
+    expect(res).toEqual({ ok: false, code: 'CANCELLED' });
+    expect(seen.slice(0, 2)).toEqual(['progress', 'export']);
     expect(r.events).toContain('abort');
+    expect(r.events).not.toContain('commit');
+  });
+
+  it('a saved backup is reported as saved even when last_backup_at cannot be recorded', async () => {
+    const s = await setup();
+    const r = rig();
+    const res = await runBackup(
+      deps(s, r, {
+        recordBackupMade: async () => {
+          throw new Error('writer is busy');
+        },
+      }),
+      PASS,
+    );
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.value.recorded).toBe(false);
+    expect(r.events).toContain('commit');
+    expect(r.events).not.toContain('abort'); // the file is kept
+  });
+
+  it('a save dialog that fails after creating the document fails the backup cleanly', async () => {
+    const s = await setup();
+    const r = rig();
+    r.platform.createDocument = async () => {
+      throw new Error('provider cannot open the file for writing');
+    };
+    expect(await runBackup(deps(s, r), PASS)).toEqual({ ok: false, code: 'BACKUP_FAILED' });
+  });
+
+  it('photos the platform left out are counted in the result', async () => {
+    const s = await setup();
+    const r = rig();
+    r.platform.photosSkipped = () => 2;
+    const res = await runBackup(deps(s, r), PASS);
+    expect(res.ok && res.value.photosSkipped).toBe(2);
   });
 
   it('a failure while exporting the database aborts the document and leaves the data alone', async () => {
@@ -274,6 +329,9 @@ describe('passphrase rules and file name', () => {
     expect(passphraseHint('')).toBe('too-short');
     expect(passphraseHint('elevenchars')).toBe('too-short');
     expect(passphraseHint('twelve chars')).toBe('strong-enough');
+    expect(passphraseHint('aaaaaaaaaaaa')).toBe('low-variety'); // twelve of one character is not a passphrase
+    expect(passphraseHint('abababababab')).toBe('low-variety');
+    expect(passphraseHint('abcdeabcdeab')).toBe('strong-enough');
     expect(passphraseHint('あいうえおかきくけこさし')).toBe('strong-enough'); // 12 characters, 36 bytes
     expect(passphraseHint('あいうえおかきくけこさ')).toBe('too-short'); // 11 characters
   });

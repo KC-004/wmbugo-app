@@ -69,7 +69,7 @@ export function RestoreFlow({ api = realRestoreApi, onExit, onBusyChange }: { ap
         const head = await api.inspect(file.source);
         if (!head.ok) {
           release();
-          return setStep({ kind: 'refused', message: head.code === 'FILE_TOO_LARGE' ? copy.restore.tooLarge : copy.restore.notBackup });
+          return setStep({ kind: 'refused', message: head.code === 'FILE_TOO_LARGE' ? copy.restore.tooLarge : head.code === 'BACKUP_TOO_NEW' ? copy.restore.tooNew : copy.restore.notBackup });
         }
         setStep({ kind: 'passphrase' });
       } catch {
@@ -135,8 +135,15 @@ export function RestoreFlow({ api = realRestoreApi, onExit, onBusyChange }: { ap
         setBusy(false);
         if (r.code === 'LOW_SPACE_NEEDS_CONFIRMATION') return setStep({ ...c, lowSpace: true });
         release();
+        // Only staging was touched, so a full disk or a failure to write there leaves the phone as it was.
         const message =
-          r.code === 'BACKUP_TOO_NEW' ? copy.restore.tooNew : r.code === 'NO_ROOM' ? copy.restore.noRoomAtAll : r.code === 'RESTORE_FAILED' ? copy.restore.failed : copy.restore.damaged;
+          r.code === 'BACKUP_TOO_NEW'
+            ? copy.restore.tooNew
+            : r.code === 'NO_ROOM'
+              ? copy.restore.noRoomAtAll
+              : r.code === 'RESTORE_FAILED' || r.code === 'STORAGE_FAILED'
+                ? copy.restore.failed
+                : copy.restore.damaged;
         return setStep({ kind: 'failed', message });
       }
     } catch {

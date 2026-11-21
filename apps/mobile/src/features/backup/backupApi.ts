@@ -27,7 +27,10 @@ export const realBackupApi: BackupApi = {
         appVersion: BACKUP_APP_VERSION,
         nowMs: () => systemClock.nowMs(),
         timezoneId: () => systemClock.timezoneId(),
-        recordBackupMade: async (atMs) => void (await writer.run(RecordBackupMade, { atMs }, 'user')),
+        recordBackupMade: async (atMs) => {
+          const r = await writer.run(RecordBackupMade, { atMs }, 'user');
+          if (!r.ok) throw new Error('last backup not recorded');
+        },
         onProgress: hooks.onProgress,
         isCancelled: hooks.isCancelled,
       },

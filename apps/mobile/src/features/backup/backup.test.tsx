@@ -29,7 +29,7 @@ const press = async (r: ReactTestRenderer, id: string) => {
   await settle();
 };
 
-const DONE: BackupDone = { counts: { entries: 1284, accounts: 6, photos: 42 }, bytes: 1000 };
+const DONE: BackupDone = { counts: { entries: 1284, accounts: 6, photos: 42 }, bytes: 1000, photosSkipped: 0, recorded: true };
 const LONG = 'a passphrase long enough';
 
 function mount(api: BackupApi, extra: { onBusyChange?: (b: boolean) => void; onDone?: () => void } = {}) {
@@ -198,5 +198,38 @@ describe('Back up screen (Story 8.7)', () => {
     expect(has(r, 'backup-form')).toBe(true);
     expect(has(r, 'backup-failed')).toBe(false);
     void TextInput;
+  });
+});
+
+describe('Back up screen: the Epic 8 review changes', () => {
+  it('twelve of the same character is not Strong enough: it asks for more different characters and keeps Save disabled', () => {
+    const r = mount({ run: jest.fn() });
+    type(r, 'backup-pass', 'aaaaaaaaaaaa');
+    type(r, 'backup-confirm', 'aaaaaaaaaaaa');
+    expect(texts(r)).toContain('Use more different characters');
+    expect(texts(r)).not.toContain('Strong enough');
+    const btn = r.root.findAll((n) => n.props.testID === 'backup-save' && n.props.accessibilityState)[0]!;
+    expect(btn.props.accessibilityState).toMatchObject({ disabled: true });
+  });
+
+  it('shows the progress view with Cancel as soon as the system hands over a place, and says which photos were left out', async () => {
+    let progress!: (f: number) => void;
+    let finish!: (v: { ok: true; value: BackupDone }) => void;
+    const run = jest.fn((_p: string, hooks: { onProgress: (f: number) => void }) => {
+      progress = hooks.onProgress;
+      return new Promise<{ ok: true; value: BackupDone }>((res) => (finish = res));
+    });
+    const r = mount({ run } as unknown as BackupApi);
+    type(r, 'backup-pass', LONG);
+    type(r, 'backup-confirm', LONG);
+    await press(r, 'backup-save');
+    expect(has(r, 'backup-progress')).toBe(false); // the dialog is open: the form stays
+    await act(async () => progress(0));
+    expect(has(r, 'backup-progress')).toBe(true);
+    expect(has(r, 'backup-cancel')).toBe(true);
+    await act(async () => finish({ ok: true, value: { ...DONE, photosSkipped: 2, recorded: false } }));
+    await settle();
+    expect(texts(r)).toContain("2 photos couldn't be read and are not in this backup.");
+    expect(texts(r)).toContain("The backup is saved, but the date of your last backup couldn't be updated.");
   });
 });

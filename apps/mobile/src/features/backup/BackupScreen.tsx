@@ -32,14 +32,11 @@ export function BackupScreen({ api = realBackupApi, onBusyChange, onDone }: { ap
     running.current = true;
     cancelled.current = false;
     onBusyChange?.(true);
-    // The system dialog comes first: while it is open the form stays as it is; only a chosen place starts the progress view.
-    let started = false;
+    // The system dialog comes first: while it is open the form stays as it is; a chosen place starts the progress view at once, so
+    // Cancel is there during the export and the photo pass too.
     try {
       const r = await api.run(pass, {
-        onProgress: (fraction) => {
-          started = true;
-          setPhase({ kind: 'running', fraction });
-        },
+        onProgress: (fraction) => setPhase({ kind: 'running', fraction }),
         isCancelled: () => cancelled.current,
       });
       if (r.ok) setPhase({ kind: 'done', done: r.value });
@@ -48,7 +45,6 @@ export function BackupScreen({ api = realBackupApi, onBusyChange, onDone }: { ap
     } catch {
       setPhase({ kind: 'failed' });
     } finally {
-      void started;
       running.current = false;
       onBusyChange?.(false);
     }
@@ -87,6 +83,16 @@ export function BackupScreen({ api = realBackupApi, onBusyChange, onDone }: { ap
         <Text testID="backup-counts" style={[textStyle('body'), ink]}>
           {backupCountsLine(phase.done.counts)}
         </Text>
+        {phase.done.photosSkipped > 0 ? (
+          <Text testID="backup-skipped" style={[textStyle('body'), { color: theme.color('semantic-warning') }]}>
+            {phase.done.photosSkipped === 1 ? copy.backup.skippedOne : copy.backup.skippedMany.replace('{n}', String(phase.done.photosSkipped))}
+          </Text>
+        ) : null}
+        {phase.done.recorded ? null : (
+          <Text testID="backup-not-noted" style={[textStyle('body'), muted]}>
+            {copy.backup.notNoted}
+          </Text>
+        )}
         <Text style={[textStyle('body'), muted]}>{copy.backup.keepSafe}</Text>
         <Button label={copy.backup.done} testID="backup-finish" onPress={() => onDone?.()} />
       </View>
@@ -119,7 +125,7 @@ export function BackupScreen({ api = realBackupApi, onBusyChange, onDone }: { ap
         <View style={styles.hintRow}>
           <Icon icon={check.hint === 'strong-enough' ? CheckCircle : Info} size={16} color={check.hint === 'strong-enough' ? 'semantic-income' : 'text-secondary'} />
           <Text testID="backup-hint" style={[textStyle('caption'), { color: theme.color(check.hint === 'strong-enough' ? 'semantic-income' : 'text-secondary') }]}>
-            {check.hint === 'strong-enough' ? copy.backup.strongEnough : copy.backup.useAtLeast}
+            {check.hint === 'strong-enough' ? copy.backup.strongEnough : check.hint === 'low-variety' ? copy.backup.moreVariety : copy.backup.useAtLeast}
           </Text>
         </View>
         {check.mismatch ? (

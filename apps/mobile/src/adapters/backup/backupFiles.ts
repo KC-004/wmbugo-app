@@ -19,6 +19,7 @@ interface Native {
   openEncryptedWrite(destPath: string, keyHex: string): Promise<number>;
   writeEncrypted(handle: number, base64: string): Promise<void>;
   closeEncrypted(handle: number): Promise<void>;
+  abortEncrypted(handle: number): Promise<void>;
   restartApp(): Promise<void>;
 }
 
@@ -29,7 +30,14 @@ const native = (): Native => {
 };
 
 async function openDocument(uri: string): Promise<BackupDocument> {
-  const handle = await native().openWrite(uri);
+  let handle: number;
+  try {
+    handle = await native().openWrite(uri);
+  } catch (e) {
+    // The dialog created an empty document that cannot be written to: it is removed, not left in the person's folder.
+    await native().deleteDocument(uri).catch(() => false);
+    throw e;
+  }
   let open = true;
   const close = async () => {
     if (open) {
@@ -93,11 +101,12 @@ export async function* streamDecrypted(path: string, keyHex: string, chunk = 64 
 }
 
 /** Writes a receipt photo into app-private storage encrypted with the device file key as its bytes arrive (restore, Story 8.8). */
-export async function openEncryptedPhoto(destPath: string, keyHex: string): Promise<{ write(chunk: Uint8Array): Promise<void>; close(): Promise<void> }> {
+export async function openEncryptedPhoto(destPath: string, keyHex: string): Promise<{ write(chunk: Uint8Array): Promise<void>; close(): Promise<void>; abort(): Promise<void> }> {
   const handle = await native().openEncryptedWrite(destPath, keyHex);
   return {
     write: (chunk) => native().writeEncrypted(handle, toBase64(chunk)),
     close: () => native().closeEncrypted(handle),
+    abort: () => native().abortEncrypted(handle),
   };
 }
 

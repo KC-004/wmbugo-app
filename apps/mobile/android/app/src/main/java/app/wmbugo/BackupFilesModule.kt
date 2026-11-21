@@ -3,6 +3,9 @@ package app.wmbugo
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
+import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
 import android.util.Base64
 import com.facebook.react.ReactPackage
@@ -42,6 +45,9 @@ class BackupFilesModule(private val ctx: ReactApplicationContext) : ReactContext
   private val ids = AtomicInteger(1)
   private val writers = ConcurrentHashMap<Int, OutputStream>()
   private val readers = ConcurrentHashMap<Int, FileChannel>()
+  // The descriptor behind a reader is kept: if only the channel were held, the descriptor could be garbage collected and its
+  // finalizer would close the file under a read in progress.
+  private val readerFds = ConcurrentHashMap<Int, ParcelFileDescriptor>()
   private val decrypting = ConcurrentHashMap<Int, InputStream>()
   private val encrypting = ConcurrentHashMap<Int, EncryptingFile>()
 
@@ -169,8 +175,14 @@ class BackupFilesModule(private val ctx: ReactApplicationContext) : ReactContext
   fun openRead(uri: String, promise: Promise) {
     try {
       val pfd = ctx.contentResolver.openFileDescriptor(Uri.parse(uri), "r") ?: throw IllegalStateException("Cannot open the file")
-      val channel = FileInputStream(pfd.fileDescriptor).channel
+      val channel = try {
+        FileInputStream(pfd.fileDescriptor).channel
+      } catch (e: Exception) {
+        pfd.close()
+        throw e
+      }
       val id = ids.getAndIncrement()
+      readerFds[id] = pfd
       readers[id] = channel
       val map = Arguments.createMap()
       map.putInt("handle", id)
@@ -202,6 +214,7 @@ class BackupFilesModule(private val ctx: ReactApplicationContext) : ReactContext
   fun closeRead(handle: Int, promise: Promise) {
     try {
       readers.remove(handle)?.close()
+      readerFds.remove(handle)?.close()
       promise.resolve(null)
     } catch (e: Exception) {
       promise.reject("E_CLOSE", e.message, e)
@@ -220,16 +233,20 @@ class BackupFilesModule(private val ctx: ReactApplicationContext) : ReactContext
 
   @ReactMethod
   fun openDecrypted(srcPath: String, keyHex: String, promise: Promise) {
+    var input: FileInputStream? = null
     try {
-      val input = FileInputStream(File(srcPath))
+      input = FileInputStream(File(srcPath))
       val iv = ByteArray(IV_BYTES)
-      if (input.read(iv) != IV_BYTES) throw IllegalStateException("Corrupt file")
+      // readFully: a single read may return fewer bytes than asked without the file being short.
+      java.io.DataInputStream(input).readFully(iv)
       val cipher = Cipher.getInstance("AES/GCM/NoPadding")
       cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(fileKey(keyHex), "AES"), GCMParameterSpec(128, iv))
       val id = ids.getAndIncrement()
       decrypting[id] = javax.crypto.CipherInputStream(input, cipher)
       promise.resolve(id)
     } catch (e: Exception) {
+      // The stream was opened before the failure: do not leave its descriptor behind.
+      try { input?.close() } catch (_: Exception) {}
       promise.reject("E_OPEN", e.message, e)
     }
   }
@@ -269,18 +286,20 @@ class BackupFilesModule(private val ctx: ReactApplicationContext) : ReactContext
   /** Opens an encrypted photo file in the same format the app uses (12-byte IV, then AES-256-GCM), written as bytes arrive. */
   @ReactMethod
   fun openEncryptedWrite(destPath: String, keyHex: String, promise: Promise) {
+    var out: java.io.FileOutputStream? = null
     try {
       val dest = File(destPath)
       dest.parentFile?.mkdirs()
       val iv = ByteArray(IV_BYTES).also { java.security.SecureRandom().nextBytes(it) }
       val cipher = Cipher.getInstance("AES/GCM/NoPadding")
       cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(fileKey(keyHex), "AES"), GCMParameterSpec(128, iv))
-      val out = java.io.FileOutputStream(dest)
+      out = java.io.FileOutputStream(dest)
       out.write(iv)
       val id = ids.getAndIncrement()
       encrypting[id] = EncryptingFile(out, cipher)
       promise.resolve(id)
     } catch (e: Exception) {
+      try { out?.close() } catch (_: Exception) {}
       promise.reject("E_OPEN", e.message, e)
     }
   }
@@ -299,6 +318,18 @@ class BackupFilesModule(private val ctx: ReactApplicationContext) : ReactContext
 
   /** Writes the GCM tag and closes. Until this is called the file is not a complete photo. */
   @ReactMethod
+  fun abortEncrypted(handle: Int, promise: Promise) {
+    // An extraction that failed part-way: the stream is closed without finishing the cipher. The partial file is staging, which the
+    // restore removes.
+    try {
+      encrypting.remove(handle)?.out?.close()
+      promise.resolve(null)
+    } catch (e: Exception) {
+      promise.reject("E_CLOSE", e.message, e)
+    }
+  }
+
+  @ReactMethod
   fun closeEncrypted(handle: Int, promise: Promise) {
     try {
       val f = encrypting.remove(handle) ?: throw IllegalStateException("Unknown handle")
@@ -314,11 +345,13 @@ class BackupFilesModule(private val ctx: ReactApplicationContext) : ReactContext
   @ReactMethod
   fun restartApp(promise: Promise) {
     try {
-      val launch = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName)
-      launch?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-      promise.resolve(null)
+      // No launch intent means nothing can bring the app back: say so instead of exiting into nothing.
+      val launch = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName) ?: throw IllegalStateException("No launch intent")
+      launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
       ctx.startActivity(launch)
-      Runtime.getRuntime().exit(0)
+      promise.resolve(null)
+      // A moment later, so the launch is handed over and the answer reaches JS before the process goes.
+      Handler(Looper.getMainLooper()).postDelayed({ Runtime.getRuntime().exit(0) }, 300)
     } catch (e: Exception) {
       promise.reject("E_RESTART", e.message, e)
     }

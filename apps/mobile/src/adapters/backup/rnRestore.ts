@@ -102,7 +102,7 @@ export function createRnRestoreDb(live: SqlDatabase | null): RestoreDb {
       }
       const id = name.slice('attachments/'.length);
       const photo = await openEncryptedPhoto(`${RESTORE_LAYOUT.stagingAttachmentsDir}/${id}.enc`, await deviceKey());
-      return { write: (c) => photo.write(c), close: () => photo.close() };
+      return { write: (c) => photo.write(c), close: () => photo.close(), abort: () => photo.abort() };
     },
 
     async migrateAndRekey(archiveKeyHex) {

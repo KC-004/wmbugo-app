@@ -9,6 +9,8 @@ import {
   KDF_LIMITS,
   MAGIC,
   MANIFEST_NAME,
+  MAX_FILE_BYTES,
+  MAX_MANIFEST_BYTES,
   SALT_BYTES,
   VERIFIER_BYTES,
   VERIFIER_CONTEXT,
@@ -52,7 +54,7 @@ export interface BackupInput {
   readonly kdf?: { readonly opslimit: number; readonly memlimit: number };
 }
 
-export type BackupWriteError = 'PASSPHRASE_EMPTY' | 'ENTRIES_INVALID' | 'ENTRY_MISMATCH' | 'WRITE_FAILED' | 'KDF_INVALID';
+export type BackupWriteError = 'PASSPHRASE_EMPTY' | 'ENTRIES_INVALID' | 'ENTRY_MISMATCH' | 'WRITE_FAILED' | 'KDF_INVALID' | 'FILE_TOO_LARGE';
 
 /** Splits the plaintext stream into 64 KiB chunks and encrypts each; the last one is tagged FINAL. */
 class ChunkWriter {
@@ -72,6 +74,8 @@ class ChunkWriter {
       this.bytesWritten += chunk.length;
       await this.sink.write(chunk);
     }
+    // What is kept back must not alias the caller's buffer: a source that reuses its read buffer would change it before it is sent.
+    if (this.pending.length > 0 && this.pending.buffer === data.buffer) this.pending = this.pending.slice();
   }
 
   async close(): Promise<void> {
@@ -108,6 +112,11 @@ export async function writeBackup(crypto: Crypto, input: BackupInput, sink: Byte
     names.add(e.name);
   }
   if (input.entries.length === 0) return err('ENTRIES_INVALID');
+  // The count the manifest states is the number of photo entries: the reader checks it, so the writer must not produce otherwise.
+  if (input.counts.photos !== input.entries.length - 1) return err('ENTRIES_INVALID');
+  // A backup its own reader would refuse is not written: found now, not when the person needs it.
+  const declaredBytes = input.entries.reduce((n, e) => n + e.size, 0);
+  if (declaredBytes > MAX_FILE_BYTES) return err('FILE_TOO_LARGE');
 
   const manifest: BackupManifest = {
     formatVersion: FORMAT_VERSION,
@@ -122,6 +131,7 @@ export async function writeBackup(crypto: Crypto, input: BackupInput, sink: Byte
     archiveKey: toHex(input.archiveKey),
   };
   const manifestBytes = utf8Encode(JSON.stringify(manifest));
+  if (manifestBytes.length > MAX_MANIFEST_BYTES) return err('FILE_TOO_LARGE');
 
   const salt = crypto.randomBytes(SALT_BYTES);
   const key = await crypto.argon2id(passphraseBytes(input.passphrase), salt, kdf.opslimit, kdf.memlimit, KEY_BYTES);

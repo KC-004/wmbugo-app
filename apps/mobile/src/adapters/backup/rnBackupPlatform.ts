@@ -45,7 +45,9 @@ export async function sweepStaging(): Promise<void> {
  * and streamed in memory; they never exist in plain form on disk. The save dialog is Android's (no storage permission).
  */
 export function createRnBackupPlatform(db: SqlDatabase, crypto: Crypto): BackupPlatform {
+  let skipped = 0;
   return {
+    photosSkipped: () => skipped,
     async exportDatabase(archiveKeyHex) {
       await RNFS.mkdir(STAGING_DIR);
       const path = `${STAGING_DIR}/export-${Date.now()}.db`;
@@ -70,17 +72,27 @@ export function createRnBackupPlatform(db: SqlDatabase, crypto: Crypto): BackupP
       }
     },
 
-    async photos() {
+    async photos(isCancelled) {
+      skipped = 0;
       const key = await keychainKeyStore.getKey();
       if (!key) throw new Error('No key');
       const ids = (await db.query(ATTACHMENT_IDS_SQL)).map((r) => String(r[0]));
       const out: BackupEntrySource[] = [];
       for (const id of ids) {
+        if (isCancelled?.()) throw new Error('cancelled');
         const path = receiptPath(id);
-        if (!(await RNFS.exists(path))) continue; // a row whose file was never written has nothing to back up
+        // A row whose file is missing has nothing to back up. It is counted, so the person is told.
+        if (!(await RNFS.exists(path))) {
+          skipped += 1;
+          continue;
+        }
         // One pass for the size and SHA-256 (the manifest lists both), another to stream it into the backup.
-        const { sha256, size } = await digestOf(crypto, streamDecrypted(path, key));
-        out.push({ name: `attachments/${id}`, size, sha256, read: () => streamDecrypted(path, key) });
+        try {
+          const { sha256, size } = await digestOf(crypto, streamDecrypted(path, key));
+          out.push({ name: `attachments/${id}`, size, sha256, read: () => streamDecrypted(path, key) });
+        } catch {
+          skipped += 1; // damaged or unreadable: one bad receipt must not stop every backup
+        }
       }
       return out;
     },

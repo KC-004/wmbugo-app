@@ -29,7 +29,7 @@ export interface RestoreApi {
   /** The system file picker (no permission); null when cancelled. */
   pick(): Promise<PickedBackup | null>;
   /** Looks at the header only: is it a wmbugo backup? Needs no passphrase. */
-  inspect(source: ByteSource): Promise<Result<{ size: number }, 'NOT_A_WMBUGO_BACKUP' | 'FILE_TOO_LARGE'>>;
+  inspect(source: ByteSource): Promise<Result<{ size: number }, 'NOT_A_WMBUGO_BACKUP' | 'FILE_TOO_LARGE' | 'BACKUP_TOO_NEW'>>;
   /** Opens the manifest with the passphrase (a preview never extracts the rest). */
   openManifest(source: ByteSource, passphrase: string): Promise<Result<BackupManifest, BackupReadError>>;
   /** What is on this phone now, or null for nothing yet (the Welcome screen). */

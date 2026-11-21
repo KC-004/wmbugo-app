@@ -30,7 +30,7 @@ export const DEFAULT_KDF = { opslimit: 3, memlimit: 64 * 1024 * 1024 } as const;
  * What a reader accepts: a damaged parameter cannot ask for gigabytes of memory. The memory limit must be a whole number of KiB,
  * because Argon2 rounds it down to KiB: a stray bit below that would change nothing and a flipped byte would go unnoticed.
  */
-export const KDF_LIMITS = { minOps: 1, maxOps: 16, minMem: 8 * 1024, maxMem: 1024 * 1024 * 1024 } as const;
+export const KDF_LIMITS = { minOps: 1, maxOps: 16, minMem: 8 * 1024, maxMem: 256 * 1024 * 1024 } as const;
 
 export const MANIFEST_NAME = 'manifest.json';
 export const DB_NAME = 'db';
@@ -58,7 +58,11 @@ export interface BackupManifest {
   readonly archiveKey: string;
 }
 
-export type BackupReadError = 'NOT_A_WMBUGO_BACKUP' | 'WRONG_PASSPHRASE' | 'BACKUP_DAMAGED' | 'BACKUP_TOO_NEW' | 'FILE_TOO_LARGE';
+/** `STORAGE_FAILED`: the file is fine but the phone could not write what it read (a full disk): not a damaged backup. */
+export type BackupReadError = 'NOT_A_WMBUGO_BACKUP' | 'WRONG_PASSPHRASE' | 'BACKUP_DAMAGED' | 'BACKUP_TOO_NEW' | 'FILE_TOO_LARGE' | 'STORAGE_FAILED';
+
+/** The most photos and bytes a manifest may declare: the file itself cannot exceed `MAX_FILE_BYTES`. */
+const MAX_ENTRIES = 200_000;
 
 // ---- byte helpers (no Buffer, no TextEncoder: core runs in Hermes and Node) ----
 
@@ -181,12 +185,21 @@ export function parseManifest(json: string): BackupManifest | null {
     const r = b as Record<string, unknown> | null;
     if (!r || !str(r.accountId) || typeof r.balanceMinor !== 'number' || !Number.isSafeInteger(r.balanceMinor)) return null;
   }
+  const entryList = m.entries as unknown[];
+  if (entryList.length === 0 || entryList.length > MAX_ENTRIES) return null;
   const names = new Set<string>();
-  for (const e of m.entries as unknown[]) {
+  let declared = 0;
+  for (const e of entryList) {
     const r = e as Record<string, unknown> | null;
     if (!r || typeof r.name !== 'string' || !isAllowedEntryName(r.name) || r.name === MANIFEST_NAME || names.has(r.name) || !num(r.size) || !hex(r.sha256, 32)) return null;
     names.add(r.name);
+    declared += r.size as number;
   }
+  // The database comes first and is always there: a backup without one has nothing to restore.
+  if ((entryList[0] as Record<string, unknown>).name !== DB_NAME) return null;
+  // The declared sizes cannot add up to more than a file may hold, and the photo count is the number of photo entries.
+  if (!Number.isSafeInteger(declared) || declared > MAX_FILE_BYTES) return null;
+  if (counts.photos !== entryList.length - 1) return null;
   if (!hex(m.payloadChecksum, 32) || !hex(m.archiveKey, KEY_BYTES)) return null;
   return m as unknown as BackupManifest;
 }
