@@ -41,7 +41,7 @@ import { setNavTimingSink } from '../features/shell/navTiming';
 import { invalidationHandlers, queryClient } from '../shared/queryClient';
 import { BENCH_TRIGGER, runSaveBenchmark } from './benchmark';
 import { keychainKeyStore } from './storage/keychainKeyStore';
-import { appNotifier, postCaptureFixture, setNotificationPrivacyReader, withNotificationRepost } from './notifier';
+import { appNotifier, postCaptureFixture, privacyFromSettings, setNotificationPrivacyReader, withNotificationRepost } from './notifier';
 import { readProfile } from './readProfile';
 import { withBudgetHandlers } from './budgetHandlers';
 import { serialize, withBillHandlers, withReminderSync } from './billHandlers';
@@ -227,15 +227,8 @@ async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
     }, log), syncReminders, log)),
   });
   // Notification privacy (Story 8.5): every notification passes through the form decided from the saved settings.
-  setNotificationPrivacyReader(async () => {
-    const s = (await readProfile(started.value.db))?.settings;
-    return {
-      notificationDetail: s?.notificationDetail ?? 'full',
-      fullNotificationsOptIn: s?.fullNotificationsOptIn ?? false,
-      appLockEnabled: s?.appLockEnabled ?? false,
-      hideAmounts: s?.hideAmounts ?? false,
-    };
-  });
+  // A profile that cannot be read is the most private form, not the default one.
+  setNotificationPrivacyReader(async () => privacyFromSettings((await readProfile(started.value.db))?.settings));
   const newId = createIdGenerator(systemClock, secureRandom);
   const writer = new LedgerWriter({
     uow: started.value.db,
@@ -268,7 +261,7 @@ async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
   // Bill reminders are scheduled again at start and whenever the app comes back (Story 6.5): the window moves with the day.
   appStateScheduler.onStartOrResume(() => syncReminders().catch(() => log.warn('bills.reminder_sync_threw')));
   // A notification permission changed in Android settings while the app was away shows on the next screen read (Story 8.1).
-  appStateScheduler.onStartOrResume(() => refreshPermissionViews(queryClient));
+  appStateScheduler.onStartOrResume(() => void Promise.resolve(refreshPermissionViews(queryClient)).catch(() => undefined));
   // Events committed before the app was last killed are delivered now, without holding up the first screen.
   void dispatcher.deliverPending().catch(() => undefined);
   // NFR-04 benchmark: only when the trigger file was placed in the private directory (debuggable builds via run-as).
@@ -279,17 +272,23 @@ async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
   });
   // A backup or restore that was interrupted leaves staging behind: it is swept at every start (Story 8.7). Not after a restore that
   // just held: its journal is already gone and nothing is in staging.
-  void sweepStaging();
+  void sweepStaging().catch(() => undefined);
   // The first start after a restore that held: every query is invalidated and reminders are planned again from the restored data.
   if (restoreOutcome === 'restored') void writer.run(AnnounceBackupRestored, undefined, 'system').catch(() => undefined);
   // Safe mode (Story 8.12): `quick_check` once after the first frame and once per local day. A failure stops every write.
   scheduleIntegrityChecks(started.value.db, writer, log, () => localToday(systemClock.nowMs(), systemClock.timezoneId()), (task) => appStateScheduler.onStartOrResume(task));
-  // Debug-only fixture (Story 8.5): a file placed in the private directory posts the hidden capture notification once.
-  void rnFileStore.exists(CAPTURE_FIXTURE_TRIGGER).then(async (on) => {
-    if (!on) return;
-    await rnFileStore.remove(CAPTURE_FIXTURE_TRIGGER);
-    await postCaptureFixture();
-  });
+  // Debug-only fixture (Story 8.5): a file placed in the private directory posts the hidden capture notification once. Not in a
+  // release build, and a failure here is never a crash.
+  if (__DEV__) {
+    void rnFileStore
+      .exists(CAPTURE_FIXTURE_TRIGGER)
+      .then(async (on) => {
+        if (!on) return;
+        await rnFileStore.remove(CAPTURE_FIXTURE_TRIGGER);
+        await postCaptureFixture();
+      })
+      .catch(() => undefined);
+  }
   return started;
 }
 

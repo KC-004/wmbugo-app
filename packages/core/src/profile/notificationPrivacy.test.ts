@@ -59,17 +59,20 @@ describe('decideNotificationForm: captures (matrix)', () => {
 });
 
 describe('decideNotificationForm: budgets and bills', () => {
-  it('budget: public on the lock screen always, public in the shade while app lock or hide amounts is on', () => {
+  it('budget: public on the lock screen always; in the shade it follows the capture rule (detail hidden, or app lock or hide amounts without the opt-in)', () => {
     expect(decideNotificationForm('budget', base)).toEqual({ shade: 'full', lockScreen: 'public', actions: [] });
     expect(decideNotificationForm('budget', with_({ appLockEnabled: true })).shade).toBe('public');
     expect(decideNotificationForm('budget', with_({ hideAmounts: true })).shade).toBe('public');
-    expect(decideNotificationForm('budget', with_({ appLockEnabled: true, fullNotificationsOptIn: true })).shade).toBe('public');
+    expect(decideNotificationForm('budget', with_({ appLockEnabled: true, fullNotificationsOptIn: true })).shade).toBe('full');
+    expect(decideNotificationForm('budget', with_({ notificationDetail: 'hidden' })).shade).toBe('public');
+    expect(decideNotificationForm('budget', with_({ notificationDetail: 'hidden', fullNotificationsOptIn: true })).shade).toBe('public');
   });
 
-  it('bill: the lock screen is public, and the shade keeps the wording because it carries no money', () => {
-    for (const s of [base, with_({ appLockEnabled: true }), with_({ hideAmounts: true, notificationDetail: 'hidden' })]) {
+  it('bill: the lock screen is public, and the shade keeps the wording (no money) unless notification detail is hidden', () => {
+    for (const s of [base, with_({ appLockEnabled: true }), with_({ hideAmounts: true, appLockEnabled: true })]) {
       expect(decideNotificationForm('bill', s)).toEqual({ shade: 'full', lockScreen: 'public', actions: [] });
     }
+    expect(decideNotificationForm('bill', with_({ notificationDetail: 'hidden' }))).toEqual({ shade: 'public', lockScreen: 'public', actions: [] });
   });
 });
 
@@ -187,5 +190,82 @@ describe('SetNotificationPrivacy', () => {
     expect(await writer.run(SetNotificationPrivacy, {}, 'user')).toEqual({ ok: false, code: 'SETTING_INVALID' });
     expect(await writer.run(ChangeSetting, { key: 'privacy.notification_detail', value: 'hidden' }, 'user')).toEqual({ ok: false, code: 'SETTING_INVALID' });
     expect(parseSettings(await db.query(SETTINGS_SQL)).notificationDetail).toBe('full');
+  });
+});
+
+describe('the wrapper applies the form to every notification (Epic 8 review)', () => {
+  const capture = (id: string): NotificationContent => ({
+    id,
+    channel: 'capture_review',
+    title: '₹450 at Swiggy',
+    body: 'Food account',
+    publicTitle: 'New payment',
+    publicBody: '',
+    badge: false,
+    data: { screen: 'ReviewQueue' },
+    actions: ['approve', 'reject'],
+  });
+  const recorder = () => {
+    const posts: NotificationContent[] = [];
+    const inner: Notifier = {
+      available: true,
+      permission: async () => 'granted',
+      requestPermission: async () => 'granted',
+      post: async (c) => void posts.push(c),
+      replaceScheduled: async () => undefined,
+      onOpen: () => () => undefined,
+    };
+    return { inner, posts };
+  };
+
+  it('a full capture is replaced by the hidden one with only Review when the settings say hidden, and kept when they say full', async () => {
+    const { inner, posts } = recorder();
+    let settings = with_({ appLockEnabled: true });
+    const n = withNotificationPrivacy(inner, async () => settings);
+    await n.post(capture('c1'));
+    expect(posts[0]!.title).toBe('New payment to check');
+    expect(posts[0]!.body).toBe('');
+    expect(posts[0]!.actions).toEqual(['review']);
+    expect(posts[0]!.id).toBe('c1');
+    settings = base;
+    await n.post(capture('c2'));
+    expect(posts[1]!.title).toBe('₹450 at Swiggy');
+    expect(posts[1]!.actions).toEqual(['approve', 'reject']);
+  });
+
+  it('repostAll switches a capture from full to hidden after a settings change', async () => {
+    const { inner, posts } = recorder();
+    let settings = base;
+    const n = withNotificationPrivacy(inner, async () => settings);
+    await n.post(capture('c1'));
+    settings = with_({ notificationDetail: 'hidden' });
+    await n.repostAll();
+    expect(posts[1]!.title).toBe('New payment to check');
+  });
+
+  it('a settings read that fails withholds everything instead of showing the full form', async () => {
+    const { inner, posts } = recorder();
+    const n = withNotificationPrivacy(inner, async () => Promise.reject(new Error('database closed')));
+    await n.post(capture('c1'));
+    expect(posts[0]!.title).toBe('New payment to check');
+    const budget = budgetAlertContent({ budgetId: 'b1', periodStart: '2026-11-01', name: 'Food', thresholdPct: 80 });
+    await n.post(budget);
+    expect(posts[1]!.title).toBe(budget.publicTitle);
+  });
+
+  it('a dismissed notification is forgotten and not posted again, and only the newest fifty are remembered', async () => {
+    const { inner, posts } = recorder();
+    const n = withNotificationPrivacy(inner, async () => base);
+    await n.post(capture('gone'));
+    n.forget('gone');
+    await n.repostAll();
+    expect(posts).toHaveLength(1);
+    posts.length = 0;
+    for (let i = 0; i < 60; i++) await n.post(capture(`n${i}`));
+    posts.length = 0;
+    await n.repostAll();
+    expect(posts).toHaveLength(50);
+    expect(posts.map((p) => p.id)).not.toContain('n0');
+    expect(posts.map((p) => p.id)).toContain('n59');
   });
 });

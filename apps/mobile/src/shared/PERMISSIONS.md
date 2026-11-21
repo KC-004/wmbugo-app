@@ -1,6 +1,6 @@
 # Permissions
 
-wmbugo asks for as little as it can. The release build declares no `INTERNET` and no `ACCESS_NETWORK_STATE` permission, so it cannot send anything anywhere. Every permission that may ever be on the release allowlist (`scripts/android-permission-allowlist.json`) has a row below; a CI test fails when one has none. Every runtime request goes through the single `requestPermission(kind)` helper in `src/adapters/permissions.ts`, and none is requested during onboarding (spy test in `onboarding.test.tsx`).
+wmbugo asks for as little as it can. The release build declares no `INTERNET` and no `ACCESS_NETWORK_STATE` permission, so wmbugo does not send your data anywhere. (This is what the build declares and what the checks in CI verify; the proxy audit in `scripts/privacy/proxy-audit` is the check on a real phone.) Every permission that may ever be on the release allowlist (`scripts/android-permission-allowlist.json`) has a row below; a CI test fails when one has none. Every runtime request goes through the single `requestPermission(kind)` helper in `src/adapters/permissions.ts`, and none is requested during onboarding (spy test in `onboarding.test.tsx`).
 
 | Permission | Kind | Feature that needs it | In-context rationale (shown before the system prompt) | What still works when denied | Revocation in Android settings |
 | --- | --- | --- | --- | --- | --- |

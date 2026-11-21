@@ -14,6 +14,8 @@ export interface NotificationContent {
   /** Always false: no numeric app badge. */
   readonly badge: false;
   readonly data: Readonly<Record<string, string>>;
+  /** The buttons on the shade form. Absent means none. A hidden capture offers only `review`. */
+  readonly actions?: readonly ('approve' | 'reject' | 'review')[];
 }
 
 /** A notification to be shown later, at a UTC instant (inexact: the system may delay it a little, no exact-alarm permission). */

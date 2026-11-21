@@ -1,5 +1,5 @@
 import {
-  DEFAULT_SETTINGS,
+  HIDDEN_NOTIFICATION_PRIVACY,
   hiddenCaptureNotification,
   unavailableNotifier,
   withNotificationPrivacy,
@@ -10,13 +10,16 @@ import {
 
 type PrivacyReader = () => Promise<NotificationPrivacySettings>;
 
-const defaults: NotificationPrivacySettings = {
-  notificationDetail: DEFAULT_SETTINGS.notificationDetail,
-  fullNotificationsOptIn: DEFAULT_SETTINGS.fullNotificationsOptIn,
-  appLockEnabled: DEFAULT_SETTINGS.appLockEnabled,
-  hideAmounts: DEFAULT_SETTINGS.hideAmounts,
-};
-let reader: PrivacyReader = async () => defaults;
+/** Until the app has started and read the saved settings, and whenever they cannot be read, nothing is shown (fail closed). */
+let reader: PrivacyReader = async () => HIDDEN_NOTIFICATION_PRIVACY;
+
+/** The privacy settings from a saved profile; no profile (or none readable) is the most private form. */
+export function privacyFromSettings(
+  s: { notificationDetail: NotificationPrivacySettings['notificationDetail']; fullNotificationsOptIn: boolean; appLockEnabled: boolean; hideAmounts: boolean } | null | undefined,
+): NotificationPrivacySettings {
+  if (!s) return HIDDEN_NOTIFICATION_PRIVACY;
+  return { notificationDetail: s.notificationDetail, fullNotificationsOptIn: s.fullNotificationsOptIn, appLockEnabled: s.appLockEnabled, hideAmounts: s.hideAmounts };
+}
 
 /** The composition root says where the privacy settings are read from (the profile). Kept here so this file never imports the app services. */
 export function setNotificationPrivacyReader(read: PrivacyReader): void {

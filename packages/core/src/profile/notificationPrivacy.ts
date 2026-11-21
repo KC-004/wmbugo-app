@@ -25,6 +25,17 @@ export interface NotificationForm {
   readonly actions: readonly NotificationAction[];
 }
 
+/**
+ * What is assumed when the settings cannot be read: everything withheld. A failure to read must never show more than a person who
+ * chose the most private options would have allowed.
+ */
+export const HIDDEN_NOTIFICATION_PRIVACY: NotificationPrivacySettings = {
+  notificationDetail: 'hidden',
+  fullNotificationsOptIn: false,
+  appLockEnabled: true,
+  hideAmounts: true,
+};
+
 /** The wording of the hidden capture notification: no amount, merchant, account or category text. */
 export const CAPTURE_HIDDEN_TITLE = 'New payment to check';
 export const NOTIFICATION_STRINGS = {
@@ -37,20 +48,22 @@ export const NOTIFICATION_STRINGS = {
 /**
  * The form of one notification. A capture is `hidden` in the shade when notification detail is hidden, or when app lock or hide
  * amounts is on and the person has not opted in to full details; on the lock screen it is always `hidden` unless the lock-screen
- * approve flag is true (default false; its setting arrives with CAP-006 in Epic 11). Budget notifications always use the public
- * wording on the lock screen, and in the shade while app lock or hide amounts is on. Bill reminders carry no money, so the
- * shade keeps `Rent is due tomorrow`; the lock screen shows the public version.
+ * approve flag is true (default false; its setting arrives with CAP-006 in Epic 11). Budget notifications use the public wording on
+ * the lock screen always, and in the shade under the same rule as captures: detail hidden, or app lock or hide amounts on without
+ * the opt-in. Bill reminders carry no money, so the shade keeps `Rent is due tomorrow` unless notification detail is hidden; the
+ * lock screen shows the public version.
  */
 export function decideNotificationForm(kind: NotificationKind, settings: NotificationPrivacySettings, lockScreenApprove = false): NotificationForm {
   const guarded = settings.appLockEnabled || settings.hideAmounts;
+  const detailHidden = settings.notificationDetail === 'hidden';
+  const withheld = detailHidden || (guarded && !settings.fullNotificationsOptIn);
   if (kind === 'capture') {
-    const hidden = settings.notificationDetail === 'hidden' || (guarded && !settings.fullNotificationsOptIn);
-    const shade: ShadeForm = hidden ? 'hidden' : 'full';
+    const shade: ShadeForm = withheld ? 'hidden' : 'full';
     const lockScreen: ShadeForm = lockScreenApprove && shade === 'full' ? 'full' : 'hidden';
     return { shade, lockScreen, actions: shade === 'full' ? ['approve', 'reject'] : ['review'] };
   }
-  if (kind === 'budget') return { shade: guarded ? 'public' : 'full', lockScreen: 'public', actions: [] };
-  return { shade: 'full', lockScreen: 'public', actions: [] };
+  if (kind === 'budget') return { shade: withheld ? 'public' : 'full', lockScreen: 'public', actions: [] };
+  return { shade: detailHidden ? 'public' : 'full', lockScreen: 'public', actions: [] };
 }
 
 /** The effective shade form for captures: what the Privacy summary and the notification detail screen show. */
@@ -76,6 +89,7 @@ export function hiddenCaptureNotification(id: string): NotificationContent {
     publicBody: '',
     badge: false,
     data: { screen: 'ReviewQueue' },
+    actions: ['review'],
   };
 }
 
@@ -92,13 +106,22 @@ export function withShadeForm(content: NotificationContent, shade: ShadeForm): N
  * A Notifier that applies the privacy form to every notification the features post or schedule, reading the current settings
  * each time. Posted notifications are remembered so `repostAll` can re-post them in a new form after a settings change.
  */
-export function withNotificationPrivacy(inner: Notifier, read: () => Promise<NotificationPrivacySettings>): Notifier & { repostAll(): Promise<void> } {
+/** How many posted notifications are remembered for `repostAll`: the shade holds few, and the oldest are dropped first. */
+const MAX_REMEMBERED = 50;
+
+export function withNotificationPrivacy(inner: Notifier, read: () => Promise<NotificationPrivacySettings>): Notifier & { repostAll(): Promise<void>; forget(id: string): void } {
   const posted = new Map<string, NotificationContent>();
   const kindOf = (c: NotificationContent): NotificationKind => (c.channel === 'budget_alerts' ? 'budget' : c.channel === 'bill_reminders' ? 'bill' : 'capture');
+  // A settings read that fails withholds everything: the failure must not be the way details reach the lock screen.
+  const settings = () => read().catch(() => HIDDEN_NOTIFICATION_PRIVACY);
   const apply = async (c: NotificationContent): Promise<NotificationContent> => {
     const kind = kindOf(c);
-    if (kind === 'capture') return c; // a capture is built already in its form by `hiddenCaptureNotification` or the capture builder
-    return withShadeForm(c, decideNotificationForm(kind, await read()).shade);
+    const form = decideNotificationForm(kind, await settings());
+    if (kind === 'capture') {
+      // A capture built in its full form is replaced by the hidden one when the settings say so; the hidden one offers only Review.
+      return form.shade === 'hidden' && c.title !== CAPTURE_HIDDEN_TITLE ? hiddenCaptureNotification(c.id) : c;
+    }
+    return withShadeForm(c, form.shade);
   };
   return {
     get available() {
@@ -107,8 +130,14 @@ export function withNotificationPrivacy(inner: Notifier, read: () => Promise<Not
     permission: () => inner.permission(),
     requestPermission: () => inner.requestPermission(),
     async post(content) {
+      posted.delete(content.id);
       posted.set(content.id, content);
+      while (posted.size > MAX_REMEMBERED) posted.delete(posted.keys().next().value as string);
       await inner.post(await apply(content));
+    },
+    /** The person dismissed or opened it, or it was resolved: it is not posted again after a settings change. */
+    forget(id) {
+      posted.delete(id);
     },
     async replaceScheduled(channel, items) {
       const shaped = await Promise.all(items.map(async (i) => ({ ...i, content: await apply(i.content) })));

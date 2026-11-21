@@ -364,8 +364,8 @@ describe('Privacy (Story 8.2)', () => {
     act(() => fire(r, 'row-stays'));
     const all = texts(r).join(' | ');
     for (const t of ['Your entries and photos', 'No internet', 'Android backups', 'Backup and export files', 'Diagnostics']) expect(all).toContain(t);
-    expect(all).toContain('Stored encrypted on this phone. Nobody else can read them, including us.');
-    expect(all).toContain("wmbugo has no internet permission, so it can't send anything.");
+    expect(all).toContain('Stored encrypted on this phone. wmbugo keeps them here and has no account or server that holds them.');
+    expect(all).toContain("wmbugo does not ask Android for internet permission. Your entries are not sent anywhere by wmbugo.");
     expect(all).not.toMatch(/never leave|can never|under any circumstances/i);
     act(() => fire(r, 'settings-back'));
     expect(has(r, 'switch-hide-amounts')).toBe(true);
