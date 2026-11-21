@@ -9,6 +9,7 @@ import {
   paydayFromChoice,
   paydaySummary,
   periodRangeLabel,
+  privacySummary,
   youSummary,
   type FirstDay,
   type NumberFormat,
@@ -30,15 +31,16 @@ import { Button } from '../../shared/ui/Button';
 import { TopBar } from '../../shared/ui/TopBar';
 import { Chip } from '../../shared/ui/Chip';
 import { useFocusRing } from '../../shared/ui/FocusRing';
+import { hidingBlocksScreenshots } from '../../adapters/recentsPrivacy';
 import { RegionPicker } from '../onboarding/OnboardingFlow';
 import { CategoriesScreen } from '../categories/CategoriesScreen';
 import { RecentlyDeletedScreen } from './RecentlyDeletedScreen';
 import { realSettingsApi, SETTINGS_QUERY_KEY, type SettingsApi, type SettingsData } from './settingsApi';
 
-type Page = 'hub' | 'you' | 'appearance' | 'money' | 'categories' | 'data' | 'deleted';
+type Page = 'hub' | 'you' | 'appearance' | 'money' | 'categories' | 'data' | 'deleted' | 'privacy' | 'stays';
 
 /** Where Back goes from each page. */
-const PARENT: Readonly<Record<Page, Page>> = { hub: 'hub', you: 'hub', appearance: 'you', money: 'you', categories: 'hub', data: 'hub', deleted: 'data' };
+const PARENT: Readonly<Record<Page, Page>> = { hub: 'hub', you: 'hub', appearance: 'you', money: 'you', categories: 'hub', data: 'hub', deleted: 'data', privacy: 'hub', stays: 'privacy' };
 
 const THEMES: readonly { v: ThemeChoice; label: string }[] = [
   { v: 'system', label: copy.settings.themeSystem },
@@ -66,6 +68,15 @@ const FIRST_DAYS: readonly { v: FirstDay; label: string }[] = [
   { v: 'mon', label: copy.settings.dayMon },
   { v: 'sun', label: copy.settings.daySun },
   { v: 'sat', label: copy.settings.daySat },
+];
+
+/** What stays on this phone: plain rows, one sentence each. No row claims bytes can never leave the phone. */
+const STAYS: readonly (readonly [string, string])[] = [
+  [copy.privacy.staysEntriesTitle, copy.privacy.staysEntries],
+  [copy.privacy.staysInternetTitle, copy.privacy.staysInternet],
+  [copy.privacy.staysBackupsTitle, copy.privacy.staysBackups],
+  [copy.privacy.staysFilesTitle, copy.privacy.staysFiles],
+  [copy.privacy.staysDiagnosticsTitle, copy.privacy.staysDiagnostics],
 ];
 
 const choiceOf = (rule: { kind: string }): PaydayChoice => (rule.kind === 'day' ? 'other' : (rule.kind as PaydayChoice));
@@ -99,8 +110,15 @@ export function SettingsScreen({ api = realSettingsApi, onBack }: { api?: Settin
     await refresh();
   };
 
+  const setHideAmounts = async (hidden: boolean) => {
+    setNote(null);
+    const r = await api.setHideAmounts(hidden);
+    if (!r.ok) setNote(copy.settings.saveError);
+    await refresh();
+  };
+
   const title =
-    page === 'hub' ? copy.nav.settings : page === 'you' ? copy.settings.you : page === 'appearance' ? copy.settings.appearance : page === 'money' ? copy.settings.moneyBasics : page === 'categories' ? copy.categories.title : page === 'data' ? copy.deleted.data : copy.deleted.recentlyDeleted;
+    page === 'hub' ? copy.nav.settings : page === 'you' ? copy.settings.you : page === 'appearance' ? copy.settings.appearance : page === 'money' ? copy.settings.moneyBasics : page === 'categories' ? copy.categories.title : page === 'data' ? copy.deleted.data : page === 'privacy' ? copy.privacy.group : page === 'stays' ? copy.privacy.staysTitle : copy.deleted.recentlyDeleted;
   const back = () => (page === 'hub' ? onBack() : setPage(PARENT[page]));
 
   return (
@@ -116,7 +134,37 @@ export function SettingsScreen({ api = realSettingsApi, onBack }: { api?: Settin
             summary={d.expenseCategoryCount === 1 ? copy.categories.summaryOne : copy.categories.summaryMany.replace('{n}', String(d.expenseCategoryCount))}
             onPress={() => setPage('categories')}
           />
+          <Row testID="group-privacy" label={copy.privacy.group} summary={privacySummary({ hideAmounts: d.settings.hideAmounts })} onPress={() => setPage('privacy')} />
           <Row testID="group-data" label={copy.deleted.data} summary={copy.deleted.dataSummary} onPress={() => setPage('data')} />
+        </>
+      ) : page === 'privacy' ? (
+        <>
+          <SwitchRow
+            testID="switch-hide-amounts"
+            label={copy.privacy.hideAmounts}
+            hint={copy.privacy.hideAmountsHint}
+            value={d.settings.hideAmounts}
+            onChange={(v) => void setHideAmounts(v)}
+          />
+          <SwitchRow
+            testID="switch-hide-recents"
+            label={copy.privacy.hideInRecents}
+            hint={hidingBlocksScreenshots() ? `${copy.privacy.hideInRecentsHint} ${copy.privacy.blocksScreenshots}` : copy.privacy.hideInRecentsHint}
+            value={d.settings.hideInRecents}
+            onChange={(v) => void setSetting('device.hide_in_recents', v)}
+          />
+          <Row testID="row-stays" label={copy.privacy.staysRow} summary={copy.privacy.staysSummary} onPress={() => setPage('stays')} />
+        </>
+      ) : page === 'stays' ? (
+        <>
+          {STAYS.map(([title, text]) => (
+            <View key={title} testID={`stays-${title}`} accessible accessibilityLabel={`${title}. ${text}`} style={[styles.row, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
+              <View style={styles.rowText}>
+                <Text style={[textStyle('body-medium'), { color: theme.color('text-primary') }]}>{title}</Text>
+                <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{text}</Text>
+              </View>
+            </View>
+          ))}
         </>
       ) : page === 'categories' ? (
         <CategoriesScreen />

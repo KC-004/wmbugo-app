@@ -16,6 +16,7 @@ class MainApplication : Application(), ReactApplication {
         PackageList(this).packages.apply {
           add(DeviceCapabilitiesPackage())
           add(ReceiptFilesPackage())
+          add(PrivacyPackage())
         },
     )
   }
@@ -23,6 +24,7 @@ class MainApplication : Application(), ReactApplication {
   override fun onCreate() {
     super.onCreate()
     NativeCrashRecorder.install(this)
+    RecentsPrivacy.install(this)
     loadReactNative(this)
   }
 }

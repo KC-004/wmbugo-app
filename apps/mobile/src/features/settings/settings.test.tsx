@@ -10,10 +10,15 @@ import { ThemeProvider, useTheme } from '../../shared/theme/ThemeProvider';
 import { HomeScreen } from '../home/HomeScreen';
 import { homeData } from '../home/homeTestKit';
 import type { HomeApi, HomeData } from '../home/homeApi';
+import { hidingBlocksScreenshots } from '../../adapters/recentsPrivacy';
 import { SettingsBridge } from './SettingsBridge';
 import { SettingsScreen } from './SettingsScreen';
 import type { SettingsApi, SettingsData } from './settingsApi';
 
+jest.mock('../../adapters/recentsPrivacy', () => ({
+  ...jest.requireActual('../../adapters/recentsPrivacy'),
+  hidingBlocksScreenshots: jest.fn(() => false),
+}));
 jest.mock('../../adapters/startApp', () => ({ getServices: jest.fn(), systemClock: { nowMs: () => 0, timezoneId: () => 'Asia/Singapore' } }));
 
 const live: ReactTestRenderer[] = [];
@@ -58,7 +63,7 @@ function fakeApi(initial: SettingsData) {
     const map: Record<string, keyof AppSettings> = {
       theme: 'theme', 'ui.number_format': 'numberFormat', 'ui.haptics': 'haptics', 'ui.reduce_motion': 'reduceMotion',
       'finance.period_mode': 'periodMode', 'finance.first_day_of_week': 'firstDay', 'finance.default_account': 'defaultAccountId',
-      'finance.block_transfers_above_balance': 'blockTransfers',
+      'finance.block_transfers_above_balance': 'blockTransfers', 'device.hide_in_recents': 'hideInRecents',
     };
     current = { ...current, settings: { ...current.settings, [map[key]!]: value } };
     return { ok: true };
@@ -69,10 +74,13 @@ function fakeApi(initial: SettingsData) {
   });
   const timezoneCheck = jest.fn(async () => null as { deviceTz: string } | null);
   const answerTimezone = jest.fn(async () => ({ ok: true }));
-  const setHideAmounts = jest.fn(async () => ({ ok: true }));
+  const setHideAmounts = jest.fn(async (hidden: boolean) => {
+    current = { ...current, settings: { ...current.settings, hideAmounts: hidden } };
+    return { ok: true };
+  });
   const saveHomeLayout = jest.fn(async () => ({ ok: true }));
   const api: SettingsApi = { load: async () => current, changeSetting, setHideAmounts, saveHomeLayout, changeProfile, timezoneCheck, answerTimezone };
-  return { api, changeSetting, changeProfile, timezoneCheck, answerTimezone };
+  return { api, changeSetting, changeProfile, timezoneCheck, answerTimezone, setHideAmounts };
 }
 
 function mount(node: React.ReactElement) {
@@ -277,6 +285,69 @@ describe('Money basics', () => {
   });
 });
 
+describe('Privacy (Story 8.2)', () => {
+  it('has a Privacy group whose live summary is part of its label', async () => {
+    const { r } = await open(data());
+    expect(host(r, 'group-privacy').props.accessibilityLabel).toBe('Privacy, Amounts shown');
+    const hidden = await open(data({}, { hideAmounts: true }));
+    expect(host(hidden.r, 'group-privacy').props.accessibilityLabel).toBe('Privacy, Amounts hidden');
+  });
+
+  it('Hide amounts calls SetHideAmounts and the row summary follows at once', async () => {
+    const { r, setHideAmounts } = await open(data());
+    act(() => fire(r, 'group-privacy'));
+    expect(host(r, 'switch-hide-amounts').props.accessibilityState).toEqual({ checked: false });
+    await act(async () => fire(r, 'switch-hide-amounts', 'onValueChange', true));
+    await settle();
+    expect(setHideAmounts).toHaveBeenCalledWith(true);
+    expect(host(r, 'switch-hide-amounts').props.accessibilityState).toEqual({ checked: true });
+    act(() => fire(r, 'settings-back'));
+    expect(host(r, 'group-privacy').props.accessibilityLabel).toBe('Privacy, Amounts hidden');
+  });
+
+  it('a change made elsewhere (the hero eye) updates the switch', async () => {
+    const f = fakeApi(data());
+    const r = mount(<SettingsScreen api={f.api} onBack={jest.fn()} />);
+    await settle();
+    act(() => fire(r, 'group-privacy'));
+    await f.api.setHideAmounts(true);
+    const qc = clients[clients.length - 1]!;
+    await act(async () => qc.invalidateQueries({ queryKey: ['ledger'] }));
+    await settle();
+    expect(host(r, 'switch-hide-amounts').props.accessibilityState).toEqual({ checked: true });
+  });
+
+  it('Hide wmbugo in recent apps saves the device setting; the screenshot caption shows only below Android 13', async () => {
+    const { r, changeSetting } = await open(data());
+    act(() => fire(r, 'group-privacy'));
+    expect(host(r, 'switch-hide-recents').props.accessibilityState).toEqual({ checked: false });
+    await act(async () => fire(r, 'switch-hide-recents', 'onValueChange', true));
+    expect(changeSetting).toHaveBeenCalledWith('device.hide_in_recents', true);
+    const caption = 'On this phone this also blocks screenshots of wmbugo.';
+    (hidingBlocksScreenshots as jest.Mock).mockReturnValue(false);
+    const modern = await open(data());
+    act(() => fire(modern.r, 'group-privacy'));
+    expect(texts(modern.r).join(' ')).not.toContain(caption);
+    (hidingBlocksScreenshots as jest.Mock).mockReturnValue(true);
+    const old = await open(data());
+    act(() => fire(old.r, 'group-privacy'));
+    expect(texts(old.r).join(' ')).toContain(caption);
+  });
+
+  it('What stays on this phone lists the five plain rows and never claims bytes can never leave', async () => {
+    const { r } = await open(data());
+    act(() => fire(r, 'group-privacy'));
+    act(() => fire(r, 'row-stays'));
+    const all = texts(r).join(' | ');
+    for (const t of ['Your entries and photos', 'No internet', 'Android backups', 'Backup and export files', 'Diagnostics']) expect(all).toContain(t);
+    expect(all).toContain('Stored encrypted on this phone. Nobody else can read them, including us.');
+    expect(all).toContain("wmbugo has no internet permission, so it can't send anything.");
+    expect(all).not.toMatch(/never leave|can never|under any circumstances/i);
+    act(() => fire(r, 'settings-back'));
+    expect(has(r, 'switch-hide-amounts')).toBe(true);
+  });
+});
+
 describe('Block transfers above the balance', () => {
   it('is a switch in You that saves the setting', async () => {
     const { r, changeSetting } = await open(data());
@@ -284,6 +355,26 @@ describe('Block transfers above the balance', () => {
     expect(host(r, 'switch-block-transfers').props.accessibilityState).toEqual({ checked: false });
     await act(async () => fire(r, 'switch-block-transfers', 'onValueChange', true));
     expect(changeSetting).toHaveBeenCalledWith('finance.block_transfers_above_balance', true);
+  });
+});
+
+describe('SettingsBridge and the app switcher (Story 8.2)', () => {
+  it('applies Hide wmbugo in recent apps natively once the setting is known, on and off', async () => {
+    const calls: boolean[] = [];
+    const rn = jest.requireActual('react-native') as { NativeModules: Record<string, unknown> };
+    rn.NativeModules.WmbugoPrivacy = { setHideInRecents: async (v: boolean) => void calls.push(v), setHideForAppLock: async () => undefined };
+    try {
+      const f = fakeApi(data({}, { hideInRecents: true }));
+      mount(
+        <SettingsBridge api={f.api}>
+          <Text>x</Text>
+        </SettingsBridge>,
+      );
+      await settle();
+      expect(calls).toEqual([true]);
+    } finally {
+      delete rn.NativeModules.WmbugoPrivacy;
+    }
   });
 });
 

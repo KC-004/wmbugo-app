@@ -8,7 +8,7 @@ import { entryShape } from '../ledger/entryCommands';
 import { SETTING_BLOCK_TRANSFERS } from '../ledger/transferCommands';
 import { LedgerWriter } from '../writer/ledgerWriter';
 import { findRegion } from './regions';
-import { effectiveLocale, parseSettings, paydaySummary, periodRule, SETTINGS_SQL, validateSetting, youSummary, DEFAULT_SETTINGS } from './settings';
+import { effectiveLocale, parseSettings, paydaySummary, periodRule, privacySummary, SETTING_HIDE_IN_RECENTS, SETTINGS_SQL, validateSetting, youSummary, DEFAULT_SETTINGS } from './settings';
 import { AnswerTimezonePrompt, ApplyPendingTimezone, ChangeProfile, ChangeSetting, SetHideAmounts, TrackTimezone } from './settingsCommands';
 import { nextLocalDate, offsetMinutes, PROMPT_TIMEZONE, shouldAskTimezone, timezonesDiffer } from './timezone';
 import { periodFor } from './period';
@@ -230,5 +230,22 @@ describe('timezone prompt', () => {
   it('refuses an invalid device timezone', async () => {
     const { writer } = await setup();
     expect(await writer.run(AnswerTimezonePrompt, { use: true, deviceTz: 'Mars/Base' }, 'user')).toEqual({ ok: false, code: 'TIMEZONE_INVALID' });
+  });
+});
+
+describe('Privacy settings (Story 8.2)', () => {
+  it('summarises the parts that exist', () => {
+    expect(privacySummary({ hideAmounts: false })).toBe('Amounts shown');
+    expect(privacySummary({ hideAmounts: true })).toBe('Amounts hidden');
+    expect(privacySummary({ appLock: false, hideAmounts: false, notifications: 'full' })).toBe('App lock off · Amounts shown · Notifications: full');
+    expect(privacySummary({ appLock: true, hideAmounts: true, notifications: 'hidden' })).toBe('App lock on · Amounts hidden · Notifications: hidden');
+  });
+
+  it('hide in recents is a boolean device setting, off by default', () => {
+    expect(DEFAULT_SETTINGS.hideInRecents).toBe(false);
+    expect(validateSetting(SETTING_HIDE_IN_RECENTS, true)).toEqual({ ok: true, value: true });
+    expect(validateSetting(SETTING_HIDE_IN_RECENTS, 'yes')).toEqual({ ok: false });
+    expect(parseSettings([[SETTING_HIDE_IN_RECENTS, 'true']]).hideInRecents).toBe(true);
+    expect(parseSettings([[SETTING_HIDE_IN_RECENTS, '"x"']]).hideInRecents).toBe(false);
   });
 });

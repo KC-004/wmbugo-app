@@ -12,6 +12,11 @@ export const SETTING_BLOCK_TRANSFERS_KEY = 'finance.block_transfers_above_balanc
 export const SETTING_SHOW_NET_WORTH = 'ui.show_net_worth';
 /** Hide amounts (Story 5.3): every amount in the app is masked while it is on. Per device; the setting is the source of truth. */
 export const SETTING_HIDE_AMOUNTS = 'ui.hide_amounts';
+/**
+ * Hide wmbugo in recent apps (Story 8.2): a device setting, so a restore keeps this phone's choice (Story 8.8). On Android 13+
+ * the recents snapshot is switched off; on Android 8 to 12 the window is marked secure.
+ */
+export const SETTING_HIDE_IN_RECENTS = 'device.hide_in_recents';
 /** The Home card layout (Story 5.6): a list of `{cardId, hidden, size}` in display order, or null for the PRD order. */
 export const SETTING_HOME_LAYOUT = 'ui.home_layout';
 export const SETTING_THEME_KEY = 'theme';
@@ -36,6 +41,7 @@ export interface AppSettings {
   readonly blockTransfers: boolean;
   readonly showNetWorth: boolean;
   readonly hideAmounts: boolean;
+  readonly hideInRecents: boolean;
   readonly homeLayout: readonly HomeLayoutEntry[] | null;
 }
 
@@ -50,6 +56,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   blockTransfers: false,
   showNetWorth: false,
   hideAmounts: false,
+  hideInRecents: false,
   homeLayout: null,
 };
 
@@ -72,6 +79,7 @@ export function validateSetting(key: string, value: unknown): { ok: true; value:
     case SETTING_BLOCK_TRANSFERS_KEY:
     case SETTING_SHOW_NET_WORTH:
     case SETTING_HIDE_AMOUNTS:
+    case SETTING_HIDE_IN_RECENTS:
       return typeof value === 'boolean' ? { ok: true, value } : { ok: false };
     case SETTING_HOME_LAYOUT:
       return value === null ? { ok: true, value } : isHomeLayout(value) ? { ok: true, value: sanitizeHomeLayout(value) } : { ok: false };
@@ -108,6 +116,7 @@ export function parseSettings(rows: readonly (readonly unknown[])[]): AppSetting
     blockTransfers: pick(SETTING_BLOCK_TRANSFERS_KEY, DEFAULT_SETTINGS.blockTransfers),
     showNetWorth: pick(SETTING_SHOW_NET_WORTH, DEFAULT_SETTINGS.showNetWorth),
     hideAmounts: pick(SETTING_HIDE_AMOUNTS, DEFAULT_SETTINGS.hideAmounts),
+    hideInRecents: pick(SETTING_HIDE_IN_RECENTS, DEFAULT_SETTINGS.hideInRecents),
     homeLayout: pick<readonly HomeLayoutEntry[] | null>(SETTING_HOME_LAYOUT, null),
   };
 }
@@ -146,4 +155,21 @@ const THEME_WORD: Readonly<Record<ThemeChoice, string>> = { system: 'System', li
 /** The live one-line summary for the You group: "Payday 1st · Dark". */
 export function youSummary(rule: PaydayRule, theme: ThemeChoice): string {
   return `Payday ${paydaySummary(rule)} · ${THEME_WORD[theme]}`;
+}
+
+export interface PrivacySummaryParts {
+  /** Story 8.3 adds this part; absent until app lock exists. */
+  readonly appLock?: boolean;
+  readonly hideAmounts: boolean;
+  /** Story 8.5 adds this part: the effective shade form for captures. */
+  readonly notifications?: 'full' | 'hidden';
+}
+
+/** The live one-line Privacy summary, part of the row's spoken label: "App lock off · Amounts shown · Notifications: full". */
+export function privacySummary(parts: PrivacySummaryParts): string {
+  const out: string[] = [];
+  if (parts.appLock !== undefined) out.push(parts.appLock ? 'App lock on' : 'App lock off');
+  out.push(parts.hideAmounts ? 'Amounts hidden' : 'Amounts shown');
+  if (parts.notifications !== undefined) out.push(`Notifications: ${parts.notifications}`);
+  return out.join(' · ');
 }

@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { applyHideInRecents } from '../../adapters/recentsPrivacy';
 import { setInAppReduceMotion } from '../../shared/a11y/inAppMotion';
 import { useAmountsStore } from '../../shared/state/amountsHidden';
 import { useTheme } from '../../shared/theme/ThemeProvider';
@@ -16,6 +17,7 @@ export function SettingsBridge({ api = realSettingsApi, children }: { api?: Sett
   const mode = q.data?.settings.theme;
   const reduce = q.data?.settings.reduceMotion;
   const hideAmounts = q.data?.settings.hideAmounts;
+  const hideInRecents = q.data?.settings.hideInRecents;
   const { setMode } = theme;
   useEffect(() => {
     if (mode) setMode(mode);
@@ -23,6 +25,10 @@ export function SettingsBridge({ api = realSettingsApi, children }: { api?: Sett
   useEffect(() => {
     if (reduce !== undefined) setInAppReduceMotion(reduce);
   }, [reduce]);
+  // The app-switcher hiding is applied natively as soon as the setting is known; the native side also keeps it for cold starts (Story 8.2).
+  useEffect(() => {
+    if (hideInRecents !== undefined) void applyHideInRecents(hideInRecents);
+  }, [hideInRecents]);
   // Hide amounts is read before the first frame, so a masked app never flashes its amounts on opening (Story 5.3).
   useLayoutEffect(() => {
     if (hideAmounts !== undefined) useAmountsStore.getState().setHidden(hideAmounts);
