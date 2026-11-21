@@ -40,6 +40,8 @@ export interface RestoreApi {
   restore(source: ByteSource, passphrase: string, options: { withoutSafetyCopy: boolean }): Promise<Result<{ manifest: BackupManifest }, RestoreBackupError>>;
   /** Remembers what Home says after the restart, then restarts the app. */
   finish(manifest: BackupManifest): Promise<void>;
+  /** Restarts the app only (after a failure that closed the database, or when `finish` could not). */
+  restart?(): Promise<void>;
   /** The profile timezone for `Made 3 Nov 2026, 9:14 pm`. */
   timezoneId(): Promise<string>;
 }
@@ -99,6 +101,10 @@ export const realRestoreApi: RestoreApi = {
     const { rememberRestoreNotice } = await import('../../adapters/backup/restoreNotice');
     const { restartApp } = await import('../../adapters/backup/backupFiles');
     await rememberRestoreNotice(madeAtLabel(manifest.createdAt.utcMs, manifest.createdAt.timezoneId).replace(/ \d{4}.*$/, ''));
+    await restartApp();
+  },
+  async restart() {
+    const { restartApp } = await import('../../adapters/backup/backupFiles');
     await restartApp();
   },
   async timezoneId() {

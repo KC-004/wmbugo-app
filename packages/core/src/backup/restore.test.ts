@@ -89,7 +89,19 @@ class MemFs implements RestoreFs {
     this.guard();
     return this.files.get(path) ?? null;
   }
+  /** Like the phone's adapter: the journal is written to `.tmp`, the old one is unlinked, then the `.tmp` is moved over it. */
+  nonAtomicJournal = false;
   async writeText(path: string, text: string) {
+    if (this.nonAtomicJournal && path === L.journalPath) {
+      this.mutate();
+      this.files.set(`${path}.tmp`, text);
+      this.mutate();
+      this.files.delete(path);
+      this.mutate();
+      this.files.set(path, text);
+      this.files.delete(`${path}.tmp`);
+      return;
+    }
     this.mutate();
     this.files.set(path, text);
   }
@@ -281,25 +293,40 @@ describe('restoreBackup (Story 8.8)', () => {
   });
 
   describe('free space', () => {
-    it('refuses with LOW_SPACE_NEEDS_CONFIRMATION when there is less than twice the data size, and changes nothing', async () => {
+    it('refuses with LOW_SPACE_NEEDS_CONFIRMATION when there is less than twice the data size plus the staging, and changes nothing', async () => {
       const r = rig({ currentBytes: 1000 });
-      r.fs.free = 1999;
+      const backup = await makeBackup();
+      r.fs.free = 2000 + backup.size * 2 - 1;
       const before = r.fs.snapshot();
-      expect(await restoreBackup(r.deps, await makeBackup(), 'a restore passphrase')).toEqual({ ok: false, code: 'LOW_SPACE_NEEDS_CONFIRMATION' });
+      expect(await restoreBackup(r.deps, backup, 'a restore passphrase')).toEqual({ ok: false, code: 'LOW_SPACE_NEEDS_CONFIRMATION' });
       expect(r.fs.snapshot()).toBe(before);
       expect(r.events).not.toContain('maintenance:on');
     });
 
-    it('exactly twice the data size is enough', async () => {
+    it('exactly twice the data size plus the staging is enough', async () => {
       const r = rig({ currentBytes: 1000 });
-      r.fs.free = 2000;
-      expect((await restoreBackup(r.deps, await makeBackup(), 'a restore passphrase')).ok).toBe(true);
+      const backup = await makeBackup();
+      r.fs.free = 2000 + backup.size * 2;
+      expect((await restoreBackup(r.deps, backup, 'a restore passphrase')).ok).toBe(true);
+    });
+
+    it('NO_ROOM when even the staging does not fit, with or without a safety copy, and nothing changes', async () => {
+      for (const withoutSafetyCopy of [false, true]) {
+        const r = rig({ currentBytes: 1000 });
+        const backup = await makeBackup();
+        r.fs.free = backup.size * 2 - 1;
+        const before = r.fs.snapshot();
+        expect(await restoreBackup(r.deps, backup, 'a restore passphrase', { withoutSafetyCopy })).toEqual({ ok: false, code: 'NO_ROOM' });
+        expect(r.fs.snapshot()).toBe(before);
+        expect(r.events).not.toContain('maintenance:on');
+      }
     });
 
     it('with withoutSafetyCopy it proceeds without one: the replaced data is gone and nothing waits for the next start', async () => {
       const r = rig({ currentBytes: 1000 });
-      r.fs.free = 10;
-      const res = await restoreBackup(r.deps, await makeBackup(), 'a restore passphrase', { withoutSafetyCopy: true });
+      const backup = await makeBackup();
+      r.fs.free = backup.size * 2;
+      const res = await restoreBackup(r.deps, backup, 'a restore passphrase', { withoutSafetyCopy: true });
       expect(res.ok && res.value.safetyCopyKept).toBe(false);
       expect(r.fs.files.get(L.dbPath)).toBe(RESTORED_DB);
       expect([...r.fs.files.keys()].some((k) => k.startsWith(L.safetyDir))).toBe(false);
@@ -336,7 +363,6 @@ describe('the app is killed at every step (fault injection, NFR-12)', () => {
         seenNew++;
         continue;
       }
-      expect({ label, old: oldState(r), new: newState(r) }).toEqual({ label, old: oldState(r), new: newState(r) });
       expect({ label, ok: oldState(r) || newState(r) }).toEqual({ label, ok: true });
       expect({ label, mixed: oldState(r) && newState(r) }).toEqual({ label, mixed: false });
       // Nothing but the live data is left behind.
@@ -397,5 +423,91 @@ describe('the app is killed at every step (fault injection, NFR-12)', () => {
     const before = r.fs.snapshot();
     expect(await recoverRestore(r.fs, L, async () => true)).toBe('none');
     expect(r.fs.snapshot()).toBe(before);
+  });
+});
+
+describe('hardening from the Epic 8 code review', () => {
+  it('a journal write that is not atomic (unlink then move) is still recovered at every kill point: old or restored, never a mixture', async () => {
+    let seenOld = 0;
+    let seenNew = 0;
+    for (let n = 0; n < 60; n++) {
+      const r = rig({ currentBytes: 1000 });
+      r.fs.nonAtomicJournal = true;
+      const backup = await makeBackup();
+      r.fs.killAfter(n);
+      const res = await restoreBackup(r.deps, backup, 'a restore passphrase').catch(() => ({ ok: false as const }));
+      r.fs.revive();
+      const outcome = await recoverRestore(r.fs, L, async () => true);
+      const old = r.fs.files.get(L.dbPath) === OLD_DB && r.fs.files.get(`${L.attachmentsDir}/old.enc`) === OLD_PHOTO;
+      const restored = r.fs.files.get(L.dbPath) === RESTORED_DB && r.fs.files.get(`${L.attachmentsDir}/${PHOTO_ID}.enc`) === 'new photo';
+      const label = `killed after ${n} operations (${outcome}, ok=${res.ok})`;
+      expect({ label, either: old !== restored }).toEqual({ label, either: true });
+      expect({ label, extra: [...r.fs.files.keys()].filter((k) => k.startsWith('priv/')) }).toEqual({ label, extra: [] });
+      if (old) seenOld++;
+      else seenNew++;
+    }
+    expect(seenOld).toBeGreaterThan(0);
+    expect(seenNew).toBeGreaterThan(0);
+  });
+
+  it('only a complete .tmp journal is trusted: a kill between the unlink and the move still rolls the swap back', async () => {
+    const r = rig();
+    await restoreBackup(r.deps, await makeBackup(), 'a restore passphrase');
+    const journal = r.fs.files.get(L.journalPath)!;
+    r.fs.files.set(L.journalPath, JSON.stringify({ ...JSON.parse(journal), phase: 'swapping', steps: ['db-to-safety'] }));
+    r.fs.files.delete(L.journalPath);
+    r.fs.files.set(`${L.journalPath}.tmp`, JSON.stringify({ v: 1, phase: 'swapping', withSafety: true, steps: ['db-to-safety'] }));
+    expect(await recoverRestore(r.fs, L, async () => true)).toBe('rolled-back');
+    expect(r.fs.files.get(L.dbPath)).toBe(OLD_DB);
+    expect([...r.fs.files.keys()].filter((k) => k.includes('journal'))).toEqual([]);
+  });
+
+  it('a partly written .tmp is ignored: the older complete journal decides', async () => {
+    const r = rig();
+    await restoreBackup(r.deps, await makeBackup(), 'a restore passphrase');
+    r.fs.files.set(`${L.journalPath}.tmp`, '{"v":1,"phase":"swap');
+    expect(await recoverRestore(r.fs, L, async () => true)).toBe('restored');
+    expect([...r.fs.files.keys()].some((k) => k.includes('journal'))).toBe(false);
+  });
+
+  it('a failure after the live database is closed puts the data back, keeps maintenance on, and says a restart is needed', async () => {
+    const r = rig();
+    const orig = r.fs.rename.bind(r.fs);
+    r.fs.rename = async (from: string, to: string) => {
+      if (from === L.stagingDb && to === L.dbPath) throw new Error('disk error');
+      return orig(from, to);
+    };
+    const res = await restoreBackup(r.deps, await makeBackup(), 'a restore passphrase');
+    expect(res).toEqual({ ok: false, code: 'RESTART_REQUIRED' });
+    expect(r.fs.files.get(L.dbPath)).toBe(OLD_DB);
+    expect(r.fs.files.get(`${L.attachmentsDir}/old.enc`)).toBe(OLD_PHOTO);
+    expect([...r.fs.files.keys()].some((k) => k.startsWith('priv/'))).toBe(false);
+    expect(r.events).not.toContain('maintenance:off'); // the connection is closed: writes stay refused until the app is reopened
+  });
+
+  it('a failure in prepareForSwap also asks for a restart', async () => {
+    const r = rig();
+    r.db.prepareForSwap = async () => {
+      throw new Error('checkpoint failed');
+    };
+    expect(await restoreBackup(r.deps, await makeBackup(), 'a restore passphrase')).toEqual({ ok: false, code: 'RESTART_REQUIRED' });
+    expect(r.fs.files.get(L.dbPath)).toBe(OLD_DB);
+  });
+
+  it('restored data that fails its start checks with no safety copy is reported as unverified, not as reverted', async () => {
+    const r = rig();
+    const backup = await makeBackup();
+    r.fs.free = backup.size * 2;
+    await restoreBackup(r.deps, backup, 'a restore passphrase', { withoutSafetyCopy: true });
+    expect(await recoverRestore(r.fs, L, async () => false)).toBe('restore-unverified');
+    expect(r.fs.files.get(L.dbPath)).toBe(RESTORED_DB);
+    expect(r.fs.files.has(L.journalPath)).toBe(false);
+  });
+
+  it('an account in the staged data that the manifest does not list is refused', async () => {
+    const r = rig();
+    r.checks.value = { quickCheckOk: true, invariantsOk: true, balances: new Map([['acc-1', 97_500], ['acc-extra', 1]]) };
+    expect(await restoreBackup(r.deps, await makeBackup(), 'a restore passphrase')).toEqual({ ok: false, code: 'BACKUP_DAMAGED' });
+    expect(r.fs.files.get(L.dbPath)).toBe(OLD_DB);
   });
 });

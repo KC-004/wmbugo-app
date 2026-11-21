@@ -6,7 +6,8 @@ import { err, ok, type Result } from '../shared/result';
 import type { RandomSource } from '../shared/uuid';
 import { loadMigrations, runMigrations, type BundledMigrations, type MigrationErrorCode } from './migrations';
 
-export type StartupErrorCode = 'KEY_UNAVAILABLE' | 'DATABASE_OPEN_FAILED' | 'STORAGE_UNSAFE' | MigrationErrorCode;
+/** `ERASE_UNFINISHED`: an erase was interrupted and this start could not finish it, so no data is opened (Story 8.11). */
+export type StartupErrorCode = 'KEY_UNAVAILABLE' | 'DATABASE_OPEN_FAILED' | 'STORAGE_UNSAFE' | 'ERASE_UNFINISHED' | MigrationErrorCode;
 
 export type StartRoute = 'onboarding' | 'home';
 

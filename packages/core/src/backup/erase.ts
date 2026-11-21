@@ -66,18 +66,28 @@ export async function eraseAllData(deps: EraseDeps): Promise<Result<void, EraseE
   }
 }
 
+/** What a start found: no erase in progress, one it finished, or one it could not finish (the marker stays). */
+export type InterruptedErase = 'none' | 'finished' | 'failed';
+
 /**
  * Called first at every start, before the database or the key are touched: an erase that was interrupted is finished and the app
- * opens Welcome. Returns true when it had to.
+ * opens Welcome. A start whose recovery fails must not go on to open the half-erased data: the caller stops with a screen that
+ * offers Try again (Epic 8 review, P4).
  */
-export async function finishInterruptedErase(deps: Omit<EraseDeps, 'maintenance'>): Promise<boolean> {
-  if (!(await deps.fs.exists(deps.layout.markerPath))) return false;
+export async function finishInterruptedErase(deps: Omit<EraseDeps, 'maintenance'>): Promise<InterruptedErase> {
+  let marker = false;
+  try {
+    marker = await deps.fs.exists(deps.layout.markerPath);
+  } catch {
+    return 'failed';
+  }
+  if (!marker) return 'none';
   try {
     await finish({ ...deps, maintenance: { enter: () => undefined, exit: () => undefined } });
   } catch {
-    return false; // still unfinished: the marker stays and the next start tries again
+    return 'failed'; // still unfinished: the marker stays and the next start tries again
   }
-  return true;
+  return 'finished';
 }
 
 /** What the first Erase screen says (Story 8.11). */

@@ -1,4 +1,3 @@
-import { ANDROID_DATABASE_PATH } from '@op-engineering/op-sqlite';
 import * as RNFS from '@dr.pogodin/react-native-fs';
 import type { EraseDeps, EraseLayout, SqlDatabase } from '@wmbugo/core';
 import { RECEIPTS_DIR } from '../files/receiptFiles';
@@ -21,7 +20,8 @@ export const ERASE_LAYOUT: EraseLayout = {
     // The safety copies taken before a migration, and decrypted photos kept for viewing.
     `${PRIVATE_DIR}/safety`,
     `${RNFS.CachesDirectoryPath}/wmbugo-view`,
-    `${ANDROID_DATABASE_PATH}/wmbugo.db-journal`,
+    // Everything else in private storage except the marker, which goes last.
+    `${PRIVATE_DIR}/post-capture-fixture`,
   ],
   markerPath: `${PRIVATE_DIR}/erase.marker`,
 };
@@ -40,7 +40,12 @@ export function interruptedEraseDeps(): Omit<EraseDeps, 'maintenance'> {
   return {
     fs: rnEraseFs,
     layout: ERASE_LAYOUT,
-    cancelNotifications: async () => void (await appNotifier.cancelAll?.()),
+    cancelNotifications: async () => {
+      if (!appNotifier.available) return; // nothing was ever scheduled
+      // A notifier that cannot cancel would leave reminders firing against deleted data: fail the erase instead of reporting success.
+      if (!appNotifier.cancelAll) throw new Error('notifier cannot cancel');
+      await appNotifier.cancelAll();
+    },
     closeDatabase: async () => undefined,
     deleteKey: deleteDatabaseKey,
   };

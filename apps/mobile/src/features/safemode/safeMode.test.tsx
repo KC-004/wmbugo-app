@@ -58,7 +58,24 @@ describe('full-screen safe mode (Story 8.12)', () => {
     const hint = r.root.findAll((n) => n.props.testID === 'safe-mode-backup' && n.props.accessibilityHint)[0]!.props.accessibilityHint;
     expect(hint).toBe("The data can't be read, so it can't be backed up.");
     expect(has(r, 'safe-mode-fresh')).toBe(false);
-    expect(has(r, 'safe-mode-retry')).toBe(false);
+    expect(has(r, 'safe-mode-retry')).toBe(true); // a transient fault should not need a restore
+  });
+
+  it('a database saved by a newer wmbugo says to update, with Try again and Diagnostics but no restore or erase', async () => {
+    const r = await mount(<SafeModeScreen variant="newer" onRetry={jest.fn()} />);
+    expect(texts(r)).toContain('This data was saved by a newer version of wmbugo. Update wmbugo to open it. Your entries are untouched.');
+    expect(has(r, 'safe-mode-retry')).toBe(true);
+    expect(has(r, 'safe-mode-diagnostics')).toBe(true);
+    for (const id of ['safe-mode-restore', 'safe-mode-fresh', 'safe-mode-backup']) expect(has(r, id)).toBe(false);
+  });
+
+  it('an erase that could not be finished says so, and Try again runs it again', async () => {
+    const onRetry = jest.fn();
+    const r = await mount(<SafeModeScreen variant="erase" onRetry={onRetry} />);
+    expect(texts(r)).toContain("wmbugo couldn't finish erasing this phone's data. Try again to finish. Nothing new was added.");
+    await press(r, 'safe-mode-retry');
+    expect(onRetry).toHaveBeenCalledTimes(1);
+    expect(has(r, 'safe-mode-restore')).toBe(false);
   });
 
   it('a migration that rolled back says nothing was lost and Try again runs it again', async () => {
@@ -74,6 +91,7 @@ describe('full-screen safe mode (Story 8.12)', () => {
     expect(texts(r)).toContain("This phone's key for wmbugo is gone, so the data here can't be opened. A backup is the only way to get it back.");
     for (const id of ['safe-mode-restore', 'safe-mode-fresh', 'safe-mode-diagnostics']) expect(has(r, id)).toBe(true);
     expect(has(r, 'safe-mode-backup')).toBe(false);
+    expect(has(r, 'safe-mode-retry')).toBe(false); // a gone key does not come back by trying again
   });
 
   it('Start fresh opens the Story 8.11 erase flow, and Back returns', async () => {

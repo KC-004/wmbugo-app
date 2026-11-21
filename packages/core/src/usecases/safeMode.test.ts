@@ -1,13 +1,26 @@
-import { classifyStartupFailure, integrityCheckDue, quickCheckPasses, SAFE_MODE_BANNER, SAFE_MODE_KEY_LOST, SAFE_MODE_MIGRATION, SAFE_MODE_NO_BACKUP } from './safeMode';
+import { classifyStartupFailure, integrityCheckDue, quickCheckPasses, quickCheckVerdict, SAFE_MODE_ERASE, SAFE_MODE_NEWER, SAFE_MODE_BANNER, SAFE_MODE_KEY_LOST, SAFE_MODE_MIGRATION, SAFE_MODE_NO_BACKUP } from './safeMode';
 import type { StartupErrorCode } from './startup';
 
 describe('safe mode (Story 8.12)', () => {
   const facts = (databaseExists: boolean, keyMissing: boolean) => ({ databaseExists, keyMissing });
 
   it('a database that cannot be opened is unreadable', () => {
-    for (const code of ['DATABASE_OPEN_FAILED', 'STORAGE_UNSAFE', 'DATABASE_NEWER_THAN_APP', 'MIGRATION_CHECKSUM_MISMATCH', 'MIGRATION_BUNDLE_INVALID'] as StartupErrorCode[]) {
+    for (const code of ['DATABASE_OPEN_FAILED', 'STORAGE_UNSAFE', 'MIGRATION_CHECKSUM_MISMATCH', 'MIGRATION_BUNDLE_INVALID'] as StartupErrorCode[]) {
       expect(classifyStartupFailure(code, facts(true, false))).toBe('unreadable');
     }
+  });
+
+  it('a database from a newer wmbugo says to update, and an unfinished erase offers Try again', () => {
+    expect(classifyStartupFailure('DATABASE_NEWER_THAN_APP', facts(true, false))).toBe('newer');
+    expect(classifyStartupFailure('ERASE_UNFINISHED', facts(true, false))).toBe('erase');
+    expect(SAFE_MODE_NEWER).toBe('This data was saved by a newer version of wmbugo. Update wmbugo to open it. Your entries are untouched.');
+    expect(SAFE_MODE_ERASE).toBe("wmbugo couldn't finish erasing this phone's data. Try again to finish. Nothing new was added.");
+  });
+
+  it('the verdict tells a problem from a database that could not answer', async () => {
+    expect(await quickCheckVerdict({ query: async () => [['ok']] })).toBe('ok');
+    expect(await quickCheckVerdict({ query: async () => [['*** in database main ***']] })).toBe('failed');
+    expect(await quickCheckVerdict({ query: async () => Promise.reject(new Error('database is locked')) })).toBe('threw');
   });
 
   it('a migration that rolled back is its own message, with Try again', () => {

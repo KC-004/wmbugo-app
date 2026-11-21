@@ -135,21 +135,31 @@ describe('EraseAllData (Story 8.11)', () => {
       expect({ n, marker: s.fs.files.has(L.markerPath) || n === 0 }).toEqual({ n, marker: true });
       const finished = await finishInterruptedErase(s.deps);
       if (n === 0) {
-        expect(finished).toBe(false); // killed before the marker was written: nothing was started, the data is intact
+        expect(finished).toBe('none'); // killed before the marker was written: nothing was started, the data is intact
         expect(s.fs.files.get(L.dbPath)).toBe('DB');
         continue;
       }
-      expect({ n, finished }).toEqual({ n, finished: true });
+      expect({ n, finished }).toEqual({ n, finished: 'finished' });
       expect({ n, left: [...s.fs.files.keys()].sort() }).toEqual({ n, left: [...PERSON_OWNED].sort() });
       expect({ n, key: s.key() }).toEqual({ n, key: false });
-      expect(await finishInterruptedErase(s.deps)).toBe(false); // and the start after that finds nothing to do
+      expect(await finishInterruptedErase(s.deps)).toBe('none'); // and the start after that finds nothing to do
     }
+  });
+
+  it('a start whose recovery cannot finish says so, keeps the marker, and the next start finishes it', async () => {
+    const s = setup({ deleteKey: async () => Promise.reject(new Error('keystore busy')) });
+    s.fs.files.set(L.markerPath, 'erase');
+    expect(await finishInterruptedErase(s.deps)).toBe('failed');
+    expect(s.fs.files.has(L.markerPath)).toBe(true);
+    const again = setup();
+    again.fs.files.set(L.markerPath, 'erase');
+    expect(await finishInterruptedErase(again.deps)).toBe('finished');
   });
 
   it('with no marker, a start does nothing and touches nothing', async () => {
     const s = setup();
     const before = [...s.fs.files.entries()].sort().toString();
-    expect(await finishInterruptedErase(s.deps)).toBe(false);
+    expect(await finishInterruptedErase(s.deps)).toBe('none');
     expect([...s.fs.files.entries()].sort().toString()).toBe(before);
     expect(s.events).toEqual([]);
   });

@@ -2,8 +2,11 @@ import { eraseAllData } from '@wmbugo/core';
 import { getServices } from '../../adapters/startApp';
 
 export interface EraseApi {
-  /** Erases everything and restarts the app on Welcome. Resolves `failed` if it could not finish (the next start finishes it). */
-  erase(): Promise<'ok' | 'failed'>;
+  /**
+   * Erases everything and restarts the app on Welcome. `failed` if it could not finish (the next start finishes it); `reopen` if
+   * everything is erased but the app could not restart itself.
+   */
+  erase(): Promise<'ok' | 'failed' | 'reopen'>;
 }
 
 export const realEraseApi: EraseApi = {
@@ -18,7 +21,11 @@ export const realEraseApi: EraseApi = {
     }
     const r = await eraseAllData(rn.eraseDeps(s?.db ?? null, { enter: () => s?.writer.setMaintenance(true), exit: () => s?.writer.setMaintenance(false) }));
     if (!r.ok) return 'failed';
-    await files.restartApp();
+    try {
+      await files.restartApp();
+    } catch {
+      return 'reopen';
+    }
     return 'ok';
   },
 };

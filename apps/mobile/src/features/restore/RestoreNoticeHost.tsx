@@ -16,12 +16,19 @@ export function RestoreNoticeHost({ readNotice }: { readNotice?: () => Promise<s
     void (async () => {
       try {
         const outcome = takeRestoreOutcome();
-        if (outcome === 'restore-failed') {
+        if (outcome === 'none') return;
+        // The notice file is read and cleared for every outcome, so a failed restore cannot leave a stale date for the next one.
+        const when = await (readNotice ?? (async () => (await import('../../adapters/backup/restoreNotice')).takeRestoreNotice()))().catch(() => null);
+        // Died before the swap or during it: the old data is back, which is what the sentence says.
+        if (outcome === 'restore-failed' || outcome === 'rolled-back' || outcome === 'staging-discarded') {
           toast.show({ message: copy.restore.failed });
           return;
         }
-        if (outcome !== 'restored') return;
-        const when = await (readNotice ?? (async () => (await import('../../adapters/backup/restoreNotice')).takeRestoreNotice()))();
+        // The restored data stays but could not be checked, and there was nothing to go back to.
+        if (outcome === 'restore-unverified') {
+          toast.show({ message: copy.restore.unverified });
+          return;
+        }
         toast.show({ message: when ? copy.restore.restored.replace('{when}', when) : copy.restore.restored.replace('Restored from your {when} backup', 'Restored from your backup') });
       } catch {
         /* the notice is a nicety */

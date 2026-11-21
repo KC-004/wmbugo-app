@@ -2,6 +2,7 @@ import {
   createCrashRecorder,
   AnnounceBackupRestored,
   finishInterruptedErase,
+  type InterruptedErase,
   recoverRestore,
   type RecoverOutcome,
   createFileLogSink,
@@ -157,20 +158,31 @@ export function takeRestoreOutcome(): RecoverOutcome {
 }
 
 async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
-  const log = await getLogger();
-  // An erase that was interrupted is finished before anything else: no database is opened, and the key is deleted (Story 8.11).
-  // The start that follows has no database and no key, so it opens Welcome.
+  // An erase that was interrupted is finished before anything else, even before the logger exists, so that it does not hold open
+  // a log file the erase deletes (Story 8.11). The start that follows has no database and no key, so it opens Welcome. If the erase
+  // cannot be finished the start stops: opening half-erased data would let new entries be wiped by the next start's erase.
+  let erase: InterruptedErase = 'none';
   try {
-    if (await finishInterruptedErase(interruptedEraseDeps())) log.warn('erase.finished_after_interruption');
+    erase = await finishInterruptedErase(interruptedEraseDeps());
   } catch {
-    log.error('erase.recovery_failed');
+    erase = 'failed';
   }
-  // A restore that was killed, or that did not hold, is finished or undone before the database is opened (Story 8.8).
+  const log = await getLogger();
+  if (erase === 'failed') {
+    log.error('erase.recovery_failed');
+    return { ok: false, code: 'ERASE_UNFINISHED' };
+  }
+  // The erase is not written about in the log it just deleted: the log of the next start begins here.
+  // A restore that was killed, or that did not hold, is finished or undone before the database is opened (Story 8.8). If that cannot
+  // be done the start stops: a half-moved database must not be opened.
   try {
-    restoreOutcome = await recoverRestore(rnRestoreFs, RESTORE_LAYOUT, restoredDatabaseOpens);
-    if (restoreOutcome !== 'none') log.warn('restore.recovered', { reason: restoreOutcome });
+    const recovered = await recoverRestore(rnRestoreFs, RESTORE_LAYOUT, restoredDatabaseOpens);
+    // A start that is retried after a failure must not forget what the first start found.
+    if (recovered !== 'none') restoreOutcome = recovered;
+    if (recovered !== 'none') log.warn('restore.recovered', { reason: recovered });
   } catch {
     log.error('restore.recovery_failed');
+    return { ok: false, code: 'STORAGE_UNSAFE' };
   }
   const started = await startStorage({
     keyStore: keychainKeyStore,

@@ -25,3 +25,17 @@
 - source_spec: `spec-5-1-home-read-model-refresh-and-stale-indication.md`
   summary: Split Home into independent per-card queries so one failing card does not blank the others.
   evidence: 5.1 keeps one combined `home.summary` query; the cards in 5.4 and 5.5 need their own queries to meet the per-card error criterion.
+
+## Deferred from: code review of Epic 8 (2026-11-21)
+Full list in epic-8-code-review-2026-11-21.md. Summary:
+- Device checks: CipherInputStream GCM tag handling, libsodium known-answer parity, BiometricPrompt on API 26-29, provider renaming of .wmbugo files.
+- startAppOnce test needs a small refactor.
+- Safe-mode refusal shown on edit and delete screens (depends on decision D4).
+- Argon2id runs up to three times per restore; measure on the phone.
+- Pure-TypeScript secretstream speed on Hermes unmeasured.
+- No committed schema-N backup fixture.
+- Notification library not installed (Epic 11).
+- ChangeSetting re-auth is UI-only.
+- Backup key derivation hardening (verifier subkey, header as associated data).
+- Restore notice time zone and string handling.
+- CI symbols upload retention.

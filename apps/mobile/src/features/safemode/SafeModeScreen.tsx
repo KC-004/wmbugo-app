@@ -19,6 +19,9 @@ type Page = 'home' | 'restore' | 'diagnostics' | 'export' | 'backup' | 'fresh';
  * - `unreadable`: restore and Diagnostics; `Back up what can be read` is shown disabled, with the reason.
  * - `key-lost`: the key is gone; restore, `Start fresh` (the erase flow) and Diagnostics.
  * - `migration`: an update rolled back and nothing was lost; `Try again` runs it again.
+ * - `newer`: the data was saved by a newer wmbugo: update the app; Try again opens it again afterwards.
+ * - `erase`: an interrupted erase could not be finished; Try again finishes it.
+ * Every variant except `key-lost` offers Try again: a transient fault should not need a restore.
  */
 export function SafeModeScreen({ variant, onRetry }: { variant: Exclude<SafeModeVariant, 'readable'>; onRetry: () => void }) {
   const theme = useTheme();
@@ -36,7 +39,18 @@ export function SafeModeScreen({ variant, onRetry }: { variant: Exclude<SafeMode
   }, [page, busy]);
 
   const ink = { color: theme.color('text-primary') };
-  const sentence = variant === 'key-lost' ? copy.safeMode.keyLost : variant === 'migration' ? copy.safeMode.migration : copy.safeMode.banner;
+  const sentence =
+    variant === 'key-lost'
+      ? copy.safeMode.keyLost
+      : variant === 'migration'
+        ? copy.safeMode.migration
+        : variant === 'newer'
+          ? copy.safeMode.newer
+          : variant === 'erase'
+            ? copy.safeMode.eraseUnfinished
+            : copy.safeMode.banner;
+  // Opening again can help whenever nothing is known to be damaged: a transient fault, an update just installed, a finished erase.
+  const canRetry = variant !== 'key-lost';
 
   if (page !== 'home') {
     const title = page === 'restore' ? copy.safeMode.restore : page === 'fresh' ? copy.safeMode.startFreshTitle : page === 'backup' ? copy.safeMode.backUp : copy.safeMode.diagnostics;
@@ -46,7 +60,7 @@ export function SafeModeScreen({ variant, onRetry }: { variant: Exclude<SafeMode
           {title}
         </Text>
         {page === 'restore' ? <RestoreFlow onBusyChange={setBusy} onExit={() => setPage('home')} /> : null}
-        {page === 'fresh' ? <EraseFlow onBusyChange={setBusy} onExit={() => setPage('home')} /> : null}
+        {page === 'fresh' ? <EraseFlow backupAvailable={false} onBusyChange={setBusy} onExit={() => setPage('home')} /> : null}
         {page === 'diagnostics' ? <DiagnosticsScreen onExport={() => setPage('export')} /> : null}
         {page === 'export' ? <DiagnosticsExportScreen /> : null}
         {page === 'backup' ? <BackupScreen onBusyChange={setBusy} onDone={() => setPage('home')} /> : null}
@@ -61,8 +75,10 @@ export function SafeModeScreen({ variant, onRetry }: { variant: Exclude<SafeMode
       <Text testID="safe-mode-message" accessibilityRole="alert" accessibilityLiveRegion="polite" style={[textStyle('title'), ink, styles.text]}>
         {sentence}
       </Text>
-      {variant === 'migration' ? <Button label={copy.safeMode.tryAgain} testID="safe-mode-retry" onPress={onRetry} /> : null}
-      <Button label={copy.safeMode.restore} variant={variant === 'migration' ? 'secondary' : 'primary'} testID="safe-mode-restore" onPress={() => setPage('restore')} />
+      {canRetry ? <Button label={copy.safeMode.tryAgain} testID="safe-mode-retry" onPress={onRetry} /> : null}
+      {variant === 'newer' || variant === 'erase' ? null : (
+        <Button label={copy.safeMode.restore} variant={canRetry ? 'secondary' : 'primary'} testID="safe-mode-restore" onPress={() => setPage('restore')} />
+      )}
       {variant === 'unreadable' ? <Button label={copy.safeMode.backUp} variant="secondary" disabledReason={copy.safeMode.noBackup} testID="safe-mode-backup" onPress={() => setPage('backup')} /> : null}
       {variant === 'key-lost' ? <Button label={copy.safeMode.startFresh} variant="secondary" testID="safe-mode-fresh" onPress={() => setPage('fresh')} /> : null}
       <Button label={copy.safeMode.diagnostics} variant="text" testID="safe-mode-diagnostics" onPress={() => setPage('diagnostics')} />

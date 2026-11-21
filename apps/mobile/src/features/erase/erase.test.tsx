@@ -146,7 +146,18 @@ describe('Erase all data (Story 8.11)', () => {
     await press(r, 'erase-continue');
     await press(r, 'erase-understand');
     await press(r, 'erase-go');
-    expect(texts(r)).toContain("Couldn't finish erasing. wmbugo will finish it when it opens next.");
+    expect(texts(r)).toContain("Couldn't finish erasing. Close wmbugo and open it again: it finishes the erase before anything else.");
+  });
+
+  it('an erase that finished but could not restart the app says to reopen it, and does not say it failed', async () => {
+    const busy: boolean[] = [];
+    const r = await mount({ erase: jest.fn(async () => 'reopen' as const) }, { onBusyChange: (b: boolean) => busy.push(b) });
+    await press(r, 'erase-continue');
+    await press(r, 'erase-understand');
+    await press(r, 'erase-go');
+    expect(texts(r)).toContain('Everything was erased. Close wmbugo and open it again.');
+    expect(texts(r).join(' ')).not.toMatch(/Couldn't finish/);
+    expect(busy).toEqual([true]); // Back stays held: the database is closed
   });
 
   it('a thrown error is a failure, not a crash', async () => {

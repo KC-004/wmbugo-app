@@ -19,7 +19,10 @@ export interface RestoreFs {
   remove(path: string): Promise<void>;
   makeDir(path: string): Promise<void>;
   readText(path: string): Promise<string | null>;
-  /** Replaces the file in one step (the adapter writes a temporary file and renames it). */
+  /**
+   * Replaces the file. The adapter writes `<path>.tmp` completely, then moves it over the file; a kill between the two steps can
+   * leave only the `.tmp`, which `recoverRestore` reads when it is complete (P1 of the Epic 8 review).
+   */
   writeText(path: string, text: string): Promise<void>;
   freeBytes(): Promise<number>;
 }
@@ -76,7 +79,14 @@ export interface RestoreDeps {
   readonly appSchemaVersion: number;
 }
 
-export type RestoreBackupError = BackupReadError | 'LOW_SPACE_NEEDS_CONFIRMATION' | 'RESTORE_FAILED';
+export type RestoreBackupError =
+  | BackupReadError
+  | 'LOW_SPACE_NEEDS_CONFIRMATION'
+  /** Even without a safety copy there is no room to stage this backup. Nothing changed. */
+  | 'NO_ROOM'
+  | 'RESTORE_FAILED'
+  /** The failure came after the live database was closed: the data was put back, but wmbugo must be reopened. */
+  | 'RESTART_REQUIRED';
 
 export interface RestoreDone {
   readonly manifest: BackupManifest;
@@ -101,8 +111,9 @@ async function writeJournal(deps: RestoreDeps, j: Journal): Promise<void> {
   await deps.fs.writeText(deps.layout.journalPath, JSON.stringify(j));
 }
 
-async function readJournal(fs: RestoreFs, layout: RestoreLayout): Promise<Journal | null> {
-  const text = await fs.readText(layout.journalPath);
+const JOURNAL_TMP = (l: RestoreLayout) => `${l.journalPath}.tmp`;
+
+function parseJournal(text: string | null): Journal | null {
   if (text === null) return null;
   try {
     const j = JSON.parse(text) as Journal;
@@ -110,6 +121,20 @@ async function readJournal(fs: RestoreFs, layout: RestoreLayout): Promise<Journa
   } catch {
     return null;
   }
+}
+
+/**
+ * The journal, or the newer complete `.tmp` beside it. The adapter writes the temporary file in full and then unlinks the journal
+ * and moves the temporary file over it; a kill in between leaves only the `.tmp`. A partly written `.tmp` does not parse, so the
+ * older complete journal is used.
+ */
+async function readJournal(fs: RestoreFs, layout: RestoreLayout): Promise<Journal | null> {
+  return parseJournal(await fs.readText(JOURNAL_TMP(layout))) ?? parseJournal(await fs.readText(layout.journalPath));
+}
+
+async function dropJournal(fs: RestoreFs, layout: RestoreLayout): Promise<void> {
+  await fs.remove(layout.journalPath);
+  await fs.remove(JOURNAL_TMP(layout));
 }
 
 async function moveIfPresent(fs: RestoreFs, from: string, to: string): Promise<void> {
@@ -165,9 +190,15 @@ export async function restoreBackup(
   if (!preview.ok) return preview; // nothing has changed
 
   const withSafety = options.withoutSafetyCopy !== true;
+  // Staging holds the decrypted database, its re-keyed copy and the photos: about twice the archive. The safety copy needs room for
+  // the data it replaces, twice over for the rename and the first start.
+  const free = await fs.freeBytes();
+  const stagingNeed = source.size * 2;
   if (withSafety) {
-    const need = (await deps.db.currentDataBytes()) * 2;
-    if ((await fs.freeBytes()) < need) return err('LOW_SPACE_NEEDS_CONFIRMATION');
+    const need = (await deps.db.currentDataBytes()) * 2 + stagingNeed;
+    if (free < need) return err(free < stagingNeed ? 'NO_ROOM' : 'LOW_SPACE_NEEDS_CONFIRMATION');
+  } else if (free < stagingNeed) {
+    return err('NO_ROOM');
   }
 
   deps.maintenance.enter();
@@ -186,12 +217,20 @@ export async function restoreBackup(
     const checks = await deps.db.verify();
     if (!checks.quickCheckOk || !checks.invariantsOk) return err('BACKUP_DAMAGED');
     for (const b of manifest.accountBalances) if (checks.balances.get(b.accountId) !== b.balanceMinor) return err('BACKUP_DAMAGED');
+    // An account in the staged data that the manifest does not list is not what was backed up.
+    if (checks.balances.size !== manifest.accountBalances.length) return err('BACKUP_DAMAGED');
 
     swapped = true; // from here a failure is recovered by the journal, not by discarding staging
     await deps.db.prepareForSwap?.();
     await swap(deps, withSafety);
     return ok({ manifest, safetyCopyKept: withSafety });
   } catch {
+    if (swapped) {
+      // The live database may already be closed, so the writer stays in maintenance. What the swap had moved is put back from the
+      // journal; the app must be reopened to open it (never a mixture).
+      await recoverRestore(fs, layout, async () => false).catch(() => undefined);
+      return err('RESTART_REQUIRED');
+    }
     return err('RESTORE_FAILED');
   } finally {
     if (!swapped) {
@@ -207,21 +246,22 @@ export type RecoverOutcome =
   | 'rolled-back' // died during the swap: the safety copy was put back
   | 'rolled-forward' // died during a swap with no safety copy: it was completed
   | 'restored' // the swap finished and the restored data passed the start checks
-  | 'restore-failed'; // the restored data failed its start checks: the safety copy was put back
+  | 'restore-failed' // the restored data failed its start checks: the safety copy was put back
+  | 'restore-unverified'; // it failed them and there was no safety copy: the restored data stays and cannot be checked
 
 /**
  * Runs at every start, before the database is opened (Story 8.8). It finishes or undoes whatever a killed restore left:
  * - no journal: any staging is discarded and the live data opens as it was;
  * - a swap that was cut short: the safety copy is put back (or, with no safety copy, the swap is completed);
  * - a finished swap: `startChecks` (the database opens, `quick_check` passes, the first query returns) decides. If they pass the
- *   safety copy is deleted; if they fail it is put back and the message reads `The restore didn't finish. Your phone is as it was before.`
+ *   safety copy is deleted; if they fail it is put back and the message reads `The restore didn't finish. Your phone is as it was before.` (with no safety copy: `restore-unverified`, which says the restored data could not be checked)
  */
 export async function recoverRestore(fs: RestoreFs, layout: RestoreLayout, startChecks: () => Promise<boolean>): Promise<RecoverOutcome> {
   const journal = await readJournal(fs, layout);
   if (journal === null) {
     const hadStaging = await fs.exists(layout.stagingDir);
     await fs.remove(layout.stagingDir);
-    if (await fs.exists(layout.journalPath)) await fs.remove(layout.journalPath); // a damaged journal is dropped
+    await dropJournal(fs, layout); // a damaged journal, or a partly written temporary one, is dropped
     return hadStaging ? 'staging-discarded' : 'none';
   }
 
@@ -240,7 +280,7 @@ export async function recoverRestore(fs: RestoreFs, layout: RestoreLayout, start
     }
     await fs.remove(layout.safetyDir);
     await fs.remove(layout.stagingDir);
-    await fs.remove(layout.journalPath);
+    await dropJournal(fs, layout);
   };
 
   if (journal.phase === 'swapping') {
@@ -264,7 +304,7 @@ export async function recoverRestore(fs: RestoreFs, layout: RestoreLayout, start
       }
     }
     await fs.remove(layout.stagingDir);
-    await fs.remove(layout.journalPath);
+    await dropJournal(fs, layout);
     return 'rolled-forward';
   }
 
@@ -276,15 +316,15 @@ export async function recoverRestore(fs: RestoreFs, layout: RestoreLayout, start
   if (passed) {
     await fs.remove(layout.safetyDir);
     await fs.remove(layout.stagingDir);
-    await fs.remove(layout.journalPath);
+    await dropJournal(fs, layout);
     return 'restored';
   }
   if (journal.withSafety) {
     await restoreFromSafety();
     return 'restore-failed';
   }
-  await fs.remove(layout.journalPath); // no safety copy to go back to
-  return 'restore-failed';
+  await dropJournal(fs, layout); // no safety copy to go back to: the restored data stays
+  return 'restore-unverified';
 }
 
 import type { UseCase } from '../writer/ledgerWriter';
@@ -303,3 +343,6 @@ export const AnnounceBackupRestored: UseCase<void, void, never> = {
 
 /** The message shown after a restore that did not hold (NFR-12). */
 export const RESTORE_REVERTED_MESSAGE = "The restore didn't finish. Your phone is as it was before.";
+
+/** The restored data failed its start checks and there was no safety copy to go back to (NFR-12: say what is true). */
+export const RESTORE_UNVERIFIED_MESSAGE = "The restored data couldn't be checked, and there was no copy to go back to. Restore again, or open Diagnostics.";

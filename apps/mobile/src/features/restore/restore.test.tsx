@@ -137,7 +137,7 @@ describe('Restore from a backup (Story 8.9)', () => {
     const r = await mount(f.api);
     type(r, 'restore-pass', 'not it');
     await press(r, 'restore-open');
-    expect(texts(r)).toContain("That passphrase doesn't open this backup.");
+    expect(texts(r)).toContain("That passphrase doesn't open this backup. Nothing on this phone changed.");
     expect(host(r, 'restore-pass').props.value).toBe('not it');
     expect(has(r, 'restore-checking')).toBe(false);
     // Typing again clears the message.
@@ -249,7 +249,7 @@ describe('Restore from a backup (Story 8.9)', () => {
       await act(async () => void r.root.findAll((n) => n.props.testID === 'restore-go' && typeof n.props.onPress === 'function')[0]!.props.onPress());
       expect(texts(r)).toContain('Restoring…');
       expect(r.root.findAll((n) => /cancel/i.test(String(n.props.testID ?? '')))).toHaveLength(0);
-      expect(busy).toEqual([true]);
+      expect(busy).toEqual([true, false, true]); // reading the manifest, then the restore
       await act(async () => done({ ok: true, value: { manifest: MANIFEST } }));
       await settle();
       expect(f.calls).toContain('finish');

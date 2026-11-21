@@ -162,7 +162,8 @@ export function createRnRestoreDb(live: SqlDatabase | null): RestoreDb {
           const b = balanceOf(a);
           if (b.kind === 'known') balances.set(a.id, b.minor);
         }
-        return { quickCheckOk, invariantsOk: fk.length === 0 && profiles <= 1, balances };
+        // Exactly one profile: a backup with none would drop the person into onboarding over restored data.
+        return { quickCheckOk, invariantsOk: fk.length === 0 && profiles === 1, balances };
       } finally {
         await staged.close().catch(() => undefined);
       }
@@ -174,7 +175,9 @@ export function createRnRestoreDb(live: SqlDatabase | null): RestoreDb {
 
     /** Closes the live connection (folding the write-ahead log into the file) right before the swap moves the file. */
     async prepareForSwap() {
-      await live?.query('PRAGMA wal_checkpoint(TRUNCATE)').catch(() => undefined);
+      // If the log cannot be folded into the file, nothing is closed or moved: the swap would otherwise leave recent writes behind
+      // in a -wal file that is then deleted.
+      await live?.query('PRAGMA wal_checkpoint(TRUNCATE)');
       await live?.close().catch(() => undefined);
       for (const suffix of ['-wal', '-shm']) await RNFS.unlink(`${RESTORE_LAYOUT.dbPath}${suffix}`).catch(() => undefined);
     },
@@ -185,6 +188,8 @@ export function createRnRestoreDb(live: SqlDatabase | null): RestoreDb {
 export async function restoredDatabaseOpens(): Promise<boolean> {
   let db: SqlDatabase | null = null;
   try {
+    // The opener creates a new empty database when the file is missing, and an empty database passes quick_check.
+    if (!(await RNFS.exists(RESTORE_LAYOUT.dbPath))) return false;
     db = await createOpSqliteOpener().open(await deviceKey());
     const quick = await db.query('PRAGMA quick_check');
     if (!(quick.length === 1 && String(quick[0]![0]) === 'ok')) return false;
