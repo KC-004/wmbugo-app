@@ -21,6 +21,7 @@ import { minorToInput } from '../../shared/minorInput';
 import { copy } from '../../shared/copy';
 import { invalidateForEvent } from '../../shared/queryClient';
 import { useToast } from '../../shared/feedback/ToastHost';
+import { cancelAppLockOffer, scheduleAppLockOffer } from '../lock/appLockOfferBus';
 import { useUiStore } from '../../shared/state/uiStore';
 import { useTheme } from '../../shared/theme/ThemeProvider';
 import { textStyle } from '../../shared/theme/typography';
@@ -369,14 +370,20 @@ export function AddSheet({
       await refresh();
       // Saved, never blocked; if it looks like something already recorded it waits, counted nowhere, for the user's answer.
       if (r.value.result === 'POSSIBLE_DUPLICATE') duplicate.offer(id);
-      else
+      else {
         toast.show({
           message: copy.add.saved,
           undo: {
             label: copy.common.undo,
-            onUndo: () => void undo([id]),
+            onUndo: () => {
+              cancelAppLockOffer();
+              void undo([id]);
+            },
           },
         });
+        // The one-time app lock offer follows the first saved entry, after the toast is up (Story 8.4).
+        scheduleAppLockOffer();
+      }
       done();
       if (isRefund) {
         setRefundFor(null);
@@ -472,8 +479,15 @@ export function AddSheet({
       await refresh();
       toast.show({
         message: copy.add.saved,
-        undo: { label: copy.common.undo, onUndo: () => void undo(ids) },
+        undo: {
+          label: copy.common.undo,
+          onUndo: () => {
+            cancelAppLockOffer();
+            void undo(ids);
+          },
+        },
       });
+      scheduleAppLockOffer();
       done();
       setDraft({ typedText: '', categoryId: null });
       setWarned(null);

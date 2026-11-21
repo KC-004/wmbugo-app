@@ -3,9 +3,11 @@ import { TextInput } from 'react-native';
 import { act, type ReactTestRenderer } from 'react-test-renderer';
 import { typedAmountLabel } from '../../shared/a11y/labels';
 import { useUiStore } from '../../shared/state/uiStore';
+import { cancelAppLockOffer, scheduleAppLockOffer } from '../lock/appLockOfferBus';
 import { KEY_SIZE } from './Keypad';
 import { cleanup, fakeApi, find, fire, has, host, mount, mountReady, quietAccessibility, settle, tap, texts, unmountNow } from './testKit';
 
+jest.mock('../lock/appLockOfferBus', () => ({ scheduleAppLockOffer: jest.fn(), cancelAppLockOffer: jest.fn(), registerAppLockOfferHost: jest.fn() }));
 jest.mock('../../adapters/startApp', () => ({ getServices: jest.fn(), systemClock: { nowMs: () => 0, timezoneId: () => 'Asia/Singapore' } }));
 
 afterEach(cleanup);
@@ -151,6 +153,32 @@ describe('saving', () => {
     expect(record).toHaveBeenCalledWith({ submissionId: 'sub-1', kind: 'expense', amountMinor: 1250, categoryId: 'cat_food', accountId: 'a1' });
     expect(close).toHaveBeenCalledTimes(1);
     expect(texts(r)).toEqual(expect.arrayContaining(['Saved', 'Undo']));
+  });
+
+  it('a saved entry asks for the one-time app lock offer, and Undo before it appears cancels it (Story 8.4)', async () => {
+    (scheduleAppLockOffer as jest.Mock).mockClear();
+    (cancelAppLockOffer as jest.Mock).mockClear();
+    const { r } = await mountReady();
+    tap(r, '5');
+    act(() => fire(r, 'category-cat_food'));
+    await act(async () => fire(r, 'save'));
+    await settle();
+    expect(scheduleAppLockOffer).toHaveBeenCalledTimes(1);
+    expect(cancelAppLockOffer).not.toHaveBeenCalled();
+    await act(async () => fire(r, 'toast-undo'));
+    await settle();
+    expect(cancelAppLockOffer).toHaveBeenCalledTimes(1);
+  });
+
+  it('a failed save asks for no offer (Story 8.4)', async () => {
+    (scheduleAppLockOffer as jest.Mock).mockClear();
+    const { r, record } = await mountReady();
+    record.mockResolvedValueOnce({ ok: false, code: 'X' });
+    tap(r, '5');
+    act(() => fire(r, 'category-cat_food'));
+    await act(async () => fire(r, 'save'));
+    await settle();
+    expect(scheduleAppLockOffer).not.toHaveBeenCalled();
   });
 
   it('Undo removes the saved entry', async () => {

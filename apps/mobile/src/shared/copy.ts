@@ -1059,6 +1059,11 @@ export const copy = {
     afterFifteenMinutes: 'After 15 minutes',
     turnedOn: 'App lock on',
     couldntSave: "Couldn't change app lock. Nothing was changed.",
+    offerFingerprint: 'Lock wmbugo with your fingerprint?',
+    offerScreenLock: 'Lock wmbugo with your screen lock?',
+    offerBody: "You'll unlock it when you open wmbugo. Change this anytime in Settings › Privacy.",
+    offerTurnOn: 'Turn on app lock',
+    offerNotNow: 'Not now',
   },
   privacy: {
     group: 'Privacy',

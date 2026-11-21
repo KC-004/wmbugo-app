@@ -32,7 +32,8 @@ import { Button } from '../../shared/ui/Button';
 import { TopBar } from '../../shared/ui/TopBar';
 import { Chip } from '../../shared/ui/Chip';
 import { useFocusRing } from '../../shared/ui/FocusRing';
-import { authenticate, isDeviceSecure, openSecuritySettings } from '../../adapters/appLock';
+import { openSecuritySettings } from '../../adapters/appLock';
+import { enableAppLock } from '../lock/enableAppLock';
 import { hidingBlocksScreenshots } from '../../adapters/recentsPrivacy';
 import { requireReauth } from '../../shared/reauth';
 import { RegionPicker } from '../onboarding/OnboardingFlow';
@@ -132,20 +133,13 @@ export function SettingsScreen({ api = realSettingsApi, onBack }: { api?: Settin
   const turnOnAppLock = async () => {
     setLockMessage(null);
     setNote(null);
-    if (!(await isDeviceSecure())) {
-      setLockMessage({ text: copy.lock.needScreenLock, openSettings: true });
-      return;
+    const r = await enableAppLock(api);
+    if (r.status === 'needs-screen-lock') setLockMessage({ text: copy.lock.needScreenLock, openSettings: true });
+    else if (r.status === 'failed') {
+      if (r.message === copy.lock.couldntSave) setNote(r.message);
+      else if (r.message) setLockMessage({ text: r.message, openSettings: false });
     }
-    const out = await authenticate(copy.lock.turnOnPrompt);
-    if (out.result !== 'success') {
-      if (out.result === 'unavailable') setLockMessage({ text: copy.lock.needScreenLock, openSettings: true });
-      else if (out.result !== 'cancelled' && out.message) setLockMessage({ text: out.message, openSettings: false });
-      return; // cancelled or failed: nothing is saved
-    }
-    const r = await api.setAppLock(true);
-    if (!r.ok) setNote(copy.lock.couldntSave);
-    // The app switcher hiding comes on with app lock and can still be switched on without it (Story 8.2).
-    else await api.changeSetting('device.hide_in_recents', true);
+    // Cancelled or failed: nothing was saved. The app-switcher hiding comes on with app lock (Story 8.2).
     await refresh();
   };
   const turnOffAppLock = async () => {
