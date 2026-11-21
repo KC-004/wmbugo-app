@@ -28,28 +28,54 @@ export const REDACTED = '[redacted]';
 const ALLOWED_KEY =
   /^(id|ids|code|errorCode|errorType|ok|event|kind|tab|route|step|useCase|invariant|flavor|level|reason|schemaVersion|appVersion|version|databaseExists|migrationsApplied|enabled|durationMs|errorMessage|stack|stackFrames)$|(Id|Ids|Count|Ms|Version|Code)$/;
 // Free-text keys: allowed, but scrubbed.
-const FREE_TEXT_KEY = /^(errorMessage|stack|stackFrames|reason)$/;
+const FREE_TEXT_KEY = /^(errorMessage|stack|stackFrames)$/;
 const ID_LIKE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Keys whose string value must be an id (a UUID), a code (no spaces), or a number. A value of another shape under such a key
+// is redacted: the key being allowed says what the field is meant to hold, not that anything may be put in it.
+const ID_KEY = /^(id|ids)$|(Id|Ids)$/;
+const CODE_KEY = /^(code|errorCode|errorType|kind|tab|route|step|useCase|invariant|flavor|level|reason|event)$|Code$/;
+const NUMBER_KEY = /(Count|Ms)$|^(durationMs)$/;
+const VERSION_KEY = /^(schemaVersion|appVersion|version)$|Version$/;
+const CODE_VALUE = /^[A-Za-z0-9_.:/-]{1,64}$/;
+const VERSION_VALUE = /^\d+(?:\.\d+){0,3}$/;
 
 // Money inside otherwise harmless text, matched whole so partial digit groups (1,18,600) cannot survive.
 const AMOUNT_IN_TEXT =
-  /(?:[₹$€£¥]|\b(?:INR|USD|CAD|GBP|EUR|AED|SAR|QAR|BHD|KWD|OMR|SGD|MYR|CHF|SEK|NOK|DKK|PLN|CZK|HUF|THB|IDR|PHP|VND|Rs\.?)\s?)\d[\d,.\s]*\d|\d[\d,]*(?:\.\d+)?\s?(?:[₹$€£¥]|\b(?:INR|USD|EUR|GBP|SGD|Rs\.?)\b)/gi;
+  /(?:[₹$€£¥]|\b(?:INR|USD|CAD|GBP|EUR|AED|SAR|QAR|BHD|KWD|OMR|SGD|MYR|CHF|SEK|NOK|DKK|PLN|CZK|HUF|THB|IDR|PHP|VND|Rs\.?)\s?)\d(?:[\d,.\s]*\d)?|\d[\d,]*(?:\.\d+)?\s?(?:[₹$€£¥]|\b(?:INR|USD|EUR|GBP|SGD|Rs\.?)\b)/gi;
 // Masked account numbers: ••4821, XX4821, A/c *4821, a/c no. 4821.
 const MASK_IN_TEXT = /(?:a\/c\s*(?:no\.?\s*)?[*x•#]*|x{2,}|\*{2,}|•{1,}|#)\s?\d{3,}/gi;
 const EMAIL_OR_UPI = /[\w.+-]+@[\w-]+(?:\.[\w-]+)*/g;
 
-/** Scrubs free text: masked accounts, emails and UPI ids, amounts, then any run of 3 or more digits. Pure. */
+/**
+ * Scrubs free text: masked accounts, emails and UPI ids, amounts, any amount written with two decimals, then any run of 3 or more
+ * digits. Pure.
+ */
 export function scrubText(s: string): string {
   return s
     .replace(EMAIL_OR_UPI, '[id]')
     .replace(MASK_IN_TEXT, '[acct]')
     .replace(AMOUNT_IN_TEXT, '[n]')
+    .replace(/\b\d+[.,]\d{2}\b/g, '[n]')
     .replace(/\d{3,}/g, '[n]');
 }
 
+/**
+ * Scrubs a stack frame: the function name is scrubbed like free text, the location (`(file:line:column)` or `@file:line:column`) is
+ * kept as it is, because line and column numbers are what a record is symbolicated with.
+ */
+export function scrubFrame(frame: string): string {
+  const at = frame.search(/[(@]/);
+  return at === -1 ? scrubText(frame) : scrubText(frame.slice(0, at)) + frame.slice(at);
+}
+
 function scrubAllowed(key: string, s: string): string {
-  // Ids are opaque and useful in a log; a UUID is kept as it is, anything else is scrubbed like free text.
-  if (!FREE_TEXT_KEY.test(key) && ID_LIKE.test(s)) return s;
+  if (FREE_TEXT_KEY.test(key)) return scrubText(s);
+  // Ids are opaque and useful in a log; a UUID is kept as it is, and nothing else may sit under an id key.
+  if (ID_KEY.test(key)) return ID_LIKE.test(s) ? s : REDACTED;
+  // A version is dotted digits; a number-valued key does not hold text; a code key holds a code, not a sentence.
+  if (VERSION_KEY.test(key)) return VERSION_VALUE.test(s) ? s : REDACTED;
+  if (NUMBER_KEY.test(key)) return /^\d{1,15}$/.test(s) ? s : REDACTED;
+  if (CODE_KEY.test(key)) return CODE_VALUE.test(s) ? scrubText(s) : REDACTED;
   return scrubText(s);
 }
 

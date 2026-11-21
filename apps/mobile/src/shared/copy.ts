@@ -1098,6 +1098,8 @@ export const copy = {
     saved: 'Saved',
     saveFailed: "Couldn't save the file. Nothing was saved.",
     loading: 'Reading the status…',
+    parserThrew: 'The parser stopped on this text.',
+    reportFailed: "The report couldn't be built, so there is nothing to save. Try again.",
   },
   restore: {
     row: 'Restore from backup',

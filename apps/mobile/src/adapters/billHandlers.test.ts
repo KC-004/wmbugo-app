@@ -65,3 +65,12 @@ describe('serialize', () => {
     await expect(flaky()).resolves.toBe('ok');
   });
 });
+
+describe('after a restore (Epic 8 review)', () => {
+  it('plans the bill reminders again from the restored data on BackupRestored', async () => {
+    const order: string[] = [];
+    const map = withReminderSync({}, async () => void order.push('sync'), logger());
+    await run(map, 'BackupRestored');
+    expect(order).toEqual(['sync']);
+  });
+});

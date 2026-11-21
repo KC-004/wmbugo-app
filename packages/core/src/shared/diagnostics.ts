@@ -1,4 +1,4 @@
-import { redactEntry, scrubText, type LogLevel, type LogValue } from './logger';
+import { redactEntry, scrubFrame, scrubText, type LogLevel, type LogValue } from './logger';
 import type { CrashRecord } from './crashRecord';
 
 /**
@@ -72,8 +72,8 @@ export function redactLogLine(line: string): string {
 
 /** One crash record on one line, scrubbed again. */
 export function crashLine(r: CrashRecord): string {
-  const frames = r.frames.slice(0, 30).join(' | ');
-  return JSON.stringify({ t: r.t, kind: r.kind, appVersion: scrubText(r.appVersion), schemaVersion: r.schemaVersion, errorType: scrubText(r.errorType), message: scrubText(r.message), frames });
+  const frames = r.frames.slice(0, 30).map(scrubFrame).join(' | ');
+  return JSON.stringify({ t: r.t, kind: scrubText(String(r.kind)), appVersion: scrubText(r.appVersion), schemaVersion: r.schemaVersion, errorType: scrubText(r.errorType), message: scrubText(r.message), frames });
 }
 
 export interface DiagnosticsInput {

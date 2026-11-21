@@ -1,4 +1,4 @@
-import { AccessibilityInfo, Text } from 'react-native';
+import { AccessibilityInfo, BackHandler, Text } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { BackupManifest, ByteSource } from '@wmbugo/core';
@@ -316,5 +316,120 @@ describe('the notice after a restart (Story 8.8, 8.9)', () => {
     (takeRestoreOutcome as jest.Mock).mockReturnValueOnce('none');
     const r = await mountHost();
     expect(texts(r).join(' ')).not.toMatch(/Restored|restore/);
+  });
+});
+
+describe('Restore: what the Epic 8 review found', () => {
+  const goRestore = async (r: ReactTestRenderer) => {
+    await press(r, 'restore-understand');
+    await press(r, 'restore-go');
+  };
+
+  it('a file from a newer format says to update wmbugo, straight from the header', async () => {
+    const f = fakeApi({ inspect: jest.fn(async () => ({ ok: false as const, code: 'BACKUP_TOO_NEW' as const })) });
+    const r = await mount(f.api);
+    expect(texts(r)).toContain('This backup was made by a newer version of wmbugo. Update wmbugo, then try again. Nothing on this phone changed.');
+  });
+
+  it('a failure after the live database was closed says the data was put back and wmbugo must be reopened, and offers a restart, not Close', async () => {
+    const restart = jest.fn(async () => undefined);
+    const f = fakeApi({ restore: jest.fn(async () => ({ ok: false as const, code: 'RESTART_REQUIRED' as const })), restart });
+    const r = await toConfirm(f.api);
+    await goRestore(r);
+    expect(texts(r)).toContain("The restore didn't finish. Your data was put back, but wmbugo has to be opened again before it can be used.");
+    expect(has(r, 'restore-close')).toBe(false);
+    await press(r, 'restore-restart');
+    expect(restart).toHaveBeenCalledTimes(1);
+  });
+
+  it('when the restore held but the restart or the notice failed, it says the data is in place and does not claim the phone is as it was', async () => {
+    const f = fakeApi({ finish: jest.fn(async () => Promise.reject(new Error('could not restart'))), restart: jest.fn(async () => undefined) });
+    const r = await toConfirm(f.api);
+    await goRestore(r);
+    expect(texts(r)).toContain('The restore finished and your data is in place. Close wmbugo and open it again to use it.');
+    expect(texts(r).join(' ')).not.toMatch(/as it was before/);
+    expect(has(r, 'restore-restart')).toBe(true);
+  });
+
+  it('no room even for staging is its own message and changes nothing; a full disk while staging reads as a failure that changed nothing, not as a damaged file', async () => {
+    const noRoom = fakeApi({ restore: jest.fn(async () => ({ ok: false as const, code: 'NO_ROOM' as const })) });
+    let r = await toConfirm(noRoom.api);
+    await goRestore(r);
+    expect(texts(r)).toContain("There isn't enough free space to restore this backup. Nothing on this phone changed.");
+    const full = fakeApi({ restore: jest.fn(async () => ({ ok: false as const, code: 'STORAGE_FAILED' as const })) });
+    r = await toConfirm(full.api);
+    await goRestore(r);
+    expect(texts(r)).toContain("The restore didn't finish. Your phone is as it was before.");
+    expect(texts(r).join(' ')).not.toMatch(/damaged/);
+  });
+
+  it('hardware Back is held while a manifest is read and while the restore runs, on any path into the flow, and free otherwise', async () => {
+    const handlers: (() => boolean)[] = [];
+    jest.spyOn(BackHandler, 'addEventListener').mockImplementation(((_: string, h: () => boolean) => {
+      handlers.push(h);
+      return { remove: () => handlers.splice(handlers.indexOf(h), 1) };
+    }) as never);
+    let done!: (v: { ok: true; value: { manifest: BackupManifest } }) => void;
+    const f = fakeApi({ restore: jest.fn(() => new Promise((res) => (done = res as never))) });
+    const r = await toConfirm(f.api);
+    const back = () => handlers[handlers.length - 1]!();
+    expect(back()).toBe(false);
+    await press(r, 'restore-understand');
+    await act(async () => void r.root.findAll((n) => n.props.testID === 'restore-go' && typeof n.props.onPress === 'function')[0]!.props.onPress());
+    await settle();
+    expect(back()).toBe(true);
+    await act(async () => done({ ok: true, value: { manifest: MANIFEST } }));
+    await settle();
+  });
+
+  it('two taps on Restore start one restore', async () => {
+    let done!: (v: { ok: true; value: { manifest: BackupManifest } }) => void;
+    const f = fakeApi({ restore: jest.fn(() => new Promise((res) => (done = res as never))) });
+    const r = await toConfirm(f.api);
+    await press(r, 'restore-understand');
+    const go = r.root.findAll((n) => n.props.testID === 'restore-go' && typeof n.props.onPress === 'function')[0]!;
+    await act(async () => {
+      void go.props.onPress();
+      void go.props.onPress();
+    });
+    await settle();
+    expect(f.api.restore).toHaveBeenCalledTimes(1);
+    await act(async () => done({ ok: true, value: { manifest: MANIFEST } }));
+    await settle();
+  });
+
+  it('the preview says what is true when the restore goes ahead without a safety copy', async () => {
+    const f = fakeApi({ lowSpace: jest.fn(async () => true) });
+    const r = await toConfirm(f.api);
+    expect(texts(r)).toContain('If something goes wrong during restore, nothing on this phone changes.');
+    await press(r, 'restore-without-copy');
+    expect(texts(r)).toContain("Without a copy, if something goes wrong the data on this phone may be lost, and wmbugo can't go back.");
+    expect(texts(r)).not.toContain('If something goes wrong during restore, nothing on this phone changes.');
+  });
+
+  it('every outcome of a restart that follows a restore says what happened, and the stale notice is read for each', async () => {
+    const cases: [string, string][] = [
+      ['rolled-back', "The restore didn't finish. Your phone is as it was before."],
+      ['staging-discarded', "The restore didn't finish. Your phone is as it was before."],
+      ['restore-unverified', "The restored data couldn't be checked, and there was no copy to go back to. Restore again, or open Diagnostics."],
+    ];
+    for (const [outcome, message] of cases) {
+      (takeRestoreOutcome as jest.Mock).mockReturnValueOnce(outcome);
+      const read = jest.fn(async () => '3 Nov');
+      let r!: ReactTestRenderer;
+      await act(async () => {
+        r = create(
+          <ThemeProvider>
+            <ToastHost bottomOffset={0}>
+              <RestoreNoticeHost readNotice={read} />
+            </ToastHost>
+          </ThemeProvider>,
+        );
+      });
+      live.push(r);
+      await settle();
+      expect({ outcome, shown: texts(r).includes(message) }).toEqual({ outcome, shown: true });
+      expect(read).toHaveBeenCalledTimes(1); // consumed, so a later restore cannot show this one's date
+    }
   });
 });

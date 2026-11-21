@@ -16,6 +16,8 @@ import { useSafeModeStore } from '../shared/state/safeModeStore';
 
 /** Which safe-mode screen a failed start shows: asks the file system and the Keystore, each on its own. */
 export async function describeStartupFailure(code: StartupErrorCode): Promise<SafeModeVariant> {
+  // Diagnostics has no services to ask while the start is failing: the code is kept for it (a code only, never a message).
+  useSafeModeStore.getState().setStartFailure(`start_${code}`);
   const databaseExists = await rnFileStore.exists(RESTORE_LAYOUT.dbPath).catch(() => false);
   // The Keystore could not be asked: not called lost.
   const keyMissing = await keychainKeyStore.getKey().then(

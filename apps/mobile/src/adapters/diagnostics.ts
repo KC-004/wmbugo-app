@@ -3,12 +3,14 @@ import { NativeModules } from 'react-native';
 import { dayMonthLabel, toLocalDate, buildDiagnosticsText, diagnosticsFileName, utf8Encode, type DiagnosticsStatus } from '@wmbugo/core';
 import { availableKind } from './appLock';
 import { createTextDocument } from './backup/backupFiles';
+import { RESTORE_LAYOUT } from './backup/rnRestore';
 import { RECEIPTS_DIR } from './files/receiptFiles';
 import { appNotifier } from './notifier';
 import { permissionState } from './permissions';
 import { getCrashRecorder, getServices, LOG_PATH, systemClock } from './startApp';
 import { realSettingsApi } from '../features/settings/settingsApi';
 import { useLockStore } from '../shared/state/lockStore';
+import { useSafeModeStore } from '../shared/state/safeModeStore';
 
 /** Each probe is tried on its own: what cannot be read is reported as Not available, so Diagnostics works without the database open. */
 async function probe<T>(fn: () => Promise<T> | T): Promise<T | null> {
@@ -19,13 +21,20 @@ async function probe<T>(fn: () => Promise<T> | T): Promise<T | null> {
   }
 }
 
-async function sizeOf(path: string): Promise<number | null> {
+/** The size of a file or a directory tree; 0 when it does not exist (nothing there yet is a size of nothing). */
+async function sizeOf(path: string): Promise<number> {
   if (!(await RNFS.exists(path))) return 0;
   const s = await RNFS.stat(path);
   if (!s.isDirectory()) return Number(s.size);
   let total = 0;
-  for (const f of await RNFS.readDir(path)) total += (await sizeOf(f.path)) ?? 0;
+  for (const f of await RNFS.readDir(path)) total += await sizeOf(f.path);
   return total;
+}
+
+/** The database and its write-ahead companions, at the path the rest of the app uses; null when there is no database file. */
+async function databaseBytes(): Promise<number | null> {
+  if (!(await RNFS.exists(RESTORE_LAYOUT.dbPath))) return null;
+  return (await sizeOf(RESTORE_LAYOUT.dbPath)) + (await sizeOf(`${RESTORE_LAYOUT.dbPath}-wal`)) + (await sizeOf(`${RESTORE_LAYOUT.dbPath}-shm`));
 }
 
 interface AppInfo {
@@ -38,6 +47,17 @@ const dateLabel = (ms: number): string | null => {
   return d.ok ? dayMonthLabel(d.value) : null;
 };
 
+/** Safe mode as Diagnostics shows it: the reason when the app is in it, the failed start's code when there are no services, else Off. */
+async function safeModeStatus(): Promise<string | null> {
+  const failure = useSafeModeStore.getState().startFailure;
+  try {
+    const { writer } = getServices();
+    return writer.inSafeMode ? (writer.safeReason ?? 'On') : 'Off';
+  } catch {
+    return failure; // no services: the code of the failed start, or Not available when there is none
+  }
+}
+
 export async function readStatus(): Promise<DiagnosticsStatus> {
   const info = await probe(async () => (NativeModules.WmbugoPrivacy as { getAppInfo(): Promise<AppInfo> } | undefined)?.getAppInfo() ?? null);
   const settings = await probe(() => realSettingsApi.load());
@@ -49,11 +69,15 @@ export async function readStatus(): Promise<DiagnosticsStatus> {
   const kind = await probe(() => availableKind());
   return {
     app: info ? `${info.versionName} (${info.packageName.endsWith('.sms') ? 'sms' : 'nosms'})` : null,
-    schemaVersion: await probe(async () => Number((await getServices().db.query('SELECT COALESCE(MAX(version), 0) FROM schema_migration'))[0]?.[0])),
+    schemaVersion: await probe(async () => {
+      const n = Number((await getServices().db.query('SELECT COALESCE(MAX(version), 0) FROM schema_migration'))[0]?.[0]);
+      if (!Number.isFinite(n)) throw new Error('no schema version'); // reported as Not available, not as NaN
+      return n;
+    }),
     storage: {
-      dbBytes: await probe(async () => (await sizeOf(`${RNFS.DocumentDirectoryPath}/../databases/wmbugo.db`)) ?? null),
+      dbBytes: await probe(() => databaseBytes()),
       photoBytes: await probe(() => sizeOf(RECEIPTS_DIR)),
-      logBytes: await probe(async () => ((await sizeOf(LOG_PATH)) ?? 0) + ((await sizeOf(`${LOG_PATH}.1`)) ?? 0)),
+      logBytes: await probe(async () => (await sizeOf(LOG_PATH)) + (await sizeOf(`${LOG_PATH}.1`))),
       freeBytes: await probe(async () => Number((await RNFS.getFSInfo()).freeSpace)),
     },
     notifications: notification === null ? null : notification === 'granted' ? 'allowed' : notification === 'denied' ? 'denied' : 'not asked',
@@ -62,7 +86,7 @@ export async function readStatus(): Promise<DiagnosticsStatus> {
     appLock: useLockStore.getState().enabled,
     lastBackup: settings ? (settings.settings.lastBackupAt === null ? 'none' : dateLabel(settings.settings.lastBackupAt)) : null,
     crashes,
-    safeMode: await probe(() => (getServices().writer.inSafeMode ? (getServices().writer.safeReason ?? 'On') : 'Off')),
+    safeMode: await safeModeStatus(),
   };
 }
 
@@ -86,7 +110,14 @@ export async function saveReport(text: string): Promise<'saved' | 'cancelled' | 
     doc = await createTextDocument(diagnosticsFileName(d.ok ? d.value : 'file'));
     if (doc === null) return 'cancelled';
     const bytes = utf8Encode(text);
-    for (let i = 0; i < bytes.length; i += 32 * 1024) await doc.sink.write(bytes.subarray(i, i + 32 * 1024));
+    let written = 0;
+    for (let i = 0; i < bytes.length; i += 32 * 1024) {
+      const piece = bytes.subarray(i, i + 32 * 1024);
+      await doc.sink.write(piece);
+      written += piece.length;
+    }
+    // The saved bytes are the previewed text: a short write is a failure, not a file that looks saved.
+    if (written !== bytes.length) throw new Error('short write');
     await doc.commit();
     return 'saved';
   } catch {

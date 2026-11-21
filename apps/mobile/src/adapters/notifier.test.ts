@@ -36,7 +36,11 @@ describe('app notifier privacy wiring (Story 8.5)', () => {
 
   it('a failing re-post never breaks the handler', async () => {
     const handlers = withNotificationRepost({});
-    jest.spyOn(appNotifier, 'repostAll').mockRejectedValue(new Error('x'));
-    await expect(handlers.ProfileChanged![0]!({ name: 'ProfileChanged', payload: { fields: [] } } as never)).resolves.toBeUndefined();
+    const spy = jest.spyOn(appNotifier, 'repostAll').mockRejectedValue(new Error('x'));
+    try {
+      await expect(handlers.ProfileChanged![0]!({ name: 'ProfileChanged', payload: { fields: [] } } as never)).resolves.toBeUndefined();
+    } finally {
+      spy.mockRestore(); // not left behind for the tests that follow
+    }
   });
 });

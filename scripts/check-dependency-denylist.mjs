@@ -54,12 +54,27 @@ export function findDenied(text) {
   return hits;
 }
 
+/** A Gradle report that resolved nothing is a failed `gradlew` run, not a clean classpath: an empty file has no denylisted name in it. */
+export function isUsableGradleReport(text) {
+  for (const name of packageNames(text)) if (name.includes(':')) return true;
+  return false;
+}
+
+/** In CI both flavors' resolved classpaths must have been written, so a missing report cannot pass as "nothing to check". */
+const REQUIRED_REPORTS = ['dependencies-nosms.txt', 'dependencies-sms.txt'];
+
 function defaultTargets() {
   const out = [];
   const lock = join(root, 'pnpm-lock.yaml');
   if (existsSync(lock)) out.push(lock);
   const reports = join(root, 'apps/mobile/android/app/build/reports');
   if (existsSync(reports)) for (const f of readdirSync(reports)) if (/^dependencies-.*\.txt$/.test(f)) out.push(join(reports, f));
+  if (process.env.CI) {
+    for (const name of REQUIRED_REPORTS) {
+      const p = join(reports, name);
+      if (!out.includes(p)) out.push(p); // reported below as missing
+    }
+  }
   return out;
 }
 
@@ -77,7 +92,13 @@ if (isMain) {
       failed = true;
       continue;
     }
-    const hits = findDenied(readFileSync(file, 'utf8'));
+    const text = readFileSync(file, 'utf8');
+    if (/(^|[\\/])dependencies-[^\\/]*\.txt$/.test(file) && !isUsableGradleReport(text)) {
+      console.error(`check-dependency-denylist: ${relative(root, file)} lists no dependencies: the gradle run that wrote it failed.`);
+      failed = true;
+      continue;
+    }
+    const hits = findDenied(text);
     for (const h of hits) {
       console.error(`${relative(root, file)}: ${h.name} is a denylisted ${h.label} dependency`);
       failed = true;

@@ -1,5 +1,5 @@
 import type { FileStore } from '../ports/filestore';
-import { scrubText, type Logger } from './logger';
+import { scrubFrame, scrubText, type Logger } from './logger';
 
 export type CrashKind = 'js' | 'promise' | 'native';
 
@@ -37,11 +37,15 @@ function errorParts(error: unknown): { type: string; message: string; stack: str
 /** Pure: builds the redacted record for one error. */
 export function buildCrashRecord(ctx: CrashContext, kind: CrashKind, error: unknown): CrashRecord {
   const { type, message, stack } = errorParts(error);
+  // The stack starts with the error's own text (its name and every line of its message). Those lines are dropped before frames are
+  // picked, so a message line that happens to look like `at x` or contain an @ is never stored as a frame, unscrubbed.
+  const header = message.length === 0 ? 1 : message.split('\n').length;
   const frames = stack
     .split('\n')
+    .slice(header)
     .filter((l) => FRAME_LINE.test(l))
     .slice(0, MAX_FRAMES)
-    .map((l) => l.trim().slice(0, MAX_FRAME_LENGTH));
+    .map((l) => scrubFrame(l.trim().slice(0, MAX_FRAME_LENGTH)));
   return {
     t: ctx.now,
     appVersion: ctx.appVersion,
@@ -59,6 +63,8 @@ export interface CrashRecorderOptions {
   readonly context: () => CrashContext;
   readonly logger?: Logger;
   readonly maxRecords?: number;
+  /** Awaited once before the first write: makes sure the directory exists, so a crash during startup is not lost to a race. */
+  readonly prepare?: () => Promise<void>;
 }
 
 export interface CrashRecorder {
@@ -73,13 +79,19 @@ export interface CrashRecorder {
  */
 export function createCrashRecorder(files: FileStore, options: CrashRecorderOptions): CrashRecorder {
   const max = options.maxRecords ?? MAX_CRASH_RECORDS;
-  const nameOf = (t: number, n: number) => `crash-${String(Math.max(0, t)).padStart(15, '0')}-${n}.json`;
+  // The counter is padded too, so the names sort in write order even within one millisecond (10 after 9).
+  const nameOf = (t: number, n: number) => `crash-${String(Math.max(0, t)).padStart(15, '0')}-${String(n).padStart(4, '0')}.json`;
+  let prepared: Promise<void> | null = null;
   let counter = 0;
   const list = async (): Promise<string[]> => (await files.list(options.dir)).filter((n) => /^crash-\d+-\d+\.json$/.test(n)).sort();
   let chain: Promise<void> = Promise.resolve();
   const write = async (kind: CrashKind, error: unknown): Promise<void> => {
     try {
       const rec = buildCrashRecord(options.context(), kind, error);
+      if (options.prepare) {
+        prepared ??= options.prepare().catch(() => undefined);
+        await prepared;
+      }
       await files.write(`${options.dir}/${nameOf(rec.t, counter++)}`, JSON.stringify(rec));
       const names = await list();
       for (const old of names.slice(0, Math.max(0, names.length - max))) await files.remove(`${options.dir}/${old}`);

@@ -175,3 +175,30 @@ describe('Export preview and consent (Story 8.10)', () => {
     expect(disabled(r, 'diagnostics-save')).toBe(true);
   });
 });
+
+describe('the export screen when the report cannot be built (Epic 8 review)', () => {
+  it('shows what could be read, says the report failed, and does not offer it for saving even after the tick', async () => {
+    const save = jest.fn(async () => 'saved' as const);
+    const r = await mount(<DiagnosticsExportScreen api={fakeApi({ report: async () => Promise.reject(new Error('x')), save })} />);
+    expect(has(r, 'diagnostics-unreadable')).toBe(true);
+    await press(r, 'diagnostics-consent');
+    expect(disabled(r, 'diagnostics-save')).toBe(true);
+    await press(r, 'diagnostics-save');
+    expect(save).not.toHaveBeenCalled();
+  });
+});
+
+describe('a parser that throws (Epic 8 review)', () => {
+  it('is reported on the screen instead of crashing it', async () => {
+    registerParser({
+      id: 'boom',
+      label: 'Boom parser',
+      run: () => {
+        throw new Error('regex blew up');
+      },
+    });
+    const r = await mount(<DiagnosticsScreen onExport={jest.fn()} api={fakeApi()} />);
+    await press(r, 'parser-run-boom');
+    expect(texts(r)).toContain('The parser stopped on this text.');
+  });
+});

@@ -35,12 +35,25 @@ object NativeCrashRecorder {
     val frames = error.stackTrace.take(MAX_FRAMES).joinToString(",") { quote("at ${it.className}.${it.methodName} (${it.fileName ?: "?"}:${it.lineNumber})") }
     val json = "{\"t\":$t,\"appVersion\":${quote(appVersion)},\"schemaVersion\":null,\"kind\":\"native\"," +
       "\"errorType\":${quote(error.javaClass.name)},\"message\":\"\",\"frames\":[$frames]}"
-    val name = "crash-" + t.toString().padStart(15, '0') + "-" + counter.getAndIncrement() + ".json"
+    // The counter is padded like the JS records, so names sort in write order even within one millisecond.
+    val name = "crash-" + t.toString().padStart(15, '0') + "-" + counter.getAndIncrement().toString().padStart(4, '0') + ".json"
     File(dir, name).writeText(json)
-    val records = dir.listFiles { f -> Regex("crash-[0-9]+-[0-9]+[.]json").matches(f.name) }?.sortedBy { it.name } ?: return
+    val pattern = Regex("crash-[0-9]+-[0-9]+[.]json")
+    val records = dir.listFiles { f -> pattern.matches(f.name) }?.sortedBy { it.name } ?: return
     records.take(maxOf(0, records.size - MAX_RECORDS)).forEach { it.delete() }
   }
 
-  private fun quote(s: String): String =
-    "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", " ").replace("\r", " ") + "\""
+  /** A JSON string: quote, backslash and every control character below 0x20 are escaped, so a record is always valid JSON. */
+  internal fun quote(s: String): String {
+    val out = StringBuilder("\"")
+    for (c in s) {
+      when {
+        c == '"' -> out.append("\\\"")
+        c == '\\' -> out.append("\\\\")
+        c < ' ' -> out.append(String.format("\\u%04x", c.code))
+        else -> out.append(c)
+      }
+    }
+    return out.append('"').toString()
+  }
 }

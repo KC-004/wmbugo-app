@@ -17,7 +17,8 @@ describe('permission inventory', () => {
   it('has a PERMISSIONS.md row for every permission on the release allowlist', () => {
     for (const permission of allowlist.allowed) {
       const short = permission.replace('${applicationId}.', '').replace('android.permission.', '');
-      const row = md.split('\n').find((l) => l.startsWith('|') && l.includes(`\`${permission.replace('${applicationId}', '<applicationId>')}\``) || l.includes(`\`${short}\``));
+      // Only a table row counts: prose that mentions the permission name does not satisfy the inventory.
+      const row = md.split('\n').find((l) => l.startsWith('|') && (l.includes(`\`${permission.replace('${applicationId}', '<applicationId>')}\``) || l.includes(`\`${short}\``)));
       expect({ permission, row: Boolean(row) }).toEqual({ permission, row: true });
     }
   });

@@ -82,7 +82,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release-symbols-${{ github.sha }}
-          if-no-files-found: warn
+          # A wrong path would silently keep no symbols, and crash records could then never be symbolicated: fail instead.
+          if-no-files-found: error
           retention-days: 365
           path: |
             apps/mobile/android/app/build/generated/sourcemaps/react/**/*.map

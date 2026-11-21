@@ -60,3 +60,58 @@ describe('crash handlers', () => {
     expect(set).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('crash handlers: a fatal error and a storm (Epic 8 review)', () => {
+  beforeEach(() => resetCrashHandlersForTest());
+
+  it('a fatal error is written before the previous handler is allowed to end the process', async () => {
+    const order: string[] = [];
+    let release!: () => void;
+    const recorder = {
+      record: () => new Promise<void>((res) => (release = () => (order.push('written'), res()))),
+      readAll: async () => [],
+    };
+    const previous = jest.fn(() => void order.push('previous'));
+    let handler!: (e: unknown, f?: boolean) => void;
+    installCrashHandlers(recorder, { errorUtils: { getGlobalHandler: () => previous, setGlobalHandler: (h) => void (handler = h) } });
+    handler(new Error('fatal'), true);
+    await flush();
+    expect(previous).not.toHaveBeenCalled(); // still waiting for the disk
+    release();
+    await flush();
+    expect(order).toEqual(['written', 'previous']);
+  });
+
+  it('a record that never finishes does not keep a dying app alive: the previous handler runs after the flush window', async () => {
+    jest.useFakeTimers();
+    try {
+      const recorder = { record: () => new Promise<void>(() => undefined), readAll: async () => [] };
+      const previous = jest.fn();
+      let handler!: (e: unknown, f?: boolean) => void;
+      installCrashHandlers(recorder, { errorUtils: { getGlobalHandler: () => previous, setGlobalHandler: (h) => void (handler = h) } });
+      handler(new Error('fatal'), true);
+      await jest.advanceTimersByTimeAsync(1600);
+      expect(previous).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('the same non-fatal error again within a minute is not recorded again, a different one is, and the previous handler always runs', async () => {
+    let t = 1000;
+    const record = jest.fn(async () => undefined);
+    const recorder = { record, readAll: async () => [] };
+    const previous = jest.fn();
+    let handler!: (e: unknown, f?: boolean) => void;
+    installCrashHandlers(recorder, { now: () => t, errorUtils: { getGlobalHandler: () => previous, setGlobalHandler: (h) => void (handler = h) } });
+    const a = new Error('loop');
+    for (let i = 0; i < 5; i++) handler(a, false);
+    expect(record).toHaveBeenCalledTimes(1);
+    expect(previous).toHaveBeenCalledTimes(5);
+    handler(new TypeError('other'), false);
+    expect(record).toHaveBeenCalledTimes(2);
+    t += 61_000;
+    handler(a, false);
+    expect(record).toHaveBeenCalledTimes(3);
+  });
+});

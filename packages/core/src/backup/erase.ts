@@ -75,12 +75,12 @@ export type InterruptedErase = 'none' | 'finished' | 'failed';
  * offers Try again (Epic 8 review, P4).
  */
 export async function finishInterruptedErase(deps: Omit<EraseDeps, 'maintenance'>): Promise<InterruptedErase> {
-  let marker = false;
-  try {
-    marker = await deps.fs.exists(deps.layout.markerPath);
-  } catch {
-    return 'failed';
-  }
+  // null: the file system could not even be asked, which is not the same as "no erase in progress".
+  const marker = await deps.fs.exists(deps.layout.markerPath).then(
+    (v) => v,
+    () => null,
+  );
+  if (marker === null) return 'failed';
   if (!marker) return 'none';
   try {
     await finish({ ...deps, maintenance: { enter: () => undefined, exit: () => undefined } });

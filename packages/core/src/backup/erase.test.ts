@@ -123,13 +123,16 @@ describe('EraseAllData (Story 8.11)', () => {
   });
 
   it('killed at every step, the next start finds the marker, finishes the erase before anything else, and nothing is left', async () => {
-    for (let n = 0; n < 30; n++) {
+    // Far enough past the real length of an erase (about fifteen file operations) that the last iterations run to the end.
+    let completed = 0;
+    for (let n = 0; n < 40; n++) {
       const s = setup();
       s.fs.killAfter(n);
       const first = await eraseAllData(s.deps);
       s.fs.revive();
       if (first.ok) {
         expect({ n, left: [...s.fs.files.keys()].sort() }).toEqual({ n, left: [...PERSON_OWNED].sort() });
+        completed++;
         continue;
       }
       expect({ n, marker: s.fs.files.has(L.markerPath) || n === 0 }).toEqual({ n, marker: true });
@@ -144,6 +147,7 @@ describe('EraseAllData (Story 8.11)', () => {
       expect({ n, key: s.key() }).toEqual({ n, key: false });
       expect(await finishInterruptedErase(s.deps)).toBe('none'); // and the start after that finds nothing to do
     }
+    expect(completed).toBeGreaterThan(0); // the loop reached an erase that ran to the end, so no kill point was left untested
   });
 
   it('a start whose recovery cannot finish says so, keeps the marker, and the next start finishes it', async () => {

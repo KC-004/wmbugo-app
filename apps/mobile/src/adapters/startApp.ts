@@ -33,6 +33,7 @@ import { installCrashHandlers } from './crashHandlers';
 import { refreshPermissionViews } from './permissions';
 import { sweepStaging } from './backup/rnBackupPlatform';
 import { localToday, scheduleIntegrityChecks } from './safeMode';
+import { useSafeModeStore } from '../shared/state/safeModeStore';
 import { interruptedEraseDeps } from './backup/rnErase';
 import { restoredDatabaseOpens, RESTORE_LAYOUT, rnRestoreFs } from './backup/rnRestore';
 import { ensureDir, PRIVATE_DIR, rnFileStore } from './files/rnFileStore';
@@ -99,6 +100,7 @@ export function getCrashRecorder(): CrashRecorder {
   if (!crashRecorder) {
     crashRecorder = createCrashRecorder(rnFileStore, {
       dir: CRASH_DIR,
+      prepare: () => ensureDir(CRASH_DIR),
       context: () => ({ now: systemClock.nowMs(), appVersion: APP_VERSION, schemaVersion: migrations.journal.entries.length }),
     });
   }
@@ -161,12 +163,7 @@ async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
   // An erase that was interrupted is finished before anything else, even before the logger exists, so that it does not hold open
   // a log file the erase deletes (Story 8.11). The start that follows has no database and no key, so it opens Welcome. If the erase
   // cannot be finished the start stops: opening half-erased data would let new entries be wiped by the next start's erase.
-  let erase: InterruptedErase = 'none';
-  try {
-    erase = await finishInterruptedErase(interruptedEraseDeps());
-  } catch {
-    erase = 'failed';
-  }
+  const erase: InterruptedErase = await finishInterruptedErase(interruptedEraseDeps()).catch((): InterruptedErase => 'failed');
   const log = await getLogger();
   if (erase === 'failed') {
     log.error('erase.recovery_failed');
@@ -193,6 +190,7 @@ async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
     logger: log,
   });
   if (!started.ok) return started;
+  useSafeModeStore.getState().setStartFailure(null); // a start that works leaves no failure behind
 
   // Every reminder sync (a change, the app starting or coming back) goes through one queue, so a slower older sync cannot land last.
   const syncReminders = serialize(() => syncBillReminders(started.value.db, appNotifier, systemClock.nowMs()).then(() => undefined));

@@ -3,6 +3,7 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { createQueryClient } from '../../shared/queryClient';
+import { useSafeModeStore } from '../../shared/state/safeModeStore';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
 import { colorTokens } from '../../shared/theme/colors';
 import { setNavTimingSink, markTabFirstFrame, markTabPress } from './navTiming';
@@ -234,5 +235,25 @@ describe('nav timing', () => {
     markTabFirstFrame('Plan');
     setNavTimingSink(null);
     expect(seen).toEqual([{ tab: 'Plan', durationMs: 123 }]);
+  });
+});
+
+describe('safe mode with a readable database (Epic 8 review)', () => {
+  it('shows the banner above the tabs, keeps the tab bar, and disables the Add button, in the real shell', async () => {
+    useSafeModeStore.setState({ reason: 'quick_check_failed' });
+    try {
+      const r = await mountShell();
+      expect(host(r, 'safe-mode-banner')).toHaveLength(1);
+      expect(host(r, 'tab-bar')).toHaveLength(1);
+      const add = r.root.findAll((n) => n.props.testID === 'add-button' && n.props.accessibilityState)[0]!;
+      expect(add.props.accessibilityState).toMatchObject({ disabled: true });
+    } finally {
+      useSafeModeStore.setState({ reason: null });
+    }
+  });
+
+  it('shows no banner in normal operation', async () => {
+    const r = await mountShell();
+    expect(host(r, 'safe-mode-banner')).toHaveLength(0);
   });
 });

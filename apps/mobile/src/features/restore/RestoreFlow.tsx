@@ -122,40 +122,42 @@ export function RestoreFlow({ api = realRestoreApi, onExit, onBusyChange }: { ap
     }
     setBusy(true);
     setStep({ kind: 'restoring' });
-    let restored: BackupManifest | null = null;
+    // The data on disk is the restored data once this succeeds. A failure after that point is not "your phone is as it was before".
+    const finish = async (manifest: BackupManifest) => {
+      try {
+        await api.finish(manifest);
+      } catch {
+        setStep({ kind: 'failed', message: copy.restore.finishedReopen, restart: true });
+      }
+    };
     try {
       const r = await api.restore(file.source, pass, { withoutSafetyCopy: c.lowSpace && withoutCopy });
-      if (r.ok) restored = r.value.manifest;
-      else {
-        if (r.code === 'RESTART_REQUIRED') {
-          // The live database was closed: what moved was put back, but nothing can be written until the app is opened again.
-          // Back stays held, and the person gets a way to restart.
-          return setStep({ kind: 'failed', message: copy.restore.restartNeeded, restart: true });
-        }
-        setBusy(false);
-        if (r.code === 'LOW_SPACE_NEEDS_CONFIRMATION') return setStep({ ...c, lowSpace: true });
-        release();
-        // Only staging was touched, so a full disk or a failure to write there leaves the phone as it was.
-        const message =
-          r.code === 'BACKUP_TOO_NEW'
-            ? copy.restore.tooNew
-            : r.code === 'NO_ROOM'
-              ? copy.restore.noRoomAtAll
-              : r.code === 'RESTORE_FAILED' || r.code === 'STORAGE_FAILED'
-                ? copy.restore.failed
-                : copy.restore.damaged;
-        return setStep({ kind: 'failed', message });
+      if (r.ok) {
+        await finish(r.value.manifest);
+        return;
       }
+      if (r.code === 'RESTART_REQUIRED') {
+        // The live database was closed: what moved was put back, but nothing can be written until the app is opened again.
+        // Back stays held, and the person gets a way to restart.
+        return setStep({ kind: 'failed', message: copy.restore.restartNeeded, restart: true });
+      }
+      setBusy(false);
+      if (r.code === 'LOW_SPACE_NEEDS_CONFIRMATION') return setStep({ ...c, lowSpace: true });
+      release();
+      // Only staging was touched, so a full disk or a failure to write there leaves the phone as it was.
+      const message =
+        r.code === 'BACKUP_TOO_NEW'
+          ? copy.restore.tooNew
+          : r.code === 'NO_ROOM'
+            ? copy.restore.noRoomAtAll
+            : r.code === 'RESTORE_FAILED' || r.code === 'STORAGE_FAILED'
+              ? copy.restore.failed
+              : copy.restore.damaged;
+      return setStep({ kind: 'failed', message });
     } catch {
       setBusy(false);
       release();
       return setStep({ kind: 'failed', message: copy.restore.failed });
-    }
-    // The data on disk is now the restored data. A failure from here on is not "your phone is as it was before".
-    try {
-      await api.finish(restored);
-    } catch {
-      setStep({ kind: 'failed', message: copy.restore.finishedReopen, restart: true });
     }
   };
 

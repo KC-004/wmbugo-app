@@ -104,7 +104,19 @@ function ParserCheck({ parser }: { parser: ParserEntry }) {
         multiline
         style={[styles.input, textStyle('body'), { color: theme.color('text-primary'), borderColor: theme.color('border-control') }]}
       />
-      <Button label={copy.diagnostics.parserRun} variant="secondary" testID={`parser-run-${parser.id}`} onPress={() => setResult(parser.run(sample))} />
+      <Button
+        label={copy.diagnostics.parserRun}
+        variant="secondary"
+        testID={`parser-run-${parser.id}`}
+        onPress={() => {
+          // A parser that throws on odd text is the finding, not a crash of this screen.
+          try {
+            setResult(parser.run(sample.slice(0, 5000)));
+          } catch {
+            setResult(copy.diagnostics.parserThrew);
+          }
+        }}
+      />
       {result !== null ? (
         <Text testID={`parser-result-${parser.id}`} accessibilityLabel={`${copy.diagnostics.parserResult}: ${result}`} style={[textStyle('body'), { color: theme.color('text-primary') }]}>
           {result}
@@ -121,11 +133,17 @@ export function DiagnosticsExportScreen({ api = realDiagnosticsApi }: { api?: Di
   const [ok, setOk] = useState(false);
   const [result, setResult] = useState<'idle' | 'saved' | 'failed'>('idle');
   const [saving, setSaving] = useState(false);
+  // The report could not be built: the fallback is shown for reading, but it is not a report and is not offered for saving.
+  const [unreadable, setUnreadable] = useState(false);
   useEffect(() => {
     let live = true;
     void api.report().then(
       (t) => live && setText(t),
-      () => live && setText(statusLines(UNREADABLE).join('\n')),
+      () => {
+        if (!live) return;
+        setUnreadable(true);
+        setText(statusLines(UNREADABLE).join('\n'));
+      },
     );
     return () => {
       live = false;
@@ -133,7 +151,7 @@ export function DiagnosticsExportScreen({ api = realDiagnosticsApi }: { api?: Di
   }, [api]);
 
   const save = async () => {
-    if (!ok || text === null || saving) return; // export cannot proceed without the tick
+    if (!ok || text === null || saving || unreadable) return; // export cannot proceed without the tick, or without a real report
     setSaving(true);
     try {
       const r = await api.save(text);
@@ -162,7 +180,17 @@ export function DiagnosticsExportScreen({ api = realDiagnosticsApi }: { api?: Di
           {copy.diagnostics.saved}
         </Text>
       ) : null}
-      <Button label={copy.diagnostics.save} {...(ok && text !== null ? {} : { disabledReason: copy.diagnostics.disabledReason })} testID="diagnostics-save" onPress={() => void save()} />
+      {unreadable ? (
+        <Text testID="diagnostics-unreadable" accessibilityRole="alert" style={[textStyle('body'), { color: theme.color('semantic-warning') }]}>
+          {copy.diagnostics.reportFailed}
+        </Text>
+      ) : null}
+      <Button
+        label={copy.diagnostics.save}
+        {...(unreadable ? { disabledReason: copy.diagnostics.reportFailed } : ok && text !== null ? {} : { disabledReason: copy.diagnostics.disabledReason })}
+        testID="diagnostics-save"
+        onPress={() => void save()}
+      />
     </View>
   );
 }
