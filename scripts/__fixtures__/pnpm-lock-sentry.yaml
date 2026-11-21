@@ -1,0 +1,6 @@
+lockfileVersion: '9.0'
+packages:
+  '@sentry/react-native@5.20.0':
+    resolution: {integrity: sha512-x}
+  react-native@0.76.0:
+    resolution: {integrity: sha512-y}

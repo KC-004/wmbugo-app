@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 11-08-2026 09:43
-last_updated: 11-16-2026 23:00
+last_updated: 11-21-2026 14:42
 project: wmbugo-app
 project_key: NOKEY
 tracking_system: file-system
@@ -127,10 +127,10 @@ development_status:
   7-6-who-got-it-top-merchants: review
   7-7-am-i-on-track-budgets-needs-wants-savings-and-goal-rings: review
   7-8-insights-accessibility-privacy-and-performance-pass: review
-  epic-7-retrospective: optional
+  epic-7-retrospective: done
 
-  epic-8: backlog
-  8-1-redacted-logs-local-crash-records-and-the-no-network-guarant: backlog
+  epic-8: in-progress
+  8-1-redacted-logs-local-crash-records-and-the-no-network-guarant: review
   8-2-privacy-settings-hiding-wmbugo-in-recent-apps-and-what-stays: backlog
   8-3-app-lock-with-lockgate-and-re-authentication: backlog
   8-4-offer-app-lock-once-after-the-first-saved-entry: backlog
@@ -465,3 +465,50 @@ action_items:
     owner: "KCPK"
     status: open
     ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-11-16.md"
+  - id: "epic-7-retro-item-37-decide-csv-export-add-a-native-save-dial"
+    epic: 7
+    action: "Decide CSV export: add a native save-dialog module or accept the share
+      sheet as a deviation of story 7.3"
+    owner: "KCPK"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-7-retro-2026-11-21.md"
+  - id: "epic-7-retro-item-38-build-the-story-4-11-needs-wants-savings"
+    epic: 7
+    action: "Build the Story 4.11 Needs Wants Savings drill-down screens and wire
+      the Insights bar taps"
+    owner: "dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-7-retro-2026-11-21.md"
+  - id: "epic-7-retro-item-39-close-epic-7-verification-gaps-shell-rou"
+    epic: 7
+    action: "Close Epic 7 verification gaps: shell route test, database-backed realInsightsApi
+      test, ended-budget past-period case, per-event refresh test"
+    owner: "dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-7-retro-2026-11-21.md"
+  - id: "epic-7-retro-item-40-phone-check-epic-7-and-the-unchecked-epi"
+    epic: 7
+    action: "Phone-check Epic 7 and the unchecked Epic 6 stories: TalkBack, large
+      font, charts, hide amounts, CSV"
+    owner: "KCPK"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-7-retro-2026-11-21.md"
+  - id: "epic-7-retro-item-41-process-make-hide-amounts-an-acceptance"
+    epic: 7
+    action: "Process: make hide amounts an acceptance line on every story that shows
+      money, and require hidden-amount tests to assert a non-empty render"
+    owner: "dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-7-retro-2026-11-21.md"
+  - id: "epic-7-retro-item-42-run-the-epic-6-retrospective-none-exists"
+    epic: 7
+    action: "Run the Epic 6 retrospective, none exists"
+    owner: "KCPK"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-7-retro-2026-11-21.md"
+  - id: "epic-7-retro-item-43-split-copy-ts-by-feature-before-it-grows"
+    epic: 7
+    action: "Split copy.ts by feature before it grows further"
+    owner: "dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-7-retro-2026-11-21.md"

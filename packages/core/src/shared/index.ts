@@ -6,4 +6,6 @@ export * from './uuid';
 export * from './logger';
 export * from './sha256';
 export * from './fileLogSink';
+export * from './crashRecord';
+export * from './auditRedact';
 export * from './csv';

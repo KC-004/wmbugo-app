@@ -1,7 +1,8 @@
 {
   "$comment": "Permissions allowed in merged RELEASE manifests (both flavors). ${applicationId} is substituted. Banned entries fail even if listed in allowed.",
   "allowed": [
-    "${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+    "${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
+    "android.permission.POST_NOTIFICATIONS"
   ],
   "banned": [
     "android.permission.INTERNET",

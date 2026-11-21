@@ -23,29 +23,41 @@ export interface Logger {
 
 export const REDACTED = '[redacted]';
 
-// Field names whose values never reach a sink, whatever they contain.
-const SENSITIVE_KEY =
-  /amount|balance|minor|total|price|spent|income|note|memo|merchant|payee|vendor|account|mask|iban|card|upi|sms|body|message|text|title|description|name|key|token|secret|pass|pin|otp|phone|email|address/i;
+// The only field names whose values reach a sink: ids, counts, codes, durations, versions and flags. Every other key is
+// redacted whatever its value, so a new field name can never leak money by accident (Story 8.1, AD-19).
+const ALLOWED_KEY =
+  /^(id|ids|code|errorCode|errorType|ok|event|kind|tab|route|step|useCase|invariant|flavor|level|reason|schemaVersion|appVersion|version|databaseExists|migrationsApplied|enabled|durationMs|errorMessage|stack|stackFrames)$|(Id|Ids|Count|Ms|Version|Code)$/;
+// Free-text keys: allowed, but scrubbed.
+const FREE_TEXT_KEY = /^(errorMessage|stack|stackFrames|reason)$/;
+const ID_LIKE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Money and account-mask shapes inside otherwise harmless strings.
+// Money inside otherwise harmless text, matched whole so partial digit groups (1,18,600) cannot survive.
 const AMOUNT_IN_TEXT =
   /(?:[₹$€£¥]|\b(?:INR|USD|CAD|GBP|EUR|AED|SAR|QAR|BHD|KWD|OMR|SGD|MYR|CHF|SEK|NOK|DKK|PLN|CZK|HUF|THB|IDR|PHP|VND|Rs\.?)\s?)\d[\d,.\s]*\d|\d[\d,]*(?:\.\d+)?\s?(?:[₹$€£¥]|\b(?:INR|USD|EUR|GBP|SGD|Rs\.?)\b)/gi;
-const MASK_IN_TEXT = /(?:x{2,}|\*{2,}|•{2,}|#)\s?\d{3,}|\b\d{4,}\b/gi;
+// Masked account numbers: ••4821, XX4821, A/c *4821, a/c no. 4821.
+const MASK_IN_TEXT = /(?:a\/c\s*(?:no\.?\s*)?[*x•#]*|x{2,}|\*{2,}|•{1,}|#)\s?\d{3,}/gi;
+const EMAIL_OR_UPI = /[\w.+-]+@[\w-]+(?:\.[\w-]+)*/g;
 
-function redactString(s: string): string {
-  return s.replace(AMOUNT_IN_TEXT, REDACTED).replace(MASK_IN_TEXT, REDACTED);
+/** Scrubs free text: masked accounts, emails and UPI ids, amounts, then any run of 3 or more digits. Pure. */
+export function scrubText(s: string): string {
+  return s
+    .replace(EMAIL_OR_UPI, '[id]')
+    .replace(MASK_IN_TEXT, '[acct]')
+    .replace(AMOUNT_IN_TEXT, '[n]')
+    .replace(/\d{3,}/g, '[n]');
+}
+
+function scrubAllowed(key: string, s: string): string {
+  // Ids are opaque and useful in a log; a UUID is kept as it is, anything else is scrubbed like free text.
+  if (!FREE_TEXT_KEY.test(key) && ID_LIKE.test(s)) return s;
+  return scrubText(s);
 }
 
 function redactValue(key: string, value: LogValue, depth: number): LogValue {
-  if (SENSITIVE_KEY.test(key)) return value === undefined || value === null ? value : REDACTED;
-  if (typeof value === 'string') return redactString(value);
-  if (Array.isArray(value)) return depth > 4 ? REDACTED : value.map((v) => redactValue(key, v, depth + 1));
-  if (value !== null && typeof value === 'object') {
-    if (depth > 4) return REDACTED;
-    const out: Record<string, LogValue> = {};
-    for (const [k, v] of Object.entries(value)) out[k] = redactValue(k, v, depth + 1);
-    return out;
-  }
+  if (!ALLOWED_KEY.test(key)) return value === undefined || value === null ? value : REDACTED;
+  if (typeof value === 'string') return scrubAllowed(key, value);
+  if (Array.isArray(value)) return depth > 4 ? REDACTED : value.map((v) => (typeof v === 'string' ? scrubAllowed(key, v) : v === null || typeof v !== 'object' ? v : REDACTED));
+  if (value !== null && typeof value === 'object') return REDACTED;
   return value;
 }
 
@@ -53,7 +65,7 @@ function redactValue(key: string, value: LogValue, depth: number): LogValue {
 export function redactEntry(level: LogLevel, event: string, fields: Record<string, LogValue> = {}): LogEntry {
   const out: Record<string, LogValue> = {};
   for (const [k, v] of Object.entries(fields)) out[k] = redactValue(k, v, 0);
-  return { level, event: redactString(event), fields: out };
+  return { level, event: scrubText(event), fields: out };
 }
 
 /** Logger that redacts amounts, account masks and notes before anything reaches the sink. */

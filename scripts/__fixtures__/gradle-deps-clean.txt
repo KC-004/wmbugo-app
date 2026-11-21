@@ -1,0 +1,6 @@
+nosmsReleaseRuntimeClasspath - Runtime classpath of compilation 'nosmsRelease' (target  (androidJvm)).
++--- androidx.core:core:1.13.1
++--- com.facebook.react:react-android:0.76.0
+|    \--- com.squareup.okhttp3:okhttp:4.9.2
++--- com.facebook.fresco:fresco:3.2.0
+\--- com.facebook.soloader:soloader:0.11.0

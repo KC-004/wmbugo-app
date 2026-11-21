@@ -20,23 +20,23 @@ describe('redacting Logger', () => {
 
   it('redacts amounts and masks hiding in free text of harmless fields', () => {
     const e = redactEntry('warn', 'failed', {
-      detail: 'could not save ₹1,234.50 from XX1234 and Rs. 99 plus 4567890',
-      status: 'ok',
+      errorMessage: 'could not save ₹1,234.50 from XX1234 and Rs. 99 plus 4567890',
+      code: 'ok',
     });
-    const d = String(e.fields.detail);
+    const d = String(e.fields.errorMessage);
     expect(d).not.toMatch(/1,234/);
     expect(d).not.toMatch(/1234/);
     expect(d).not.toMatch(/4567890/);
     expect(d).not.toMatch(/99/);
-    expect(e.fields.status).toBe('ok');
+    expect(e.fields.code).toBe('ok');
   });
 
   it('redacts nested objects and arrays', () => {
-    const e = redactEntry('info', 'x', { ctx: { balance: 5, items: [{ note: 'a' }, 'USD 12.00'], flag: true } });
+    const e = redactEntry('info', 'x', { ctx: { balance: 5, items: [{ note: 'a' }, 'USD 12.00'], flag: true }, ids: ['USD 12.00', { note: 'a' }] });
     expect(JSON.stringify(e)).not.toMatch(/USD 12/);
     expect(JSON.stringify(e)).not.toMatch(/"balance":5/);
     expect(JSON.stringify(e)).not.toMatch(/"note":"a"/);
-    expect((e.fields.ctx as { flag: boolean }).flag).toBe(true);
+    expect(e.fields.ctx).toBe(REDACTED);
   });
 
   it('redacts amounts in the event name too', () => {

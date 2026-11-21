@@ -31,6 +31,7 @@ import {
 import { getServices, systemClock } from '../../adapters/startApp';
 import { readProfile } from '../../adapters/readProfile';
 import { appNotifier } from '../../adapters/notifier';
+import { requestPermission } from '../../adapters/permissions';
 import { promptStateSeenStore } from '../home/homeApi';
 
 export interface BillsData {
@@ -158,7 +159,7 @@ export const realBillsApi: BillsApi = {
   async answerReminderAsk(allow) {
     await promptStateSeenStore.markSeen(REMINDER_ASK_KEY);
     if (allow) {
-      await appNotifier.requestPermission();
+      await requestPermission('notifications');
       await syncBillReminders(getServices().db, appNotifier, systemClock.nowMs());
     }
   },

@@ -3,6 +3,7 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { findRegion, type SetUpProfileInput } from '@wmbugo/core';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
 import { OnboardingFlow, sampleMinor } from './OnboardingFlow';
+import * as permissions from '../../adapters/permissions';
 
 const live: ReactTestRenderer[] = [];
 afterEach(() => {
@@ -259,6 +260,7 @@ describe('permissions and offline', () => {
   it('requests no permission anywhere in the flow (SMS, camera, photos, notifications)', async () => {
     const request = jest.spyOn(PermissionsAndroid, 'request').mockResolvedValue('denied');
     const requestMultiple = jest.spyOn(PermissionsAndroid, 'requestMultiple').mockResolvedValue({} as never);
+    const permissionSpy = jest.spyOn(permissions, 'requestPermission');
     const open = jest.spyOn(Linking, 'openSettings').mockResolvedValue();
     const openUrl = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined as never);
     const r = mount('SG', async () => true);
@@ -274,6 +276,7 @@ describe('permissions and offline', () => {
     await act(async () => fire(r, 'onboarding-continue'));
     expect(request).not.toHaveBeenCalled();
     expect(requestMultiple).not.toHaveBeenCalled();
+    expect(permissionSpy).not.toHaveBeenCalled();
     expect(open).not.toHaveBeenCalled();
     expect(openUrl).not.toHaveBeenCalled();
   });

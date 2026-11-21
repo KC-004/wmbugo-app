@@ -1,6 +1,7 @@
 import type { SqlParam, SqlTransaction, UnitOfWork } from '../ports/storage';
 import type { Clock } from '../shared/clock';
-import { redactEntry, type Logger, type LogValue } from '../shared/logger';
+import { redactAuditChange } from '../shared/auditRedact';
+import type { Logger, LogValue } from '../shared/logger';
 import { err, type Result } from '../shared/result';
 import type { Actor, EventName, EventPayloads } from './events';
 
@@ -146,7 +147,7 @@ export class LedgerWriter {
         const at = clock.nowMs();
         const audited = touched.length > 0 ? touched : [{ entityKind: 'none', entityId: '', change: {} }];
         for (const t of audited) {
-          const change = JSON.stringify(redactEntry('info', useCase.name, t.change).fields);
+          const change = JSON.stringify(redactAuditChange(t.change));
           checkParams([at]);
           await tx.execute(
             'INSERT INTO audit_event (id, kind, actor, entity_kind, entity_id, change_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',

@@ -1,4 +1,5 @@
 import {
+  createCrashRecorder,
   createFileLogSink,
   ATTACHMENT_IDS_SQL,
   budgetAlertHandlers,
@@ -21,8 +22,10 @@ import {
   type SetUpProfileInput,
   type SqlDatabase,
 } from '@wmbugo/core';
-import type { Clock, Logger, Result, StartupErrorCode, StartupOk } from '@wmbugo/core';
+import type { Clock, CrashRecorder, Logger, Result, StartupErrorCode, StartupOk } from '@wmbugo/core';
 import migrations from '../../drizzle/migrations';
+import { installCrashHandlers } from './crashHandlers';
+import { refreshPermissionViews } from './permissions';
 import { ensureDir, PRIVATE_DIR, rnFileStore } from './files/rnFileStore';
 import { setSaveTimingSink } from '../features/add/saveTiming';
 import { setNavTimingSink } from '../features/shell/navTiming';
@@ -48,7 +51,11 @@ const singleProfile: Invariant = {
 };
 
 const LOG_DIR = `${PRIVATE_DIR}/logs`;
-const LOG_MAX_BYTES = 256 * 1024;
+/** Rotates at 1 MiB with one previous file kept, so the log never takes more than 2 MiB (Story 8.1). */
+export const LOG_MAX_BYTES = 1024 * 1024;
+const CRASH_DIR = `${PRIVATE_DIR}/crashes`;
+/** Matches `versionName` in android/app/build.gradle. */
+const APP_VERSION = '1.0';
 
 /** The one place the app's real clock is read; core only ever sees this port. */
 export const systemClock: Clock = {
@@ -70,6 +77,25 @@ export async function getLogger(): Promise<Logger> {
     createFileLogSink(rnFileStore, { path: `${LOG_DIR}/wmbugo.log`, maxBytes: LOG_MAX_BYTES, now: () => systemClock.nowMs() }),
   );
   return logger;
+}
+
+let crashRecorder: CrashRecorder | null = null;
+
+/** Local crash records in app-private storage: redacted, newest 20, never sent anywhere (Story 8.1). */
+export function getCrashRecorder(): CrashRecorder {
+  if (!crashRecorder) {
+    crashRecorder = createCrashRecorder(rnFileStore, {
+      dir: CRASH_DIR,
+      context: () => ({ now: systemClock.nowMs(), appVersion: APP_VERSION, schemaVersion: migrations.journal.entries.length }),
+    });
+  }
+  return crashRecorder;
+}
+
+/** Called once from index.js before the app registers, so an error during startup is recorded too. */
+export function installCrashCapture(): void {
+  void ensureDir(CRASH_DIR).catch(() => undefined);
+  installCrashHandlers(getCrashRecorder());
 }
 
 export interface AppServices {
@@ -185,6 +211,8 @@ async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
   });
   // Bill reminders are scheduled again at start and whenever the app comes back (Story 6.5): the window moves with the day.
   appStateScheduler.onStartOrResume(() => syncReminders().catch(() => log.warn('bills.reminder_sync_threw')));
+  // A notification permission changed in Android settings while the app was away shows on the next screen read (Story 8.1).
+  appStateScheduler.onStartOrResume(() => refreshPermissionViews(queryClient));
   // Events committed before the app was last killed are delivered now, without holding up the first screen.
   void dispatcher.deliverPending().catch(() => undefined);
   // NFR-04 benchmark: only when the trigger file was placed in the private directory (debuggable builds via run-as).

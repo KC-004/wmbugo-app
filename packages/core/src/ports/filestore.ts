@@ -10,4 +10,8 @@ export interface FileStore {
   write(path: string, text: string): Promise<void>;
   move(from: string, to: string): Promise<void>;
   remove(path: string): Promise<void>;
+  /** The whole file as text. */
+  read(path: string): Promise<string>;
+  /** File names (not paths) directly inside a directory; an empty list when it does not exist. */
+  list(dir: string): Promise<string[]>;
 }

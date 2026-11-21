@@ -14,6 +14,11 @@ export const rnFileStore: FileStore = {
   write: (path, text) => RNFS.writeFile(path, text, 'utf8'),
   move: (from, to) => RNFS.moveFile(from, to),
   remove: (path) => RNFS.unlink(path),
+  read: (path) => RNFS.readFile(path, 'utf8'),
+  async list(dir) {
+    if (!(await RNFS.exists(dir))) return [];
+    return (await RNFS.readDir(dir)).map((f) => f.name);
+  },
 };
 
 export function ensureDir(path: string): Promise<void> {

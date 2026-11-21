@@ -32,6 +32,7 @@ import {
 import { getServices, systemClock } from '../../adapters/startApp';
 import { readProfile } from '../../adapters/readProfile';
 import { appNotifier } from '../../adapters/notifier';
+import { requestPermission } from '../../adapters/permissions';
 import { promptStateSeenStore } from '../home/homeApi';
 
 export interface BudgetsData {
@@ -141,7 +142,7 @@ export const realBudgetsApi: BudgetsApi = {
   },
   async answerAlertAsk(allow) {
     await promptStateSeenStore.markSeen(ALERT_ASK_KEY);
-    if (allow) await appNotifier.requestPermission();
+    if (allow) await requestPermission('notifications');
   },
   remove: (id) => getServices().writer.run(RemoveBudget, { budgetId: id }, 'user'),
   restore: (id) => getServices().writer.run(RestoreBudget, { budgetId: id }, 'user'),

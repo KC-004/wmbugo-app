@@ -64,8 +64,30 @@ jobs:
       - name: Permission allowlist check (both flavors)
         run: pnpm check:permissions
 
+      - name: Resolved release dependencies (both flavors)
+        working-directory: apps/mobile/android
+        run: |
+          mkdir -p app/build/reports
+          ./gradlew --no-daemon -q :app:dependencies --configuration nosmsReleaseRuntimeClasspath > app/build/reports/dependencies-nosms.txt
+          ./gradlew --no-daemon -q :app:dependencies --configuration smsReleaseRuntimeClasspath > app/build/reports/dependencies-sms.txt
+
+      - name: Dependency denylist (no analytics, crash-reporting, ads, attribution or network SDK)
+        run: pnpm check:denylist
+
       - name: Standard release APKs are not debuggable
         run: pnpm check:not-debuggable
+
+      # Crash records stay on the phone and are never sent, so they are symbolicated offline with these (Story 8.1, AD-19).
+      - name: Keep JS source maps and native symbols for this build
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-symbols-${{ github.sha }}
+          if-no-files-found: warn
+          retention-days: 365
+          path: |
+            apps/mobile/android/app/build/generated/sourcemaps/react/**/*.map
+            apps/mobile/android/app/build/outputs/mapping/**/mapping.txt
+            apps/mobile/android/app/build/intermediates/merged_native_libs/**/*.so
 
   encrypted-db:
     name: Encrypted database header check (emulator)

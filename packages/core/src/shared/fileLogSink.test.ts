@@ -25,6 +25,8 @@ class MemFiles implements FileStore {
     this.files.delete(p);
     return Promise.resolve();
   };
+  read = (p: string) => Promise.resolve(this.files.get(p) ?? '');
+  list = (d: string) => Promise.resolve([...this.files.keys()].filter((k) => k.startsWith(`${d}/`)).map((k) => k.slice(d.length + 1)));
 }
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
