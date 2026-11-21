@@ -1,3 +1,4 @@
+import { useEffect, useRef, type ComponentRef } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { copy } from '../copy';
 import { useTheme } from '../theme/ThemeProvider';
@@ -17,6 +18,7 @@ export function PassphraseField({
   onToggleShow,
   autoComplete,
   invalid = false,
+  focusSignal,
   testID,
 }: {
   label: string;
@@ -26,14 +28,21 @@ export function PassphraseField({
   onToggleShow: () => void;
   autoComplete: 'password-new' | 'password';
   invalid?: boolean;
+  /** Each time this number changes the field takes focus (a wrong passphrase moves focus back to it). */
+  focusSignal?: number;
   testID: string;
 }) {
   const theme = useTheme();
+  const input = useRef<ComponentRef<typeof TextInput>>(null);
+  useEffect(() => {
+    if (focusSignal) input.current?.focus();
+  }, [focusSignal]);
   return (
     <View style={styles.wrap}>
       <Text style={[textStyle('label'), { color: theme.color('text-secondary') }]}>{label}</Text>
       <View style={[styles.row, { borderColor: theme.color(invalid ? 'semantic-expense' : 'border-control'), backgroundColor: theme.color('bg-surface') }]}>
         <TextInput
+          ref={input}
           testID={testID}
           accessibilityLabel={label}
           value={value}

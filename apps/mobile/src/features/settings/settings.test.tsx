@@ -509,6 +509,7 @@ describe('Data group and Back up (Story 8.7)', () => {
     const { r } = await open(data({}, { lastBackupAt: Date.UTC(2026, 10, 3, 12, 0, 0) }));
     act(() => fire(r, 'group-data'));
     expect(host(r, 'row-backup').props.accessibilityLabel).toBe('Back up, Last backup 3 Nov');
+    expect(host(r, 'row-restore').props.accessibilityLabel).toBe('Restore from backup, Restore from backup');
     expect(has(r, 'row-deleted')).toBe(true);
     act(() => fire(r, 'row-backup'));
     expect(has(r, 'backup-form')).toBe(true);

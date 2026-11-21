@@ -138,7 +138,7 @@ development_status:
   8-6-encrypted-backup-format-in-core: review
   8-7-make-a-backup-with-a-passphrase: review
   8-8-restorebackup-in-maintenance-mode: review
-  8-9-restore-preview-and-confirmation: backlog
+  8-9-restore-preview-and-confirmation: review
   8-10-diagnostics-with-a-preview-before-anything-is-exported: backlog
   8-11-storage-retention-and-erase-all-data: backlog
   8-12-safe-mode-when-the-data-can-t-be-opened-safely: backlog

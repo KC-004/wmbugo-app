@@ -256,6 +256,32 @@ describe('50/30/20 and Finish', () => {
   });
 });
 
+describe('Restore from a backup on Welcome (Story 8.9)', () => {
+  it('offers Restore from a backup as a text button on Welcome when a restore is available, and not on later steps', () => {
+    const onRestore = jest.fn();
+    let r!: ReactTestRenderer;
+    act(() => {
+      r = create(
+        <ThemeProvider initialMode="light">
+          <OnboardingFlow detected={findRegion('SG')} timezoneId="Asia/Singapore" onFinish={async () => true} onRestore={onRestore} />
+        </ThemeProvider>,
+      );
+    });
+    live.push(r);
+    const button = () => r.root.findAll((n) => n.props.testID === 'welcome-restore' && typeof n.props.onPress === 'function');
+    expect(button().length).toBeGreaterThan(0);
+    act(() => button()[0]!.props.onPress());
+    expect(onRestore).toHaveBeenCalledTimes(1);
+    next(r);
+    expect(button()).toHaveLength(0);
+  });
+
+  it('is absent when no restore is offered', () => {
+    const r = mount('SG');
+    expect(r.root.findAll((n) => n.props.testID === 'welcome-restore')).toHaveLength(0);
+  });
+});
+
 describe('permissions and offline', () => {
   it('requests no permission anywhere in the flow (SMS, camera, photos, notifications)', async () => {
     const request = jest.spyOn(PermissionsAndroid, 'request').mockResolvedValue('denied');

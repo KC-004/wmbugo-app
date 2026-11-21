@@ -221,3 +221,19 @@ export async function extractBackup(
     return err(BAD);
   }
 }
+
+/**
+ * Looks only at a file's header (Story 8.9): is it a wmbugo backup at all? Nothing is derived or decrypted, so it is instant and
+ * works before any passphrase is typed. `FILE_TOO_LARGE` comes first, as for a full read.
+ */
+export async function inspectBackupHeader(source: ByteSource): Promise<Result<{ readonly size: number }, 'NOT_A_WMBUGO_BACKUP' | 'FILE_TOO_LARGE'>> {
+  if (source.size > MAX_FILE_BYTES) return err('FILE_TOO_LARGE');
+  if (source.size < HEADER_BYTES) return err('NOT_A_WMBUGO_BACKUP');
+  try {
+    const head = await source.read(0, 12);
+    if (head.length < 12 || !equalBytes(head.subarray(0, 8), utf8Encode(MAGIC)) || readU32(head, 8) !== FORMAT_VERSION) return err('NOT_A_WMBUGO_BACKUP');
+    return ok({ size: source.size });
+  } catch {
+    return err('NOT_A_WMBUGO_BACKUP');
+  }
+}

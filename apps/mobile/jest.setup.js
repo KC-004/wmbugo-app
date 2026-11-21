@@ -6,9 +6,13 @@ jest.mock('./src/adapters/startApp', () => ({
   getServices: jest.fn(),
   startApp: jest.fn(),
   setUpProfile: jest.fn(),
+  takeRestoreOutcome: () => 'none',
   systemClock: { timezoneId: () => 'Asia/Singapore', nowMs: () => 0 },
 }));
 
 // The libsodium binding is native (JSI) and ships untranspiled ESM; tests that need real crypto mock it with libsodium-wrappers-sumo
 // (see adapters/backup/rnCrypto.test.ts). Everywhere else it only has to import.
 jest.mock('react-native-libsodium', () => ({ __esModule: true, default: {} }));
+
+// Reads and writes a file in the private directory; the notice host is tested with an injected reader.
+jest.mock('./src/adapters/backup/restoreNotice', () => ({ takeRestoreNotice: async () => null, rememberRestoreNotice: async () => undefined }));

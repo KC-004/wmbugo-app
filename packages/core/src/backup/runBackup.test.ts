@@ -290,3 +290,25 @@ describe('passphrase rules and file name', () => {
     expect(suggestedBackupName(Date.UTC(2026, 10, 8, 20, 0, 0), 'Asia/Singapore')).toBe('wmbugo-backup-2026-11-09.wmbugo');
   });
 });
+
+describe('restore preview helpers (Story 8.9)', () => {
+  it('madeAtLabel reads 3 Nov 2026, 9:14 pm in the profile timezone', async () => {
+    const { madeAtLabel } = await import('./policy');
+    expect(madeAtLabel(Date.UTC(2026, 10, 3, 13, 14, 0), 'Asia/Singapore')).toBe('3 Nov 2026, 9:14 pm');
+    expect(madeAtLabel(Date.UTC(2026, 10, 3, 1, 5, 0), 'Asia/Singapore')).toBe('3 Nov 2026, 9:05 am');
+    expect(madeAtLabel(Date.UTC(2026, 10, 3, 4, 0, 0), 'Asia/Singapore')).toBe('3 Nov 2026, 12:00 pm');
+  });
+
+  it('inspectBackupHeader says at once whether a file is a wmbugo backup, without a passphrase', async () => {
+    const { inspectBackupHeader } = await import('./reader');
+    const s = await setup();
+    const r = rig();
+    await runBackup(deps(s, r), PASS);
+    const file = concat(r.written);
+    const src = (b: Uint8Array) => ({ size: b.length, read: async (o: number, n: number) => b.subarray(o, o + n) });
+    expect(await inspectBackupHeader(src(file))).toEqual({ ok: true, value: { size: file.length } });
+    expect(await inspectBackupHeader(src(new Uint8Array(2000).fill(1)))).toEqual({ ok: false, code: 'NOT_A_WMBUGO_BACKUP' });
+    expect(await inspectBackupHeader(src(new Uint8Array(10)))).toEqual({ ok: false, code: 'NOT_A_WMBUGO_BACKUP' });
+    expect(await inspectBackupHeader({ size: 5 * 1024 ** 3, read: async () => new Uint8Array(0) })).toEqual({ ok: false, code: 'FILE_TOO_LARGE' });
+  });
+});

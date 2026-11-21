@@ -43,3 +43,18 @@ export function backupCountsLine(counts: { readonly entries: number; readonly ac
   const fmt = (n: number, one: string, many: string) => `${n.toLocaleString('en-US')} ${n === 1 ? one : many}`;
   return [fmt(counts.entries, 'entry', 'entries'), fmt(counts.accounts, 'account', 'accounts'), fmt(counts.photos, 'photo', 'photos')].join(' · ');
 }
+
+const TWELVE_HOUR = (tz: string) => new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: 'numeric', minute: '2-digit', hour12: true });
+
+/** `3 Nov 2026, 9:14 pm`, in the given time zone: when a backup was made. */
+export function madeAtLabel(utcMs: number, timezoneId: string): string {
+  const d = toLocalDate(utcMs, timezoneId);
+  if (!d.ok) return '';
+  let time: string;
+  try {
+    time = TWELVE_HOUR(timezoneId).format(new Date(utcMs)).replace(/\s?([AP])M/i, (_, x: string) => ` ${x.toLowerCase()}m`);
+  } catch {
+    time = '';
+  }
+  return `${dayMonthLabel(d.value)} ${d.value.slice(0, 4)}${time ? `, ${time}` : ''}`;
+}

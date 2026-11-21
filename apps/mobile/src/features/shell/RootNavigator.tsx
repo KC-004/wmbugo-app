@@ -8,6 +8,7 @@ import { copy } from '../../shared/copy';
 import { navLayout } from '../../shared/feedback/layout';
 import { SheetHost } from '../../shared/feedback/SheetHost';
 import { AppLockOfferHost } from '../lock/AppLockOfferHost';
+import { RestoreNoticeHost } from '../restore/RestoreNoticeHost';
 import { ToastHost } from '../../shared/feedback/ToastHost';
 import { useTheme } from '../../shared/theme/ThemeProvider';
 import type { AddButtonRef } from './AddButton';
@@ -360,6 +361,7 @@ export function RootNavigator() {
       <ToastHost bottomOffset={88 + insets.bottom}>
         <SheetHost>
           <AppLockOfferHost />
+          <RestoreNoticeHost />
           <RootStack.Navigator screenOptions={{ headerShown: false }}>
             <RootStack.Screen name="Tabs" component={TabsWithAdd} />
             <RootStack.Screen name="Accounts" component={AccountsRoute} />

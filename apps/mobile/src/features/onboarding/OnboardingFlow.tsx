@@ -52,13 +52,15 @@ export interface OnboardingFlowProps {
   timezoneId: string;
   /** Writes the profile (SetUpProfile). Resolves true when saved. Called only after the last step. */
   onFinish: (input: SetUpProfileInput) => Promise<boolean>;
+  /** Welcome offers `Restore from a backup` when this is given (Story 8.9). */
+  onRestore?: () => void;
 }
 
 /**
  * Onboarding: Welcome, region and currency, payday, optional 50/30/20. All answers stay in memory
  * until Finish, so process death restarts at Welcome with nothing written. No permission is requested.
  */
-export function OnboardingFlow({ detected, timezoneId, onFinish }: OnboardingFlowProps) {
+export function OnboardingFlow({ detected, timezoneId, onFinish, onRestore }: OnboardingFlowProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const [state, dispatch] = useReducer(onboardingReducer, detected, initialOnboarding);
@@ -122,6 +124,7 @@ export function OnboardingFlow({ detected, timezoneId, onFinish }: OnboardingFlo
             <CoinMark size={96} />
             <Text accessibilityRole="header" style={[textStyle('title'), ink, styles.centerText]}>{copy.onboarding.welcomeTitle}</Text>
             <Text style={[textStyle('body'), secondary, styles.centerText]}>{copy.onboarding.welcomeFacts}</Text>
+            {onRestore ? <Button label={copy.restore.welcomeButton} variant="text" onPress={onRestore} testID="welcome-restore" /> : null}
           </View>
         ) : null}
 
