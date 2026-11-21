@@ -11,6 +11,8 @@ import {
   periodRangeLabel,
   backupSummary,
   effectiveCaptureForm,
+  retentionLine,
+  sizeLabel,
   privacySummary,
   youSummary,
   type FirstDay,
@@ -37,6 +39,8 @@ import { useFocusRing } from '../../shared/ui/FocusRing';
 import { openSecuritySettings } from '../../adapters/appLock';
 import { BackupScreen } from '../backup/BackupScreen';
 import { DiagnosticsExportScreen, DiagnosticsScreen } from '../diagnostics/DiagnosticsScreen';
+import { realDiagnosticsApi } from '../diagnostics/diagnosticsApi';
+import { EraseFlow } from '../erase/EraseFlow';
 import { RestoreFlow } from '../restore/RestoreFlow';
 import { enableAppLock } from '../lock/enableAppLock';
 import { hidingBlocksScreenshots } from '../../adapters/recentsPrivacy';
@@ -46,10 +50,10 @@ import { CategoriesScreen } from '../categories/CategoriesScreen';
 import { RecentlyDeletedScreen } from './RecentlyDeletedScreen';
 import { realSettingsApi, SETTINGS_QUERY_KEY, type SettingsApi, type SettingsData } from './settingsApi';
 
-type Page = 'hub' | 'you' | 'appearance' | 'money' | 'categories' | 'data' | 'deleted' | 'privacy' | 'stays' | 'notifications' | 'backup' | 'restore' | 'help' | 'diagnostics' | 'export';
+type Page = 'hub' | 'you' | 'appearance' | 'money' | 'categories' | 'data' | 'deleted' | 'privacy' | 'stays' | 'notifications' | 'backup' | 'restore' | 'help' | 'diagnostics' | 'export' | 'erase';
 
 /** Where Back goes from each page. */
-const PARENT: Readonly<Record<Page, Page>> = { hub: 'hub', you: 'hub', appearance: 'you', money: 'you', categories: 'hub', data: 'hub', deleted: 'data', privacy: 'hub', stays: 'privacy', notifications: 'privacy', backup: 'data', restore: 'data', help: 'hub', diagnostics: 'help', export: 'diagnostics' };
+const PARENT: Readonly<Record<Page, Page>> = { hub: 'hub', you: 'hub', appearance: 'you', money: 'you', categories: 'hub', data: 'hub', deleted: 'data', privacy: 'hub', stays: 'privacy', notifications: 'privacy', backup: 'data', restore: 'data', help: 'hub', diagnostics: 'help', export: 'diagnostics', erase: 'data' };
 
 const THEMES: readonly { v: ThemeChoice; label: string }[] = [
   { v: 'system', label: copy.settings.themeSystem },
@@ -173,7 +177,7 @@ export function SettingsScreen({ api = realSettingsApi, onBack }: { api?: Settin
   };
 
   const title =
-    page === 'hub' ? copy.nav.settings : page === 'you' ? copy.settings.you : page === 'appearance' ? copy.settings.appearance : page === 'money' ? copy.settings.moneyBasics : page === 'categories' ? copy.categories.title : page === 'data' ? copy.deleted.data : page === 'privacy' ? copy.privacy.group : page === 'stays' ? copy.privacy.staysTitle : page === 'notifications' ? copy.notifPrivacy.title : page === 'backup' ? copy.backup.title : page === 'restore' ? copy.restore.title : page === 'help' ? copy.diagnostics.helpGroup : page === 'diagnostics' ? copy.diagnostics.title : page === 'export' ? copy.diagnostics.previewTitle : copy.deleted.recentlyDeleted;
+    page === 'hub' ? copy.nav.settings : page === 'you' ? copy.settings.you : page === 'appearance' ? copy.settings.appearance : page === 'money' ? copy.settings.moneyBasics : page === 'categories' ? copy.categories.title : page === 'data' ? copy.deleted.data : page === 'privacy' ? copy.privacy.group : page === 'stays' ? copy.privacy.staysTitle : page === 'notifications' ? copy.notifPrivacy.title : page === 'backup' ? copy.backup.title : page === 'restore' ? copy.restore.title : page === 'help' ? copy.diagnostics.helpGroup : page === 'diagnostics' ? copy.diagnostics.title : page === 'export' ? copy.diagnostics.previewTitle : page === 'erase' ? copy.erase.scopeTitle : copy.deleted.recentlyDeleted;
   const back = () => (backupBusy ? undefined : page === 'hub' ? onBack() : setPage(PARENT[page]));
 
   return (
@@ -279,6 +283,14 @@ export function SettingsScreen({ api = realSettingsApi, onBack }: { api?: Settin
           <Row testID="row-backup" label={copy.backup.dataRow} summary={backupSummary(d.settings.lastBackupAt, d.profile.timezoneId)} onPress={() => setPage('backup')} />
           <Row testID="row-restore" label={copy.restore.row} summary={copy.restore.title} onPress={() => setPage('restore')} />
           <Row testID="row-deleted" label={copy.deleted.recentlyDeleted} summary={copy.deleted.keptFor} onPress={() => setPage('deleted')} />
+          <StorageRow />
+          <View accessible testID="row-keeping" accessibilityLabel={`${copy.erase.keeping}. ${retentionLine()}`} style={[styles.row, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
+            <View style={styles.rowText}>
+              <Text style={[textStyle('body-medium'), { color: theme.color('text-primary') }]}>{copy.erase.keeping}</Text>
+              <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{retentionLine()}</Text>
+            </View>
+          </View>
+          <Row testID="row-erase" label={copy.erase.row} summary={copy.erase.rowSummary} onPress={() => setPage('erase')} />
         </>
       ) : page === 'backup' ? (
         <BackupScreen onBusyChange={setBackupBusy} onDone={() => setPage('data')} />
@@ -288,6 +300,8 @@ export function SettingsScreen({ api = realSettingsApi, onBack }: { api?: Settin
         <DiagnosticsScreen onExport={() => setPage('export')} />
       ) : page === 'export' ? (
         <DiagnosticsExportScreen />
+      ) : page === 'erase' ? (
+        <EraseFlow onBusyChange={setBackupBusy} onExit={() => setPage('data')} />
       ) : page === 'restore' ? (
         <RestoreFlow onBusyChange={setBackupBusy} onExit={() => setPage('data')} />
       ) : page === 'deleted' ? (
@@ -603,3 +617,27 @@ const styles = StyleSheet.create({
   preview: { gap: 2 },
   input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, minHeight: layout.touchMin },
 });
+
+/** Settings › Data › Storage (Story 8.11): what wmbugo uses on this phone, read when the page opens. */
+function StorageRow() {
+  const theme = useTheme();
+  const [text, setText] = useState<string>(copy.diagnostics.loading);
+  useEffect(() => {
+    let live = true;
+    void realDiagnosticsApi.status().then(
+      (st) => live && setText(copy.erase.storageValue.replace('{db}', sizeLabel(st.storage.dbBytes)).replace('{photos}', sizeLabel(st.storage.photoBytes)).replace('{log}', sizeLabel(st.storage.logBytes))),
+      () => live && setText(copy.erase.storageValue.replace('{db}', sizeLabel(null)).replace('{photos}', sizeLabel(null)).replace('{log}', sizeLabel(null))),
+    );
+    return () => {
+      live = false;
+    };
+  }, []);
+  return (
+    <View accessible testID="row-storage" accessibilityLabel={`${copy.erase.storage}. ${text}`} style={[styles.row, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
+      <View style={styles.rowText}>
+        <Text style={[textStyle('body-medium'), { color: theme.color('text-primary') }]}>{copy.erase.storage}</Text>
+        <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{text}</Text>
+      </View>
+    </View>
+  );
+}

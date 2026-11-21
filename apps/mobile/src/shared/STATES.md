@@ -36,4 +36,6 @@ is on and is a no-op when it is off).
 | Restore (deleted entry, rejected capture) | reversible, Undo toast | Recently deleted, detail |
 | Remove photo | confirm sheet | detail |
 | Delete permanently | confirm sheet and re-authentication guard | Recently deleted, detail |
+| Restore from a backup | confirm checkbox and re-authentication guard when app lock is on | Settings › Data, Welcome |
+| Erase all data | scope screen, confirm checkbox, destructive button and re-authentication guard when app lock is on | Settings › Data |
 | Turn off app lock, change Lock after | confirm tier: re-authentication guard (`Confirm it's you`) when app lock is on | Settings › Privacy |

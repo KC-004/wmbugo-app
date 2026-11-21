@@ -7,7 +7,7 @@ import { layout, radii } from '../theme/tokens';
 import { textStyle } from '../theme/typography';
 import { FocusRing, useFocusRing } from './FocusRing';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'secondary-on-footer' | 'text';
+export type ButtonVariant = 'primary' | 'secondary' | 'secondary-on-footer' | 'text' | 'destructive';
 
 export interface ButtonProps {
   label: string;
@@ -40,6 +40,10 @@ export function Button({ label, onPress, variant = 'primary', disabledReason, on
   if (disabled) {
     fg = theme.color('text-secondary');
     fill = theme.color('bg-muted');
+  } else if (variant === 'destructive') {
+    // Erase all data (Story 8.11): a solid expense-coloured button with a white label, never the brand gradient.
+    fg = colorTokens['bg-surface'];
+    fill = theme.color('semantic-expense');
   } else if (variant === 'primary') {
     fg = colorTokens['bg-surface']; // white in both schemes: the gradient behind it is dark in both
   } else if (variant === 'secondary') {

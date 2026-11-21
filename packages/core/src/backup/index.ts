@@ -6,3 +6,4 @@ export * from './facts';
 export * from './policy';
 export * from './runBackup';
 export * from './restore';
+export * from './erase';

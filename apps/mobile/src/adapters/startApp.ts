@@ -1,6 +1,7 @@
 import {
   createCrashRecorder,
   AnnounceBackupRestored,
+  finishInterruptedErase,
   recoverRestore,
   type RecoverOutcome,
   createFileLogSink,
@@ -30,6 +31,7 @@ import migrations from '../../drizzle/migrations';
 import { installCrashHandlers } from './crashHandlers';
 import { refreshPermissionViews } from './permissions';
 import { sweepStaging } from './backup/rnBackupPlatform';
+import { interruptedEraseDeps } from './backup/rnErase';
 import { restoredDatabaseOpens, RESTORE_LAYOUT, rnRestoreFs } from './backup/rnRestore';
 import { ensureDir, PRIVATE_DIR, rnFileStore } from './files/rnFileStore';
 import { setSaveTimingSink } from '../features/add/saveTiming';
@@ -155,6 +157,13 @@ export function takeRestoreOutcome(): RecoverOutcome {
 
 async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
   const log = await getLogger();
+  // An erase that was interrupted is finished before anything else: no database is opened, and the key is deleted (Story 8.11).
+  // The start that follows has no database and no key, so it opens Welcome.
+  try {
+    if (await finishInterruptedErase(interruptedEraseDeps())) log.warn('erase.finished_after_interruption');
+  } catch {
+    log.error('erase.recovery_failed');
+  }
   // A restore that was killed, or that did not hold, is finished or undone before the database is opened (Story 8.8).
   try {
     restoreOutcome = await recoverRestore(rnRestoreFs, RESTORE_LAYOUT, restoredDatabaseOpens);

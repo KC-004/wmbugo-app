@@ -38,6 +38,8 @@ export interface Notifier {
   post(content: NotificationContent): Promise<void>;
   /** Replaces everything scheduled on a channel with exactly these, so running it again with the same list changes nothing. */
   replaceScheduled(channel: NotificationContent['channel'], items: readonly ScheduledNotification[]): Promise<void>;
+  /** Cancels every scheduled and every posted notification (erase all data, Story 8.11). */
+  cancelAll?(): Promise<void>;
   /** Calls back with a notification's data when the user taps it. Returns the unsubscribe. */
   onOpen(listener: (data: Readonly<Record<string, string>>) => void): () => void;
 }

@@ -1,5 +1,7 @@
 import { toLocalDate } from '../shared/clock';
 import { dayMonthLabel } from '../profile/period';
+import { REJECTED_KEEP_DAYS } from '../ledger/activitySearch';
+import { DELETED_KEEP_DAYS } from '../ledger/purge';
 
 /** The shortest passphrase a backup accepts: counted in characters (code points), not bytes. */
 export const MIN_PASSPHRASE_CHARS = 12;
@@ -57,4 +59,9 @@ export function madeAtLabel(utcMs: number, timezoneId: string): string {
     time = '';
   }
   return `${dayMonthLabel(d.value)} ${d.value.slice(0, 4)}${time ? `, ${time}` : ''}`;
+}
+
+/** The read-only retention line on Settings › Data (Story 8.11): the Story 3.12 rules, from the same constants the purge uses. */
+export function retentionLine(): string {
+  return `Deleted entries stay in Recently deleted for ${DELETED_KEEP_DAYS} days. Rejected payments stay ${REJECTED_KEEP_DAYS} days. Then they're removed for good.`;
 }

@@ -115,6 +115,10 @@ export function withNotificationPrivacy(inner: Notifier, read: () => Promise<Not
       await inner.replaceScheduled(channel, shaped);
     },
     onOpen: (l) => inner.onOpen(l),
+    cancelAll: async () => {
+      posted.clear();
+      await inner.cancelAll?.();
+    },
     async repostAll() {
       for (const content of [...posted.values()]) await inner.post(await apply(content));
     },

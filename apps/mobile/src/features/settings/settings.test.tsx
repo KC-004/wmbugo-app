@@ -519,6 +519,27 @@ describe('Data group and Back up (Story 8.7)', () => {
   });
 });
 
+describe('Storage, retention and Erase all data on Data (Story 8.11)', () => {
+  it('Data shows Storage, the read-only retention line, Recently deleted, Back up, Restore and Erase all data', async () => {
+    const { r } = await open(data());
+    act(() => fire(r, 'group-data'));
+    await settle();
+    expect(has(r, 'row-storage')).toBe(true);
+    expect(host(r, 'row-storage').props.accessibilityLabel).toMatch(/^Storage. Entries and settings .* · Photos .* · Log /);
+    expect(host(r, 'row-keeping').props.accessibilityLabel).toBe("Keeping deleted things. Deleted entries stay in Recently deleted for 30 days. Rejected payments stay 90 days. Then they're removed for good.");
+    for (const id of ['row-backup', 'row-restore', 'row-deleted', 'row-erase']) expect(has(r, id)).toBe(true);
+  });
+
+  it('Erase all data opens the scope screen, and Back returns to Data with nothing erased', async () => {
+    const { r } = await open(data());
+    act(() => fire(r, 'group-data'));
+    act(() => fire(r, 'row-erase'));
+    expect(has(r, 'erase-scope')).toBe(true);
+    act(() => fire(r, 'settings-back'));
+    expect(has(r, 'row-erase')).toBe(true);
+  });
+});
+
 describe('Help group and Diagnostics (Story 8.10)', () => {
   it('has a Help group because Diagnostics exists, and Help lists Diagnostics', async () => {
     const { r } = await open(data());
