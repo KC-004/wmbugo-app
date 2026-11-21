@@ -7,7 +7,7 @@ jest.mock('./storage/keychainKeyStore', () => ({ keychainKeyStore: { getKey: jes
 
 import { rnFileStore } from './files/rnFileStore';
 import { keychainKeyStore } from './storage/keychainKeyStore';
-import { describeStartupFailure, enterSafeMode, localToday, scheduleIntegrityChecks } from './safeMode';
+import { describeStartupFailure, enterSafeMode, localToday, recheckWith, scheduleIntegrityChecks } from './safeMode';
 
 afterEach(() => useSafeModeStore.setState({ reason: null }));
 
@@ -29,7 +29,7 @@ const writer = () => {
   } as unknown as LedgerWriter & { reason: string | null };
 };
 const dbReturning = (rows: string[][]): SqlDatabase => ({ query: jest.fn(async () => rows) }) as unknown as SqlDatabase;
-const flush = () => new Promise((r) => setTimeout(r, 5));
+const flush = () => new Promise((r) => setTimeout(r, 40));
 
 describe('describeStartupFailure (Story 8.12)', () => {
   it('calls a missing key lost only when the database file exists and the Keystore plainly has none', async () => {
@@ -97,15 +97,73 @@ describe('entering safe mode and the integrity checks (Story 8.12)', () => {
     expect(useSafeModeStore.getState().reason).toBeNull();
   });
 
-  it('a database that cannot answer counts as failed', async () => {
+  it('a database that cannot answer twice in a row enters safe mode as integrity_check_threw', async () => {
     const w = writer();
     const db = { query: jest.fn(async () => Promise.reject(new Error('file is not a database'))) } as unknown as SqlDatabase;
-    scheduleIntegrityChecks(db, w, log(), () => '2026-11-21', (task) => {
+    scheduleIntegrityChecks(
+      db,
+      w,
+      log(),
+      () => '2026-11-21',
+      (task) => {
+        task();
+        return () => undefined;
+      },
+      1,
+    );
+    await flush();
+    expect(db.query).toHaveBeenCalledTimes(2); // it asked again before giving up
+    expect(w.reason).toBe('integrity_check_threw');
+  });
+
+  it('a busy database that answers on the second ask does not enter safe mode', async () => {
+    const w = writer();
+    const query = jest.fn().mockRejectedValueOnce(new Error('database is locked')).mockResolvedValue([['ok']]);
+    scheduleIntegrityChecks(
+      { query } as unknown as SqlDatabase,
+      w,
+      log(),
+      () => '2026-11-21',
+      (task) => {
+        task();
+        return () => undefined;
+      },
+      1,
+    );
+    await flush();
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(w.inSafeMode).toBe(false);
+  });
+
+  it('a day is checked once the check has answered; two resumes while it runs ask only once', async () => {
+    const w = writer();
+    let resume!: () => void;
+    const query = jest.fn(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+      return [['ok']];
+    });
+    scheduleIntegrityChecks({ query } as unknown as SqlDatabase, w, log(), () => '2026-11-21', (task) => {
+      resume = task;
       task();
       return () => undefined;
     });
-    await flush();
-    expect(w.reason).toBe('quick_check_failed');
+    resume();
+    await new Promise((r) => setTimeout(r, 40));
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
+  it('Check again leaves safe mode when the database now answers ok, and stays in it when it does not', async () => {
+    const w = writer();
+    w.setSafeMode('quick_check_failed');
+    useSafeModeStore.setState({ reason: 'quick_check_failed' });
+    expect(await recheckWith(dbReturning([['ok']]), w, log())).toBe(true);
+    expect(w.inSafeMode).toBe(false);
+    expect(useSafeModeStore.getState().reason).toBeNull();
+    w.setSafeMode('quick_check_failed');
+    useSafeModeStore.setState({ reason: 'quick_check_failed' });
+    expect(await recheckWith(dbReturning([['*** in database main ***']]), w, log())).toBe(false);
+    expect(w.inSafeMode).toBe(true);
+    expect(useSafeModeStore.getState().reason).toBe('quick_check_failed');
   });
 
   it('localToday reads the date in the profile timezone', () => {

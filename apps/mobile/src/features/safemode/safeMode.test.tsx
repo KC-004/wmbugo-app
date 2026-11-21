@@ -1,4 +1,4 @@
-import { AccessibilityInfo, Text } from 'react-native';
+import { AccessibilityInfo, BackHandler, Text } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { Result, StartupErrorCode, StartupOk } from '@wmbugo/core';
@@ -162,6 +162,33 @@ describe('safe mode with a readable database: the banner and the Add button', ()
     const r = await mount(<SafeModeBanner />);
     expect(texts(r)).toEqual(expect.arrayContaining(["wmbugo can't safely change your data right now. Your entries are untouched.", 'Restore from backup', 'Back up what can be read', 'Diagnostics']));
     expect(r.root.findAll((n) => typeof n.type === 'string' && n.props.testID === 'safe-mode-banner')[0]!.props.accessibilityRole).toBe('alert');
+  });
+
+  it('Check again asks the database once more and the banner is the store\'s to clear', async () => {
+    useSafeModeStore.setState({ reason: 'quick_check_failed' });
+    const recheck = jest.fn(async () => {
+      useSafeModeStore.setState({ reason: null });
+      return true;
+    });
+    const r = await mount(<SafeModeBanner recheck={recheck} />);
+    await press(r, 'safe-banner-recheck');
+    expect(recheck).toHaveBeenCalledTimes(1);
+    expect(has(r, 'safe-mode-banner')).toBe(false);
+  });
+
+  it('hardware Back closes an open panel first, and is held while a backup runs', async () => {
+    useSafeModeStore.setState({ reason: 'quick_check_failed' });
+    const handlers: (() => boolean)[] = [];
+    jest.spyOn(BackHandler, 'addEventListener').mockImplementation(((_: string, h: () => boolean) => {
+      handlers.push(h);
+      return { remove: () => handlers.splice(handlers.indexOf(h), 1) };
+    }) as never);
+    const r = await mount(<SafeModeBanner />);
+    await press(r, 'safe-banner-diagnostics');
+    expect(has(r, 'diagnostics')).toBe(true);
+    await act(async () => void handlers[handlers.length - 1]!());
+    expect(has(r, 'diagnostics')).toBe(false);
+    expect(has(r, 'safe-mode-banner')).toBe(true);
   });
 
   it('each action opens its screen over the app and Back returns to the banner', async () => {

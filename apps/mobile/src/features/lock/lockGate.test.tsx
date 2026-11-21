@@ -283,3 +283,104 @@ describe('LockGate (Story 8.3)', () => {
     expect(applyHideForAppLock).toHaveBeenCalledWith(true);
   });
 });
+
+describe('LockGate fails closed and knows its settings before it decides (Epic 8 review)', () => {
+  function mountWith(api: SettingsApi, over: Partial<LockGateDeps> = {}) {
+    const deps: LockGateDeps = {
+      authenticate: jest.fn<ReturnType<AuthFn>, Parameters<AuthFn>>(async () => ({ result: 'success', message: '' })),
+      elapsedRealtimeMs: jest.fn(async () => 0),
+      openSecuritySettings: jest.fn(async () => undefined),
+      ...over,
+    };
+    const qc = createQueryClient();
+    let r!: ReactTestRenderer;
+    act(() => {
+      r = create(
+        <QueryClientProvider client={qc}>
+          <ThemeProvider>
+            <LockGate api={api} deps={deps}>
+              <Screen />
+            </LockGate>
+          </ThemeProvider>
+        </QueryClientProvider>,
+      );
+    });
+    live.push(r);
+    return { r, deps };
+  }
+
+  it('covers the app on the first frame, before the settings are known, and uncovers it when app lock is off', async () => {
+    (applyHideForAppLock as jest.Mock).mockClear();
+    let release!: () => void;
+    const api = { load: () => new Promise((res) => (release = () => res({ settings: { ...DEFAULT_SETTINGS, appLockEnabled: false } }))) } as unknown as SettingsApi;
+    const { r } = mountWith(api);
+    expect(has(r, 'lock-gate-pending')).toBe(true);
+    expect(applyHideForAppLock).not.toHaveBeenCalled(); // the default is not applied over the stored setting
+    await act(async () => release());
+    await settle();
+    expect(has(r, 'lock-gate-pending')).toBe(false);
+    expect(has(r, 'lock-gate')).toBe(false);
+    expect(applyHideForAppLock).toHaveBeenCalledWith(false);
+  });
+
+  it('with app lock on, the cover never lifts between the settings arriving and the lock showing', async () => {
+    (applyHideForAppLock as jest.Mock).mockClear();
+    const { r } = mountWith(makeApi({ appLockEnabled: true, lockAfter: '1m' }), { authenticate: jest.fn(async () => ({ result: 'cancelled' as const, message: '' })) });
+    await settle();
+    expect(has(r, 'lock-gate-pending')).toBe(false);
+    expect(has(r, 'lock-gate')).toBe(true);
+    expect(applyHideForAppLock).toHaveBeenCalledWith(true);
+  });
+
+  it('a settings read that fails keeps the app covered, says why, and Try again reads them again', async () => {
+    let fail = true;
+    const api = {
+      load: async () => {
+        if (fail) throw new Error('database closed');
+        return { settings: { ...DEFAULT_SETTINGS, appLockEnabled: false } };
+      },
+    } as unknown as SettingsApi;
+    const { r } = mountWith(api);
+    await settle();
+    await settle();
+    expect(has(r, 'lock-settings-failed')).toBe(true);
+    expect(has(r, 'lock-gate-pending')).toBe(true);
+    fail = false;
+    await press(r, 'lock-retry');
+    await settle();
+    expect(has(r, 'lock-gate-pending')).toBe(false);
+  });
+
+  it('no screen lock on the phone: says so and offers to turn app lock off, which then opens the app', async () => {
+    let enabled = true;
+    const api = {
+      load: async () => ({ settings: { ...DEFAULT_SETTINGS, appLockEnabled: enabled } }),
+      setAppLock: jest.fn(async (on: boolean) => {
+        enabled = on;
+        return { ok: true };
+      }),
+    } as unknown as SettingsApi;
+    const { r } = mountWith(api, { authenticate: jest.fn(async () => ({ result: 'unavailable' as const, message: '' })) });
+    await settle();
+    expect(has(r, 'lock-no-screen-lock')).toBe(true);
+    await press(r, 'lock-turn-off');
+    await settle();
+    expect(api.setAppLock).toHaveBeenCalledWith(false);
+    expect(has(r, 'lock-gate')).toBe(false);
+  });
+
+  it('a prompt the system never answers does not leave Unlock dead: it times out and Try again works', async () => {
+    const authenticate = jest
+      .fn<ReturnType<AuthFn>, Parameters<AuthFn>>()
+      .mockImplementationOnce(() => new Promise(() => undefined))
+      .mockResolvedValue({ result: 'success', message: '' });
+    const { r } = mountWith(makeApi({ appLockEnabled: true }), { authenticate, promptTimeoutMs: 20 });
+    await settle();
+    await act(async () => new Promise((res) => setTimeout(res, 50)));
+    await settle();
+    expect(has(r, 'lock-gate')).toBe(true);
+    await press(r, 'lock-unlock');
+    await settle();
+    expect(has(r, 'lock-gate')).toBe(false);
+  });
+});

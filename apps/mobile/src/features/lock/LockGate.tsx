@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { AppState, StyleSheet, Text, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { shouldLock } from '@wmbugo/core';
@@ -17,8 +17,13 @@ export interface LockGateDeps {
   readonly authenticate: (title: string) => Promise<AuthOutcome>;
   readonly elapsedRealtimeMs: () => Promise<number | null>;
   readonly openSecuritySettings: () => Promise<void>;
+  /** How long to wait for a prompt the system never answers. Tests shorten it. */
+  readonly promptTimeoutMs?: number;
 }
 const realDeps: LockGateDeps = { authenticate, elapsedRealtimeMs, openSecuritySettings };
+
+/** A prompt the native side never answers (the activity was recreated while it showed) must not leave Unlock dead. */
+const PROMPT_TIMEOUT_MS = 60_000;
 
 /**
  * LockGate (Story 8.3, SEC-004, FLOW-12). With app lock on it covers the whole app on a cold start, and when the app comes
@@ -38,22 +43,32 @@ export function LockGate({ children, api = realSettingsApi, deps = realDeps }: {
   const [needsScreenLock, setNeedsScreenLock] = useState(false);
   const leftAt = useRef<number | null | undefined>(undefined);
   const prompting = useRef(false);
-  const coldStartDone = useRef(false);
+  // The cold-start decision has been taken. Until then the app is covered: the lock setting is not known, and showing amounts for
+  // the moment it takes to read it would defeat the lock. A failed read keeps the cover (fail closed) with a way to try again.
+  const [decided, setDecided] = useState(false);
+  const readFailed = !decided && q.isError && !q.data;
 
   // The first frame after the settings are known: a cold start with app lock on starts locked.
-  if (!coldStartDone.current && q.data) {
-    coldStartDone.current = true;
+  useLayoutEffect(() => {
+    if (decided || !q.data) return;
     useLockStore.getState().setEnabled(enabled);
     if (shouldLock({ enabled, lockAfter, awayMs: null })) useLockStore.getState().setLocked(true);
-  }
+    setDecided(true);
+  }, [decided, q.data, enabled, lockAfter]);
 
   const unlock = useCallback(async () => {
     if (prompting.current) return;
     prompting.current = true;
     setMessage(null);
     setNeedsScreenLock(false);
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const out = await deps.authenticate(copy.lock.unlockPrompt);
+      const out = await Promise.race([
+        deps.authenticate(copy.lock.unlockPrompt),
+        new Promise<AuthOutcome>((resolve) => {
+          timer = setTimeout(() => resolve({ result: 'error', message: '' }), deps.promptTimeoutMs ?? PROMPT_TIMEOUT_MS);
+        }),
+      ]);
       if (out.result === 'success') {
         setLocked(false);
         releasePendingIntent();
@@ -65,6 +80,7 @@ export function LockGate({ children, api = realSettingsApi, deps = realDeps }: {
       }
       // 'cancelled': the person stays on LockGate with Unlock.
     } finally {
+      if (timer !== undefined) clearTimeout(timer);
       prompting.current = false;
     }
   }, [deps, setLocked]);
@@ -100,18 +116,43 @@ export function LockGate({ children, api = realSettingsApi, deps = realDeps }: {
 
   // Turning app lock off or on while the app is open: nothing locks until the next trigger.
   useEffect(() => {
+    // Only once the setting is known: before that `enabled` is a default, and applying it would clear the native hiding that app
+    // lock keeps for a cold start.
+    if (!decided) return;
     useLockStore.getState().setEnabled(enabled);
     void applyHideForAppLock(enabled);
     if (!enabled) setLocked(false);
-  }, [enabled, setLocked]);
+  }, [decided, enabled, setLocked]);
 
-  const cover = locked && enabled;
+  // No screen lock left on the phone: app lock cannot ask anything, so the person is offered to turn it off.
+  const turnOff = async () => {
+    const r = await api.setAppLock(false);
+    if (r.ok) {
+      await q.refetch();
+      setLocked(false);
+    }
+  };
+
+  const cover = !decided || (locked && enabled);
   return (
     <View style={styles.fill}>
       <View style={styles.fill} importantForAccessibility={cover ? 'no-hide-descendants' : 'auto'} accessibilityElementsHidden={cover}>
         {children}
       </View>
-      {cover ? (
+      {cover && !decided ? (
+        <View testID="lock-gate-pending" accessibilityViewIsModal style={[styles.cover, { backgroundColor: theme.color('bg-canvas') }]}>
+          <CoinMark size={72} />
+          {readFailed ? (
+            <>
+              <Text testID="lock-settings-failed" accessibilityRole="alert" accessibilityLiveRegion="polite" style={[textStyle('body'), styles.message, { color: theme.color('text-secondary') }]}>
+                {copy.lock.settingsFailed}
+              </Text>
+              <Button label={copy.lock.retry} testID="lock-retry" onPress={() => void q.refetch()} />
+            </>
+          ) : null}
+        </View>
+      ) : null}
+      {cover && decided ? (
         <View testID="lock-gate" accessibilityViewIsModal style={[styles.cover, { backgroundColor: theme.color('bg-canvas') }]}>
           <CoinMark size={72} />
           <Text accessibilityRole="header" style={[textStyle('title'), { color: theme.color('text-primary') }]}>
@@ -124,6 +165,14 @@ export function LockGate({ children, api = realSettingsApi, deps = realDeps }: {
           ) : null}
           <Button label={message && !needsScreenLock ? copy.lock.tryAgain : copy.lock.unlock} testID="lock-unlock" onPress={() => void unlock()} />
           {needsScreenLock ? <Button label={copy.lock.openSettings} variant="secondary" testID="lock-open-settings" onPress={() => void deps.openSecuritySettings()} /> : null}
+          {needsScreenLock ? (
+            <>
+              <Text testID="lock-no-screen-lock" style={[textStyle('body'), styles.message, { color: theme.color('text-secondary') }]}>
+                {copy.lock.noScreenLock}
+              </Text>
+              <Button label={copy.lock.turnOff} variant="secondary" testID="lock-turn-off" onPress={() => void turnOff()} />
+            </>
+          ) : null}
         </View>
       ) : null}
     </View>

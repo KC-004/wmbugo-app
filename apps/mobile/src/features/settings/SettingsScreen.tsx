@@ -157,8 +157,8 @@ export function SettingsScreen({ api = realSettingsApi, onBack }: { api?: Settin
     const r = await enableAppLock(api);
     if (r.status === 'needs-screen-lock') setLockMessage({ text: copy.lock.needScreenLock, openSettings: true });
     else if (r.status === 'failed') {
-      if (r.message === copy.lock.couldntSave) setNote(r.message);
-      else if (r.message) setLockMessage({ text: r.message, openSettings: false });
+      if (r.reason === 'save') setNote(r.message);
+      else setLockMessage({ text: r.message, openSettings: false });
     }
     // Cancelled or failed: nothing was saved. The app-switcher hiding comes on with app lock (Story 8.2).
     await refresh();
