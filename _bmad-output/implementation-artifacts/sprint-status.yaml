@@ -144,8 +144,8 @@ development_status:
   8-12-safe-mode-when-the-data-can-t-be-opened-safely: review
   epic-8-retrospective: optional
 
-  epic-9: backlog
-  9-1-read-any-bank-csv-file-in-core: backlog
+  epic-9: in-progress
+  9-1-read-any-bank-csv-file-in-core: review
   9-2-column-mapping-row-validation-and-saved-bank-formats-in-core: backlog
   9-3-import-plan-classify-every-row-against-the-ledger-before-wri: backlog
   9-4-importcsvbatch-atomic-resumable-idempotent-commit: backlog
