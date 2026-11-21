@@ -4,3 +4,4 @@ export * from './filestore';
 export * from './scheduler';
 export * from './categorySuggester';
 export * from './notifier';
+export * from './crypto';

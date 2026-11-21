@@ -146,4 +146,26 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    // Story 8.6: the backup module handles plaintext, so it may only write through the handles it is given (a ByteSink or an
+    // EntryTarget). It imports no file system and no FileStore, so it cannot pick a path of its own.
+    files: ['packages/core/src/backup/**/*.ts'],
+    ignores: ['packages/core/src/backup/**/*.test.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            ...forbiddenInCore.map((name) => ({ name, message: BOUNDARY_MESSAGE })),
+            ...['fs', 'node:fs', 'fs/promises', 'node:fs/promises', 'path', 'node:path', 'os', 'node:os'].map((name) => ({
+              name,
+              message: 'The backup module writes only through injected handles (ByteSink, EntryTarget), never to a path of its own.',
+            })),
+            { name: '../ports/filestore', message: 'The backup module writes only through injected handles, not a FileStore.' },
+            { name: '../shared/fileLogSink', message: 'The backup module writes only through injected handles.' },
+          ],
+        },
+      ],
+    },
+  },
 );
