@@ -88,6 +88,12 @@ export function csvFingerprint(c: CsvCandidate, occurrence: number): string {
   return sha256Hex(['csv', 'row', c.accountId ?? '', c.localDate, c.direction, String(c.amountMinor), descriptionKey(c), String(occurrence)].join('|'));
 }
 
+/**
+ * The fingerprint a row is committed under when the person chose `Import anyway` for a row whose earlier entry was removed but not
+ * yet purged: that entry still holds the original fingerprint, so the new one cannot. The next plan reads this one first.
+ */
+export const anywayFingerprint = (fingerprint: string): string => sha256Hex(`${fingerprint}|anyway`);
+
 /** 1 for the first identical (account, date, direction, amount, description) row in file order, 2 for the next, and so on. */
 function occurrences(rows: readonly CsvCandidate[]): number[] {
   const seen = new Map<string, number>();

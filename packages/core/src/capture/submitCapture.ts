@@ -19,6 +19,24 @@ import { tagMoveForGoal, type TagMoveError } from '../planning/goals';
 
 export type CaptureSourceKind = 'manual' | 'upi' | 'sms' | 'receipt' | 'csv' | 'notification' | 'share';
 
+/**
+ * What a CSV import decided for one row (Story 9.4). The plan (Story 9.3) already did the matching, so a CSV row is not matched
+ * again here: it is confirmed, or held for review for the reason the plan gave, or written as skipped.
+ */
+export interface CsvRowMeta {
+  readonly batchId: string;
+  /** The row's 1-based position in the file, written on its source record. */
+  readonly fileRow: number;
+  /** The row waits for the person, with this reason on its review candidate. */
+  readonly review?: { readonly reason: 'duplicate' | 'held_pair' | 'edge_day' | 'transfer_pair'; readonly matchedTransactionId?: string | null };
+  /** No category in the file matched one wmbugo has: the entry is confirmed but still needs a category. */
+  readonly needsCategory?: boolean;
+  /** The person chose to skip the row: it is written as an `excluded` entry, so a later import skips it too. */
+  readonly excluded?: boolean;
+  /** Another currency (Story 3.10): no profile amount and no posting until the person confirms one. */
+  readonly foreign?: { readonly amountMinor: number; readonly currency: string; readonly exponent: number };
+}
+
 export type SubmitInput = {
   readonly submissionId: string;
   readonly sourceKind: CaptureSourceKind;
@@ -28,6 +46,8 @@ export type SubmitInput = {
   readonly ignoreTombstone?: boolean;
   /** A transfer into a savings pot made for a goal (Story 6.7): the goal's allocation is written in the same transaction. */
   readonly goalId?: string;
+  /** CSV rows only (Story 9.4). */
+  readonly csv?: CsvRowMeta;
 } & ({ readonly entry: ManualEntry; readonly copiedFrom?: string } | { readonly transfer: TransferInput } | { readonly refund: RefundInput });
 
 export type SubmitResult = 'RECORDED' | 'ALREADY_SUBMITTED' | 'POSSIBLE_DUPLICATE' | 'SKIPPED_PREVIOUSLY_REJECTED' | 'SKIPPED_PREVIOUSLY_DELETED';
@@ -65,15 +85,30 @@ async function candidates(ctx: WriterContext, amountMinor: number, localDate: st
   }));
 }
 
-async function writeSource(ctx: WriterContext, transactionId: string, fingerprint: string, kind: CaptureSourceKind = 'manual', reference: string | null = null): Promise<void> {
-  await ctx.execute('INSERT INTO source_record (id, transaction_id, source_kind, fingerprint, reference, created_at) VALUES (?, ?, ?, ?, ?, ?)', [
+async function writeSource(
+  ctx: WriterContext,
+  transactionId: string,
+  fingerprint: string,
+  kind: CaptureSourceKind = 'manual',
+  reference: string | null = null,
+  csv?: CsvRowMeta,
+): Promise<void> {
+  await ctx.execute('INSERT INTO source_record (id, transaction_id, source_kind, fingerprint, reference, created_at, import_batch_id, file_row) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [
     ctx.newId(),
     transactionId,
     kind,
     fingerprint,
     reference,
     ctx.nowMs(),
+    csv?.batchId ?? null,
+    csv?.fileRow ?? null,
   ]);
+}
+
+/** Marks an entry the person chose to skip: kept (and shown under Show rejected) so a later import skips it, then purged by Story 3.12. */
+async function markExcluded(ctx: WriterContext, transactionId: string): Promise<void> {
+  const now = ctx.nowMs();
+  await ctx.execute("UPDATE \"transaction\" SET status = 'excluded', removed_at = ?, removal_kind = 'excluded', updated_at = ? WHERE id = ?", [now, now, transactionId]);
 }
 
 /**
@@ -124,6 +159,7 @@ export const createSubmitCapture = (deps: { readonly suggester?: CategorySuggest
     }
 
     const e = input.entry;
+    if (input.csv?.foreign) return createForeignRow(ctx, input, e, fingerprint);
     // A non-manual entry that matches a tombstone (rejected or deleted before) is skipped and nothing is written. Manual entries never are.
     if (input.sourceKind !== 'manual' && !input.ignoreTombstone) {
       const tz = await profileTimezone(ctx);
@@ -148,6 +184,8 @@ export const createSubmitCapture = (deps: { readonly suggester?: CategorySuggest
       }
     }
     const created = await createEntry(ctx, entry, async (facts) => {
+      // A CSV row was matched by the plan: it is confirmed, or waits for the reason the plan gave. It is not matched a second time.
+      if (input.sourceKind === 'csv') return { status: input.csv?.review ? 'needs_review' : 'confirmed' };
       if (facts.newAccount || facts.accountId === null) return { status: 'confirmed' };
       const item: CaptureItem = {
         id: 'new',
@@ -169,7 +207,8 @@ export const createSubmitCapture = (deps: { readonly suggester?: CategorySuggest
     }, category);
     if (!created.ok) return created;
     const c = created.value;
-    await writeSource(ctx, c.transactionId, fingerprint, input.sourceKind, input.reference ?? null);
+    await writeSource(ctx, c.transactionId, fingerprint, input.sourceKind, input.reference ?? null, input.csv);
+    if (input.csv) await finishCsvRow(ctx, c.transactionId, input.csv);
     if (c.duplicateOf) {
       await ctx.execute("INSERT INTO review_candidate (id, transaction_id, matched_transaction_id, reason, status, created_at) VALUES (?, ?, ?, 'duplicate', 'open', ?)", [
         ctx.newId(),
@@ -190,5 +229,51 @@ export const createSubmitCapture = (deps: { readonly suggester?: CategorySuggest
     });
   },
 });
+
+/** The CSV-only steps after a row's entry exists: its category need, the review candidate it waits on, or its exclusion. */
+async function finishCsvRow(ctx: WriterContext, transactionId: string, csv: CsvRowMeta): Promise<void> {
+  if (csv.needsCategory && !csv.review) await ctx.execute('UPDATE "transaction" SET needs_category = 1 WHERE id = ?', [transactionId]);
+  if (csv.review) {
+    await ctx.execute("INSERT INTO review_candidate (id, transaction_id, matched_transaction_id, reason, status, created_at) VALUES (?, ?, ?, ?, 'open', ?)", [
+      ctx.newId(),
+      transactionId,
+      csv.review.matchedTransactionId ?? null,
+      csv.review.reason,
+      ctx.nowMs(),
+    ]);
+  }
+  if (csv.excluded) await markExcluded(ctx, transactionId);
+}
+
+/**
+ * A CSV row in another currency (Story 3.10, IMP-002): never converted. It is written as a waiting entry that carries the foreign
+ * amount, with no profile amount and no posting, so it counts in nothing until the person confirms an amount.
+ */
+async function createForeignRow(ctx: WriterContext, input: SubmitInput & { entry: ManualEntry }, e: ManualEntry, fingerprint: string) {
+  const f = input.csv!.foreign!;
+  const tz = await profileTimezone(ctx);
+  if (tz === null) return err('NO_PROFILE' as const);
+  if (!Number.isSafeInteger(f.amountMinor) || f.amountMinor <= 0) return err('AMOUNT_INVALID' as const);
+  const at = e.occurredAtMs ?? ctx.nowMs();
+  const date = toLocalDate(at, tz);
+  if (!date.ok) return err('INSTANT_INVALID' as const);
+  const cat = (await ctx.query('SELECT kind FROM category WHERE id = ? AND archived = 0', [e.categoryId]))[0];
+  if (!cat) return err('CATEGORY_NOT_FOUND' as const);
+  const now = ctx.nowMs();
+  const transactionId = ctx.newId();
+  await ctx.execute(
+    "INSERT INTO \"transaction\" (id, event_type, status, amount_minor, occurred_at_utc, local_date, timezone_id, original_description, tags_json, needs_category, foreign_amount_minor, foreign_currency, foreign_currency_exponent, created_at, updated_at) VALUES (?, ?, 'needs_review', 0, ?, ?, ?, ?, '[]', 0, ?, ?, ?, ?, ?)",
+    [transactionId, e.kind, at, date.value, tz, e.merchant ?? null, f.amountMinor, f.currency, f.exponent, now, now],
+  );
+  // No profile amount yet (the entry shape allows that for a foreign capture waiting for one): the split carries the category and 0.
+  await ctx.execute('INSERT INTO split (id, transaction_id, category_id, amount_minor) VALUES (?, ?, ?, 0)', [ctx.newId(), transactionId, e.categoryId]);
+  await writeSource(ctx, transactionId, fingerprint, input.sourceKind, input.reference ?? null, input.csv);
+  await ctx.execute("INSERT INTO review_candidate (id, transaction_id, matched_transaction_id, reason, status, created_at) VALUES (?, ?, NULL, 'foreign_currency', 'open', ?)", [ctx.newId(), transactionId, now]);
+  if (input.csv!.excluded) await markExcluded(ctx, transactionId);
+  ctx.touch('transaction', transactionId, { eventType: e.kind, created: true, status: 'needs_review', foreign: true });
+  ctx.emit('TransactionsChanged', { transactionIds: [transactionId] });
+  ctx.emit('CapturesSubmitted', { transactionIds: [transactionId] });
+  return ok({ transactionId, accountId: null, feeTransactionId: null, result: 'RECORDED' as const });
+}
 
 export const SubmitCapture: UseCase<SubmitInput, Submitted, SubmitError> = createSubmitCapture();

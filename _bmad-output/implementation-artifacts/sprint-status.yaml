@@ -148,7 +148,7 @@ development_status:
   9-1-read-any-bank-csv-file-in-core: review
   9-2-column-mapping-row-validation-and-saved-bank-formats-in-core: review
   9-3-import-plan-classify-every-row-against-the-ledger-before-wri: review
-  9-4-importcsvbatch-atomic-resumable-idempotent-commit: backlog
+  9-4-importcsvbatch-atomic-resumable-idempotent-commit: review
   9-5-imported-transfer-pairs-and-edge-day-rows-in-the-review-queu: backlog
   9-6-import-wizard-choose-a-file-confirm-columns-and-preview: backlog
   9-7-import-wizard-check-matches-import-and-see-the-summary: backlog

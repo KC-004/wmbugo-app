@@ -1,7 +1,7 @@
 import { duplicateFingerprint, tombstoneHash } from '../../ledger/purge';
 import type { Querier } from '../../planning/budgets';
 import type { CaptureItem } from '../match';
-import { csvFingerprint, dayKey, type ImportPlanContext, type KnownFingerprint } from './plan';
+import { anywayFingerprint, csvFingerprint, dayKey, type ImportPlanContext, type KnownFingerprint } from './plan';
 import type { CsvCandidate, ValidatedRow } from './rows';
 
 /**
@@ -27,6 +27,11 @@ export function fingerprintsOf(rows: readonly ValidatedRow[]): Map<number, strin
   return out;
 }
 
+/**
+ * `fileId` is the digest of the file's bytes. Entries an earlier (interrupted) run of this same file already committed carry it, so
+ * on a resume they are never matched against the rows still to come, and they do not make the file's own first or last day look
+ * partly covered by something else.
+ */
 export async function loadImportPlanContext(db: Querier, rows: readonly ValidatedRow[], fileId: string): Promise<ImportPlanContext> {
   const candidates = rows.filter((r): r is ValidatedRow & { candidate: CsvCandidate } => r.candidate !== null && !r.skipped).map((r) => r.candidate);
 
@@ -34,7 +39,8 @@ export async function loadImportPlanContext(db: Querier, rows: readonly Validate
 
   // Fingerprints already in the ledger, and whether the entry they belong to was removed.
   const fingerprints = new Map<string, KnownFingerprint>();
-  const wanted = [...new Set(fingerprintsOf(rows).values())];
+  const base = [...new Set(fingerprintsOf(rows).values())];
+  const wanted = [...base, ...base.map(anywayFingerprint)];
   for (let i = 0; i < wanted.length; i += CHUNK) {
     const part = wanted.slice(i, i + CHUNK);
     const found = await db.query(
@@ -45,6 +51,11 @@ export async function loadImportPlanContext(db: Querier, rows: readonly Validate
       const kind = r[2] === null || r[2] === undefined ? null : String(r[2]);
       fingerprints.set(String(r[0]), { transactionId: String(r[1]), removed: kind === null ? null : kind === 'deleted' ? 'deleted' : 'rejected' });
     }
+  }
+  // A row imported anyway after its first entry was removed: the later entry is the one the row now stands for.
+  for (const fp of base) {
+    const again = fingerprints.get(anywayFingerprint(fp));
+    if (again) fingerprints.set(fp, again);
   }
 
   // Confirmed entries around the file's dates, for the matcher.
@@ -57,7 +68,8 @@ export async function loadImportPlanContext(db: Querier, rows: readonly Validate
     const found = await db.query(
       `SELECT t.id, t.event_type, t.amount_minor, t.local_date, t.occurred_at_utc, t.original_description, p.account_id,
               COALESCE((SELECT sr.source_kind FROM source_record sr WHERE sr.transaction_id = t.id ORDER BY sr.created_at LIMIT 1), 'manual'),
-              (SELECT sr.reference FROM source_record sr WHERE sr.transaction_id = t.id ORDER BY sr.created_at LIMIT 1)
+              (SELECT sr.reference FROM source_record sr WHERE sr.transaction_id = t.id ORDER BY sr.created_at LIMIT 1),
+              (SELECT ib.file_digest FROM source_record sr JOIN import_batch ib ON ib.id = sr.import_batch_id WHERE sr.transaction_id = t.id LIMIT 1)
        FROM "transaction" t JOIN posting p ON p.transaction_id = t.id AND p.posting_kind = 'normal'
        WHERE t.status = 'confirmed' AND t.removed_at IS NULL AND t.event_type IN ('expense','income') AND t.local_date BETWEEN ? AND ?`,
       [from, to],
@@ -74,14 +86,17 @@ export async function loadImportPlanContext(db: Querier, rows: readonly Validate
         merchant: r[5] === null ? null : String(r[5]),
         accountId: String(r[6]),
         source: String(r[7]) as CaptureItem['source'],
+        ...(r[9] !== null && r[9] !== undefined && String(r[9]) === fileId ? { fileId } : {}),
       });
     }
     // Entries on the first and last day, from any source and in any state but removed: that is what a partly covered day is about.
     const edges = [...new Set([dates[0]!, dates[dates.length - 1]!])];
     const counted = await db.query(
       `SELECT p.account_id, t.local_date, COUNT(DISTINCT t.id) FROM "transaction" t JOIN posting p ON p.transaction_id = t.id AND p.posting_kind = 'normal'
-       WHERE t.removed_at IS NULL AND t.status IN ('confirmed','needs_review') AND t.local_date IN (${edges.map(() => '?').join(',')}) GROUP BY p.account_id, t.local_date`,
-      edges,
+       WHERE t.removed_at IS NULL AND t.status IN ('confirmed','needs_review') AND t.local_date IN (${edges.map(() => '?').join(',')})
+         AND NOT EXISTS (SELECT 1 FROM source_record sr JOIN import_batch ib ON ib.id = sr.import_batch_id WHERE sr.transaction_id = t.id AND ib.file_digest = ?)
+       GROUP BY p.account_id, t.local_date`,
+      [...edges, fileId],
     );
     for (const r of counted) dayCounts.set(dayKey(String(r[0]), String(r[1])), Number(r[2]));
   }
