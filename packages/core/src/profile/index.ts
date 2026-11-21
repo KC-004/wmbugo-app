@@ -12,3 +12,4 @@ export * from './insightsPeriods';
 export * from './insightsBuckets';
 export * from './profileDates';
 export * from './appLock';
+export * from './notificationPrivacy';

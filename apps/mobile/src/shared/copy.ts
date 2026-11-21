@@ -1065,6 +1065,18 @@ export const copy = {
     offerTurnOn: 'Turn on app lock',
     offerNotNow: 'Not now',
   },
+  notifPrivacy: {
+    row: 'Notification detail',
+    title: 'Notification detail',
+    full: 'Full details',
+    hidden: 'Hidden — shows "New payment to check"',
+    optIn: 'Show full details even when app lock or hidden amounts is on',
+    lockScreenCaption: 'On the lock screen, payment details stay hidden unless you allow lock-screen approve.',
+    off: 'Notifications are off for wmbugo',
+    openSettings: 'Open settings',
+    summaryFull: 'Full',
+    summaryHidden: 'Hidden',
+  },
   privacy: {
     group: 'Privacy',
     hideAmounts: 'Hide amounts',

@@ -134,7 +134,7 @@ development_status:
   8-2-privacy-settings-hiding-wmbugo-in-recent-apps-and-what-stays: review
   8-3-app-lock-with-lockgate-and-re-authentication: review
   8-4-offer-app-lock-once-after-the-first-saved-entry: review
-  8-5-notification-privacy-hidden-form-and-notification-detail: backlog
+  8-5-notification-privacy-hidden-form-and-notification-detail: review
   8-6-encrypted-backup-format-in-core: backlog
   8-7-make-a-backup-with-a-passphrase: backlog
   8-8-restorebackup-in-maintenance-mode: backlog

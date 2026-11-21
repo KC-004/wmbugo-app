@@ -92,8 +92,19 @@ function fakeApi(initial: SettingsData) {
     current = { ...current, settings: { ...current.settings, appLockEnabled: enabled } };
     return { ok: true };
   });
-  const api: SettingsApi = { load: async () => current, changeSetting, setHideAmounts, setAppLock, saveHomeLayout, changeProfile, timezoneCheck, answerTimezone };
-  return { api, changeSetting, changeProfile, timezoneCheck, answerTimezone, setHideAmounts, setAppLock };
+  const setNotificationPrivacy = jest.fn(async (input: { detail?: 'full' | 'hidden'; fullOptIn?: boolean }) => {
+    current = {
+      ...current,
+      settings: {
+        ...current.settings,
+        ...(input.detail !== undefined ? { notificationDetail: input.detail } : {}),
+        ...(input.fullOptIn !== undefined ? { fullNotificationsOptIn: input.fullOptIn } : {}),
+      },
+    };
+    return { ok: true };
+  });
+  const api: SettingsApi = { load: async () => current, changeSetting, setHideAmounts, setAppLock, setNotificationPrivacy, saveHomeLayout, changeProfile, timezoneCheck, answerTimezone };
+  return { api, changeSetting, changeProfile, timezoneCheck, answerTimezone, setHideAmounts, setAppLock, setNotificationPrivacy };
 }
 
 function mount(node: React.ReactElement) {
@@ -301,9 +312,9 @@ describe('Money basics', () => {
 describe('Privacy (Story 8.2)', () => {
   it('has a Privacy group whose live summary is part of its label', async () => {
     const { r } = await open(data());
-    expect(host(r, 'group-privacy').props.accessibilityLabel).toBe('Privacy, App lock off · Amounts shown');
+    expect(host(r, 'group-privacy').props.accessibilityLabel).toBe('Privacy, App lock off · Amounts shown · Notifications: full');
     const hidden = await open(data({}, { hideAmounts: true }));
-    expect(host(hidden.r, 'group-privacy').props.accessibilityLabel).toBe('Privacy, App lock off · Amounts hidden');
+    expect(host(hidden.r, 'group-privacy').props.accessibilityLabel).toBe('Privacy, App lock off · Amounts hidden · Notifications: hidden');
   });
 
   it('Hide amounts calls SetHideAmounts and the row summary follows at once', async () => {
@@ -315,7 +326,7 @@ describe('Privacy (Story 8.2)', () => {
     expect(setHideAmounts).toHaveBeenCalledWith(true);
     expect(host(r, 'switch-hide-amounts').props.accessibilityState).toEqual({ checked: true });
     act(() => fire(r, 'settings-back'));
-    expect(host(r, 'group-privacy').props.accessibilityLabel).toBe('Privacy, App lock off · Amounts hidden');
+    expect(host(r, 'group-privacy').props.accessibilityLabel).toBe('Privacy, App lock off · Amounts hidden · Notifications: hidden');
   });
 
   it('a change made elsewhere (the hero eye) updates the switch', async () => {
@@ -379,7 +390,7 @@ describe('App lock settings (Story 8.3)', () => {
     expect(changeSetting).toHaveBeenCalledWith('device.hide_in_recents', true);
     expect(host(r, 'switch-app-lock').props.accessibilityState).toEqual({ checked: true });
     act(() => fire(r, 'settings-back'));
-    expect(host(r, 'group-privacy').props.accessibilityLabel).toBe('Privacy, App lock on · Amounts shown');
+    expect(host(r, 'group-privacy').props.accessibilityLabel).toBe('Privacy, App lock on · Amounts shown · Notifications: hidden');
   });
 
   it('a cancelled or failed prompt saves nothing', async () => {
@@ -432,6 +443,57 @@ describe('App lock settings (Story 8.3)', () => {
     await act(async () => fire(r, 'switch-app-lock', 'onValueChange', false));
     await settle();
     expect(setAppLock).toHaveBeenCalledWith(false);
+  });
+});
+
+describe('Notification detail (Story 8.5)', () => {
+  const openNotifications = async (d: SettingsData) => {
+    const f = await open(d);
+    act(() => fire(f.r, 'group-privacy'));
+    act(() => fire(f.r, 'row-notifications'));
+    return f;
+  };
+
+  it('shows radio rows Full details and Hidden, the opt-in switch (off) and the lock-screen caption', async () => {
+    const { r } = await openNotifications(data());
+    expect(texts(r)).toEqual(expect.arrayContaining(['Full details', 'Hidden — shows "New payment to check"', 'Show full details even when app lock or hidden amounts is on', 'On the lock screen, payment details stay hidden unless you allow lock-screen approve.']));
+    expect(host(r, 'notif-detail-full').props.accessibilityState).toMatchObject({ selected: true });
+    expect(host(r, 'switch-notif-optin').props.accessibilityState).toEqual({ checked: false });
+  });
+
+  it('switching to Hidden and the opt-in switch save through SetNotificationPrivacy, and the summary follows', async () => {
+    const { r, setNotificationPrivacy } = await openNotifications(data());
+    await act(async () => fire(r, 'notif-detail-hidden'));
+    await settle();
+    expect(setNotificationPrivacy).toHaveBeenCalledWith({ detail: 'hidden' });
+    await act(async () => fire(r, 'switch-notif-optin', 'onValueChange', true));
+    await settle();
+    expect(setNotificationPrivacy).toHaveBeenCalledWith({ fullOptIn: true });
+    act(() => fire(r, 'settings-back'));
+    expect(host(r, 'row-notifications').props.accessibilityLabel).toBe('Notification detail, Hidden');
+    act(() => fire(r, 'settings-back'));
+    expect(host(r, 'group-privacy').props.accessibilityLabel).toBe('Privacy, App lock off · Amounts shown · Notifications: hidden');
+  });
+
+  it('the Privacy summary ends Notifications: hidden while app lock is on without the opt-in, and full with it', async () => {
+    const guarded = await open(data({}, { appLockEnabled: true }));
+    expect(host(guarded.r, 'group-privacy').props.accessibilityLabel).toBe('Privacy, App lock on · Amounts shown · Notifications: hidden');
+    const optedIn = await open(data({}, { appLockEnabled: true, fullNotificationsOptIn: true }));
+    expect(host(optedIn.r, 'group-privacy').props.accessibilityLabel).toBe('Privacy, App lock on · Amounts shown · Notifications: full');
+  });
+
+  it('with the permission off it says so with Open settings, and the setting stays editable', async () => {
+    const { r, setNotificationPrivacy } = await openNotifications(data({ notificationsOff: true }));
+    expect(texts(r)).toContain('Notifications are off for wmbugo');
+    await act(async () => fire(r, 'notifications-open-settings'));
+    expect(openSecuritySettings).toHaveBeenCalled();
+    await act(async () => fire(r, 'notif-detail-hidden'));
+    expect(setNotificationPrivacy).toHaveBeenCalledWith({ detail: 'hidden' });
+  });
+
+  it('with the permission on (or the build unable to post) no off message shows', async () => {
+    const { r } = await openNotifications(data({ notificationsOff: false }));
+    expect(texts(r)).not.toContain('Notifications are off for wmbugo');
   });
 });
 

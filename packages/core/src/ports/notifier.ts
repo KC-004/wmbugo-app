@@ -5,7 +5,7 @@
 export interface NotificationContent {
   /** A stable id, so posting the same notification twice replaces it instead of adding another. */
   readonly id: string;
-  readonly channel: 'budget_alerts' | 'bill_reminders';
+  readonly channel: 'budget_alerts' | 'bill_reminders' | 'capture_review';
   readonly title: string;
   readonly body: string;
   /** What the lock screen shows when the phone hides notification content. */

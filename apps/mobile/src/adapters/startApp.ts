@@ -32,7 +32,8 @@ import { setNavTimingSink } from '../features/shell/navTiming';
 import { invalidationHandlers, queryClient } from '../shared/queryClient';
 import { BENCH_TRIGGER, runSaveBenchmark } from './benchmark';
 import { keychainKeyStore } from './storage/keychainKeyStore';
-import { appNotifier } from './notifier';
+import { appNotifier, postCaptureFixture, setNotificationPrivacyReader, withNotificationRepost } from './notifier';
+import { readProfile } from './readProfile';
 import { withBudgetHandlers } from './budgetHandlers';
 import { serialize, withBillHandlers, withReminderSync } from './billHandlers';
 import { realReceiptFiles } from './files/receiptFiles';
@@ -51,6 +52,7 @@ const singleProfile: Invariant = {
 };
 
 const LOG_DIR = `${PRIVATE_DIR}/logs`;
+const CAPTURE_FIXTURE_TRIGGER = `${PRIVATE_DIR}/post-capture-fixture`;
 /** Rotates at 1 MiB with one previous file kept, so the log never takes more than 2 MiB (Story 8.1). */
 export const LOG_MAX_BYTES = 1024 * 1024;
 const CRASH_DIR = `${PRIVATE_DIR}/crashes`;
@@ -154,7 +156,7 @@ async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
     db: started.value.db,
     clock: systemClock,
     logger: log,
-    handlers: withReminderSync(withBillHandlers(withBudgetHandlers(invalidationHandlers(queryClient), async () => {
+    handlers: withNotificationRepost(withReminderSync(withBillHandlers(withBudgetHandlers(invalidationHandlers(queryClient), async () => {
       // Payday, the period mode or the first day of the week changed: the derived budget periods are rebuilt from the period
       // service (Story 4.5). A failure is logged and the cache is rebuilt on the next change; no entry is touched either way.
       const w = services?.writer;
@@ -178,7 +180,17 @@ async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
       await w.run(ReleaseBillLinks, {}, 'system').catch(() => log.warn('bills.release_threw'));
       // A savings move that was deleted, rejected or excluded stops counting toward its goal (Story 6.7).
       await w.run(ReleaseGoalMoves, {}, 'system').catch(() => log.warn('goals.release_threw'));
-    }, log), syncReminders, log),
+    }, log), syncReminders, log)),
+  });
+  // Notification privacy (Story 8.5): every notification passes through the form decided from the saved settings.
+  setNotificationPrivacyReader(async () => {
+    const s = (await readProfile(started.value.db))?.settings;
+    return {
+      notificationDetail: s?.notificationDetail ?? 'full',
+      fullNotificationsOptIn: s?.fullNotificationsOptIn ?? false,
+      appLockEnabled: s?.appLockEnabled ?? false,
+      hideAmounts: s?.hideAmounts ?? false,
+    };
   });
   const newId = createIdGenerator(systemClock, secureRandom);
   const writer = new LedgerWriter({
@@ -220,6 +232,12 @@ async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
     if (!on) return;
     await rnFileStore.remove(BENCH_TRIGGER);
     await runSaveBenchmark(log, systemClock);
+  });
+  // Debug-only fixture (Story 8.5): a file placed in the private directory posts the hidden capture notification once.
+  void rnFileStore.exists(CAPTURE_FIXTURE_TRIGGER).then(async (on) => {
+    if (!on) return;
+    await rnFileStore.remove(CAPTURE_FIXTURE_TRIGGER);
+    await postCaptureFixture();
   });
   return started;
 }

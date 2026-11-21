@@ -9,6 +9,7 @@ import {
   paydayFromChoice,
   paydaySummary,
   periodRangeLabel,
+  effectiveCaptureForm,
   privacySummary,
   youSummary,
   type FirstDay,
@@ -41,10 +42,10 @@ import { CategoriesScreen } from '../categories/CategoriesScreen';
 import { RecentlyDeletedScreen } from './RecentlyDeletedScreen';
 import { realSettingsApi, SETTINGS_QUERY_KEY, type SettingsApi, type SettingsData } from './settingsApi';
 
-type Page = 'hub' | 'you' | 'appearance' | 'money' | 'categories' | 'data' | 'deleted' | 'privacy' | 'stays';
+type Page = 'hub' | 'you' | 'appearance' | 'money' | 'categories' | 'data' | 'deleted' | 'privacy' | 'stays' | 'notifications';
 
 /** Where Back goes from each page. */
-const PARENT: Readonly<Record<Page, Page>> = { hub: 'hub', you: 'hub', appearance: 'you', money: 'you', categories: 'hub', data: 'hub', deleted: 'data', privacy: 'hub', stays: 'privacy' };
+const PARENT: Readonly<Record<Page, Page>> = { hub: 'hub', you: 'hub', appearance: 'you', money: 'you', categories: 'hub', data: 'hub', deleted: 'data', privacy: 'hub', stays: 'privacy', notifications: 'privacy' };
 
 const THEMES: readonly { v: ThemeChoice; label: string }[] = [
   { v: 'system', label: copy.settings.themeSystem },
@@ -82,6 +83,10 @@ const STAYS: readonly (readonly [string, string])[] = [
   [copy.privacy.staysFilesTitle, copy.privacy.staysFiles],
   [copy.privacy.staysDiagnosticsTitle, copy.privacy.staysDiagnostics],
 ];
+
+/** The effective shade form for captures, from the saved settings. */
+const captureForm = (d: SettingsData): 'full' | 'hidden' =>
+  effectiveCaptureForm({ notificationDetail: d.settings.notificationDetail, fullNotificationsOptIn: d.settings.fullNotificationsOptIn, appLockEnabled: d.settings.appLockEnabled, hideAmounts: d.settings.hideAmounts });
 
 const LOCK_AFTER: readonly { v: LockAfter; label: string }[] = [
   { v: 'immediately', label: copy.lock.immediately },
@@ -128,6 +133,12 @@ export function SettingsScreen({ api = realSettingsApi, onBack }: { api?: Settin
     await refresh();
   };
 
+  const setNotifPrivacy = async (input: { detail?: 'full' | 'hidden'; fullOptIn?: boolean }) => {
+    setNote(null);
+    const r = await api.setNotificationPrivacy(input);
+    if (!r.ok) setNote(copy.settings.saveError);
+    await refresh();
+  };
   const [lockMessage, setLockMessage] = useState<{ text: string; openSettings: boolean } | null>(null);
   /** Turning app lock on: needs a screen lock and a successful system prompt; only then is anything saved (Story 8.3). */
   const turnOnAppLock = async () => {
@@ -156,7 +167,7 @@ export function SettingsScreen({ api = realSettingsApi, onBack }: { api?: Settin
   };
 
   const title =
-    page === 'hub' ? copy.nav.settings : page === 'you' ? copy.settings.you : page === 'appearance' ? copy.settings.appearance : page === 'money' ? copy.settings.moneyBasics : page === 'categories' ? copy.categories.title : page === 'data' ? copy.deleted.data : page === 'privacy' ? copy.privacy.group : page === 'stays' ? copy.privacy.staysTitle : copy.deleted.recentlyDeleted;
+    page === 'hub' ? copy.nav.settings : page === 'you' ? copy.settings.you : page === 'appearance' ? copy.settings.appearance : page === 'money' ? copy.settings.moneyBasics : page === 'categories' ? copy.categories.title : page === 'data' ? copy.deleted.data : page === 'privacy' ? copy.privacy.group : page === 'stays' ? copy.privacy.staysTitle : page === 'notifications' ? copy.notifPrivacy.title : copy.deleted.recentlyDeleted;
   const back = () => (page === 'hub' ? onBack() : setPage(PARENT[page]));
 
   return (
@@ -172,7 +183,7 @@ export function SettingsScreen({ api = realSettingsApi, onBack }: { api?: Settin
             summary={d.expenseCategoryCount === 1 ? copy.categories.summaryOne : copy.categories.summaryMany.replace('{n}', String(d.expenseCategoryCount))}
             onPress={() => setPage('categories')}
           />
-          <Row testID="group-privacy" label={copy.privacy.group} summary={privacySummary({ appLock: d.settings.appLockEnabled, hideAmounts: d.settings.hideAmounts })} onPress={() => setPage('privacy')} />
+          <Row testID="group-privacy" label={copy.privacy.group} summary={privacySummary({ appLock: d.settings.appLockEnabled, hideAmounts: d.settings.hideAmounts, notifications: captureForm(d) })} onPress={() => setPage('privacy')} />
           <Row testID="group-data" label={copy.deleted.data} summary={copy.deleted.dataSummary} onPress={() => setPage('data')} />
         </>
       ) : page === 'privacy' ? (
@@ -213,8 +224,36 @@ export function SettingsScreen({ api = realSettingsApi, onBack }: { api?: Settin
             value={d.settings.hideInRecents}
             onChange={(v) => void setSetting('device.hide_in_recents', v)}
           />
+          <Row
+            testID="row-notifications"
+            label={copy.notifPrivacy.row}
+            summary={captureForm(d) === 'hidden' ? copy.notifPrivacy.summaryHidden : copy.notifPrivacy.summaryFull}
+            onPress={() => setPage('notifications')}
+          />
           <Row testID="row-stays" label={copy.privacy.staysRow} summary={copy.privacy.staysSummary} onPress={() => setPage('stays')} />
         </>
+      ) : page === 'notifications' ? (
+        <View style={styles.gap}>
+          {d.notificationsOff ? (
+            <View style={styles.gap}>
+              <Text testID="notifications-off" style={[textStyle('body'), { color: theme.color('text-secondary') }]}>
+                {copy.notifPrivacy.off}
+              </Text>
+              <Button label={copy.notifPrivacy.openSettings} variant="secondary" testID="notifications-open-settings" onPress={() => void openSecuritySettings()} />
+            </View>
+          ) : null}
+          <Group label={copy.notifPrivacy.title}>
+            <Chip label={copy.notifPrivacy.full} role="radio" testID="notif-detail-full" selected={d.settings.notificationDetail === 'full'} onPress={() => void setNotifPrivacy({ detail: 'full' })} />
+            <Chip label={copy.notifPrivacy.hidden} role="radio" testID="notif-detail-hidden" selected={d.settings.notificationDetail === 'hidden'} onPress={() => void setNotifPrivacy({ detail: 'hidden' })} />
+          </Group>
+          <SwitchRow
+            testID="switch-notif-optin"
+            label={copy.notifPrivacy.optIn}
+            value={d.settings.fullNotificationsOptIn}
+            onChange={(v) => void setNotifPrivacy({ fullOptIn: v })}
+          />
+          <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{copy.notifPrivacy.lockScreenCaption}</Text>
+        </View>
       ) : page === 'stays' ? (
         <>
           {STAYS.map(([title, text]) => (

@@ -7,6 +7,7 @@ import {
   type PaydayChangePlan,
   ChangeSetting,
   SetAppLock,
+  SetNotificationPrivacy,
   SetHideAmounts,
   SaveHomeLayout,
   type HomeLayoutEntry,
@@ -22,6 +23,8 @@ import {
   type ProfileChange,
   type Region,
 } from '@wmbugo/core';
+import { permissionState } from '../../adapters/permissions';
+import { appNotifier } from '../../adapters/notifier';
 import { getServices, systemClock } from '../../adapters/startApp';
 import { readProfile } from '../../adapters/readProfile';
 
@@ -42,6 +45,8 @@ export interface SettingsData {
   readonly accounts: AccountRow[];
   /** Active spending categories, Uncategorised included (the Money row's summary). */
   readonly expenseCategoryCount: number;
+  /** Notifications are off for wmbugo in Android settings (only when this build can post them). */
+  readonly notificationsOff?: boolean;
 }
 
 export interface TimezoneAsk {
@@ -53,6 +58,8 @@ export interface SettingsApi {
   changeSetting(key: string, value: unknown): Promise<{ ok: boolean; code?: string }>;
   /** Hide amounts on or off (Story 5.3): one audited write. */
   setHideAmounts(hidden: boolean): Promise<{ ok: boolean; code?: string }>;
+  /** Notification detail and the full-details opt-in (Story 8.5): one audited write. */
+  setNotificationPrivacy(input: { detail?: "full" | "hidden"; fullOptIn?: boolean }): Promise<{ ok: boolean; code?: string }>;
   /** App lock on or off (Story 8.3): one audited write. The device prompt has already succeeded. */
   setAppLock(enabled: boolean): Promise<{ ok: boolean; code?: string }>;
   /** Saves the Home card layout (Story 5.6) in one audited write; null resets to the PRD order. */
@@ -86,12 +93,14 @@ export const realSettingsApi: SettingsApi = {
         payday: p.payday,
       },
       hasTransactions: count > 0,
+      notificationsOff: appNotifier.available && (await permissionState('notifications')) === 'denied',
       accounts: mapAccountRows(await db.query(ACCOUNT_LIST_SQL)).filter((a) => a.status === 'active'),
       expenseCategoryCount: Number((await db.query("SELECT COUNT(*) FROM category WHERE archived = 0 AND kind = 'expense'"))[0]![0]),
     };
   },
   changeSetting: (key, value) => getServices().writer.run(ChangeSetting, { key, value }, 'user'),
   setHideAmounts: (hidden) => getServices().writer.run(SetHideAmounts, { hidden }, 'user'),
+  setNotificationPrivacy: (input) => getServices().writer.run(SetNotificationPrivacy, input, 'user'),
   setAppLock: (enabled) => getServices().writer.run(SetAppLock, { enabled }, 'user'),
   saveHomeLayout: (layout) => getServices().writer.run(SaveHomeLayout, { layout }, 'user'),
   changeProfile: (change) => getServices().writer.run(ChangeProfile, change, 'user'),

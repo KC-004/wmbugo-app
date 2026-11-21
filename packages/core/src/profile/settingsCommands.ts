@@ -8,7 +8,7 @@ import { planPaydayChange } from './period';
 import { rebuildPeriods } from '../planning/budgetStore';
 import type { Region } from './regions';
 import { sameHomeLayout, type HomeLayoutEntry } from './homeLayout';
-import { parseSettings, SETTING_APP_LOCK, SETTING_DEFAULT_ACCOUNT, SETTING_HIDE_AMOUNTS, SETTING_HOME_LAYOUT, SETTINGS_SQL, validateSetting } from './settings';
+import { parseSettings, SETTING_APP_LOCK, SETTING_FULL_NOTIFICATIONS_OPT_IN, SETTING_NOTIFICATION_DETAIL, SETTING_DEFAULT_ACCOUNT, SETTING_HIDE_AMOUNTS, SETTING_HOME_LAYOUT, SETTINGS_SQL, validateSetting } from './settings';
 import { nextLocalDate, offsetMinutes, PROMPT_TIMEZONE, SETTING_TZ_MISMATCH_SINCE, SETTING_TZ_PENDING, TIMEZONE_GAP_MINUTES } from './timezone';
 
 async function upsertSetting(ctx: WriterContext, key: string, value: unknown): Promise<void> {
@@ -33,7 +33,7 @@ export const ChangeSetting: UseCase<{ key: string; value: unknown }, void, 'SETT
   name: 'ChangeSetting',
   async execute(ctx, input) {
     // App lock turns on only after the device prompt succeeds (SetAppLock), never through the generic setting path.
-    if (input.key === SETTING_APP_LOCK) return err('SETTING_INVALID');
+    if (input.key === SETTING_APP_LOCK || input.key === SETTING_NOTIFICATION_DETAIL || input.key === SETTING_FULL_NOTIFICATIONS_OPT_IN) return err('SETTING_INVALID');
     const v = validateSetting(input.key, input.value);
     if (!v.ok) return err('SETTING_INVALID');
     if (input.key === SETTING_DEFAULT_ACCOUNT && v.value !== null) {
@@ -75,6 +75,33 @@ export const SetAppLock: UseCase<{ enabled: boolean }, void, 'SETTING_INVALID'> 
     await upsertSetting(ctx, SETTING_APP_LOCK, v.value);
     ctx.touch('settings', SETTING_APP_LOCK, { changed: true });
     ctx.emit('ProfileChanged', { fields: [SETTING_APP_LOCK] });
+    return ok(undefined);
+  },
+};
+
+/**
+ * Notification privacy (Story 8.5, SEC-005): the detail (`full` or `hidden`) and the switch that shows full details even while app
+ * lock or hide amounts is on. One audited write with `ProfileChanged`; the audit row records the keys, never the values.
+ */
+export const SetNotificationPrivacy: UseCase<{ detail?: unknown; fullOptIn?: unknown }, void, 'SETTING_INVALID'> = {
+  name: 'SetNotificationPrivacy',
+  async execute(ctx, input) {
+    if (input.detail === undefined && input.fullOptIn === undefined) return err('SETTING_INVALID');
+    const detail = input.detail === undefined ? null : validateSetting(SETTING_NOTIFICATION_DETAIL, input.detail);
+    const optIn = input.fullOptIn === undefined ? null : validateSetting(SETTING_FULL_NOTIFICATIONS_OPT_IN, input.fullOptIn);
+    if ((detail && !detail.ok) || (optIn && !optIn.ok)) return err('SETTING_INVALID');
+    const fields: string[] = [];
+    if (detail?.ok) {
+      await upsertSetting(ctx, SETTING_NOTIFICATION_DETAIL, detail.value);
+      ctx.touch('settings', SETTING_NOTIFICATION_DETAIL, { changed: true });
+      fields.push(SETTING_NOTIFICATION_DETAIL);
+    }
+    if (optIn?.ok) {
+      await upsertSetting(ctx, SETTING_FULL_NOTIFICATIONS_OPT_IN, optIn.value);
+      ctx.touch('settings', SETTING_FULL_NOTIFICATIONS_OPT_IN, { changed: true });
+      fields.push(SETTING_FULL_NOTIFICATIONS_OPT_IN);
+    }
+    ctx.emit('ProfileChanged', { fields });
     return ok(undefined);
   },
 };
