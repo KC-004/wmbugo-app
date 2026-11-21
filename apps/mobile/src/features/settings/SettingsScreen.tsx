@@ -36,6 +36,7 @@ import { Chip } from '../../shared/ui/Chip';
 import { useFocusRing } from '../../shared/ui/FocusRing';
 import { openSecuritySettings } from '../../adapters/appLock';
 import { BackupScreen } from '../backup/BackupScreen';
+import { DiagnosticsExportScreen, DiagnosticsScreen } from '../diagnostics/DiagnosticsScreen';
 import { RestoreFlow } from '../restore/RestoreFlow';
 import { enableAppLock } from '../lock/enableAppLock';
 import { hidingBlocksScreenshots } from '../../adapters/recentsPrivacy';
@@ -45,10 +46,10 @@ import { CategoriesScreen } from '../categories/CategoriesScreen';
 import { RecentlyDeletedScreen } from './RecentlyDeletedScreen';
 import { realSettingsApi, SETTINGS_QUERY_KEY, type SettingsApi, type SettingsData } from './settingsApi';
 
-type Page = 'hub' | 'you' | 'appearance' | 'money' | 'categories' | 'data' | 'deleted' | 'privacy' | 'stays' | 'notifications' | 'backup' | 'restore';
+type Page = 'hub' | 'you' | 'appearance' | 'money' | 'categories' | 'data' | 'deleted' | 'privacy' | 'stays' | 'notifications' | 'backup' | 'restore' | 'help' | 'diagnostics' | 'export';
 
 /** Where Back goes from each page. */
-const PARENT: Readonly<Record<Page, Page>> = { hub: 'hub', you: 'hub', appearance: 'you', money: 'you', categories: 'hub', data: 'hub', deleted: 'data', privacy: 'hub', stays: 'privacy', notifications: 'privacy', backup: 'data', restore: 'data' };
+const PARENT: Readonly<Record<Page, Page>> = { hub: 'hub', you: 'hub', appearance: 'you', money: 'you', categories: 'hub', data: 'hub', deleted: 'data', privacy: 'hub', stays: 'privacy', notifications: 'privacy', backup: 'data', restore: 'data', help: 'hub', diagnostics: 'help', export: 'diagnostics' };
 
 const THEMES: readonly { v: ThemeChoice; label: string }[] = [
   { v: 'system', label: copy.settings.themeSystem },
@@ -172,7 +173,7 @@ export function SettingsScreen({ api = realSettingsApi, onBack }: { api?: Settin
   };
 
   const title =
-    page === 'hub' ? copy.nav.settings : page === 'you' ? copy.settings.you : page === 'appearance' ? copy.settings.appearance : page === 'money' ? copy.settings.moneyBasics : page === 'categories' ? copy.categories.title : page === 'data' ? copy.deleted.data : page === 'privacy' ? copy.privacy.group : page === 'stays' ? copy.privacy.staysTitle : page === 'notifications' ? copy.notifPrivacy.title : page === 'backup' ? copy.backup.title : page === 'restore' ? copy.restore.title : copy.deleted.recentlyDeleted;
+    page === 'hub' ? copy.nav.settings : page === 'you' ? copy.settings.you : page === 'appearance' ? copy.settings.appearance : page === 'money' ? copy.settings.moneyBasics : page === 'categories' ? copy.categories.title : page === 'data' ? copy.deleted.data : page === 'privacy' ? copy.privacy.group : page === 'stays' ? copy.privacy.staysTitle : page === 'notifications' ? copy.notifPrivacy.title : page === 'backup' ? copy.backup.title : page === 'restore' ? copy.restore.title : page === 'help' ? copy.diagnostics.helpGroup : page === 'diagnostics' ? copy.diagnostics.title : page === 'export' ? copy.diagnostics.previewTitle : copy.deleted.recentlyDeleted;
   const back = () => (backupBusy ? undefined : page === 'hub' ? onBack() : setPage(PARENT[page]));
 
   return (
@@ -189,6 +190,7 @@ export function SettingsScreen({ api = realSettingsApi, onBack }: { api?: Settin
             onPress={() => setPage('categories')}
           />
           <Row testID="group-privacy" label={copy.privacy.group} summary={privacySummary({ appLock: d.settings.appLockEnabled, hideAmounts: d.settings.hideAmounts, notifications: captureForm(d) })} onPress={() => setPage('privacy')} />
+          <Row testID="group-help" label={copy.diagnostics.helpGroup} summary={copy.diagnostics.helpSummary} onPress={() => setPage('help')} />
           <Row testID="group-data" label={copy.deleted.data} summary={backupSummary(d.settings.lastBackupAt, d.profile.timezoneId)} onPress={() => setPage('data')} />
         </>
       ) : page === 'privacy' ? (
@@ -280,6 +282,12 @@ export function SettingsScreen({ api = realSettingsApi, onBack }: { api?: Settin
         </>
       ) : page === 'backup' ? (
         <BackupScreen onBusyChange={setBackupBusy} onDone={() => setPage('data')} />
+      ) : page === 'help' ? (
+        <Row testID="row-diagnostics" label={copy.diagnostics.row} summary={copy.diagnostics.title} onPress={() => setPage('diagnostics')} />
+      ) : page === 'diagnostics' ? (
+        <DiagnosticsScreen onExport={() => setPage('export')} />
+      ) : page === 'export' ? (
+        <DiagnosticsExportScreen />
       ) : page === 'restore' ? (
         <RestoreFlow onBusyChange={setBackupBusy} onExit={() => setPage('data')} />
       ) : page === 'deleted' ? (

@@ -73,6 +73,20 @@ class PrivacyModule(private val ctx: ReactApplicationContext) : ReactContextBase
   @ReactMethod
   fun getApiLevel(promise: Promise) = promise.resolve(Build.VERSION.SDK_INT)
 
+  /** The version name and package, for Diagnostics: `1.0 (nosms)` is the version plus the flavor the package id says. */
+  @ReactMethod
+  fun getAppInfo(promise: Promise) {
+    try {
+      val info = ctx.packageManager.getPackageInfo(ctx.packageName, 0)
+      val map = com.facebook.react.bridge.Arguments.createMap()
+      map.putString("versionName", info.versionName ?: "unknown")
+      map.putString("packageName", ctx.packageName)
+      promise.resolve(map)
+    } catch (e: Exception) {
+      promise.reject("E_APPINFO", e)
+    }
+  }
+
   @ReactMethod
   fun setHideInRecents(hidden: Boolean, promise: Promise) {
     try {

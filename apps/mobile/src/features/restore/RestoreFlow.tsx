@@ -1,14 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Check } from 'phosphor-react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { backupCountsLine, madeAtLabel, type BackupManifest } from '@wmbugo/core';
 import { copy } from '../../shared/copy';
 import { requireReauth } from '../../shared/reauth';
-import { Icon } from '../../shared/theme/Icon';
 import { useTheme } from '../../shared/theme/ThemeProvider';
-import { layout, radii } from '../../shared/theme/tokens';
+import { radii } from '../../shared/theme/tokens';
 import { textStyle } from '../../shared/theme/typography';
 import { Button } from '../../shared/ui/Button';
+import { CheckRow } from '../../shared/ui/CheckRow';
 import { PassphraseField } from '../../shared/ui/PassphraseField';
 import { BackupScreen } from '../backup/BackupScreen';
 import { realRestoreApi, type PickedBackup, type RestoreApi, type ThisPhone } from './restoreApi';
@@ -215,28 +214,8 @@ export function RestoreFlow({ api = realRestoreApi, onExit, onBusyChange }: { ap
   );
 }
 
-function CheckRow({ label, checked, onToggle, testID }: { label: string; checked: boolean; onToggle: () => void; testID: string }) {
-  const theme = useTheme();
-  return (
-    <Pressable
-      testID={testID}
-      accessibilityRole="checkbox"
-      accessibilityLabel={label}
-      accessibilityState={{ checked }}
-      onPress={onToggle}
-      style={[styles.check, { borderColor: theme.color('border-control'), backgroundColor: theme.color('bg-surface') }]}>
-      <View style={[styles.box, { borderColor: theme.color(checked ? 'accent-primary' : 'border-control'), backgroundColor: checked ? theme.color('accent-primary') : 'transparent' }]}>
-        {checked ? <Icon icon={Check} size={16} color="bg-surface" /> : null}
-      </View>
-      <Text style={[textStyle('body'), { color: theme.color('text-primary'), flex: 1 }]}>{label}</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   gap: { gap: 12 },
   card: { borderWidth: 1, borderRadius: radii.md, padding: 12, gap: 16 },
   col: { gap: 2 },
-  check: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: radii.md, padding: 12, minHeight: layout.touchMin },
-  box: { width: 24, height: 24, borderWidth: 2, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
 });

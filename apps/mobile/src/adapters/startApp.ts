@@ -61,6 +61,8 @@ const CAPTURE_FIXTURE_TRIGGER = `${PRIVATE_DIR}/post-capture-fixture`;
 /** Rotates at 1 MiB with one previous file kept, so the log never takes more than 2 MiB (Story 8.1). */
 export const LOG_MAX_BYTES = 1024 * 1024;
 const CRASH_DIR = `${PRIVATE_DIR}/crashes`;
+/** The current log file (the previous one is `<path>.1`). */
+export const LOG_PATH = `${LOG_DIR}/wmbugo.log`;
 /** Matches `versionName` in android/app/build.gradle. */
 const APP_VERSION = '1.0';
 
@@ -81,7 +83,7 @@ export async function getLogger(): Promise<Logger> {
     /* the file sink swallows write failures; logging must never block startup */
   }
   logger = createRedactingLogger(
-    createFileLogSink(rnFileStore, { path: `${LOG_DIR}/wmbugo.log`, maxBytes: LOG_MAX_BYTES, now: () => systemClock.nowMs() }),
+    createFileLogSink(rnFileStore, { path: LOG_PATH, maxBytes: LOG_MAX_BYTES, now: () => systemClock.nowMs() }),
   );
   return logger;
 }

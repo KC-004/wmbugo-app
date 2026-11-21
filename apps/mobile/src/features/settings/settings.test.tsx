@@ -519,6 +519,26 @@ describe('Data group and Back up (Story 8.7)', () => {
   });
 });
 
+describe('Help group and Diagnostics (Story 8.10)', () => {
+  it('has a Help group because Diagnostics exists, and Help lists Diagnostics', async () => {
+    const { r } = await open(data());
+    expect(host(r, 'group-help').props.accessibilityLabel).toBe('Help, Diagnostics');
+    act(() => fire(r, 'group-help'));
+    expect(host(r, 'row-diagnostics').props.accessibilityLabel).toBe('Diagnostics, Diagnostics');
+    act(() => fire(r, 'row-diagnostics'));
+    await settle();
+    expect(has(r, 'diagnostics')).toBe(true);
+    expect(has(r, 'diagnostics-export')).toBe(true);
+    act(() => fire(r, 'diagnostics-export'));
+    expect(has(r, 'diagnostics-preview')).toBe(true);
+    act(() => fire(r, 'settings-back'));
+    expect(has(r, 'diagnostics')).toBe(true);
+    act(() => fire(r, 'settings-back'));
+    act(() => fire(r, 'settings-back'));
+    expect(has(r, 'group-help')).toBe(true);
+  });
+});
+
 describe('Block transfers above the balance', () => {
   it('is a switch in You that saves the setting', async () => {
     const { r, changeSetting } = await open(data());

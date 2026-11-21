@@ -2,6 +2,7 @@ import type { FileStore } from '../ports/filestore';
 import { buildCrashRecord, createCrashRecorder, MAX_CRASH_RECORDS } from './crashRecord';
 import { createFileLogSink } from './fileLogSink';
 import { createRedactingLogger, REDACTED, redactEntry, scrubText } from './logger';
+import { logFixtureEntry, REDACTION_FIXTURE_VALUES } from '../testing/redactionFixture';
 
 class MemFiles implements FileStore {
   files = new Map<string, string>();
@@ -29,29 +30,6 @@ class MemFiles implements FileStore {
 }
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
-
-/** The fixture entry of Story 8.1; Story 8.10 runs the same values against the Diagnostics export. */
-export const REDACTION_FIXTURE_VALUES = ['1,18,600', '118600', 'Swiggy Instamart', 'rent for Feb', 'HDFC ••4821', '••4821', '4821', 'sara@okhdfc', '/data/user/0/app.wmbugo/files/receipts/a.jpg', 'Your A/c XX4821 debited by Rs 1,18,600'];
-
-export function logFixtureEntry(logger: ReturnType<typeof createRedactingLogger>): void {
-  logger.info('entry.saved', {
-    amountMinor: 11860000,
-    amount: '₹1,18,600',
-    merchant: 'Swiggy Instamart',
-    note: 'rent for Feb',
-    account: 'HDFC ••4821',
-    upi: 'sara@okhdfc',
-    image: '/data/user/0/app.wmbugo/files/receipts/a.jpg',
-    smsBody: 'Your A/c XX4821 debited by Rs 1,18,600 to sara@okhdfc',
-    durationMs: 42,
-    code: 'OK',
-    entryCount: 3,
-  });
-  logger.error('save.failed', {
-    code: 'WRITE_FAILED',
-    errorMessage: 'could not save ₹1,18,600 from ••4821 (sara@okhdfc) a/c no. 4821, ref 998877',
-  });
-}
 
 describe('allowlist redaction (Story 8.1)', () => {
   it('keeps ids, counts, codes, durations and versions only', () => {

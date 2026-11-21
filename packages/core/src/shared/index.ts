@@ -9,3 +9,4 @@ export * from './fileLogSink';
 export * from './crashRecord';
 export * from './auditRedact';
 export * from './csv';
+export * from './diagnostics';
