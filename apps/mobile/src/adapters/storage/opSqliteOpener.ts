@@ -10,12 +10,12 @@ const SAFETY_DIR = `${PRIVATE_DIR}/safety`;
  * go through executeRaw / executeBatch: Drizzle's own op-sqlite driver does not
  * work with op-sqlite 19 (see docs/decisions/S1-storage-migrations.md).
  */
-export function createOpSqliteOpener(name: string = DB_NAME): DatabaseOpener {
+export function createOpSqliteOpener(name: string = DB_NAME, location?: string): DatabaseOpener {
   return {
-  exists: () => fileExists(`${ANDROID_DATABASE_PATH}/${name}`),
+  exists: () => fileExists(`${location ?? ANDROID_DATABASE_PATH}/${name}`),
 
   async open(keyHex: string): Promise<SqlDatabase> {
-    const db = open({ name, encryptionKey: keyHex });
+    const db = open({ name, encryptionKey: keyHex, ...(location ? { location } : {}) });
     // Foreign keys are off by default in SQLite and are per connection: the ledger relies on them.
     db.executeSync('PRAGMA foreign_keys = ON');
     return {

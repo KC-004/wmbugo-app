@@ -1,5 +1,8 @@
 import {
   createCrashRecorder,
+  AnnounceBackupRestored,
+  recoverRestore,
+  type RecoverOutcome,
   createFileLogSink,
   ATTACHMENT_IDS_SQL,
   budgetAlertHandlers,
@@ -27,6 +30,7 @@ import migrations from '../../drizzle/migrations';
 import { installCrashHandlers } from './crashHandlers';
 import { refreshPermissionViews } from './permissions';
 import { sweepStaging } from './backup/rnBackupPlatform';
+import { restoredDatabaseOpens, RESTORE_LAYOUT, rnRestoreFs } from './backup/rnRestore';
 import { ensureDir, PRIVATE_DIR, rnFileStore } from './files/rnFileStore';
 import { setSaveTimingSink } from '../features/add/saveTiming';
 import { setNavTimingSink } from '../features/shell/navTiming';
@@ -139,8 +143,23 @@ export function startApp(): Promise<Result<StartupOk, StartupErrorCode>> {
   return starting;
 }
 
+/** What the last start found about a restore (Story 8.8): shown once on Home, then cleared. */
+let restoreOutcome: RecoverOutcome = 'none';
+export function takeRestoreOutcome(): RecoverOutcome {
+  const o = restoreOutcome;
+  restoreOutcome = 'none';
+  return o;
+}
+
 async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
   const log = await getLogger();
+  // A restore that was killed, or that did not hold, is finished or undone before the database is opened (Story 8.8).
+  try {
+    restoreOutcome = await recoverRestore(rnRestoreFs, RESTORE_LAYOUT, restoredDatabaseOpens);
+    if (restoreOutcome !== 'none') log.warn('restore.recovered', { reason: restoreOutcome });
+  } catch {
+    log.error('restore.recovery_failed');
+  }
   const started = await startStorage({
     keyStore: keychainKeyStore,
     random: secureRandom,
@@ -234,8 +253,11 @@ async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
     await rnFileStore.remove(BENCH_TRIGGER);
     await runSaveBenchmark(log, systemClock);
   });
-  // A backup or restore that was interrupted leaves staging behind: it is swept at every start (Story 8.7).
+  // A backup or restore that was interrupted leaves staging behind: it is swept at every start (Story 8.7). Not after a restore that
+  // just held: its journal is already gone and nothing is in staging.
   void sweepStaging();
+  // The first start after a restore that held: every query is invalidated and reminders are planned again from the restored data.
+  if (restoreOutcome === 'restored') void writer.run(AnnounceBackupRestored, undefined, 'system').catch(() => undefined);
   // Debug-only fixture (Story 8.5): a file placed in the private directory posts the hidden capture notification once.
   void rnFileStore.exists(CAPTURE_FIXTURE_TRIGGER).then(async (on) => {
     if (!on) return;

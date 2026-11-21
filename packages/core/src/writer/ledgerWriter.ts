@@ -5,7 +5,7 @@ import type { Logger, LogValue } from '../shared/logger';
 import { err, type Result } from '../shared/result';
 import type { Actor, EventName, EventPayloads } from './events';
 
-export type WriterErrorCode = 'INVARIANT_VIOLATED' | 'WRITE_FAILED';
+export type WriterErrorCode = 'INVARIANT_VIOLATED' | 'WRITE_FAILED' | 'MAINTENANCE' | 'SAFE_MODE';
 
 export interface TouchedEntity {
   readonly entityKind: string;
@@ -89,7 +89,33 @@ export class LedgerWriter {
 
   constructor(private readonly deps: LedgerWriterDeps) {}
 
+  private maintenance = false;
+  private safeModeReason: string | null = null;
+
+  /**
+   * Maintenance mode (Story 8.8): a restore is swapping the data, so every use case is refused with `MAINTENANCE` and scheduled work,
+   * which goes through the same door, skips itself. `exclusive` jobs (the restore itself) still run.
+   */
+  setMaintenance(on: boolean): void {
+    this.maintenance = on;
+  }
+
+  /** Safe mode (Story 8.12): the data cannot be opened safely, so every use case is refused with `SAFE_MODE` and nothing is written. */
+  setSafeMode(reason: string | null): void {
+    this.safeModeReason = reason;
+  }
+
+  get inSafeMode(): boolean {
+    return this.safeModeReason !== null;
+  }
+
+  get safeReason(): string | null {
+    return this.safeModeReason;
+  }
+
   run<I, O, C extends string>(useCase: UseCase<I, O, C>, input: I, actor: Actor): Promise<Result<O, C | WriterErrorCode>> {
+    if (this.safeModeReason !== null) return Promise.resolve(err('SAFE_MODE'));
+    if (this.maintenance) return Promise.resolve(err('MAINTENANCE'));
     const result = this.tail.then(() => this.runOne(useCase, input, actor));
     this.tail = result.catch(() => undefined);
     return result;

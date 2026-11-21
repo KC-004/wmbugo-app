@@ -16,6 +16,10 @@ interface Native {
   openDecrypted(srcPath: string, keyHex: string): Promise<number>;
   readDecrypted(handle: number, length: number): Promise<string>;
   closeDecrypted(handle: number): Promise<void>;
+  openEncryptedWrite(destPath: string, keyHex: string): Promise<number>;
+  writeEncrypted(handle: number, base64: string): Promise<void>;
+  closeEncrypted(handle: number): Promise<void>;
+  restartApp(): Promise<void>;
 }
 
 const native = (): Native => {
@@ -86,4 +90,18 @@ export async function* streamDecrypted(path: string, keyHex: string, chunk = 64 
   } finally {
     await native().closeDecrypted(handle).catch(() => undefined);
   }
+}
+
+/** Writes a receipt photo into app-private storage encrypted with the device file key as its bytes arrive (restore, Story 8.8). */
+export async function openEncryptedPhoto(destPath: string, keyHex: string): Promise<{ write(chunk: Uint8Array): Promise<void>; close(): Promise<void> }> {
+  const handle = await native().openEncryptedWrite(destPath, keyHex);
+  return {
+    write: (chunk) => native().writeEncrypted(handle, toBase64(chunk)),
+    close: () => native().closeEncrypted(handle),
+  };
+}
+
+/** Restarts the app after a restore swapped the data. Does not return. */
+export function restartApp(): Promise<void> {
+  return native().restartApp();
 }

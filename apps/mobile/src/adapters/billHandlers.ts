@@ -25,6 +25,8 @@ export function withReminderSync(handlers: HandlerMap, sync: () => Promise<void>
     RecurringChanged: [...(handlers.RecurringChanged ?? []), run],
     TransactionsChanged: [...(handlers.TransactionsChanged ?? []), run],
     ProfileChanged: [...(handlers.ProfileChanged ?? []), run],
+    // A restore replaced the bills: every reminder is planned again from the restored data (Story 8.8).
+    BackupRestored: [...(handlers.BackupRestored ?? []), run],
   };
 }
 

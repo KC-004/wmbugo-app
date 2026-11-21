@@ -35,6 +35,8 @@ export const EVENT_CATALOGUE = {
   BudgetThresholdCrossed: { areas: ['notifications'] },
   RecurringChanged: { areas: ['bills', 'plan', 'home'] },
   GoalsChanged: { areas: ['goals', 'plan', 'home', 'insights'] },
+  /** A restore replaced all the data (Story 8.8): every query is invalidated and bill reminders are scheduled again. */
+  BackupRestored: { areas: ['ledger', 'budgets', 'plan', 'bills', 'goals', 'insights', 'home', 'widget', 'periods', 'notifications', 'captures', 'learning'] },
 } as const satisfies Record<string, EventSpec>;
 
 export type EventName = keyof typeof EVENT_CATALOGUE;
@@ -63,6 +65,8 @@ export interface EventPayloads {
   RecurringChanged: { readonly ruleIds: readonly string[] };
   /** Goal ids only (Story 6.6): the goals list, Plan and Home refresh; never an amount or a name. */
   GoalsChanged: { readonly goalIds: readonly string[] };
+  /** Carries nothing: every area is stale. */
+  BackupRestored: { readonly restored: true };
   /** The highest alert level a budget crossed in a period (Story 4.9): ids and the percentage only, never an amount. */
   BudgetThresholdCrossed: { readonly budgetId: string; readonly periodStart: string; readonly thresholdPct: number };
 }

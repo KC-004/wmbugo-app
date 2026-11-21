@@ -43,6 +43,7 @@ class BackupFilesModule(private val ctx: ReactApplicationContext) : ReactContext
   private val writers = ConcurrentHashMap<Int, OutputStream>()
   private val readers = ConcurrentHashMap<Int, FileChannel>()
   private val decrypting = ConcurrentHashMap<Int, InputStream>()
+  private val encrypting = ConcurrentHashMap<Int, EncryptingFile>()
 
   init {
     ctx.addActivityEventListener(this)
@@ -262,6 +263,68 @@ class BackupFilesModule(private val ctx: ReactApplicationContext) : ReactContext
       promise.resolve(null)
     }
   }
+
+  // ---- photos, encrypted as they arrive (restore) ----
+
+  /** Opens an encrypted photo file in the same format the app uses (12-byte IV, then AES-256-GCM), written as bytes arrive. */
+  @ReactMethod
+  fun openEncryptedWrite(destPath: String, keyHex: String, promise: Promise) {
+    try {
+      val dest = File(destPath)
+      dest.parentFile?.mkdirs()
+      val iv = ByteArray(IV_BYTES).also { java.security.SecureRandom().nextBytes(it) }
+      val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+      cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(fileKey(keyHex), "AES"), GCMParameterSpec(128, iv))
+      val out = java.io.FileOutputStream(dest)
+      out.write(iv)
+      val id = ids.getAndIncrement()
+      encrypting[id] = EncryptingFile(out, cipher)
+      promise.resolve(id)
+    } catch (e: Exception) {
+      promise.reject("E_OPEN", e.message, e)
+    }
+  }
+
+  @ReactMethod
+  fun writeEncrypted(handle: Int, base64: String, promise: Promise) {
+    try {
+      val f = encrypting[handle] ?: throw IllegalStateException("Unknown handle")
+      val bytes = Base64.decode(base64, Base64.NO_WRAP)
+      f.out.write(f.cipher.update(bytes) ?: ByteArray(0))
+      promise.resolve(null)
+    } catch (e: Exception) {
+      promise.reject("E_WRITE", e.message, e)
+    }
+  }
+
+  /** Writes the GCM tag and closes. Until this is called the file is not a complete photo. */
+  @ReactMethod
+  fun closeEncrypted(handle: Int, promise: Promise) {
+    try {
+      val f = encrypting.remove(handle) ?: throw IllegalStateException("Unknown handle")
+      f.out.write(f.cipher.doFinal())
+      f.out.close()
+      promise.resolve(null)
+    } catch (e: Exception) {
+      promise.reject("E_CLOSE", e.message, e)
+    }
+  }
+
+  /** Starts the app again from its launcher intent and ends this process: a restore swapped the data underneath it. */
+  @ReactMethod
+  fun restartApp(promise: Promise) {
+    try {
+      val launch = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName)
+      launch?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+      promise.resolve(null)
+      ctx.startActivity(launch)
+      Runtime.getRuntime().exit(0)
+    } catch (e: Exception) {
+      promise.reject("E_RESTART", e.message, e)
+    }
+  }
+
+  private class EncryptingFile(val out: java.io.OutputStream, val cipher: Cipher)
 
   companion object {
     private const val REQUEST_CREATE = 7201
