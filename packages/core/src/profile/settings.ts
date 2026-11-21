@@ -17,10 +17,16 @@ export const SETTING_HIDE_AMOUNTS = 'ui.hide_amounts';
  * the recents snapshot is switched off; on Android 8 to 12 the window is marked secure.
  */
 export const SETTING_HIDE_IN_RECENTS = 'device.hide_in_recents';
+/** App lock (Story 8.3): a UI gate only, never bound to the database key (AD-9). A device setting: a restore keeps this phone's choice. */
+export const SETTING_APP_LOCK = 'device.app_lock_enabled';
+/** How long wmbugo may be in the background before it locks again (Story 8.3). */
+export const SETTING_LOCK_AFTER = 'device.lock_after';
 /** The Home card layout (Story 5.6): a list of `{cardId, hidden, size}` in display order, or null for the PRD order. */
 export const SETTING_HOME_LAYOUT = 'ui.home_layout';
 export const SETTING_THEME_KEY = 'theme';
 
+export type LockAfter = 'immediately' | '1m' | '5m' | '15m';
+export const LOCK_AFTER_CHOICES: readonly LockAfter[] = ['immediately', '1m', '5m', '15m'];
 export type ThemeChoice = 'system' | 'light' | 'dark';
 export type NumberFormat = 'region' | 'international' | 'indian' | 'european';
 export type FirstDay = 'mon' | 'sun' | 'sat';
@@ -42,6 +48,8 @@ export interface AppSettings {
   readonly showNetWorth: boolean;
   readonly hideAmounts: boolean;
   readonly hideInRecents: boolean;
+  readonly appLockEnabled: boolean;
+  readonly lockAfter: LockAfter;
   readonly homeLayout: readonly HomeLayoutEntry[] | null;
 }
 
@@ -57,6 +65,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   showNetWorth: false,
   hideAmounts: false,
   hideInRecents: false,
+  appLockEnabled: false,
+  lockAfter: '1m',
   homeLayout: null,
 };
 
@@ -79,8 +89,11 @@ export function validateSetting(key: string, value: unknown): { ok: true; value:
     case SETTING_BLOCK_TRANSFERS_KEY:
     case SETTING_SHOW_NET_WORTH:
     case SETTING_HIDE_AMOUNTS:
+    case SETTING_APP_LOCK:
     case SETTING_HIDE_IN_RECENTS:
       return typeof value === 'boolean' ? { ok: true, value } : { ok: false };
+    case SETTING_LOCK_AFTER:
+      return oneOf(LOCK_AFTER_CHOICES);
     case SETTING_HOME_LAYOUT:
       return value === null ? { ok: true, value } : isHomeLayout(value) ? { ok: true, value: sanitizeHomeLayout(value) } : { ok: false };
     case SETTING_DEFAULT_ACCOUNT:
@@ -117,6 +130,8 @@ export function parseSettings(rows: readonly (readonly unknown[])[]): AppSetting
     showNetWorth: pick(SETTING_SHOW_NET_WORTH, DEFAULT_SETTINGS.showNetWorth),
     hideAmounts: pick(SETTING_HIDE_AMOUNTS, DEFAULT_SETTINGS.hideAmounts),
     hideInRecents: pick(SETTING_HIDE_IN_RECENTS, DEFAULT_SETTINGS.hideInRecents),
+    appLockEnabled: pick(SETTING_APP_LOCK, DEFAULT_SETTINGS.appLockEnabled),
+    lockAfter: pick(SETTING_LOCK_AFTER, DEFAULT_SETTINGS.lockAfter),
     homeLayout: pick<readonly HomeLayoutEntry[] | null>(SETTING_HOME_LAYOUT, null),
   };
 }

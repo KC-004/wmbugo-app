@@ -132,7 +132,7 @@ development_status:
   epic-8: in-progress
   8-1-redacted-logs-local-crash-records-and-the-no-network-guarant: review
   8-2-privacy-settings-hiding-wmbugo-in-recent-apps-and-what-stays: review
-  8-3-app-lock-with-lockgate-and-re-authentication: backlog
+  8-3-app-lock-with-lockgate-and-re-authentication: review
   8-4-offer-app-lock-once-after-the-first-saved-entry: backlog
   8-5-notification-privacy-hidden-form-and-notification-detail: backlog
   8-6-encrypted-backup-format-in-core: backlog

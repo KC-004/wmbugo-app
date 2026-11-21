@@ -23,8 +23,8 @@ tokens, 48dp controls, TalkBack labels with role and state, and the state set ab
 ## Destructive actions and their tier (Epic 3)
 
 Every destructive action is either reversible with an Undo toast, or irreversible behind a confirm sheet that states the
-consequence in plain words and then passes the shared re-authentication guard (`shared/reauth.ts`, a no-op until app lock
-exists in Epic 8).
+consequence in plain words and then passes the shared re-authentication guard (`shared/reauth.ts`, asks `Confirm it's you` when app lock
+is on and is a no-op when it is off).
 
 | Action | Tier | Where |
 |--------|------|-------|
@@ -36,3 +36,4 @@ exists in Epic 8).
 | Restore (deleted entry, rejected capture) | reversible, Undo toast | Recently deleted, detail |
 | Remove photo | confirm sheet | detail |
 | Delete permanently | confirm sheet and re-authentication guard | Recently deleted, detail |
+| Turn off app lock, change Lock after | confirm tier: re-authentication guard (`Confirm it's you`) when app lock is on | Settings › Privacy |

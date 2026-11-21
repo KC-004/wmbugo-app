@@ -8,7 +8,7 @@ import { planPaydayChange } from './period';
 import { rebuildPeriods } from '../planning/budgetStore';
 import type { Region } from './regions';
 import { sameHomeLayout, type HomeLayoutEntry } from './homeLayout';
-import { parseSettings, SETTING_DEFAULT_ACCOUNT, SETTING_HIDE_AMOUNTS, SETTING_HOME_LAYOUT, SETTINGS_SQL, validateSetting } from './settings';
+import { parseSettings, SETTING_APP_LOCK, SETTING_DEFAULT_ACCOUNT, SETTING_HIDE_AMOUNTS, SETTING_HOME_LAYOUT, SETTINGS_SQL, validateSetting } from './settings';
 import { nextLocalDate, offsetMinutes, PROMPT_TIMEZONE, SETTING_TZ_MISMATCH_SINCE, SETTING_TZ_PENDING, TIMEZONE_GAP_MINUTES } from './timezone';
 
 async function upsertSetting(ctx: WriterContext, key: string, value: unknown): Promise<void> {
@@ -32,6 +32,8 @@ async function readSetting(ctx: WriterContext, key: string): Promise<unknown> {
 export const ChangeSetting: UseCase<{ key: string; value: unknown }, void, 'SETTING_INVALID' | 'ACCOUNT_NOT_FOUND'> = {
   name: 'ChangeSetting',
   async execute(ctx, input) {
+    // App lock turns on only after the device prompt succeeds (SetAppLock), never through the generic setting path.
+    if (input.key === SETTING_APP_LOCK) return err('SETTING_INVALID');
     const v = validateSetting(input.key, input.value);
     if (!v.ok) return err('SETTING_INVALID');
     if (input.key === SETTING_DEFAULT_ACCOUNT && v.value !== null) {
@@ -57,6 +59,22 @@ export const SetHideAmounts: UseCase<{ hidden: boolean }, void, 'SETTING_INVALID
     await upsertSetting(ctx, SETTING_HIDE_AMOUNTS, v.value);
     ctx.touch('settings', SETTING_HIDE_AMOUNTS, { changed: true });
     ctx.emit('ProfileChanged', { fields: [SETTING_HIDE_AMOUNTS] });
+    return ok(undefined);
+  },
+};
+
+/**
+ * Turns app lock on or off (Story 8.3, SEC-004). The caller has already passed the device prompt; this stores the flag with an
+ * audit row and `ProfileChanged`. The audit row records the key, never the value. The database key is not touched (AD-9).
+ */
+export const SetAppLock: UseCase<{ enabled: boolean }, void, 'SETTING_INVALID'> = {
+  name: 'SetAppLock',
+  async execute(ctx, input) {
+    const v = validateSetting(SETTING_APP_LOCK, input.enabled);
+    if (!v.ok) return err('SETTING_INVALID');
+    await upsertSetting(ctx, SETTING_APP_LOCK, v.value);
+    ctx.touch('settings', SETTING_APP_LOCK, { changed: true });
+    ctx.emit('ProfileChanged', { fields: [SETTING_APP_LOCK] });
     return ok(undefined);
   },
 };

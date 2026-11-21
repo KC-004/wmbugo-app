@@ -9,7 +9,7 @@ import { SETTING_BLOCK_TRANSFERS } from '../ledger/transferCommands';
 import { LedgerWriter } from '../writer/ledgerWriter';
 import { findRegion } from './regions';
 import { effectiveLocale, parseSettings, paydaySummary, periodRule, privacySummary, SETTING_HIDE_IN_RECENTS, SETTINGS_SQL, validateSetting, youSummary, DEFAULT_SETTINGS } from './settings';
-import { AnswerTimezonePrompt, ApplyPendingTimezone, ChangeProfile, ChangeSetting, SetHideAmounts, TrackTimezone } from './settingsCommands';
+import { AnswerTimezonePrompt, ApplyPendingTimezone, ChangeProfile, ChangeSetting, SetAppLock, SetHideAmounts, TrackTimezone } from './settingsCommands';
 import { nextLocalDate, offsetMinutes, PROMPT_TIMEZONE, shouldAskTimezone, timezonesDiffer } from './timezone';
 import { periodFor } from './period';
 import { recordEntry, recordTransfer } from '../testing/capture';
@@ -247,5 +247,23 @@ describe('Privacy settings (Story 8.2)', () => {
     expect(validateSetting(SETTING_HIDE_IN_RECENTS, 'yes')).toEqual({ ok: false });
     expect(parseSettings([[SETTING_HIDE_IN_RECENTS, 'true']]).hideInRecents).toBe(true);
     expect(parseSettings([[SETTING_HIDE_IN_RECENTS, '"x"']]).hideInRecents).toBe(false);
+  });
+});
+
+describe('SetAppLock (Story 8.3)', () => {
+  it('stores the flag with an audit row naming the key only, emits ProfileChanged, and refuses the generic path', async () => {
+    const { db, writer } = await setup();
+    const generic = await writer.run(ChangeSetting, { key: 'device.app_lock_enabled', value: true }, 'user');
+    expect(generic).toEqual({ ok: false, code: 'SETTING_INVALID' });
+    const r = await writer.run(SetAppLock, { enabled: true }, 'user');
+    expect(r.ok).toBe(true);
+    const rows = await db.query(SETTINGS_SQL);
+    expect(parseSettings(rows).appLockEnabled).toBe(true);
+    const audit = await db.query("SELECT change_json FROM audit_event WHERE kind = 'SetAppLock'");
+    expect(JSON.parse(String(audit[0]![0]))).toEqual({ changed: true });
+    const events = await db.query("SELECT event FROM outbox WHERE event = 'ProfileChanged'");
+    expect(events.length).toBeGreaterThan(0);
+    await writer.run(SetAppLock, { enabled: false }, 'user');
+    expect(parseSettings(await db.query(SETTINGS_SQL)).appLockEnabled).toBe(false);
   });
 });

@@ -12,6 +12,7 @@ import {
   privacySummary,
   youSummary,
   type FirstDay,
+  type LockAfter,
   type NumberFormat,
   type PaydayChoice,
   type PaydayRule,
@@ -31,7 +32,9 @@ import { Button } from '../../shared/ui/Button';
 import { TopBar } from '../../shared/ui/TopBar';
 import { Chip } from '../../shared/ui/Chip';
 import { useFocusRing } from '../../shared/ui/FocusRing';
+import { authenticate, isDeviceSecure, openSecuritySettings } from '../../adapters/appLock';
 import { hidingBlocksScreenshots } from '../../adapters/recentsPrivacy';
+import { requireReauth } from '../../shared/reauth';
 import { RegionPicker } from '../onboarding/OnboardingFlow';
 import { CategoriesScreen } from '../categories/CategoriesScreen';
 import { RecentlyDeletedScreen } from './RecentlyDeletedScreen';
@@ -79,6 +82,13 @@ const STAYS: readonly (readonly [string, string])[] = [
   [copy.privacy.staysDiagnosticsTitle, copy.privacy.staysDiagnostics],
 ];
 
+const LOCK_AFTER: readonly { v: LockAfter; label: string }[] = [
+  { v: 'immediately', label: copy.lock.immediately },
+  { v: '1m', label: copy.lock.afterOneMinute },
+  { v: '5m', label: copy.lock.afterFiveMinutes },
+  { v: '15m', label: copy.lock.afterFifteenMinutes },
+];
+
 const choiceOf = (rule: { kind: string }): PaydayChoice => (rule.kind === 'day' ? 'other' : (rule.kind as PaydayChoice));
 
 /**
@@ -117,6 +127,40 @@ export function SettingsScreen({ api = realSettingsApi, onBack }: { api?: Settin
     await refresh();
   };
 
+  const [lockMessage, setLockMessage] = useState<{ text: string; openSettings: boolean } | null>(null);
+  /** Turning app lock on: needs a screen lock and a successful system prompt; only then is anything saved (Story 8.3). */
+  const turnOnAppLock = async () => {
+    setLockMessage(null);
+    setNote(null);
+    if (!(await isDeviceSecure())) {
+      setLockMessage({ text: copy.lock.needScreenLock, openSettings: true });
+      return;
+    }
+    const out = await authenticate(copy.lock.turnOnPrompt);
+    if (out.result !== 'success') {
+      if (out.result === 'unavailable') setLockMessage({ text: copy.lock.needScreenLock, openSettings: true });
+      else if (out.result !== 'cancelled' && out.message) setLockMessage({ text: out.message, openSettings: false });
+      return; // cancelled or failed: nothing is saved
+    }
+    const r = await api.setAppLock(true);
+    if (!r.ok) setNote(copy.lock.couldntSave);
+    // The app switcher hiding comes on with app lock and can still be switched on without it (Story 8.2).
+    else await api.changeSetting('device.hide_in_recents', true);
+    await refresh();
+  };
+  const turnOffAppLock = async () => {
+    setLockMessage(null);
+    if (!(await requireReauth())) return; // cancelled: the screen stays as it was
+    const r = await api.setAppLock(false);
+    if (!r.ok) setNote(copy.lock.couldntSave);
+    await refresh();
+  };
+  const changeLockAfter = async (v: string) => {
+    if (v === d?.settings.lockAfter) return;
+    if (!(await requireReauth())) return;
+    await setSetting('device.lock_after', v);
+  };
+
   const title =
     page === 'hub' ? copy.nav.settings : page === 'you' ? copy.settings.you : page === 'appearance' ? copy.settings.appearance : page === 'money' ? copy.settings.moneyBasics : page === 'categories' ? copy.categories.title : page === 'data' ? copy.deleted.data : page === 'privacy' ? copy.privacy.group : page === 'stays' ? copy.privacy.staysTitle : copy.deleted.recentlyDeleted;
   const back = () => (page === 'hub' ? onBack() : setPage(PARENT[page]));
@@ -134,11 +178,33 @@ export function SettingsScreen({ api = realSettingsApi, onBack }: { api?: Settin
             summary={d.expenseCategoryCount === 1 ? copy.categories.summaryOne : copy.categories.summaryMany.replace('{n}', String(d.expenseCategoryCount))}
             onPress={() => setPage('categories')}
           />
-          <Row testID="group-privacy" label={copy.privacy.group} summary={privacySummary({ hideAmounts: d.settings.hideAmounts })} onPress={() => setPage('privacy')} />
+          <Row testID="group-privacy" label={copy.privacy.group} summary={privacySummary({ appLock: d.settings.appLockEnabled, hideAmounts: d.settings.hideAmounts })} onPress={() => setPage('privacy')} />
           <Row testID="group-data" label={copy.deleted.data} summary={copy.deleted.dataSummary} onPress={() => setPage('data')} />
         </>
       ) : page === 'privacy' ? (
         <>
+          <SwitchRow
+            testID="switch-app-lock"
+            label={copy.lock.appLock}
+            hint={copy.lock.appLockHint}
+            value={d.settings.appLockEnabled}
+            onChange={(v) => void (v ? turnOnAppLock() : turnOffAppLock())}
+          />
+          {lockMessage ? (
+            <View style={styles.gap}>
+              <Text testID="lock-setup-message" accessibilityRole="alert" accessibilityLiveRegion="assertive" style={[textStyle('body'), { color: theme.color('semantic-warning') }]}>
+                {lockMessage.text}
+              </Text>
+              {lockMessage.openSettings ? <Button label={copy.lock.openSettings} variant="secondary" testID="lock-open-security" onPress={() => void openSecuritySettings()} /> : null}
+            </View>
+          ) : null}
+          {d.settings.appLockEnabled ? (
+            <Group label={copy.lock.lockAfter}>
+              {LOCK_AFTER.map((c) => (
+                <Chip key={c.v} label={c.label} role="radio" variant="period" testID={`lock-after-${c.v}`} selected={d.settings.lockAfter === c.v} onPress={() => void changeLockAfter(c.v)} />
+              ))}
+            </Group>
+          ) : null}
           <SwitchRow
             testID="switch-hide-amounts"
             label={copy.privacy.hideAmounts}

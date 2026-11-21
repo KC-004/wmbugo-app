@@ -6,6 +6,7 @@ import {
   previewPaydayChange,
   type PaydayChangePlan,
   ChangeSetting,
+  SetAppLock,
   SetHideAmounts,
   SaveHomeLayout,
   type HomeLayoutEntry,
@@ -52,6 +53,8 @@ export interface SettingsApi {
   changeSetting(key: string, value: unknown): Promise<{ ok: boolean; code?: string }>;
   /** Hide amounts on or off (Story 5.3): one audited write. */
   setHideAmounts(hidden: boolean): Promise<{ ok: boolean; code?: string }>;
+  /** App lock on or off (Story 8.3): one audited write. The device prompt has already succeeded. */
+  setAppLock(enabled: boolean): Promise<{ ok: boolean; code?: string }>;
   /** Saves the Home card layout (Story 5.6) in one audited write; null resets to the PRD order. */
   saveHomeLayout(layout: readonly HomeLayoutEntry[] | null): Promise<{ ok: boolean; code?: string }>;
   changeProfile(change: ProfileChange): Promise<{ ok: boolean; code?: string }>;
@@ -89,6 +92,7 @@ export const realSettingsApi: SettingsApi = {
   },
   changeSetting: (key, value) => getServices().writer.run(ChangeSetting, { key, value }, 'user'),
   setHideAmounts: (hidden) => getServices().writer.run(SetHideAmounts, { hidden }, 'user'),
+  setAppLock: (enabled) => getServices().writer.run(SetAppLock, { enabled }, 'user'),
   saveHomeLayout: (layout) => getServices().writer.run(SaveHomeLayout, { layout }, 'user'),
   changeProfile: (change) => getServices().writer.run(ChangeProfile, change, 'user'),
   previewPayday: (rule) => previewPaydayChange(getServices().db, rule, systemClock.nowMs()),

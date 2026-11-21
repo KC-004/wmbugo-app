@@ -10,6 +10,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { detectRegion, type Region, type SetUpProfileInput } from '@wmbugo/core';
 import { setUpProfile, startApp, systemClock } from './src/adapters/startApp';
 import { OnboardingFlow } from './src/features/onboarding/OnboardingFlow';
+import { LockGate } from './src/features/lock/LockGate';
 import { SettingsBridge } from './src/features/settings/SettingsBridge';
 import { RootNavigator } from './src/features/shell/RootNavigator';
 import { StartupGate, type StartFn } from './src/features/startup/StartupGate';
@@ -51,7 +52,9 @@ function Screen({ route, setUp }: { route: 'home' | 'onboarding'; setUp: SetUpFn
   if (route === 'home' || done) {
     return (
       <SettingsBridge>
-        <RootNavigator />
+        <LockGate>
+          <RootNavigator />
+        </LockGate>
       </SettingsBridge>
     );
   }

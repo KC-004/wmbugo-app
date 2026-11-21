@@ -17,6 +17,7 @@ class MainApplication : Application(), ReactApplication {
           add(DeviceCapabilitiesPackage())
           add(ReceiptFilesPackage())
           add(PrivacyPackage())
+          add(AppLockPackage())
         },
     )
   }

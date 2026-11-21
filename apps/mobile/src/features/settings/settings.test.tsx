@@ -10,11 +10,20 @@ import { ThemeProvider, useTheme } from '../../shared/theme/ThemeProvider';
 import { HomeScreen } from '../home/HomeScreen';
 import { homeData } from '../home/homeTestKit';
 import type { HomeApi, HomeData } from '../home/homeApi';
+import { authenticate, isDeviceSecure, openSecuritySettings } from '../../adapters/appLock';
+import { useLockStore } from '../../shared/state/lockStore';
 import { hidingBlocksScreenshots } from '../../adapters/recentsPrivacy';
 import { SettingsBridge } from './SettingsBridge';
 import { SettingsScreen } from './SettingsScreen';
 import type { SettingsApi, SettingsData } from './settingsApi';
 
+jest.mock('../../adapters/appLock', () => ({
+  authenticate: jest.fn(async () => ({ result: 'success', message: '' })),
+  isDeviceSecure: jest.fn(async () => true),
+  openSecuritySettings: jest.fn(async () => undefined),
+  availableKind: jest.fn(async () => 'biometric'),
+  elapsedRealtimeMs: jest.fn(async () => 0),
+}));
 jest.mock('../../adapters/recentsPrivacy', () => ({
   ...jest.requireActual('../../adapters/recentsPrivacy'),
   hidingBlocksScreenshots: jest.fn(() => false),
@@ -63,7 +72,7 @@ function fakeApi(initial: SettingsData) {
     const map: Record<string, keyof AppSettings> = {
       theme: 'theme', 'ui.number_format': 'numberFormat', 'ui.haptics': 'haptics', 'ui.reduce_motion': 'reduceMotion',
       'finance.period_mode': 'periodMode', 'finance.first_day_of_week': 'firstDay', 'finance.default_account': 'defaultAccountId',
-      'finance.block_transfers_above_balance': 'blockTransfers', 'device.hide_in_recents': 'hideInRecents',
+      'finance.block_transfers_above_balance': 'blockTransfers', 'device.hide_in_recents': 'hideInRecents', 'device.lock_after': 'lockAfter',
     };
     current = { ...current, settings: { ...current.settings, [map[key]!]: value } };
     return { ok: true };
@@ -79,8 +88,12 @@ function fakeApi(initial: SettingsData) {
     return { ok: true };
   });
   const saveHomeLayout = jest.fn(async () => ({ ok: true }));
-  const api: SettingsApi = { load: async () => current, changeSetting, setHideAmounts, saveHomeLayout, changeProfile, timezoneCheck, answerTimezone };
-  return { api, changeSetting, changeProfile, timezoneCheck, answerTimezone, setHideAmounts };
+  const setAppLock = jest.fn(async (enabled: boolean) => {
+    current = { ...current, settings: { ...current.settings, appLockEnabled: enabled } };
+    return { ok: true };
+  });
+  const api: SettingsApi = { load: async () => current, changeSetting, setHideAmounts, setAppLock, saveHomeLayout, changeProfile, timezoneCheck, answerTimezone };
+  return { api, changeSetting, changeProfile, timezoneCheck, answerTimezone, setHideAmounts, setAppLock };
 }
 
 function mount(node: React.ReactElement) {
@@ -288,9 +301,9 @@ describe('Money basics', () => {
 describe('Privacy (Story 8.2)', () => {
   it('has a Privacy group whose live summary is part of its label', async () => {
     const { r } = await open(data());
-    expect(host(r, 'group-privacy').props.accessibilityLabel).toBe('Privacy, Amounts shown');
+    expect(host(r, 'group-privacy').props.accessibilityLabel).toBe('Privacy, App lock off · Amounts shown');
     const hidden = await open(data({}, { hideAmounts: true }));
-    expect(host(hidden.r, 'group-privacy').props.accessibilityLabel).toBe('Privacy, Amounts hidden');
+    expect(host(hidden.r, 'group-privacy').props.accessibilityLabel).toBe('Privacy, App lock off · Amounts hidden');
   });
 
   it('Hide amounts calls SetHideAmounts and the row summary follows at once', async () => {
@@ -302,7 +315,7 @@ describe('Privacy (Story 8.2)', () => {
     expect(setHideAmounts).toHaveBeenCalledWith(true);
     expect(host(r, 'switch-hide-amounts').props.accessibilityState).toEqual({ checked: true });
     act(() => fire(r, 'settings-back'));
-    expect(host(r, 'group-privacy').props.accessibilityLabel).toBe('Privacy, Amounts hidden');
+    expect(host(r, 'group-privacy').props.accessibilityLabel).toBe('Privacy, App lock off · Amounts hidden');
   });
 
   it('a change made elsewhere (the hero eye) updates the switch', async () => {
@@ -345,6 +358,80 @@ describe('Privacy (Story 8.2)', () => {
     expect(all).not.toMatch(/never leave|can never|under any circumstances/i);
     act(() => fire(r, 'settings-back'));
     expect(has(r, 'switch-hide-amounts')).toBe(true);
+  });
+});
+
+describe('App lock settings (Story 8.3)', () => {
+  beforeEach(() => {
+    (authenticate as jest.Mock).mockReset().mockResolvedValue({ result: 'success', message: '' });
+    (isDeviceSecure as jest.Mock).mockReset().mockResolvedValue(true);
+    (openSecuritySettings as jest.Mock).mockClear();
+    useLockStore.setState({ enabled: false, locked: false });
+  });
+
+  it('turns on only after the system prompt (Turn on app lock) succeeds, and the summary says App lock on', async () => {
+    const { r, setAppLock, changeSetting } = await open(data());
+    act(() => fire(r, 'group-privacy'));
+    await act(async () => fire(r, 'switch-app-lock', 'onValueChange', true));
+    await settle();
+    expect(authenticate).toHaveBeenCalledWith('Turn on app lock');
+    expect(setAppLock).toHaveBeenCalledWith(true);
+    expect(changeSetting).toHaveBeenCalledWith('device.hide_in_recents', true);
+    expect(host(r, 'switch-app-lock').props.accessibilityState).toEqual({ checked: true });
+    act(() => fire(r, 'settings-back'));
+    expect(host(r, 'group-privacy').props.accessibilityLabel).toBe('Privacy, App lock on · Amounts shown');
+  });
+
+  it('a cancelled or failed prompt saves nothing', async () => {
+    (authenticate as jest.Mock).mockResolvedValue({ result: 'cancelled', message: '' });
+    const { r, setAppLock } = await open(data());
+    act(() => fire(r, 'group-privacy'));
+    await act(async () => fire(r, 'switch-app-lock', 'onValueChange', true));
+    await settle();
+    expect(setAppLock).not.toHaveBeenCalled();
+    expect(host(r, 'switch-app-lock').props.accessibilityState).toEqual({ checked: false });
+  });
+
+  it('without a screen lock the switch stays off, says so with Open settings, and saves nothing', async () => {
+    (isDeviceSecure as jest.Mock).mockResolvedValue(false);
+    const { r, setAppLock } = await open(data());
+    act(() => fire(r, 'group-privacy'));
+    await act(async () => fire(r, 'switch-app-lock', 'onValueChange', true));
+    await settle();
+    expect(authenticate).not.toHaveBeenCalled();
+    expect(setAppLock).not.toHaveBeenCalled();
+    expect(texts(r)).toContain('Set a screen lock on your phone first.');
+    await act(async () => fire(r, 'lock-open-security'));
+    expect(openSecuritySettings).toHaveBeenCalled();
+    expect(host(r, 'switch-app-lock').props.accessibilityState).toEqual({ checked: false });
+  });
+
+  it('Lock after offers the four chips with 1 minute as the default', async () => {
+    const { r } = await open(data({}, { appLockEnabled: true }));
+    act(() => fire(r, 'group-privacy'));
+    for (const id of ['immediately', '1m', '5m', '15m']) expect(has(r, `lock-after-${id}`)).toBe(true);
+    expect(host(r, 'lock-after-1m').props.accessibilityState).toMatchObject({ selected: true });
+    expect(texts(r)).toEqual(expect.arrayContaining(['Immediately', 'After 1 minute', 'After 5 minutes', 'After 15 minutes']));
+  });
+
+  it('changing Lock after and turning app lock off ask Confirm it is you (app lock on); cancel changes nothing', async () => {
+    useLockStore.setState({ enabled: true });
+    const { r, changeSetting, setAppLock } = await open(data({}, { appLockEnabled: true }));
+    act(() => fire(r, 'group-privacy'));
+    (authenticate as jest.Mock).mockResolvedValue({ result: 'cancelled', message: '' });
+    await act(async () => fire(r, 'lock-after-5m'));
+    await act(async () => fire(r, 'switch-app-lock', 'onValueChange', false));
+    await settle();
+    expect(authenticate).toHaveBeenCalledWith("Confirm it's you");
+    expect(changeSetting).not.toHaveBeenCalled();
+    expect(setAppLock).not.toHaveBeenCalled();
+    (authenticate as jest.Mock).mockResolvedValue({ result: 'success', message: '' });
+    await act(async () => fire(r, 'lock-after-5m'));
+    await settle();
+    expect(changeSetting).toHaveBeenCalledWith('device.lock_after', '5m');
+    await act(async () => fire(r, 'switch-app-lock', 'onValueChange', false));
+    await settle();
+    expect(setAppLock).toHaveBeenCalledWith(false);
   });
 });
 
