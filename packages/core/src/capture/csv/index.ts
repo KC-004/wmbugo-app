@@ -6,3 +6,5 @@ export * from './read';
 export * from './mapping';
 export * from './rows';
 export * from './formats';
+export * from './plan';
+export * from './planContext';
