@@ -146,7 +146,7 @@ development_status:
 
   epic-9: in-progress
   9-1-read-any-bank-csv-file-in-core: review
-  9-2-column-mapping-row-validation-and-saved-bank-formats-in-core: backlog
+  9-2-column-mapping-row-validation-and-saved-bank-formats-in-core: review
   9-3-import-plan-classify-every-row-against-the-ledger-before-wri: backlog
   9-4-importcsvbatch-atomic-resumable-idempotent-commit: backlog
   9-5-imported-transfer-pairs-and-edge-day-rows-in-the-review-queu: backlog

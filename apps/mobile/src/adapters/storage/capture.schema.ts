@@ -93,3 +93,28 @@ export const tombstone = sqliteTable(
     check('tombstone_outcome_check', sql`${t.outcome} IN ('deleted','rejected')`),
   ],
 );
+
+/**
+ * A bank's CSV layout, remembered so the next file from the same bank skips the Columns step (Story 9.2). Owned by capture. It
+ * holds a hash of the heading cells and the delimiter, the column mapping and the choices made with it: never a row of data, an
+ * amount or a description.
+ */
+export const csvFormat = sqliteTable(
+  'csv_format',
+  {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    header_signature: text('header_signature').notNull(),
+    mapping_json: text('mapping_json').notNull(),
+    overrides_json: text('overrides_json').notNull().default('{}'),
+    flip_sign: integer('flip_sign').notNull().default(0),
+    account_json: text('account_json').notNull().default('{}'),
+    created_at: integer('created_at').notNull(),
+    updated_at: integer('updated_at').notNull(),
+  },
+  (t) => [
+    uniqueIndex('csv_format_signature_idx').on(t.header_signature),
+    check('csv_format_flip_check', sql`${t.flip_sign} IN (0,1)`),
+    check('csv_format_json_check', sql`json_valid(${t.mapping_json}) AND json_valid(${t.overrides_json}) AND json_valid(${t.account_json})`),
+  ],
+);
