@@ -12,6 +12,7 @@ import { setUpProfile, startApp, systemClock } from './src/adapters/startApp';
 import { OnboardingFlow } from './src/features/onboarding/OnboardingFlow';
 import { LockGate } from './src/features/lock/LockGate';
 import { RestoreFlow } from './src/features/restore/RestoreFlow';
+import { StartFailure } from './src/features/safemode/StartFailure';
 import { SettingsBridge } from './src/features/settings/SettingsBridge';
 import { RootNavigator } from './src/features/shell/RootNavigator';
 import { StartupGate, type StartFn } from './src/features/startup/StartupGate';
@@ -77,7 +78,9 @@ function App({ start = startApp, setUp = setUpProfile }: { start?: StartFn; setU
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <SafeAreaProvider>
-          <StartupGate start={start}>{(route) => <Screen route={route} setUp={setUp} />}</StartupGate>
+          <StartupGate start={start} renderError={(code, retry) => <StartFailure code={code} onRetry={retry} />}>
+            {(route) => <Screen route={route} setUp={setUp} />}
+          </StartupGate>
         </SafeAreaProvider>
       </ThemeProvider>
     </QueryClientProvider>

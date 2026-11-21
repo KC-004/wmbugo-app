@@ -47,6 +47,6 @@ export function interruptedEraseDeps(): Omit<EraseDeps, 'maintenance'> {
 }
 
 /** The deps for an erase the person confirmed: the open database is closed first, and the writer is held in maintenance mode. */
-export function eraseDeps(live: SqlDatabase, maintenance: EraseDeps['maintenance']): EraseDeps {
-  return { ...interruptedEraseDeps(), closeDatabase: () => live.close(), maintenance };
+export function eraseDeps(live: SqlDatabase | null, maintenance: EraseDeps['maintenance']): EraseDeps {
+  return { ...interruptedEraseDeps(), closeDatabase: async () => void (await live?.close()), maintenance };
 }

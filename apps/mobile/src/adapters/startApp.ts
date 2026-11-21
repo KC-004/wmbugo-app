@@ -31,6 +31,7 @@ import migrations from '../../drizzle/migrations';
 import { installCrashHandlers } from './crashHandlers';
 import { refreshPermissionViews } from './permissions';
 import { sweepStaging } from './backup/rnBackupPlatform';
+import { localToday, scheduleIntegrityChecks } from './safeMode';
 import { interruptedEraseDeps } from './backup/rnErase';
 import { restoredDatabaseOpens, RESTORE_LAYOUT, rnRestoreFs } from './backup/rnRestore';
 import { ensureDir, PRIVATE_DIR, rnFileStore } from './files/rnFileStore';
@@ -269,6 +270,8 @@ async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
   void sweepStaging();
   // The first start after a restore that held: every query is invalidated and reminders are planned again from the restored data.
   if (restoreOutcome === 'restored') void writer.run(AnnounceBackupRestored, undefined, 'system').catch(() => undefined);
+  // Safe mode (Story 8.12): `quick_check` once after the first frame and once per local day. A failure stops every write.
+  scheduleIntegrityChecks(started.value.db, writer, log, () => localToday(systemClock.nowMs(), systemClock.timezoneId()), (task) => appStateScheduler.onStartOrResume(task));
   // Debug-only fixture (Story 8.5): a file placed in the private directory posts the hidden capture notification once.
   void rnFileStore.exists(CAPTURE_FIXTURE_TRIGGER).then(async (on) => {
     if (!on) return;

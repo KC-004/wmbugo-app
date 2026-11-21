@@ -15,8 +15,18 @@ type State =
  * never on a timer and never with a spinner. On failure it shows an inline
  * error and nothing else happens: no write was made by the failing step.
  */
-export function StartupGate({ start, children }: { start: StartFn; children: (route: StartRoute) => ReactNode }) {
+export function StartupGate({
+  start,
+  children,
+  renderError,
+}: {
+  start: StartFn;
+  children: (route: StartRoute) => ReactNode;
+  /** Safe mode (Story 8.12): what to show when the data cannot be opened safely; `retry` starts again without restarting the app. */
+  renderError?: (code: StartupErrorCode, retry: () => void) => ReactNode;
+}) {
   const [state, setState] = useState<State>({ status: 'pending' });
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -31,9 +41,15 @@ export function StartupGate({ start, children }: { start: StartFn; children: (ro
     return () => {
       cancelled = true;
     };
-  }, [start]);
+  }, [start, attempt]);
 
   if (state.status === 'pending') return <View style={styles.fill} testID="startup-pending" />;
+  if (state.status === 'error' && renderError) {
+    return <>{renderError(state.code, () => {
+      setState({ status: 'pending' });
+      setAttempt((n) => n + 1);
+    })}</>;
+  }
   if (state.status === 'error') {
     return (
       <View style={styles.center} testID="startup-error">

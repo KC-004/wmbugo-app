@@ -46,6 +46,15 @@ export interface RestoreApi {
 
 const APP_SCHEMA = migrations.journal.entries.length;
 
+/** The services when the data opened; null in safe mode with an unreadable database (Story 8.12), where a restore still works. */
+function services() {
+  try {
+    return getServices();
+  } catch {
+    return null;
+  }
+}
+
 export const realRestoreApi: RestoreApi = {
   async pick() {
     const { pickBackupFile } = await import('../../adapters/backup/backupFiles');
@@ -57,25 +66,27 @@ export const realRestoreApi: RestoreApi = {
     return readManifest(createRnCrypto(), source, passphrase, { appSchemaVersion: APP_SCHEMA });
   },
   async thisPhone() {
-    const facts = await readBackupFacts(getServices().db);
+    const s = services();
+    if (s === null) return null;
+    const facts = await readBackupFacts(s.db);
     const { entries, accounts, photos } = facts.counts;
     return entries === 0 && accounts === 0 && photos === 0 ? null : { entries, accounts, photos };
   },
   async lowSpace() {
     const { rnRestoreFs, createRnRestoreDb } = await import('../../adapters/backup/rnRestore');
-    const need = (await createRnRestoreDb(getServices().db).currentDataBytes()) * 2;
+    const need = (await createRnRestoreDb(services()?.db ?? null).currentDataBytes()) * 2;
     return (await rnRestoreFs.freeBytes()) < need;
   },
   async restore(source, passphrase, options) {
     const [{ createRnCrypto }, rn] = await Promise.all([import('../../adapters/backup/rnCrypto'), import('../../adapters/backup/rnRestore')]);
-    const { db, writer } = getServices();
+    const s = services();
     const r = await restoreBackup(
       {
         crypto: createRnCrypto(),
         fs: rn.rnRestoreFs,
         layout: rn.RESTORE_LAYOUT,
-        db: rn.createRnRestoreDb(db),
-        maintenance: { enter: () => writer.setMaintenance(true), exit: () => writer.setMaintenance(false) },
+        db: rn.createRnRestoreDb(s?.db ?? null),
+        maintenance: { enter: () => s?.writer.setMaintenance(true), exit: () => s?.writer.setMaintenance(false) },
         appSchemaVersion: APP_SCHEMA,
       },
       source,

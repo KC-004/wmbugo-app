@@ -141,7 +141,7 @@ development_status:
   8-9-restore-preview-and-confirmation: review
   8-10-diagnostics-with-a-preview-before-anything-is-exported: review
   8-11-storage-retention-and-erase-all-data: review
-  8-12-safe-mode-when-the-data-can-t-be-opened-safely: backlog
+  8-12-safe-mode-when-the-data-can-t-be-opened-safely: review
   epic-8-retrospective: optional
 
   epic-9: backlog

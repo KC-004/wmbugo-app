@@ -4,6 +4,7 @@ import { Plus } from 'phosphor-react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { controlA11y } from '../../shared/a11y/labels';
 import { copy } from '../../shared/copy';
+import { useSafeModeStore } from '../../shared/state/safeModeStore';
 import { ADD_BUTTON_SIZE } from '../../shared/feedback/layout';
 import { colorTokens } from '../../shared/theme/colors';
 import { elevation } from '../../shared/theme/tokens';
@@ -17,16 +18,18 @@ export type AddButtonRef = RefObject<ComponentRef<typeof Pressable> | null>;
 
 export function AddButton({ onPress, buttonRef }: { onPress: () => void; buttonRef?: AddButtonRef }) {
   const { focused, onFocus, onBlur } = useFocusRing(true);
+  // In safe mode nothing can be added: the button stays focusable and says why (Story 8.12).
+  const safe = useSafeModeStore((s) => s.reason !== null);
   return (
     <FocusRing focused={focused} onGlass radius={ADD_BUTTON_SIZE / 2}>
       <Pressable
         ref={buttonRef}
         testID="add-button"
-        {...controlA11y({ label: copy.nav.addEntry, role: 'button' })}
-        onPress={onPress}
+        {...controlA11y({ label: copy.nav.addEntry, role: 'button', ...(safe ? { disabled: true, hint: copy.safeMode.disabledAdd } : {}) })}
+        onPress={safe ? undefined : onPress}
         onFocus={onFocus}
         onBlur={onBlur}
-        style={[styles.button, elevation.addButton]}>
+        style={[styles.button, elevation.addButton, safe ? { opacity: 0.4 } : null]}>
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
           <Svg width="100%" height="100%">
             <Defs>

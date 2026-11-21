@@ -9,6 +9,7 @@ import { navLayout } from '../../shared/feedback/layout';
 import { SheetHost } from '../../shared/feedback/SheetHost';
 import { AppLockOfferHost } from '../lock/AppLockOfferHost';
 import { RestoreNoticeHost } from '../restore/RestoreNoticeHost';
+import { SafeModeBanner } from '../safemode/SafeModeBanner';
 import { ToastHost } from '../../shared/feedback/ToastHost';
 import { useTheme } from '../../shared/theme/ThemeProvider';
 import type { AddButtonRef } from './AddButton';
@@ -362,6 +363,8 @@ export function RootNavigator() {
         <SheetHost>
           <AppLockOfferHost />
           <RestoreNoticeHost />
+          <View style={styles.fill}>
+          <SafeModeBanner />
           <RootStack.Navigator screenOptions={{ headerShown: false }}>
             <RootStack.Screen name="Tabs" component={TabsWithAdd} />
             <RootStack.Screen name="Accounts" component={AccountsRoute} />
@@ -378,6 +381,7 @@ export function RootNavigator() {
             <RootStack.Screen name="Settings" component={SettingsRoute} />
             <RootStack.Screen name="HomeEdit" component={HomeEditRoute} />
           </RootStack.Navigator>
+          </View>
         </SheetHost>
       </ToastHost>
     </NavigationContainer>

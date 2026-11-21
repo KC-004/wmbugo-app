@@ -87,18 +87,23 @@ test('shows nothing (and no spinner) until startup resolves, then the screen', a
   expect(texts(r)).toContain('Home');
 });
 
-test.each<StartupErrorCode>(['STORAGE_UNSAFE', 'KEY_UNAVAILABLE', 'DATABASE_OPEN_FAILED', 'MIGRATION_FAILED'])(
-  'shows the inline storage error for %s',
-  async (code) => {
-    const r = await render(() => Promise.resolve({ ok: false, code }));
-    expect(texts(r)).toEqual(["wmbugo couldn't open its secure storage. Nothing was changed."]);
-    expect(r.root.findAllByProps({ accessibilityRole: 'alert' }).length).toBeGreaterThan(0);
-  },
-);
+// A start that cannot open the data shows safe mode (Story 8.12): nothing is changed and the ways out are offered.
+test.each<StartupErrorCode>(['STORAGE_UNSAFE', 'KEY_UNAVAILABLE', 'DATABASE_OPEN_FAILED'])('shows the safe-mode screen for %s', async (code) => {
+  const r = await render(() => Promise.resolve({ ok: false, code }));
+  expect(texts(r)).toContain("wmbugo can't safely change your data right now. Your entries are untouched.");
+  expect(texts(r)).toEqual(expect.arrayContaining(['Restore from backup', 'Diagnostics']));
+  expect(r.root.findAllByProps({ accessibilityRole: 'alert' }).length).toBeGreaterThan(0);
+});
 
-test('a startup that throws shows the same inline error', async () => {
+test('a migration that rolled back says nothing was lost and offers Try again', async () => {
+  const r = await render(() => Promise.resolve({ ok: false, code: 'MIGRATION_FAILED' }));
+  expect(texts(r)).toContain("wmbugo couldn't finish updating your data. Nothing was lost.");
+  expect(texts(r)).toContain('Try again');
+});
+
+test('a startup that throws shows safe mode too', async () => {
   const r = await render(() => Promise.reject(new Error('boom')));
-  expect(texts(r)).toEqual(["wmbugo couldn't open its secure storage. Nothing was changed."]);
+  expect(texts(r)).toContain("wmbugo can't safely change your data right now. Your entries are untouched.");
 });
 
 test('unmounting before startup finishes does not update state', async () => {

@@ -83,7 +83,7 @@ async function openStaged(name: string, keyHex: string): Promise<SqlDatabase> {
  * archive key; it is migrated forward on its own connection, then exported again into a database keyed with this device's key.
  * Photos are encrypted with the device file key as they arrive. Nothing here touches the live data: that is the swap's job.
  */
-export function createRnRestoreDb(live: SqlDatabase): RestoreDb {
+export function createRnRestoreDb(live: SqlDatabase | null): RestoreDb {
   return {
     async openEntry(name): Promise<EntryTarget> {
       if (name === 'db') {
@@ -132,6 +132,8 @@ export function createRnRestoreDb(live: SqlDatabase): RestoreDb {
 
     async carryDeviceSettings() {
       // This phone keeps its own app lock, Lock after and hide-in-recents choices: they come from the live database, not the backup.
+      // In safe mode with an unreadable database there is no live database to read them from.
+      if (live === null) return;
       const rows = await live.query("SELECT key, value_json, version, updated_at FROM settings WHERE key LIKE 'device.%'");
       const staged = await openStaged(STAGED_NAME, await deviceKey());
       try {
@@ -172,8 +174,8 @@ export function createRnRestoreDb(live: SqlDatabase): RestoreDb {
 
     /** Closes the live connection (folding the write-ahead log into the file) right before the swap moves the file. */
     async prepareForSwap() {
-      await live.query('PRAGMA wal_checkpoint(TRUNCATE)').catch(() => undefined);
-      await live.close();
+      await live?.query('PRAGMA wal_checkpoint(TRUNCATE)').catch(() => undefined);
+      await live?.close().catch(() => undefined);
       for (const suffix of ['-wal', '-shm']) await RNFS.unlink(`${RESTORE_LAYOUT.dbPath}${suffix}`).catch(() => undefined);
     },
   };
