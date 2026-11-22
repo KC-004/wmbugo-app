@@ -49,7 +49,7 @@ Draft discounts and charges are positive magnitudes. `unparsedLineCount` counts 
 
 ## Review Triage Log
 
-- high, patched: a spaced dash () read as a negative amount; a space as thousands mark () read as 234,56; a percent rate read as an amount; a header or item name with a summary word (, ) cut item parsing off;  and  taken as the bill total
+- high, patched: a spaced dash (Latte - 3.50) read as a negative amount; a space as thousands mark (1 234,56) read as 234,56; a percent rate read as an amount; a header or item name with a summary word (TAX INVOICE, Room service sandwich) cut item parsing off;  and  taken as the bill total
 - medium, patched: item line chosen as merchant, 12-hour times, opening hours read as time, 3-digit years, missing total words for Phase 1 regions, no assertion on currency detection, unparsed count, item-name cleanup; gate now pins 0 misses and at least 30 merchants in the rate
 - low, deferred: unparsed line data and item quantity or unit price are not kept; currency detection is by ISO code only and amounts use the profile exponent; month-first and non-English written months; rejected item leaves its discount uncounted; tax-inclusive receipts are always unsure; wall-clock benchmark may flake; parser tuned on the same 40 fixtures
 
