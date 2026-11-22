@@ -95,6 +95,17 @@ class BackupFilesModule(private val ctx: ReactApplicationContext) : ReactContext
     launch(intent, REQUEST_PICK, promise)
   }
 
+  /** The picker for a bank file (Story 9.6): offers CSV and text files first, and still lets the person browse everything. */
+  @ReactMethod
+  fun pickCsvDocument(promise: Promise) {
+    val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+      addCategory(Intent.CATEGORY_OPENABLE)
+      type = "*/*"
+      putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("text/csv", "text/comma-separated-values", "text/plain", "application/csv", "application/vnd.ms-excel"))
+    }
+    launch(intent, REQUEST_PICK, promise)
+  }
+
   /** A diagnostics export is plain text, so the save dialog offers a text file (Story 8.10). */
   @ReactMethod
   fun createTextDocument(suggestedName: String, promise: Promise) {

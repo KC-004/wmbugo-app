@@ -6,6 +6,7 @@ interface Native {
   createDocument(suggestedName: string): Promise<string | null>;
   createTextDocument(suggestedName: string): Promise<string | null>;
   pickDocument(): Promise<string | null>;
+  pickCsvDocument(): Promise<string | null>;
   openWrite(uri: string): Promise<number>;
   write(handle: number, base64: string): Promise<void>;
   closeWrite(handle: number): Promise<void>;
@@ -84,6 +85,22 @@ export async function pickBackupFile(): Promise<{ source: ByteSource; close(): P
     },
     close: () => native().closeRead(handle),
   };
+}
+
+/** The picker for a bank file, limited to CSV and text (Story 9.6). Returns the file's bytes (a file over `limit` stops being read), or null when cancelled. */
+export async function pickCsvFile(limit: number): Promise<{ bytes: Uint8Array; size: number } | null> {
+  const uri = await native().pickCsvDocument();
+  if (uri === null) return null;
+  const { handle, size } = await native().openRead(uri);
+  try {
+    if (size > limit) return { bytes: new Uint8Array(0), size };
+    const out = new Uint8Array(size);
+    const step = 256 * 1024;
+    for (let at = 0; at < size; at += step) out.set(fromBase64(await native().readAt(handle, at, Math.min(step, size - at))), at);
+    return { bytes: out, size };
+  } finally {
+    await native().closeRead(handle).catch(() => undefined);
+  }
 }
 
 /** A receipt photo, decrypted with the device file key and streamed in memory in order; nothing plain is written to disk. */

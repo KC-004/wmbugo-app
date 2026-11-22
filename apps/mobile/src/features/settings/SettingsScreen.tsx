@@ -47,13 +47,14 @@ import { hidingBlocksScreenshots } from '../../adapters/recentsPrivacy';
 import { requireReauth } from '../../shared/reauth';
 import { RegionPicker } from '../onboarding/OnboardingFlow';
 import { CategoriesScreen } from '../categories/CategoriesScreen';
+import { ImportWizard } from '../import/ImportWizard';
 import { RecentlyDeletedScreen } from './RecentlyDeletedScreen';
 import { realSettingsApi, SETTINGS_QUERY_KEY, type SettingsApi, type SettingsData } from './settingsApi';
 
-type Page = 'hub' | 'you' | 'appearance' | 'money' | 'categories' | 'data' | 'deleted' | 'privacy' | 'stays' | 'notifications' | 'backup' | 'restore' | 'help' | 'diagnostics' | 'export' | 'erase';
+type Page = 'hub' | 'you' | 'appearance' | 'money' | 'categories' | 'data' | 'deleted' | 'privacy' | 'stays' | 'notifications' | 'backup' | 'restore' | 'import' | 'help' | 'diagnostics' | 'export' | 'erase';
 
 /** Where Back goes from each page. */
-const PARENT: Readonly<Record<Page, Page>> = { hub: 'hub', you: 'hub', appearance: 'you', money: 'you', categories: 'hub', data: 'hub', deleted: 'data', privacy: 'hub', stays: 'privacy', notifications: 'privacy', backup: 'data', restore: 'data', help: 'hub', diagnostics: 'help', export: 'diagnostics', erase: 'data' };
+const PARENT: Readonly<Record<Page, Page>> = { hub: 'hub', you: 'hub', appearance: 'you', money: 'you', categories: 'hub', data: 'hub', deleted: 'data', privacy: 'hub', stays: 'privacy', notifications: 'privacy', backup: 'data', restore: 'data', import: 'data', help: 'hub', diagnostics: 'help', export: 'diagnostics', erase: 'data' };
 
 const THEMES: readonly { v: ThemeChoice; label: string }[] = [
   { v: 'system', label: copy.settings.themeSystem },
@@ -282,6 +283,7 @@ export function SettingsScreen({ api = realSettingsApi, onBack }: { api?: Settin
         <>
           <Row testID="row-backup" label={copy.backup.dataRow} summary={backupSummary(d.settings.lastBackupAt, d.profile.timezoneId)} onPress={() => setPage('backup')} />
           <Row testID="row-restore" label={copy.restore.row} summary={copy.restore.title} onPress={() => setPage('restore')} />
+          <Row testID="row-import" label={copy.csvImport.row} summary={copy.csvImport.rowSummary} onPress={() => setPage('import')} />
           <Row testID="row-deleted" label={copy.deleted.recentlyDeleted} summary={copy.deleted.keptFor} onPress={() => setPage('deleted')} />
           <StorageRow />
           <View accessible testID="row-keeping" accessibilityLabel={`${copy.erase.keeping}. ${retentionLine()}`} style={[styles.row, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
@@ -302,6 +304,8 @@ export function SettingsScreen({ api = realSettingsApi, onBack }: { api?: Settin
         <DiagnosticsExportScreen />
       ) : page === 'erase' ? (
         <EraseFlow onBusyChange={setBackupBusy} onExit={() => setPage('data')} />
+      ) : page === 'import' ? (
+        <ImportWizard onBusyChange={setBackupBusy} onContinue={() => setPage('data')} />
       ) : page === 'restore' ? (
         <RestoreFlow onBusyChange={setBackupBusy} onExit={() => setPage('data')} />
       ) : page === 'deleted' ? (

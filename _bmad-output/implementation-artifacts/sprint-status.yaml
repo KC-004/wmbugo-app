@@ -150,7 +150,7 @@ development_status:
   9-3-import-plan-classify-every-row-against-the-ledger-before-wri: review
   9-4-importcsvbatch-atomic-resumable-idempotent-commit: review
   9-5-imported-transfer-pairs-and-edge-day-rows-in-the-review-queu: review
-  9-6-import-wizard-choose-a-file-confirm-columns-and-preview: backlog
+  9-6-import-wizard-choose-a-file-confirm-columns-and-preview: review
   9-7-import-wizard-check-matches-import-and-see-the-summary: backlog
   9-8-keep-or-delete-imported-files: backlog
   9-9-export-transactions-and-account-summaries-as-csv: backlog

@@ -1,10 +1,11 @@
 import { NativeModules } from 'react-native';
-import { createBackupDocument, openEncryptedPhoto, pickBackupFile } from './backupFiles';
+import { createBackupDocument, openEncryptedPhoto, pickBackupFile, pickCsvFile } from './backupFiles';
 
 const native = {
   createDocument: jest.fn(),
   createTextDocument: jest.fn(),
   pickDocument: jest.fn(),
+  pickCsvDocument: jest.fn(),
   openWrite: jest.fn(),
   write: jest.fn(),
   closeWrite: jest.fn(),
@@ -85,5 +86,33 @@ describe('the picked backup and the staged photos', () => {
     expect(native.writeEncrypted).toHaveBeenCalledWith(9, 'AQI=');
     expect(native.closeEncrypted).toHaveBeenCalledWith(9);
     expect(native.abortEncrypted).toHaveBeenCalledWith(9);
+  });
+});
+
+describe('the bank file picker (Story 9.6)', () => {
+  it('a cancelled picker gives null and opens nothing', async () => {
+    native.pickCsvDocument.mockResolvedValue(null);
+    expect(await pickCsvFile(100)).toBeNull();
+    expect(native.openRead).not.toHaveBeenCalled();
+  });
+
+  it('reads the whole file in pieces and closes it', async () => {
+    native.pickCsvDocument.mockResolvedValue('content://doc/2');
+    native.openRead.mockResolvedValue({ handle: 4, size: 3 });
+    native.readAt.mockResolvedValue('AQID');
+    const r = (await pickCsvFile(100))!;
+    expect(Array.from(r.bytes)).toEqual([1, 2, 3]);
+    expect(r.size).toBe(3);
+    expect(native.closeRead).toHaveBeenCalledWith(4);
+  });
+
+  it('a file over the limit is not read: only its size comes back', async () => {
+    native.pickCsvDocument.mockResolvedValue('content://doc/2');
+    native.openRead.mockResolvedValue({ handle: 4, size: 500 });
+    const r = (await pickCsvFile(100))!;
+    expect(r.bytes.length).toBe(0);
+    expect(r.size).toBe(500);
+    expect(native.readAt).not.toHaveBeenCalled();
+    expect(native.closeRead).toHaveBeenCalledWith(4);
   });
 });
