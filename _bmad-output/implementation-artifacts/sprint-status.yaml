@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 11-08-2026 09:43
-last_updated: 11-21-2026 14:42
+last_updated: 11-22-2026 16:03
 project: wmbugo-app
 project_key: NOKEY
 tracking_system: file-system
@@ -154,7 +154,7 @@ development_status:
   9-7-import-wizard-check-matches-import-and-see-the-summary: done
   9-8-keep-or-delete-imported-files: done
   9-9-export-transactions-and-account-summaries-as-csv: done
-  epic-9-retrospective: optional
+  epic-9-retrospective: done
 
   epic-10: backlog
   10-1-spike-s3-ocr-engine-choice-and-the-synthetic-receipt-set: backlog
@@ -470,7 +470,7 @@ action_items:
     action: "Decide CSV export: add a native save-dialog module or accept the share
       sheet as a deviation of story 7.3"
     owner: "KCPK"
-    status: open
+    status: in-progress
     ref: "_bmad-output/implementation-artifacts/epic-7-retro-2026-11-21.md"
   - id: "epic-7-retro-item-38-build-the-story-4-11-needs-wants-savings"
     epic: 7
@@ -512,3 +512,57 @@ action_items:
     owner: "dev"
     status: open
     ref: "_bmad-output/implementation-artifacts/epic-7-retro-2026-11-21.md"
+  - id: "epic-9-retro-item-44-add-the-account-to-the-reference-based-c"
+    epic: 9
+    action: "Add the account to the reference-based CSV fingerprint (or confirm LIR-03
+      on purpose) with a two-account test"
+    owner: "Amelia"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-9-retro-2026-11-22.md"
+  - id: "epic-9-retro-item-45-show-held_pair-review-rows-with-a-questi"
+    epic: 9
+    action: "Show held_pair review rows with a question and an answer instead of plain
+      Waiting"
+    owner: "Amelia"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-9-retro-2026-11-22.md"
+  - id: "epic-9-retro-item-46-decide-the-export-account_number-column"
+    epic: 9
+    action: "Decide the export account_number column: drop the switch or add a stored
+      account number"
+    owner: "KCPK"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-9-retro-2026-11-22.md"
+  - id: "epic-9-retro-item-47-verify-with-tests-the-overlap-fingerprin"
+    epic: 9
+    action: "Verify with tests the overlap-fingerprint and resume-pair risks in CSV
+      import"
+    owner: "Amelia"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-9-retro-2026-11-22.md"
+  - id: "epic-9-retro-item-48-phone-check-of-epic-9-import-resume-impo"
+    epic: 9
+    action: "Phone check of Epic 9 import, resume, Imported files and export, including
+      the RNFS readDir path question"
+    owner: "KCPK"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-9-retro-2026-11-22.md"
+  - id: "epic-9-retro-item-49-process-write-each-epic-code-review-resu"
+    epic: 9
+    action: "Process: write each epic code-review result to a file so the retro can
+      read it"
+    owner: "KCPK"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-9-retro-2026-11-22.md"
+  - id: "epic-9-retro-item-50-run-the-epic-6-and-epic-8-retrospectives"
+    epic: 9
+    action: "Run the Epic 6 and Epic 8 retrospectives"
+    owner: "KCPK"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-9-retro-2026-11-22.md"
+  - id: "epic-9-retro-item-51-split-copy-ts-by-feature-third-mention"
+    epic: 9
+    action: "Split copy.ts by feature (third mention)"
+    owner: "Amelia"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-9-retro-2026-11-22.md"
