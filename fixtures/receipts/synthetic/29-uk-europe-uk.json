@@ -1,0 +1,51 @@
+{
+  "id": "29-uk-europe-uk",
+  "market": "uk-europe",
+  "region": "GB",
+  "merchant": "Tidal Coffee Bar",
+  "date": "2026-09-26",
+  "currency": "GBP",
+  "subtotalMinor": 833,
+  "taxes": [
+    {
+      "label": "VAT",
+      "amountMinor": 167
+    }
+  ],
+  "fees": [],
+  "discounts": [],
+  "totalMinor": 1000,
+  "items": [
+    {
+      "name": "Orange juice",
+      "amountMinor": 189
+    },
+    {
+      "name": "Biscuits",
+      "amountMinor": 120
+    },
+    {
+      "name": "Sliced bread",
+      "amountMinor": 129
+    },
+    {
+      "name": "Crisps",
+      "amountMinor": 100
+    },
+    {
+      "name": "Semi skimmed milk",
+      "amountMinor": 155
+    },
+    {
+      "name": "Pasta sauce",
+      "amountMinor": 140
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": false,
+    "decimalComma": false,
+    "multiColumn": false,
+    "lowContrastOrTilted": true,
+    "longReceipt": false
+  }
+}

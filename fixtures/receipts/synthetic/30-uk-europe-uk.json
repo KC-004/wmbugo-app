@@ -1,0 +1,47 @@
+{
+  "id": "30-uk-europe-uk",
+  "market": "uk-europe",
+  "region": "GB",
+  "merchant": "Station Express",
+  "date": "2026-02-10",
+  "currency": "GBP",
+  "subtotalMinor": 1059,
+  "taxes": [
+    {
+      "label": "VAT",
+      "amountMinor": 212
+    }
+  ],
+  "fees": [],
+  "discounts": [],
+  "totalMinor": 1271,
+  "items": [
+    {
+      "name": "Cheddar 400g",
+      "amountMinor": 325
+    },
+    {
+      "name": "Crisps",
+      "amountMinor": 100
+    },
+    {
+      "name": "Cheddar 400g",
+      "amountMinor": 325
+    },
+    {
+      "name": "Biscuits",
+      "amountMinor": 120
+    },
+    {
+      "name": "Orange juice",
+      "amountMinor": 189
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": false,
+    "decimalComma": false,
+    "multiColumn": false,
+    "lowContrastOrTilted": false,
+    "longReceipt": false
+  }
+}

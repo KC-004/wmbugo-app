@@ -1,0 +1,238 @@
+{
+ "id": "01-india-in",
+ "engine": "paddleocr-ppocrv4-onnx",
+ "width": 560,
+ "height": 712,
+ "blocks": [
+  {
+   "text": "H  H",
+   "box": {
+    "left": 177,
+    "top": 21,
+    "right": 381,
+    "bottom": 66
+   },
+   "confidence": 0.707
+  },
+  {
+   "text": "a,  3",
+   "box": {
+    "left": 185,
+    "top": 67,
+    "right": 375,
+    "bottom": 100
+   },
+   "confidence": 0.758
+  },
+  {
+   "text": "Date: 16/03/2026",
+   "box": {
+    "left": 23,
+    "top": 142,
+    "right": 256,
+    "bottom": 167
+   },
+   "confidence": 0.991
+  },
+  {
+   "text": "18:31",
+   "box": {
+    "left": 280,
+    "top": 142,
+    "right": 355,
+    "bottom": 167
+   },
+   "confidence": 0.996
+  },
+  {
+   "text": "125.00",
+   "box": {
+    "left": 448,
+    "top": 210,
+    "right": 538,
+    "bottom": 234
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Masala chai pack",
+   "box": {
+    "left": 22,
+    "top": 211,
+    "right": 255,
+    "bottom": 235
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "44.00",
+   "box": {
+    "left": 464,
+    "top": 245,
+    "right": 538,
+    "bottom": 268
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Bath soap",
+   "box": {
+    "left": 21,
+    "top": 245,
+    "right": 156,
+    "bottom": 271
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "38.00",
+   "box": {
+    "left": 462,
+    "top": 278,
+    "right": 538,
+    "bottom": 303
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Curd 500g",
+   "box": {
+    "left": 22,
+    "top": 277,
+    "right": 156,
+    "bottom": 306
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Filter coffee",
+   "box": {
+    "left": 22,
+    "top": 312,
+    "right": 213,
+    "bottom": 336
+   },
+   "confidence": 0.994
+  },
+  {
+   "text": "80.00",
+   "box": {
+    "left": 463,
+    "top": 313,
+    "right": 538,
+    "bottom": 336
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "140.00",
+   "box": {
+    "left": 446,
+    "top": 345,
+    "right": 538,
+    "bottom": 371
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Mango 1kg",
+   "box": {
+    "left": 20,
+    "top": 346,
+    "right": 157,
+    "bottom": 375
+   },
+   "confidence": 0.982
+  },
+  {
+   "text": "427.00",
+   "box": {
+    "left": 447,
+    "top": 413,
+    "right": 538,
+    "bottom": 439
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Subtotal",
+   "box": {
+    "left": 22,
+    "top": 414,
+    "right": 139,
+    "bottom": 438
+   },
+   "confidence": 1
+  },
+  {
+   "text": "CGST",
+   "box": {
+    "left": 22,
+    "top": 449,
+    "right": 85,
+    "bottom": 474
+   },
+   "confidence": 1
+  },
+  {
+   "text": "10.67",
+   "box": {
+    "left": 462,
+    "top": 449,
+    "right": 538,
+    "bottom": 472
+   },
+   "confidence": 1
+  },
+  {
+   "text": "10.68",
+   "box": {
+    "left": 462,
+    "top": 482,
+    "right": 538,
+    "bottom": 507
+   },
+   "confidence": 1
+  },
+  {
+   "text": "SGST",
+   "box": {
+    "left": 22,
+    "top": 483,
+    "right": 86,
+    "bottom": 508
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "448.35",
+   "box": {
+    "left": 448,
+    "top": 549,
+    "right": 537,
+    "bottom": 575
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Grand Total",
+   "box": {
+    "left": 23,
+    "top": 551,
+    "right": 182,
+    "bottom": 575
+   },
+   "confidence": 0.993
+  },
+  {
+   "text": "Thank you",
+   "box": {
+    "left": 212,
+    "top": 617,
+    "right": 348,
+    "bottom": 646
+   },
+   "confidence": 0.998
+  }
+ ]
+}

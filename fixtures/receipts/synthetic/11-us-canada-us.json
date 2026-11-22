@@ -1,0 +1,39 @@
+{
+  "id": "11-us-canada-us",
+  "market": "us-canada",
+  "region": "US",
+  "merchant": "Maple Street Grocery",
+  "date": "2026-11-21",
+  "currency": "USD",
+  "subtotalMinor": 2733,
+  "taxes": [
+    {
+      "label": "Sales tax",
+      "amountMinor": 198
+    }
+  ],
+  "fees": [],
+  "discounts": [],
+  "totalMinor": 2931,
+  "items": [
+    {
+      "name": "Ground coffee 12oz",
+      "amountMinor": 1299
+    },
+    {
+      "name": "Chicken breast",
+      "amountMinor": 1245
+    },
+    {
+      "name": "Bananas",
+      "amountMinor": 189
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": false,
+    "decimalComma": false,
+    "multiColumn": false,
+    "lowContrastOrTilted": false,
+    "longReceipt": false
+  }
+}

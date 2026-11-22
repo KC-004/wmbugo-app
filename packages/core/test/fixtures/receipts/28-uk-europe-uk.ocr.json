@@ -1,0 +1,198 @@
+{
+ "id": "28-uk-europe-uk",
+ "engine": "paddleocr-ppocrv4-onnx",
+ "width": 560,
+ "height": 644,
+ "blocks": [
+  {
+   "text": "Penny Hardware",
+   "box": {
+    "left": 138,
+    "top": 36,
+    "right": 424,
+    "bottom": 66
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "Tel 9:00 - 21:00",
+   "box": {
+    "left": 163,
+    "top": 74,
+    "right": 395,
+    "bottom": 98
+   },
+   "confidence": 0.947
+  },
+  {
+   "text": "Date: 18/11/2026",
+   "box": {
+    "left": 23,
+    "top": 143,
+    "right": 256,
+    "bottom": 165
+   },
+   "confidence": 0.99
+  },
+  {
+   "text": "15:21",
+   "box": {
+    "left": 280,
+    "top": 143,
+    "right": 355,
+    "bottom": 166
+   },
+   "confidence": 0.995
+  },
+  {
+   "text": "3.25",
+   "box": {
+    "left": 477,
+    "top": 209,
+    "right": 538,
+    "bottom": 235
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Cheddar 400g",
+   "box": {
+    "left": 22,
+    "top": 209,
+    "right": 200,
+    "bottom": 238
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "4.10",
+   "box": {
+    "left": 476,
+    "top": 243,
+    "right": 539,
+    "bottom": 269
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Chicken thighs",
+   "box": {
+    "left": 23,
+    "top": 245,
+    "right": 226,
+    "bottom": 269
+   },
+   "confidence": 0.997
+  },
+  {
+   "text": "Sliced bread",
+   "box": {
+    "left": 22,
+    "top": 276,
+    "right": 201,
+    "bottom": 303
+   },
+   "confidence": 0.994
+  },
+  {
+   "text": "1.29",
+   "box": {
+    "left": 476,
+    "top": 277,
+    "right": 538,
+    "bottom": 304
+   },
+   "confidence": 1
+  },
+  {
+   "text": "3.25",
+   "box": {
+    "left": 476,
+    "top": 311,
+    "right": 538,
+    "bottom": 338
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Cheddar 400g",
+   "box": {
+    "left": 21,
+    "top": 311,
+    "right": 200,
+    "bottom": 340
+   },
+   "confidence": 0.997
+  },
+  {
+   "text": "Subtotal",
+   "box": {
+    "left": 21,
+    "top": 379,
+    "right": 140,
+    "bottom": 406
+   },
+   "confidence": 1
+  },
+  {
+   "text": "11.89",
+   "box": {
+    "left": 462,
+    "top": 380,
+    "right": 538,
+    "bottom": 405
+   },
+   "confidence": 1
+  },
+  {
+   "text": "VAT",
+   "box": {
+    "left": 20,
+    "top": 414,
+    "right": 70,
+    "bottom": 440
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "2.38",
+   "box": {
+    "left": 476,
+    "top": 414,
+    "right": 538,
+    "bottom": 440
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "14.27",
+   "box": {
+    "left": 462,
+    "top": 481,
+    "right": 538,
+    "bottom": 507
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Total",
+   "box": {
+    "left": 22,
+    "top": 483,
+    "right": 97,
+    "bottom": 506
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Thank you",
+   "box": {
+    "left": 212,
+    "top": 550,
+    "right": 347,
+    "bottom": 578
+   },
+   "confidence": 0.999
+  }
+ ]
+}

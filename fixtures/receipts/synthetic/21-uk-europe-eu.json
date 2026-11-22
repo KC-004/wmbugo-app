@@ -1,0 +1,47 @@
+{
+  "id": "21-uk-europe-eu",
+  "market": "uk-europe",
+  "region": "DE",
+  "merchant": "Bäckerei Lindenhof",
+  "date": "2026-07-05",
+  "currency": "EUR",
+  "subtotalMinor": 895,
+  "taxes": [
+    {
+      "label": "MwSt",
+      "amountMinor": 170
+    }
+  ],
+  "fees": [],
+  "discounts": [],
+  "totalMinor": 1065,
+  "items": [
+    {
+      "name": "Vollkornbrot",
+      "amountMinor": 389
+    },
+    {
+      "name": "Butter 250g",
+      "amountMinor": 229
+    },
+    {
+      "name": "Mineralwasser",
+      "amountMinor": 99
+    },
+    {
+      "name": "Joghurt",
+      "amountMinor": 79
+    },
+    {
+      "name": "Mineralwasser",
+      "amountMinor": 99
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": false,
+    "decimalComma": true,
+    "multiColumn": false,
+    "lowContrastOrTilted": false,
+    "longReceipt": false
+  }
+}

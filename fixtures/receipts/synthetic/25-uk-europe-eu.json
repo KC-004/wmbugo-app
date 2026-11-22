@@ -1,0 +1,52 @@
+{
+  "id": "25-uk-europe-eu",
+  "market": "uk-europe",
+  "region": "DE",
+  "merchant": "Apotheke am Dom",
+  "date": "2026-10-04",
+  "currency": "EUR",
+  "subtotalMinor": 2015,
+  "taxes": [
+    {
+      "label": "MwSt",
+      "amountMinor": 344
+    }
+  ],
+  "fees": [],
+  "discounts": [
+    {
+      "label": "Discount",
+      "amountMinor": -202
+    }
+  ],
+  "totalMinor": 2157,
+  "items": [
+    {
+      "name": "Käse Gouda",
+      "amountMinor": 479
+    },
+    {
+      "name": "Schokolade",
+      "amountMinor": 159
+    },
+    {
+      "name": "Käse Gouda",
+      "amountMinor": 479
+    },
+    {
+      "name": "Kaffee Crema",
+      "amountMinor": 749
+    },
+    {
+      "name": "Nudeln 500g",
+      "amountMinor": 149
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": false,
+    "decimalComma": true,
+    "multiColumn": false,
+    "lowContrastOrTilted": false,
+    "longReceipt": false
+  }
+}

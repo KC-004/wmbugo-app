@@ -1,0 +1,288 @@
+{
+ "id": "12-us-canada-us",
+ "engine": "paddleocr-ppocrv4-onnx",
+ "width": 560,
+ "height": 780,
+ "blocks": [
+  {
+   "text": "Harbor Coffee Roasters",
+   "box": {
+    "left": 54,
+    "top": 34,
+    "right": 504,
+    "bottom": 64
+   },
+   "confidence": 0.984
+  },
+  {
+   "text": "Tel 9:00-21:00",
+   "box": {
+    "left": 163,
+    "top": 74,
+    "right": 395,
+    "bottom": 96
+   },
+   "confidence": 0.961
+  },
+  {
+   "text": "Date: 11/15/2026",
+   "box": {
+    "left": 23,
+    "top": 143,
+    "right": 256,
+    "bottom": 166
+   },
+   "confidence": 0.992
+  },
+  {
+   "text": "10:54",
+   "box": {
+    "left": 281,
+    "top": 143,
+    "right": 357,
+    "bottom": 167
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "10.99",
+   "box": {
+    "left": 462,
+    "top": 210,
+    "right": 538,
+    "bottom": 235
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Paper towels",
+   "box": {
+    "left": 24,
+    "top": 211,
+    "right": 198,
+    "bottom": 235
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "4.29",
+   "box": {
+    "left": 477,
+    "top": 243,
+    "right": 539,
+    "bottom": 270
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Whole milk lgal",
+   "box": {
+    "left": 22,
+    "top": 244,
+    "right": 239,
+    "bottom": 269
+   },
+   "confidence": 0.966
+  },
+  {
+   "text": "3.89",
+   "box": {
+    "left": 477,
+    "top": 278,
+    "right": 539,
+    "bottom": 303
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Eggs dozen",
+   "box": {
+    "left": 22,
+    "top": 278,
+    "right": 170,
+    "bottom": 305
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "12.45",
+   "box": {
+    "left": 462,
+    "top": 311,
+    "right": 538,
+    "bottom": 337
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Chicken breast",
+   "box": {
+    "left": 23,
+    "top": 312,
+    "right": 226,
+    "bottom": 337
+   },
+   "confidence": 1
+  },
+  {
+   "text": "4.79",
+   "box": {
+    "left": 476,
+    "top": 346,
+    "right": 538,
+    "bottom": 371
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Granola bars",
+   "box": {
+    "left": 23,
+    "top": 347,
+    "right": 198,
+    "bottom": 371
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Chicken breast",
+   "box": {
+    "left": 23,
+    "top": 380,
+    "right": 226,
+    "bottom": 405
+   },
+   "confidence": 1
+  },
+  {
+   "text": "12.45",
+   "box": {
+    "left": 462,
+    "top": 380,
+    "right": 538,
+    "bottom": 406
+   },
+   "confidence": 1
+  },
+  {
+   "text": "5.99",
+   "box": {
+    "left": 476,
+    "top": 414,
+    "right": 539,
+    "bottom": 439
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Sourdough loaf",
+   "box": {
+    "left": 23,
+    "top": 415,
+    "right": 227,
+    "bottom": 439
+   },
+   "confidence": 0.992
+  },
+  {
+   "text": "54.85",
+   "box": {
+    "left": 462,
+    "top": 480,
+    "right": 539,
+    "bottom": 508
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Subtotal",
+   "box": {
+    "left": 23,
+    "top": 482,
+    "right": 139,
+    "bottom": 506
+   },
+   "confidence": 1
+  },
+  {
+   "text": "-5.49",
+   "box": {
+    "left": 462,
+    "top": 515,
+    "right": 538,
+    "bottom": 541
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Discount",
+   "box": {
+    "left": 22,
+    "top": 517,
+    "right": 140,
+    "bottom": 541
+   },
+   "confidence": 1
+  },
+  {
+   "text": "3.58",
+   "box": {
+    "left": 476,
+    "top": 549,
+    "right": 538,
+    "bottom": 576
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Sales",
+   "box": {
+    "left": 22,
+    "top": 550,
+    "right": 100,
+    "bottom": 574
+   },
+   "confidence": 1
+  },
+  {
+   "text": "tax",
+   "box": {
+    "left": 97,
+    "top": 552,
+    "right": 155,
+    "bottom": 575
+   },
+   "confidence": 0.98
+  },
+  {
+   "text": "52.94",
+   "box": {
+    "left": 462,
+    "top": 616,
+    "right": 539,
+    "bottom": 644
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Total",
+   "box": {
+    "left": 21,
+    "top": 618,
+    "right": 98,
+    "bottom": 643
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Thank you",
+   "box": {
+    "left": 213,
+    "top": 686,
+    "right": 347,
+    "bottom": 713
+   },
+   "confidence": 0.996
+  }
+ ]
+}

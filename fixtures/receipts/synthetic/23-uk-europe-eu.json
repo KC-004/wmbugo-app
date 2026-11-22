@@ -1,0 +1,55 @@
+{
+  "id": "23-uk-europe-eu",
+  "market": "uk-europe",
+  "region": "DE",
+  "merchant": "Markt am Fluss",
+  "date": "2026-11-21",
+  "currency": "EUR",
+  "subtotalMinor": 2604,
+  "taxes": [
+    {
+      "label": "MwSt",
+      "amountMinor": 495
+    }
+  ],
+  "fees": [],
+  "discounts": [],
+  "totalMinor": 3099,
+  "items": [
+    {
+      "name": "Mineralwasser",
+      "amountMinor": 99
+    },
+    {
+      "name": "Käse Gouda",
+      "amountMinor": 479
+    },
+    {
+      "name": "Kaffee Crema",
+      "amountMinor": 749
+    },
+    {
+      "name": "Eier 10 Stk",
+      "amountMinor": 319
+    },
+    {
+      "name": "Nudeln 500g",
+      "amountMinor": 149
+    },
+    {
+      "name": "Brötchen 6 Stk",
+      "amountMinor": 330
+    },
+    {
+      "name": "Käse Gouda",
+      "amountMinor": 479
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": false,
+    "decimalComma": true,
+    "multiColumn": false,
+    "lowContrastOrTilted": false,
+    "longReceipt": false
+  }
+}

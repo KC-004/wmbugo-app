@@ -1,0 +1,59 @@
+{
+  "id": "04-india-in",
+  "market": "india",
+  "region": "IN",
+  "merchant": "Blue Door Cafe",
+  "date": "2026-01-02",
+  "currency": "INR",
+  "subtotalMinor": 185200,
+  "taxes": [
+    {
+      "label": "CGST",
+      "amountMinor": 4630
+    },
+    {
+      "label": "SGST",
+      "amountMinor": 4630
+    }
+  ],
+  "fees": [],
+  "discounts": [],
+  "totalMinor": 194460,
+  "items": [
+    {
+      "name": "Ghee 500ml",
+      "amountMinor": 32500
+    },
+    {
+      "name": "Basmati rice 5kg",
+      "amountMinor": 64900
+    },
+    {
+      "name": "Ghee 500ml",
+      "amountMinor": 32500
+    },
+    {
+      "name": "Ghee 500ml",
+      "amountMinor": 32500
+    },
+    {
+      "name": "Bath soap",
+      "amountMinor": 4400
+    },
+    {
+      "name": "Bath soap",
+      "amountMinor": 4400
+    },
+    {
+      "name": "Mango 1kg",
+      "amountMinor": 14000
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": false,
+    "decimalComma": false,
+    "multiColumn": true,
+    "lowContrastOrTilted": false,
+    "longReceipt": false
+  }
+}

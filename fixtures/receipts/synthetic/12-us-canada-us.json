@@ -1,0 +1,60 @@
+{
+  "id": "12-us-canada-us",
+  "market": "us-canada",
+  "region": "US",
+  "merchant": "Harbor Coffee Roasters",
+  "date": "2026-11-15",
+  "currency": "USD",
+  "subtotalMinor": 5485,
+  "taxes": [
+    {
+      "label": "Sales tax",
+      "amountMinor": 358
+    }
+  ],
+  "fees": [],
+  "discounts": [
+    {
+      "label": "Discount",
+      "amountMinor": -549
+    }
+  ],
+  "totalMinor": 5294,
+  "items": [
+    {
+      "name": "Paper towels",
+      "amountMinor": 1099
+    },
+    {
+      "name": "Whole milk 1gal",
+      "amountMinor": 429
+    },
+    {
+      "name": "Eggs dozen",
+      "amountMinor": 389
+    },
+    {
+      "name": "Chicken breast",
+      "amountMinor": 1245
+    },
+    {
+      "name": "Granola bars",
+      "amountMinor": 479
+    },
+    {
+      "name": "Chicken breast",
+      "amountMinor": 1245
+    },
+    {
+      "name": "Sourdough loaf",
+      "amountMinor": 599
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": false,
+    "decimalComma": false,
+    "multiColumn": false,
+    "lowContrastOrTilted": false,
+    "longReceipt": false
+  }
+}

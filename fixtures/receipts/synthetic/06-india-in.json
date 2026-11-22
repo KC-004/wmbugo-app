@@ -1,0 +1,55 @@
+{
+  "id": "06-india-in",
+  "market": "india",
+  "region": "IN",
+  "merchant": "Raj Stationers",
+  "date": "2026-01-15",
+  "currency": "INR",
+  "subtotalMinor": 103300,
+  "taxes": [
+    {
+      "label": "CGST",
+      "amountMinor": 2582
+    },
+    {
+      "label": "SGST",
+      "amountMinor": 2583
+    }
+  ],
+  "fees": [],
+  "discounts": [],
+  "totalMinor": 108465,
+  "items": [
+    {
+      "name": "Ghee 500ml",
+      "amountMinor": 32500
+    },
+    {
+      "name": "Curd 500g",
+      "amountMinor": 3800
+    },
+    {
+      "name": "Filter coffee",
+      "amountMinor": 8000
+    },
+    {
+      "name": "Masala chai pack",
+      "amountMinor": 12500
+    },
+    {
+      "name": "Ghee 500ml",
+      "amountMinor": 32500
+    },
+    {
+      "name": "Mango 1kg",
+      "amountMinor": 14000
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": false,
+    "decimalComma": false,
+    "multiColumn": false,
+    "lowContrastOrTilted": true,
+    "longReceipt": false
+  }
+}

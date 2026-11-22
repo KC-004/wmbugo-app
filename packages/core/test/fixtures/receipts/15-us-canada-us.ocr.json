@@ -1,0 +1,258 @@
+{
+ "id": "15-us-canada-us",
+ "engine": "paddleocr-ppocrv4-onnx",
+ "width": 680,
+ "height": 866,
+ "blocks": [
+  {
+   "text": "Cedar Pharmacy",
+   "box": {
+    "left": 166,
+    "top": 84,
+    "right": 470,
+    "bottom": 141
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "openday9:00-21:00",
+   "box": {
+    "left": 140,
+    "top": 111,
+    "right": 500,
+    "bottom": 184
+   },
+   "confidence": 0.834
+  },
+  {
+   "text": "11:44",
+   "box": {
+    "left": 323,
+    "top": 196,
+    "right": 404,
+    "bottom": 228
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Date: 11/21/2026",
+   "box": {
+    "left": 60,
+    "top": 197,
+    "right": 311,
+    "bottom": 252
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "1.99",
+   "box": {
+    "left": 524,
+    "top": 252,
+    "right": 588,
+    "bottom": 281
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Pasta 160z",
+   "box": {
+    "left": 68,
+    "top": 277,
+    "right": 223,
+    "bottom": 317
+   },
+   "confidence": 0.972
+  },
+  {
+   "text": "3.89",
+   "box": {
+    "left": 526,
+    "top": 286,
+    "right": 592,
+    "bottom": 316
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Eggs dozen",
+   "box": {
+    "left": 69,
+    "top": 310,
+    "right": 227,
+    "bottom": 352
+   },
+   "confidence": 0.976
+  },
+  {
+   "text": "13.99",
+   "box": {
+    "left": 513,
+    "top": 320,
+    "right": 594,
+    "bottom": 351
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Olive oil",
+   "box": {
+    "left": 72,
+    "top": 344,
+    "right": 213,
+    "bottom": 384
+   },
+   "confidence": 0.967
+  },
+  {
+   "text": "4.79",
+   "box": {
+    "left": 530,
+    "top": 353,
+    "right": 597,
+    "bottom": 385
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Granola bars",
+   "box": {
+    "left": 74,
+    "top": 376,
+    "right": 261,
+    "bottom": 419
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "6.49",
+   "box": {
+    "left": 535,
+    "top": 389,
+    "right": 598,
+    "bottom": 417
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Sparkling water",
+   "box": {
+    "left": 76,
+    "top": 405,
+    "right": 308,
+    "bottom": 456
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "6.49",
+   "box": {
+    "left": 537,
+    "top": 421,
+    "right": 602,
+    "bottom": 452
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Sparkling water",
+   "box": {
+    "left": 77,
+    "top": 437,
+    "right": 312,
+    "bottom": 491
+   },
+   "confidence": 0.997
+  },
+  {
+   "text": "3.89",
+   "box": {
+    "left": 539,
+    "top": 455,
+    "right": 604,
+    "bottom": 486
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Eggs dozen",
+   "box": {
+    "left": 82,
+    "top": 480,
+    "right": 239,
+    "bottom": 522
+   },
+   "confidence": 0.996
+  },
+  {
+   "text": "41.53",
+   "box": {
+    "left": 529,
+    "top": 523,
+    "right": 608,
+    "bottom": 554
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Subtotal",
+   "box": {
+    "left": 88,
+    "top": 549,
+    "right": 213,
+    "bottom": 588
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "3.01",
+   "box": {
+    "left": 546,
+    "top": 558,
+    "right": 609,
+    "bottom": 588
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Sales tax",
+   "box": {
+    "left": 90,
+    "top": 584,
+    "right": 232,
+    "bottom": 622
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "44.54",
+   "box": {
+    "left": 537,
+    "top": 626,
+    "right": 614,
+    "bottom": 655
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Total",
+   "box": {
+    "left": 95,
+    "top": 655,
+    "right": 176,
+    "bottom": 688
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Thank you",
+   "box": {
+    "left": 290,
+    "top": 707,
+    "right": 431,
+    "bottom": 744
+   },
+   "confidence": 0.998
+  }
+ ]
+}

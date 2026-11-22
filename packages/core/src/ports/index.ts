@@ -5,3 +5,4 @@ export * from './scheduler';
 export * from './categorySuggester';
 export * from './notifier';
 export * from './crypto';
+export * from './OcrEngine';

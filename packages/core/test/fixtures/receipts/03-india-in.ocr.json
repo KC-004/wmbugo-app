@@ -1,0 +1,218 @@
+{
+ "id": "03-india-in",
+ "engine": "paddleocr-ppocrv4-onnx",
+ "width": 560,
+ "height": 678,
+ "blocks": [
+  {
+   "text": "gRd 3qeT",
+   "box": {
+    "left": 176,
+    "top": 22,
+    "right": 389,
+    "bottom": 65
+   },
+   "confidence": 0.615
+  },
+  {
+   "text": "a,  3HU",
+   "box": {
+    "left": 185,
+    "top": 66,
+    "right": 375,
+    "bottom": 100
+   },
+   "confidence": 0.662
+  },
+  {
+   "text": "13:31",
+   "box": {
+    "left": 280,
+    "top": 142,
+    "right": 355,
+    "bottom": 167
+   },
+   "confidence": 0.99
+  },
+  {
+   "text": "Date: 10/07/2026",
+   "box": {
+    "left": 23,
+    "top": 143,
+    "right": 256,
+    "bottom": 165
+   },
+   "confidence": 0.988
+  },
+  {
+   "text": "125.00",
+   "box": {
+    "left": 447,
+    "top": 209,
+    "right": 538,
+    "bottom": 235
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Masala chai pack",
+   "box": {
+    "left": 22,
+    "top": 211,
+    "right": 255,
+    "bottom": 236
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "140.00",
+   "box": {
+    "left": 447,
+    "top": 243,
+    "right": 538,
+    "bottom": 269
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Mango 1kg",
+   "box": {
+    "left": 20,
+    "top": 245,
+    "right": 156,
+    "bottom": 271
+   },
+   "confidence": 0.977
+  },
+  {
+   "text": "40.00",
+   "box": {
+    "left": 463,
+    "top": 278,
+    "right": 538,
+    "bottom": 302
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Samosa x2",
+   "box": {
+    "left": 22,
+    "top": 279,
+    "right": 155,
+    "bottom": 303
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "Filter coffee",
+   "box": {
+    "left": 21,
+    "top": 312,
+    "right": 213,
+    "bottom": 337
+   },
+   "confidence": 0.969
+  },
+  {
+   "text": "80.00",
+   "box": {
+    "left": 463,
+    "top": 313,
+    "right": 539,
+    "bottom": 336
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Subtotal",
+   "box": {
+    "left": 22,
+    "top": 380,
+    "right": 139,
+    "bottom": 404
+   },
+   "confidence": 1
+  },
+  {
+   "text": "385.00",
+   "box": {
+    "left": 448,
+    "top": 380,
+    "right": 538,
+    "bottom": 404
+   },
+   "confidence": 1
+  },
+  {
+   "text": "9.62",
+   "box": {
+    "left": 477,
+    "top": 414,
+    "right": 538,
+    "bottom": 439
+   },
+   "confidence": 1
+  },
+  {
+   "text": "CGST",
+   "box": {
+    "left": 23,
+    "top": 416,
+    "right": 84,
+    "bottom": 439
+   },
+   "confidence": 1
+  },
+  {
+   "text": "9.63",
+   "box": {
+    "left": 477,
+    "top": 447,
+    "right": 539,
+    "bottom": 474
+   },
+   "confidence": 1
+  },
+  {
+   "text": "SGST",
+   "box": {
+    "left": 23,
+    "top": 450,
+    "right": 84,
+    "bottom": 473
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Grand Total",
+   "box": {
+    "left": 23,
+    "top": 516,
+    "right": 182,
+    "bottom": 540
+   },
+   "confidence": 0.995
+  },
+  {
+   "text": "404.25",
+   "box": {
+    "left": 448,
+    "top": 516,
+    "right": 538,
+    "bottom": 542
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Thank you",
+   "box": {
+    "left": 212,
+    "top": 583,
+    "right": 348,
+    "bottom": 612
+   },
+   "confidence": 0.998
+  }
+ ]
+}

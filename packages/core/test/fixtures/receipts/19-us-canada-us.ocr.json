@@ -1,0 +1,758 @@
+{
+ "id": "19-us-canada-us",
+ "engine": "paddleocr-ppocrv4-onnx",
+ "width": 560,
+ "height": 1596,
+ "blocks": [
+  {
+   "text": "Sunrise Bakery",
+   "box": {
+    "left": 135,
+    "top": 31,
+    "right": 429,
+    "bottom": 71
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "Open daily 9:00 - 21:00",
+   "box": {
+    "left": 111,
+    "top": 71,
+    "right": 449,
+    "bottom": 104
+   },
+   "confidence": 0.973
+  },
+  {
+   "text": "Date: 09/10/2026",
+   "box": {
+    "left": 20,
+    "top": 141,
+    "right": 265,
+    "bottom": 169
+   },
+   "confidence": 0.996
+  },
+  {
+   "text": "12:01",
+   "box": {
+    "left": 253,
+    "top": 141,
+    "right": 357,
+    "bottom": 169
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "12.99",
+   "box": {
+    "left": 461,
+    "top": 207,
+    "right": 540,
+    "bottom": 237
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Ground coffee 12oz",
+   "box": {
+    "left": 21,
+    "top": 208,
+    "right": 289,
+    "bottom": 240
+   },
+   "confidence": 0.984
+  },
+  {
+   "text": "4.89",
+   "box": {
+    "left": 474,
+    "top": 243,
+    "right": 542,
+    "bottom": 272
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Granola bars",
+   "box": {
+    "left": 20,
+    "top": 244,
+    "right": 201,
+    "bottom": 272
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "2.09",
+   "box": {
+    "left": 473,
+    "top": 275,
+    "right": 542,
+    "bottom": 308
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Bananas",
+   "box": {
+    "left": 19,
+    "top": 279,
+    "right": 129,
+    "bottom": 307
+   },
+   "confidence": 0.991
+  },
+  {
+   "text": "13.29",
+   "box": {
+    "left": 461,
+    "top": 310,
+    "right": 540,
+    "bottom": 340
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Ground coffee 12oz",
+   "box": {
+    "left": 20,
+    "top": 312,
+    "right": 287,
+    "bottom": 340
+   },
+   "confidence": 0.988
+  },
+  {
+   "text": "6.39",
+   "box": {
+    "left": 473,
+    "top": 343,
+    "right": 541,
+    "bottom": 376
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Sourdough loaf",
+   "box": {
+    "left": 20,
+    "top": 345,
+    "right": 230,
+    "bottom": 374
+   },
+   "confidence": 0.995
+  },
+  {
+   "text": "13.49",
+   "box": {
+    "left": 459,
+    "top": 378,
+    "right": 542,
+    "bottom": 409
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Ground coffee 12oz",
+   "box": {
+    "left": 20,
+    "top": 380,
+    "right": 287,
+    "bottom": 409
+   },
+   "confidence": 0.974
+  },
+  {
+   "text": "7.09",
+   "box": {
+    "left": 474,
+    "top": 412,
+    "right": 540,
+    "bottom": 441
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Sparkling water",
+   "box": {
+    "left": 21,
+    "top": 412,
+    "right": 244,
+    "bottom": 444
+   },
+   "confidence": 0.994
+  },
+  {
+   "text": "2.69",
+   "box": {
+    "left": 474,
+    "top": 447,
+    "right": 540,
+    "bottom": 476
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Pasta 16oz",
+   "box": {
+    "left": 20,
+    "top": 449,
+    "right": 173,
+    "bottom": 476
+   },
+   "confidence": 0.99
+  },
+  {
+   "text": "11.79",
+   "box": {
+    "left": 461,
+    "top": 480,
+    "right": 540,
+    "bottom": 510
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Paper towels",
+   "box": {
+    "left": 19,
+    "top": 481,
+    "right": 202,
+    "bottom": 513
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "2.79",
+   "box": {
+    "left": 472,
+    "top": 513,
+    "right": 541,
+    "bottom": 545
+   },
+   "confidence": 0.962
+  },
+  {
+   "text": "Bananas",
+   "box": {
+    "left": 21,
+    "top": 517,
+    "right": 129,
+    "bottom": 544
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "5.79",
+   "box": {
+    "left": 473,
+    "top": 548,
+    "right": 541,
+    "bottom": 580
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Granola bars",
+   "box": {
+    "left": 20,
+    "top": 550,
+    "right": 201,
+    "bottom": 578
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "7.09",
+   "box": {
+    "left": 473,
+    "top": 581,
+    "right": 542,
+    "bottom": 613
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Sourdough loaf",
+   "box": {
+    "left": 20,
+    "top": 583,
+    "right": 230,
+    "bottom": 611
+   },
+   "confidence": 0.991
+  },
+  {
+   "text": "12.19",
+   "box": {
+    "left": 460,
+    "top": 615,
+    "right": 541,
+    "bottom": 649
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Paper towels",
+   "box": {
+    "left": 19,
+    "top": 617,
+    "right": 202,
+    "bottom": 649
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "7.29",
+   "box": {
+    "left": 473,
+    "top": 649,
+    "right": 541,
+    "bottom": 682
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Sourdough loaf",
+   "box": {
+    "left": 20,
+    "top": 651,
+    "right": 230,
+    "bottom": 679
+   },
+   "confidence": 0.991
+  },
+  {
+   "text": "5.69",
+   "box": {
+    "left": 474,
+    "top": 685,
+    "right": 540,
+    "bottom": 714
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Whole milk lgal",
+   "box": {
+    "left": 20,
+    "top": 686,
+    "right": 241,
+    "bottom": 714
+   },
+   "confidence": 0.958
+  },
+  {
+   "text": "7.99",
+   "box": {
+    "left": 473,
+    "top": 717,
+    "right": 542,
+    "bottom": 750
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Sparkling water",
+   "box": {
+    "left": 21,
+    "top": 718,
+    "right": 244,
+    "bottom": 750
+   },
+   "confidence": 0.994
+  },
+  {
+   "text": "8.09",
+   "box": {
+    "left": 474,
+    "top": 753,
+    "right": 542,
+    "bottom": 782
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Sparkling water",
+   "box": {
+    "left": 21,
+    "top": 753,
+    "right": 244,
+    "bottom": 785
+   },
+   "confidence": 0.994
+  },
+  {
+   "text": "14.69",
+   "box": {
+    "left": 461,
+    "top": 786,
+    "right": 540,
+    "bottom": 816
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Ground coffee 12oz",
+   "box": {
+    "left": 20,
+    "top": 787,
+    "right": 287,
+    "bottom": 816
+   },
+   "confidence": 0.977
+  },
+  {
+   "text": "14.25",
+   "box": {
+    "left": 461,
+    "top": 821,
+    "right": 540,
+    "bottom": 851
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Chicken breast",
+   "box": {
+    "left": 22,
+    "top": 822,
+    "right": 230,
+    "bottom": 851
+   },
+   "confidence": 1
+  },
+  {
+   "text": "14.35",
+   "box": {
+    "left": 459,
+    "top": 854,
+    "right": 540,
+    "bottom": 884
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Chicken breast",
+   "box": {
+    "left": 22,
+    "top": 856,
+    "right": 229,
+    "bottom": 884
+   },
+   "confidence": 0.993
+  },
+  {
+   "text": "3.89",
+   "box": {
+    "left": 474,
+    "top": 889,
+    "right": 542,
+    "bottom": 919
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Bananas",
+   "box": {
+    "left": 19,
+    "top": 891,
+    "right": 129,
+    "bottom": 918
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "8.09",
+   "box": {
+    "left": 473,
+    "top": 922,
+    "right": 541,
+    "bottom": 954
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Sourdough loaf",
+   "box": {
+    "left": 19,
+    "top": 923,
+    "right": 231,
+    "bottom": 955
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "6.09",
+   "box": {
+    "left": 475,
+    "top": 955,
+    "right": 542,
+    "bottom": 987
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Eggs dozen",
+   "box": {
+    "left": 19,
+    "top": 958,
+    "right": 174,
+    "bottom": 990
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "4.29",
+   "box": {
+    "left": 473,
+    "top": 990,
+    "right": 542,
+    "bottom": 1022
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Pasta 16oz",
+   "box": {
+    "left": 19,
+    "top": 991,
+    "right": 174,
+    "bottom": 1023
+   },
+   "confidence": 0.974
+  },
+  {
+   "text": "15.39",
+   "box": {
+    "left": 461,
+    "top": 1024,
+    "right": 540,
+    "bottom": 1054
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Ground coffee 12oz",
+   "box": {
+    "left": 20,
+    "top": 1025,
+    "right": 287,
+    "bottom": 1054
+   },
+   "confidence": 0.977
+  },
+  {
+   "text": "7.29",
+   "box": {
+    "left": 474,
+    "top": 1059,
+    "right": 540,
+    "bottom": 1088
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Granola bars",
+   "box": {
+    "left": 19,
+    "top": 1059,
+    "right": 202,
+    "bottom": 1091
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "6.49",
+   "box": {
+    "left": 476,
+    "top": 1092,
+    "right": 540,
+    "bottom": 1121
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Eggs dozen",
+   "box": {
+    "left": 19,
+    "top": 1093,
+    "right": 174,
+    "bottom": 1124
+   },
+   "confidence": 0.955
+  },
+  {
+   "text": "Olive oil",
+   "box": {
+    "left": 20,
+    "top": 1126,
+    "right": 158,
+    "bottom": 1157
+   },
+   "confidence": 0.952
+  },
+  {
+   "text": "16.69",
+   "box": {
+    "left": 459,
+    "top": 1127,
+    "right": 540,
+    "bottom": 1157
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Eggs dozen",
+   "box": {
+    "left": 19,
+    "top": 1161,
+    "right": 174,
+    "bottom": 1192
+   },
+   "confidence": 0.955
+  },
+  {
+   "text": "6.69",
+   "box": {
+    "left": 476,
+    "top": 1163,
+    "right": 539,
+    "bottom": 1189
+   },
+   "confidence": 1
+  },
+  {
+   "text": "8.39",
+   "box": {
+    "left": 475,
+    "top": 1193,
+    "right": 541,
+    "bottom": 1225
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Cheddar block",
+   "box": {
+    "left": 19,
+    "top": 1194,
+    "right": 217,
+    "bottom": 1226
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "7.29",
+   "box": {
+    "left": 473,
+    "top": 1228,
+    "right": 542,
+    "bottom": 1260
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Whole milk lgal",
+   "box": {
+    "left": 18,
+    "top": 1229,
+    "right": 244,
+    "bottom": 1261
+   },
+   "confidence": 0.988
+  },
+  {
+   "text": "7.89",
+   "box": {
+    "left": 473,
+    "top": 1261,
+    "right": 542,
+    "bottom": 1293
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Granola bars",
+   "box": {
+    "left": 19,
+    "top": 1262,
+    "right": 202,
+    "bottom": 1294
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "Subtotal",
+   "box": {
+    "left": 20,
+    "top": 1329,
+    "right": 142,
+    "bottom": 1360
+   },
+   "confidence": 1
+  },
+  {
+   "text": "273.40",
+   "box": {
+    "left": 446,
+    "top": 1329,
+    "right": 541,
+    "bottom": 1360
+   },
+   "confidence": 1
+  },
+  {
+   "text": "19.82",
+   "box": {
+    "left": 459,
+    "top": 1364,
+    "right": 540,
+    "bottom": 1394
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Sales tax",
+   "box": {
+    "left": 20,
+    "top": 1366,
+    "right": 160,
+    "bottom": 1394
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "Total",
+   "box": {
+    "left": 20,
+    "top": 1433,
+    "right": 100,
+    "bottom": 1463
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "293.22",
+   "box": {
+    "left": 446,
+    "top": 1432,
+    "right": 541,
+    "bottom": 1463
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Thank you",
+   "box": {
+    "left": 209,
+    "top": 1499,
+    "right": 351,
+    "bottom": 1534
+   },
+   "confidence": 0.999
+  }
+ ]
+}

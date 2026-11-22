@@ -1,0 +1,51 @@
+{
+  "id": "20-us-canada-us",
+  "market": "us-canada",
+  "region": "US",
+  "merchant": "Granite Fuel Stop",
+  "date": "2026-08-05",
+  "currency": "USD",
+  "subtotalMinor": 3710,
+  "taxes": [
+    {
+      "label": "Sales tax",
+      "amountMinor": 269
+    }
+  ],
+  "fees": [],
+  "discounts": [],
+  "totalMinor": 3979,
+  "items": [
+    {
+      "name": "Bananas",
+      "amountMinor": 189
+    },
+    {
+      "name": "Chicken breast",
+      "amountMinor": 1245
+    },
+    {
+      "name": "Pasta 16oz",
+      "amountMinor": 199
+    },
+    {
+      "name": "Eggs dozen",
+      "amountMinor": 389
+    },
+    {
+      "name": "Ground coffee 12oz",
+      "amountMinor": 1299
+    },
+    {
+      "name": "Eggs dozen",
+      "amountMinor": 389
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": false,
+    "decimalComma": false,
+    "multiColumn": false,
+    "lowContrastOrTilted": false,
+    "longReceipt": false
+  }
+}

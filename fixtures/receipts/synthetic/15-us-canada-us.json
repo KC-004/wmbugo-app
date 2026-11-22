@@ -1,0 +1,55 @@
+{
+  "id": "15-us-canada-us",
+  "market": "us-canada",
+  "region": "US",
+  "merchant": "Cedar Pharmacy",
+  "date": "2026-11-21",
+  "currency": "USD",
+  "subtotalMinor": 4153,
+  "taxes": [
+    {
+      "label": "Sales tax",
+      "amountMinor": 301
+    }
+  ],
+  "fees": [],
+  "discounts": [],
+  "totalMinor": 4454,
+  "items": [
+    {
+      "name": "Pasta 16oz",
+      "amountMinor": 199
+    },
+    {
+      "name": "Eggs dozen",
+      "amountMinor": 389
+    },
+    {
+      "name": "Olive oil",
+      "amountMinor": 1399
+    },
+    {
+      "name": "Granola bars",
+      "amountMinor": 479
+    },
+    {
+      "name": "Sparkling water",
+      "amountMinor": 649
+    },
+    {
+      "name": "Sparkling water",
+      "amountMinor": 649
+    },
+    {
+      "name": "Eggs dozen",
+      "amountMinor": 389
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": false,
+    "decimalComma": false,
+    "multiColumn": false,
+    "lowContrastOrTilted": true,
+    "longReceipt": false
+  }
+}

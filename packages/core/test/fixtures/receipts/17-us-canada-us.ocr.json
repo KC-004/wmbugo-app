@@ -1,0 +1,238 @@
+{
+ "id": "17-us-canada-us",
+ "engine": "paddleocr-ppocrv4-onnx",
+ "width": 560,
+ "height": 712,
+ "blocks": [
+  {
+   "text": "Corner Pizza House",
+   "box": {
+    "left": 96,
+    "top": 34,
+    "right": 465,
+    "bottom": 67
+   },
+   "confidence": 0.987
+  },
+  {
+   "text": "Open dai1y 9:00 - 21:00",
+   "box": {
+    "left": 114,
+    "top": 75,
+    "right": 446,
+    "bottom": 100
+   },
+   "confidence": 0.984
+  },
+  {
+   "text": "Date: 05/24/2026",
+   "box": {
+    "left": 23,
+    "top": 142,
+    "right": 258,
+    "bottom": 167
+   },
+   "confidence": 0.993
+  },
+  {
+   "text": "19:34",
+   "box": {
+    "left": 276,
+    "top": 143,
+    "right": 356,
+    "bottom": 166
+   },
+   "confidence": 0.996
+  },
+  {
+   "text": "12.99",
+   "box": {
+    "left": 463,
+    "top": 208,
+    "right": 539,
+    "bottom": 236
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Ground coffee 12oz",
+   "box": {
+    "left": 24,
+    "top": 211,
+    "right": 285,
+    "bottom": 235
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "4.79",
+   "box": {
+    "left": 476,
+    "top": 241,
+    "right": 540,
+    "bottom": 270
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Granola bars",
+   "box": {
+    "left": 22,
+    "top": 244,
+    "right": 200,
+    "bottom": 270
+   },
+   "confidence": 0.991
+  },
+  {
+   "text": "10.99",
+   "box": {
+    "left": 462,
+    "top": 278,
+    "right": 538,
+    "bottom": 303
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Paper towels",
+   "box": {
+    "left": 23,
+    "top": 280,
+    "right": 198,
+    "bottom": 304
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "5.49",
+   "box": {
+    "left": 477,
+    "top": 311,
+    "right": 539,
+    "bottom": 338
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Cheddar block",
+   "box": {
+    "left": 23,
+    "top": 312,
+    "right": 213,
+    "bottom": 336
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "4.79",
+   "box": {
+    "left": 477,
+    "top": 345,
+    "right": 538,
+    "bottom": 372
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Granola bars",
+   "box": {
+    "left": 23,
+    "top": 347,
+    "right": 199,
+    "bottom": 372
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "12.99",
+   "box": {
+    "left": 463,
+    "top": 380,
+    "right": 538,
+    "bottom": 405
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Ground coffee 12oz",
+   "box": {
+    "left": 22,
+    "top": 380,
+    "right": 285,
+    "bottom": 407
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "52.04",
+   "box": {
+    "left": 463,
+    "top": 447,
+    "right": 539,
+    "bottom": 473
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Subtotal",
+   "box": {
+    "left": 23,
+    "top": 449,
+    "right": 139,
+    "bottom": 473
+   },
+   "confidence": 1
+  },
+  {
+   "text": "3.77",
+   "box": {
+    "left": 478,
+    "top": 481,
+    "right": 539,
+    "bottom": 507
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Sales tax",
+   "box": {
+    "left": 22,
+    "top": 482,
+    "right": 158,
+    "bottom": 509
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "55.81",
+   "box": {
+    "left": 463,
+    "top": 550,
+    "right": 536,
+    "bottom": 575
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Total",
+   "box": {
+    "left": 21,
+    "top": 551,
+    "right": 96,
+    "bottom": 574
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Thank you",
+   "box": {
+    "left": 212,
+    "top": 617,
+    "right": 348,
+    "bottom": 646
+   },
+   "confidence": 0.993
+  }
+ ]
+}

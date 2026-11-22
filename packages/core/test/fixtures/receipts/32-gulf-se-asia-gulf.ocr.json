@@ -1,0 +1,228 @@
+{
+ "id": "32-gulf-se-asia-gulf",
+ "engine": "paddleocr-ppocrv4-onnx",
+ "width": 560,
+ "height": 678,
+ "blocks": [
+  {
+   "text": "民",
+   "box": {
+    "left": 229,
+    "top": 39,
+    "right": 262,
+    "bottom": 54
+   },
+   "confidence": 0.407
+  },
+  {
+   "text": "“ll",
+   "box": {
+    "left": 276,
+    "top": 35,
+    "right": 346,
+    "bottom": 64
+   },
+   "confidence": 0.436
+  },
+  {
+   "text": "bccb",
+   "box": {
+    "left": 221,
+    "top": 70,
+    "right": 339,
+    "bottom": 103
+   },
+   "confidence": 0.376
+  },
+  {
+   "text": "Date: 08/06/2026",
+   "box": {
+    "left": 23,
+    "top": 142,
+    "right": 256,
+    "bottom": 166
+   },
+   "confidence": 0.993
+  },
+  {
+   "text": "16:00",
+   "box": {
+    "left": 279,
+    "top": 142,
+    "right": 356,
+    "bottom": 167
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Rice 5kg",
+   "box": {
+    "left": 20,
+    "top": 208,
+    "right": 142,
+    "bottom": 238
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "32.00",
+   "box": {
+    "left": 463,
+    "top": 209,
+    "right": 538,
+    "bottom": 235
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "22.00",
+   "box": {
+    "left": 462,
+    "top": 244,
+    "right": 538,
+    "bottom": 269
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Saffron 1g",
+   "box": {
+    "left": 22,
+    "top": 244,
+    "right": 170,
+    "bottom": 271
+   },
+   "confidence": 0.967
+  },
+  {
+   "text": "Olive oil 500ml",
+   "box": {
+    "left": 21,
+    "top": 276,
+    "right": 240,
+    "bottom": 303
+   },
+   "confidence": 0.956
+  },
+  {
+   "text": "36.00",
+   "box": {
+    "left": 463,
+    "top": 278,
+    "right": 538,
+    "bottom": 302
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "25.00",
+   "box": {
+    "left": 462,
+    "top": 313,
+    "right": 539,
+    "bottom": 336
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Dates 500g",
+   "box": {
+    "left": 21,
+    "top": 312,
+    "right": 172,
+    "bottom": 341
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "Subtotal",
+   "box": {
+    "left": 22,
+    "top": 379,
+    "right": 140,
+    "bottom": 406
+   },
+   "confidence": 1
+  },
+  {
+   "text": "115.00",
+   "box": {
+    "left": 448,
+    "top": 380,
+    "right": 538,
+    "bottom": 404
+   },
+   "confidence": 1
+  },
+  {
+   "text": "11.50",
+   "box": {
+    "left": 463,
+    "top": 415,
+    "right": 538,
+    "bottom": 438
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Service charge",
+   "box": {
+    "left": 22,
+    "top": 414,
+    "right": 227,
+    "bottom": 441
+   },
+   "confidence": 0.989
+  },
+  {
+   "text": "VAT",
+   "box": {
+    "left": 21,
+    "top": 449,
+    "right": 70,
+    "bottom": 473
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "6.33",
+   "box": {
+    "left": 477,
+    "top": 449,
+    "right": 539,
+    "bottom": 473
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Total",
+   "box": {
+    "left": 22,
+    "top": 516,
+    "right": 98,
+    "bottom": 541
+   },
+   "confidence": 1
+  },
+  {
+   "text": "132.83",
+   "box": {
+    "left": 447,
+    "top": 516,
+    "right": 538,
+    "bottom": 542
+   },
+   "confidence": 1
+  },
+  {
+   "text": "LSG",
+   "box": {
+    "left": 257,
+    "top": 582,
+    "right": 304,
+    "bottom": 609
+   },
+   "confidence": 0.594
+  }
+ ]
+}

@@ -64,3 +64,12 @@ Graded from the reviewers' reports; only the first group was checked against the
 - Phone check: Kotlin `pickCsvDocument`, `createCsvDocument` and `displayNameOf` have only mocked tests.
 - Several paused imports: the import flow offers only the newest (`LIMIT 1`); the others can be discarded from Imported files.
 - Core export tests do not cover refund, adjustment, reversed or `AMOUNT_NOT_WRITABLE`.
+
+## Deferred from: build of Story 10.1 (2026-11-22)
+
+- source_spec: `spec-10-1-spike-s3-ocr-engine-choice-and-the-synthetic-receipt-set.md`
+  summary: Synthetic set is clean: size tilted canvases from the rotated box, cover December and days 28-31, localise item names on Devanagari and Arabic receipts, commit the scorer.
+  evidence: Edge-case and verification reviews of 10.1; real-photo accuracy stays unmeasured.
+- source_spec: `spec-10-1-spike-s3-ocr-engine-choice-and-the-synthetic-receipt-set.md`
+  summary: Story 10.6 must tune ONNX Runtime memory (about 1 GB native heap), choose where the 15.6 MB models live, and re-measure on a release build.
+  evidence: docs/decisions/S3-ocr-engine.md sections 6 and 8. The spike harness is kept in the session scratch only.

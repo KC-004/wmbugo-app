@@ -1,0 +1,44 @@
+{
+  "id": "39-gulf-se-asia-sg",
+  "market": "gulf-se-asia",
+  "region": "SG",
+  "merchant": "Bayfront Noodles",
+  "date": "2026-01-05",
+  "currency": "SGD",
+  "subtotalMinor": 1830,
+  "taxes": [
+    {
+      "label": "GST",
+      "amountMinor": 181
+    }
+  ],
+  "fees": [
+    {
+      "label": "Service charge",
+      "amountMinor": 183
+    }
+  ],
+  "discounts": [],
+  "totalMinor": 2194,
+  "items": [
+    {
+      "name": "Satay 10 sticks",
+      "amountMinor": 1000
+    },
+    {
+      "name": "Laksa",
+      "amountMinor": 650
+    },
+    {
+      "name": "Teh tarik",
+      "amountMinor": 180
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": false,
+    "decimalComma": false,
+    "multiColumn": false,
+    "lowContrastOrTilted": false,
+    "longReceipt": false
+  }
+}

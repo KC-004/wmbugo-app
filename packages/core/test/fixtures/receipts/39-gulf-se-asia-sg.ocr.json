@@ -1,0 +1,198 @@
+{
+ "id": "39-gulf-se-asia-sg",
+ "engine": "paddleocr-ppocrv4-onnx",
+ "width": 560,
+ "height": 644,
+ "blocks": [
+  {
+   "text": "Bayfront Noodles",
+   "box": {
+    "left": 116,
+    "top": 36,
+    "right": 443,
+    "bottom": 66
+   },
+   "confidence": 0.978
+  },
+  {
+   "text": "Open daily 9:00 - 21:00",
+   "box": {
+    "left": 114,
+    "top": 72,
+    "right": 447,
+    "bottom": 102
+   },
+   "confidence": 0.981
+  },
+  {
+   "text": "Date: 05/01/2026",
+   "box": {
+    "left": 23,
+    "top": 143,
+    "right": 256,
+    "bottom": 165
+   },
+   "confidence": 0.984
+  },
+  {
+   "text": "10:12",
+   "box": {
+    "left": 280,
+    "top": 143,
+    "right": 357,
+    "bottom": 166
+   },
+   "confidence": 0.995
+  },
+  {
+   "text": "10.00",
+   "box": {
+    "left": 462,
+    "top": 210,
+    "right": 538,
+    "bottom": 235
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Satay 10 sticks",
+   "box": {
+    "left": 23,
+    "top": 210,
+    "right": 240,
+    "bottom": 237
+   },
+   "confidence": 0.992
+  },
+  {
+   "text": "6.50",
+   "box": {
+    "left": 477,
+    "top": 244,
+    "right": 539,
+    "bottom": 269
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Laksa",
+   "box": {
+    "left": 21,
+    "top": 245,
+    "right": 99,
+    "bottom": 270
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "1.80",
+   "box": {
+    "left": 476,
+    "top": 277,
+    "right": 539,
+    "bottom": 304
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Teh tarik",
+   "box": {
+    "left": 21,
+    "top": 278,
+    "right": 156,
+    "bottom": 302
+   },
+   "confidence": 0.954
+  },
+  {
+   "text": "18.30",
+   "box": {
+    "left": 462,
+    "top": 346,
+    "right": 538,
+    "bottom": 371
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Subtotal",
+   "box": {
+    "left": 23,
+    "top": 347,
+    "right": 139,
+    "bottom": 371
+   },
+   "confidence": 1
+  },
+  {
+   "text": "1.83",
+   "box": {
+    "left": 476,
+    "top": 380,
+    "right": 538,
+    "bottom": 405
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Service charge",
+   "box": {
+    "left": 22,
+    "top": 380,
+    "right": 227,
+    "bottom": 407
+   },
+   "confidence": 0.989
+  },
+  {
+   "text": "1.81",
+   "box": {
+    "left": 476,
+    "top": 414,
+    "right": 538,
+    "bottom": 439
+   },
+   "confidence": 1
+  },
+  {
+   "text": "GST",
+   "box": {
+    "left": 22,
+    "top": 416,
+    "right": 70,
+    "bottom": 440
+   },
+   "confidence": 1
+  },
+  {
+   "text": "21.94",
+   "box": {
+    "left": 462,
+    "top": 481,
+    "right": 538,
+    "bottom": 507
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Total",
+   "box": {
+    "left": 21,
+    "top": 482,
+    "right": 98,
+    "bottom": 508
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Thank you",
+   "box": {
+    "left": 212,
+    "top": 550,
+    "right": 347,
+    "bottom": 578
+   },
+   "confidence": 0.999
+  }
+ ]
+}

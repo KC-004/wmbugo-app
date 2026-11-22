@@ -1,0 +1,51 @@
+{
+  "id": "22-uk-europe-eu",
+  "market": "uk-europe",
+  "region": "DE",
+  "merchant": "Café Rosengarten",
+  "date": "2026-09-20",
+  "currency": "EUR",
+  "subtotalMinor": 1294,
+  "taxes": [
+    {
+      "label": "MwSt",
+      "amountMinor": 246
+    }
+  ],
+  "fees": [],
+  "discounts": [],
+  "totalMinor": 1540,
+  "items": [
+    {
+      "name": "Vollkornbrot",
+      "amountMinor": 389
+    },
+    {
+      "name": "Mineralwasser",
+      "amountMinor": 99
+    },
+    {
+      "name": "Eier 10 Stk",
+      "amountMinor": 319
+    },
+    {
+      "name": "Schokolade",
+      "amountMinor": 159
+    },
+    {
+      "name": "Tomaten 500g",
+      "amountMinor": 249
+    },
+    {
+      "name": "Joghurt",
+      "amountMinor": 79
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": false,
+    "decimalComma": true,
+    "multiColumn": true,
+    "lowContrastOrTilted": false,
+    "longReceipt": false
+  }
+}

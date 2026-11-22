@@ -1,0 +1,288 @@
+{
+ "id": "18-us-canada-us",
+ "engine": "paddleocr-ppocrv4-onnx",
+ "width": 560,
+ "height": 780,
+ "blocks": [
+  {
+   "text": "Oak and Iron Books",
+   "box": {
+    "left": 95,
+    "top": 34,
+    "right": 463,
+    "bottom": 64
+   },
+   "confidence": 0.988
+  },
+  {
+   "text": "Tel 9:00 - 21:00",
+   "box": {
+    "left": 163,
+    "top": 73,
+    "right": 395,
+    "bottom": 98
+   },
+   "confidence": 0.961
+  },
+  {
+   "text": "Date: 11/23/2026",
+   "box": {
+    "left": 23,
+    "top": 143,
+    "right": 256,
+    "bottom": 166
+   },
+   "confidence": 0.984
+  },
+  {
+   "text": "15:53",
+   "box": {
+    "left": 280,
+    "top": 143,
+    "right": 357,
+    "bottom": 167
+   },
+   "confidence": 0.996
+  },
+  {
+   "text": "1.99",
+   "box": {
+    "left": 476,
+    "top": 208,
+    "right": 539,
+    "bottom": 235
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Pasta 16oz",
+   "box": {
+    "left": 23,
+    "top": 211,
+    "right": 170,
+    "bottom": 235
+   },
+   "confidence": 0.965
+  },
+  {
+   "text": "12.45",
+   "box": {
+    "left": 462,
+    "top": 243,
+    "right": 538,
+    "bottom": 269
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Chicken breast",
+   "box": {
+    "left": 23,
+    "top": 244,
+    "right": 226,
+    "bottom": 269
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Olive oil",
+   "box": {
+    "left": 22,
+    "top": 276,
+    "right": 156,
+    "bottom": 303
+   },
+   "confidence": 0.949
+  },
+  {
+   "text": "13.99",
+   "box": {
+    "left": 462,
+    "top": 278,
+    "right": 538,
+    "bottom": 303
+   },
+   "confidence": 1
+  },
+  {
+   "text": "10.99",
+   "box": {
+    "left": 462,
+    "top": 313,
+    "right": 538,
+    "bottom": 336
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Paper towels",
+   "box": {
+    "left": 23,
+    "top": 313,
+    "right": 197,
+    "bottom": 338
+   },
+   "confidence": 0.981
+  },
+  {
+   "text": "1.99",
+   "box": {
+    "left": 475,
+    "top": 344,
+    "right": 539,
+    "bottom": 372
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Pasta 16oz",
+   "box": {
+    "left": 21,
+    "top": 345,
+    "right": 170,
+    "bottom": 372
+   },
+   "confidence": 0.971
+  },
+  {
+   "text": "10.99",
+   "box": {
+    "left": 462,
+    "top": 379,
+    "right": 539,
+    "bottom": 406
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Paper towels",
+   "box": {
+    "left": 22,
+    "top": 381,
+    "right": 198,
+    "bottom": 406
+   },
+   "confidence": 0.96
+  },
+  {
+   "text": "1.89",
+   "box": {
+    "left": 476,
+    "top": 413,
+    "right": 539,
+    "bottom": 440
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Bananas",
+   "box": {
+    "left": 21,
+    "top": 415,
+    "right": 128,
+    "bottom": 439
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "54.29",
+   "box": {
+    "left": 462,
+    "top": 480,
+    "right": 539,
+    "bottom": 508
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Subtotal",
+   "box": {
+    "left": 23,
+    "top": 482,
+    "right": 139,
+    "bottom": 506
+   },
+   "confidence": 1
+  },
+  {
+   "text": "-5.43",
+   "box": {
+    "left": 462,
+    "top": 515,
+    "right": 538,
+    "bottom": 541
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "Discount",
+   "box": {
+    "left": 22,
+    "top": 517,
+    "right": 140,
+    "bottom": 541
+   },
+   "confidence": 1
+  },
+  {
+   "text": "3.54",
+   "box": {
+    "left": 476,
+    "top": 549,
+    "right": 539,
+    "bottom": 576
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Sales",
+   "box": {
+    "left": 22,
+    "top": 550,
+    "right": 100,
+    "bottom": 574
+   },
+   "confidence": 1
+  },
+  {
+   "text": "tax",
+   "box": {
+    "left": 98,
+    "top": 552,
+    "right": 155,
+    "bottom": 575
+   },
+   "confidence": 0.982
+  },
+  {
+   "text": "52.40",
+   "box": {
+    "left": 462,
+    "top": 616,
+    "right": 539,
+    "bottom": 644
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Total",
+   "box": {
+    "left": 21,
+    "top": 618,
+    "right": 98,
+    "bottom": 643
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Thank you",
+   "box": {
+    "left": 213,
+    "top": 686,
+    "right": 347,
+    "bottom": 713
+   },
+   "confidence": 0.996
+  }
+ ]
+}

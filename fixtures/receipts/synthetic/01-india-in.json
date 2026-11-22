@@ -1,0 +1,51 @@
+{
+  "id": "01-india-in",
+  "market": "india",
+  "region": "IN",
+  "merchant": "सागर फ्रेश मार्ट",
+  "date": "2026-03-16",
+  "currency": "INR",
+  "subtotalMinor": 42700,
+  "taxes": [
+    {
+      "label": "CGST",
+      "amountMinor": 1067
+    },
+    {
+      "label": "SGST",
+      "amountMinor": 1068
+    }
+  ],
+  "fees": [],
+  "discounts": [],
+  "totalMinor": 44835,
+  "items": [
+    {
+      "name": "Masala chai pack",
+      "amountMinor": 12500
+    },
+    {
+      "name": "Bath soap",
+      "amountMinor": 4400
+    },
+    {
+      "name": "Curd 500g",
+      "amountMinor": 3800
+    },
+    {
+      "name": "Filter coffee",
+      "amountMinor": 8000
+    },
+    {
+      "name": "Mango 1kg",
+      "amountMinor": 14000
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": true,
+    "decimalComma": false,
+    "multiColumn": false,
+    "lowContrastOrTilted": false,
+    "longReceipt": false
+  }
+}

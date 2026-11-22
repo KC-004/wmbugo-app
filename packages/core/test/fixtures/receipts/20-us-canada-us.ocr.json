@@ -1,0 +1,248 @@
+{
+ "id": "20-us-canada-us",
+ "engine": "paddleocr-ppocrv4-onnx",
+ "width": 560,
+ "height": 712,
+ "blocks": [
+  {
+   "text": "Granite Fuel Stop",
+   "box": {
+    "left": 104,
+    "top": 32,
+    "right": 455,
+    "bottom": 69
+   },
+   "confidence": 0.996
+  },
+  {
+   "text": "Tel 9:00 - 21:00",
+   "box": {
+    "left": 163,
+    "top": 73,
+    "right": 395,
+    "bottom": 98
+   },
+   "confidence": 0.961
+  },
+  {
+   "text": "Date: 08/05/2026",
+   "box": {
+    "left": 22,
+    "top": 142,
+    "right": 256,
+    "bottom": 167
+   },
+   "confidence": 0.993
+  },
+  {
+   "text": "14:34",
+   "box": {
+    "left": 280,
+    "top": 143,
+    "right": 357,
+    "bottom": 166
+   },
+   "confidence": 0.996
+  },
+  {
+   "text": "1.89",
+   "box": {
+    "left": 476,
+    "top": 209,
+    "right": 539,
+    "bottom": 235
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Bananas",
+   "box": {
+    "left": 22,
+    "top": 212,
+    "right": 127,
+    "bottom": 236
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "12.45",
+   "box": {
+    "left": 462,
+    "top": 243,
+    "right": 539,
+    "bottom": 270
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Chicken breast",
+   "box": {
+    "left": 23,
+    "top": 244,
+    "right": 226,
+    "bottom": 269
+   },
+   "confidence": 1
+  },
+  {
+   "text": "1.99",
+   "box": {
+    "left": 475,
+    "top": 278,
+    "right": 539,
+    "bottom": 303
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Pasta 16oz",
+   "box": {
+    "left": 22,
+    "top": 279,
+    "right": 171,
+    "bottom": 303
+   },
+   "confidence": 0.928
+  },
+  {
+   "text": "3.89",
+   "box": {
+    "left": 476,
+    "top": 312,
+    "right": 539,
+    "bottom": 337
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Eggs dozen",
+   "box": {
+    "left": 21,
+    "top": 312,
+    "right": 171,
+    "bottom": 339
+   },
+   "confidence": 0.992
+  },
+  {
+   "text": "Ground coffee 12oz",
+   "box": {
+    "left": 22,
+    "top": 346,
+    "right": 285,
+    "bottom": 371
+   },
+   "confidence": 0.953
+  },
+  {
+   "text": "12.99",
+   "box": {
+    "left": 462,
+    "top": 346,
+    "right": 538,
+    "bottom": 372
+   },
+   "confidence": 1
+  },
+  {
+   "text": "3.89",
+   "box": {
+    "left": 477,
+    "top": 380,
+    "right": 539,
+    "bottom": 405
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Eggs dozen",
+   "box": {
+    "left": 21,
+    "top": 380,
+    "right": 171,
+    "bottom": 407
+   },
+   "confidence": 0.992
+  },
+  {
+   "text": "37.10",
+   "box": {
+    "left": 463,
+    "top": 448,
+    "right": 538,
+    "bottom": 473
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Subtotal",
+   "box": {
+    "left": 23,
+    "top": 449,
+    "right": 139,
+    "bottom": 473
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Sales",
+   "box": {
+    "left": 22,
+    "top": 482,
+    "right": 101,
+    "bottom": 507
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "2.69",
+   "box": {
+    "left": 476,
+    "top": 482,
+    "right": 539,
+    "bottom": 507
+   },
+   "confidence": 1
+  },
+  {
+   "text": "tax",
+   "box": {
+    "left": 94,
+    "top": 484,
+    "right": 155,
+    "bottom": 506
+   },
+   "confidence": 0.997
+  },
+  {
+   "text": "Total",
+   "box": {
+    "left": 21,
+    "top": 550,
+    "right": 97,
+    "bottom": 575
+   },
+   "confidence": 1
+  },
+  {
+   "text": "39.79",
+   "box": {
+    "left": 463,
+    "top": 550,
+    "right": 538,
+    "bottom": 575
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Thank you",
+   "box": {
+    "left": 213,
+    "top": 619,
+    "right": 347,
+    "bottom": 645
+   },
+   "confidence": 0.999
+  }
+ ]
+}

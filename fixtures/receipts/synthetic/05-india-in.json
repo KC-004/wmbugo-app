@@ -1,0 +1,51 @@
+{
+  "id": "05-india-in",
+  "market": "india",
+  "region": "IN",
+  "merchant": "Metro Basket",
+  "date": "2026-03-24",
+  "currency": "INR",
+  "subtotalMinor": 112900,
+  "taxes": [
+    {
+      "label": "CGST",
+      "amountMinor": 2822
+    },
+    {
+      "label": "SGST",
+      "amountMinor": 2823
+    }
+  ],
+  "fees": [],
+  "discounts": [],
+  "totalMinor": 118545,
+  "items": [
+    {
+      "name": "Paneer 200g",
+      "amountMinor": 9000
+    },
+    {
+      "name": "Basmati rice 5kg",
+      "amountMinor": 64900
+    },
+    {
+      "name": "Masala chai pack",
+      "amountMinor": 12500
+    },
+    {
+      "name": "Masala chai pack",
+      "amountMinor": 12500
+    },
+    {
+      "name": "Mango 1kg",
+      "amountMinor": 14000
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": false,
+    "decimalComma": false,
+    "multiColumn": false,
+    "lowContrastOrTilted": false,
+    "longReceipt": false
+  }
+}

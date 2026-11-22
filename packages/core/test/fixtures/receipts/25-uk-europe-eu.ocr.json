@@ -1,0 +1,238 @@
+{
+ "id": "25-uk-europe-eu",
+ "engine": "paddleocr-ppocrv4-onnx",
+ "width": 560,
+ "height": 712,
+ "blocks": [
+  {
+   "text": "Apotheke am Dom",
+   "box": {
+    "left": 127,
+    "top": 36,
+    "right": 436,
+    "bottom": 66
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "Open daily 9:00 - 21:00",
+   "box": {
+    "left": 114,
+    "top": 73,
+    "right": 447,
+    "bottom": 101
+   },
+   "confidence": 0.979
+  },
+  {
+   "text": "10:13",
+   "box": {
+    "left": 296,
+    "top": 143,
+    "right": 371,
+    "bottom": 166
+   },
+   "confidence": 0.99
+  },
+  {
+   "text": "Datum: 04.10.2026",
+   "box": {
+    "left": 23,
+    "top": 144,
+    "right": 271,
+    "bottom": 166
+   },
+   "confidence": 0.984
+  },
+  {
+   "text": "4,79",
+   "box": {
+    "left": 476,
+    "top": 208,
+    "right": 539,
+    "bottom": 237
+   },
+   "confidence": 0.994
+  },
+  {
+   "text": "Kase Gouda",
+   "box": {
+    "left": 22,
+    "top": 211,
+    "right": 169,
+    "bottom": 235
+   },
+   "confidence": 0.941
+  },
+  {
+   "text": "1,59",
+   "box": {
+    "left": 475,
+    "top": 242,
+    "right": 539,
+    "bottom": 271
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Schokolade",
+   "box": {
+    "left": 22,
+    "top": 244,
+    "right": 170,
+    "bottom": 269
+   },
+   "confidence": 1
+  },
+  {
+   "text": "4,79",
+   "box": {
+    "left": 477,
+    "top": 277,
+    "right": 538,
+    "bottom": 304
+   },
+   "confidence": 0.988
+  },
+  {
+   "text": "Kase Gouda",
+   "box": {
+    "left": 21,
+    "top": 279,
+    "right": 170,
+    "bottom": 303
+   },
+   "confidence": 0.986
+  },
+  {
+   "text": "7,49",
+   "box": {
+    "left": 476,
+    "top": 310,
+    "right": 539,
+    "bottom": 340
+   },
+   "confidence": 0.994
+  },
+  {
+   "text": "Kaffee Crema",
+   "box": {
+    "left": 21,
+    "top": 313,
+    "right": 198,
+    "bottom": 337
+   },
+   "confidence": 0.985
+  },
+  {
+   "text": "1,49",
+   "box": {
+    "left": 475,
+    "top": 345,
+    "right": 540,
+    "bottom": 373
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Nudeln 500g",
+   "box": {
+    "left": 20,
+    "top": 346,
+    "right": 186,
+    "bottom": 375
+   },
+   "confidence": 0.964
+  },
+  {
+   "text": "20,15",
+   "box": {
+    "left": 462,
+    "top": 414,
+    "right": 538,
+    "bottom": 439
+   },
+   "confidence": 0.989
+  },
+  {
+   "text": "Zwischensumme",
+   "box": {
+    "left": 23,
+    "top": 416,
+    "right": 212,
+    "bottom": 438
+   },
+   "confidence": 1
+  },
+  {
+   "text": "-2,02",
+   "box": {
+    "left": 463,
+    "top": 447,
+    "right": 539,
+    "bottom": 474
+   },
+   "confidence": 0.997
+  },
+  {
+   "text": "Discount",
+   "box": {
+    "left": 22,
+    "top": 449,
+    "right": 140,
+    "bottom": 473
+   },
+   "confidence": 1
+  },
+  {
+   "text": "3,44",
+   "box": {
+    "left": 476,
+    "top": 481,
+    "right": 539,
+    "bottom": 510
+   },
+   "confidence": 0.988
+  },
+  {
+   "text": "MwSt",
+   "box": {
+    "left": 21,
+    "top": 484,
+    "right": 83,
+    "bottom": 506
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "21,57",
+   "box": {
+    "left": 462,
+    "top": 549,
+    "right": 539,
+    "bottom": 577
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Summe",
+   "box": {
+    "left": 22,
+    "top": 552,
+    "right": 97,
+    "bottom": 575
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Thank you",
+   "box": {
+    "left": 213,
+    "top": 619,
+    "right": 347,
+    "bottom": 645
+   },
+   "confidence": 0.999
+  }
+ ]
+}

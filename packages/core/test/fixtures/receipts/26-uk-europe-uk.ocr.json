@@ -1,0 +1,178 @@
+{
+ "id": "26-uk-europe-uk",
+ "engine": "paddleocr-ppocrv4-onnx",
+ "width": 560,
+ "height": 610,
+ "blocks": [
+  {
+   "text": "Elm Park Books",
+   "box": {
+    "left": 136,
+    "top": 35,
+    "right": 422,
+    "bottom": 64
+   },
+   "confidence": 0.995
+  },
+  {
+   "text": "Tel 9:00 - 21:00",
+   "box": {
+    "left": 163,
+    "top": 74,
+    "right": 395,
+    "bottom": 98
+   },
+   "confidence": 0.947
+  },
+  {
+   "text": "Date: 18/04/2026",
+   "box": {
+    "left": 23,
+    "top": 142,
+    "right": 257,
+    "bottom": 166
+   },
+   "confidence": 0.995
+  },
+  {
+   "text": "12:03",
+   "box": {
+    "left": 279,
+    "top": 142,
+    "right": 357,
+    "bottom": 167
+   },
+   "confidence": 0.992
+  },
+  {
+   "text": "2.15",
+   "box": {
+    "left": 476,
+    "top": 209,
+    "right": 538,
+    "bottom": 236
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Tea bags 80",
+   "box": {
+    "left": 21,
+    "top": 209,
+    "right": 184,
+    "bottom": 236
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "2.75",
+   "box": {
+    "left": 476,
+    "top": 245,
+    "right": 539,
+    "bottom": 269
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Free range eggs",
+   "box": {
+    "left": 20,
+    "top": 245,
+    "right": 243,
+    "bottom": 274
+   },
+   "confidence": 0.993
+  },
+  {
+   "text": "2.15",
+   "box": {
+    "left": 476,
+    "top": 277,
+    "right": 539,
+    "bottom": 304
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Tea bags 80",
+   "box": {
+    "left": 21,
+    "top": 278,
+    "right": 185,
+    "bottom": 304
+   },
+   "confidence": 0.995
+  },
+  {
+   "text": "7.05",
+   "box": {
+    "left": 476,
+    "top": 346,
+    "right": 538,
+    "bottom": 370
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Subtotal",
+   "box": {
+    "left": 22,
+    "top": 347,
+    "right": 139,
+    "bottom": 371
+   },
+   "confidence": 1
+  },
+  {
+   "text": "1.41",
+   "box": {
+    "left": 476,
+    "top": 380,
+    "right": 538,
+    "bottom": 405
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "VAT",
+   "box": {
+    "left": 19,
+    "top": 381,
+    "right": 70,
+    "bottom": 405
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "8.46",
+   "box": {
+    "left": 477,
+    "top": 447,
+    "right": 539,
+    "bottom": 473
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Total",
+   "box": {
+    "left": 22,
+    "top": 448,
+    "right": 97,
+    "bottom": 473
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Thank you",
+   "box": {
+    "left": 213,
+    "top": 517,
+    "right": 347,
+    "bottom": 543
+   },
+   "confidence": 0.999
+  }
+ ]
+}

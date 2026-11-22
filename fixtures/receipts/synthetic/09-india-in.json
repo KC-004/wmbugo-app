@@ -1,0 +1,47 @@
+{
+  "id": "09-india-in",
+  "market": "india",
+  "region": "IN",
+  "merchant": "City Bazaar",
+  "date": "2026-05-04",
+  "currency": "INR",
+  "subtotalMinor": 58000,
+  "taxes": [
+    {
+      "label": "CGST",
+      "amountMinor": 1450
+    },
+    {
+      "label": "SGST",
+      "amountMinor": 1450
+    }
+  ],
+  "fees": [],
+  "discounts": [],
+  "totalMinor": 60900,
+  "items": [
+    {
+      "name": "Ghee 500ml",
+      "amountMinor": 32500
+    },
+    {
+      "name": "Filter coffee",
+      "amountMinor": 8000
+    },
+    {
+      "name": "Tea 250g",
+      "amountMinor": 11000
+    },
+    {
+      "name": "Notebook A4",
+      "amountMinor": 6500
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": false,
+    "decimalComma": false,
+    "multiColumn": false,
+    "lowContrastOrTilted": true,
+    "longReceipt": false
+  }
+}

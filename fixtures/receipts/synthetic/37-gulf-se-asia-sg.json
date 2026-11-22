@@ -1,0 +1,52 @@
+{
+  "id": "37-gulf-se-asia-sg",
+  "market": "gulf-se-asia",
+  "region": "SG",
+  "merchant": "Orchard Tea House",
+  "date": "2026-09-04",
+  "currency": "SGD",
+  "subtotalMinor": 2560,
+  "taxes": [
+    {
+      "label": "GST",
+      "amountMinor": 253
+    }
+  ],
+  "fees": [
+    {
+      "label": "Service charge",
+      "amountMinor": 256
+    }
+  ],
+  "discounts": [],
+  "totalMinor": 3069,
+  "items": [
+    {
+      "name": "Satay 10 sticks",
+      "amountMinor": 1000
+    },
+    {
+      "name": "Laksa",
+      "amountMinor": 650
+    },
+    {
+      "name": "Teh tarik",
+      "amountMinor": 180
+    },
+    {
+      "name": "Chicken rice",
+      "amountMinor": 450
+    },
+    {
+      "name": "Roti prata",
+      "amountMinor": 280
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": false,
+    "decimalComma": false,
+    "multiColumn": false,
+    "lowContrastOrTilted": false,
+    "longReceipt": false
+  }
+}

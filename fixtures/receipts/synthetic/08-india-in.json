@@ -1,0 +1,59 @@
+{
+  "id": "08-india-in",
+  "market": "india",
+  "region": "IN",
+  "merchant": "Kiran Hardware",
+  "date": "2026-07-05",
+  "currency": "INR",
+  "subtotalMinor": 162600,
+  "taxes": [
+    {
+      "label": "CGST",
+      "amountMinor": 4065
+    },
+    {
+      "label": "SGST",
+      "amountMinor": 4065
+    }
+  ],
+  "fees": [],
+  "discounts": [],
+  "totalMinor": 170730,
+  "items": [
+    {
+      "name": "Paneer 200g",
+      "amountMinor": 9000
+    },
+    {
+      "name": "Basmati rice 5kg",
+      "amountMinor": 64900
+    },
+    {
+      "name": "Basmati rice 5kg",
+      "amountMinor": 64900
+    },
+    {
+      "name": "Bath soap",
+      "amountMinor": 4400
+    },
+    {
+      "name": "Tea 250g",
+      "amountMinor": 11000
+    },
+    {
+      "name": "Samosa x2",
+      "amountMinor": 4000
+    },
+    {
+      "name": "Bath soap",
+      "amountMinor": 4400
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": false,
+    "decimalComma": false,
+    "multiColumn": true,
+    "lowContrastOrTilted": false,
+    "longReceipt": false
+  }
+}

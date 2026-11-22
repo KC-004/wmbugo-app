@@ -1,0 +1,159 @@
+{
+  "id": "07-india-in",
+  "market": "india",
+  "region": "IN",
+  "merchant": "Annapurna Kitchen",
+  "date": "2026-01-18",
+  "currency": "INR",
+  "subtotalMinor": 583310,
+  "taxes": [
+    {
+      "label": "CGST",
+      "amountMinor": 14583
+    },
+    {
+      "label": "SGST",
+      "amountMinor": 14583
+    }
+  ],
+  "fees": [],
+  "discounts": [],
+  "totalMinor": 612476,
+  "items": [
+    {
+      "name": "Toor dal 1kg",
+      "amountMinor": 18950
+    },
+    {
+      "name": "Mango 1kg",
+      "amountMinor": 14010
+    },
+    {
+      "name": "Tea 250g",
+      "amountMinor": 11020
+    },
+    {
+      "name": "Samosa x2",
+      "amountMinor": 4030
+    },
+    {
+      "name": "Curd 500g",
+      "amountMinor": 3840
+    },
+    {
+      "name": "Bath soap",
+      "amountMinor": 4450
+    },
+    {
+      "name": "Paneer 200g",
+      "amountMinor": 9060
+    },
+    {
+      "name": "Masala chai pack",
+      "amountMinor": 12570
+    },
+    {
+      "name": "Basmati rice 5kg",
+      "amountMinor": 64980
+    },
+    {
+      "name": "Paneer 200g",
+      "amountMinor": 9090
+    },
+    {
+      "name": "Masala chai pack",
+      "amountMinor": 12600
+    },
+    {
+      "name": "Filter coffee",
+      "amountMinor": 8110
+    },
+    {
+      "name": "Mango 1kg",
+      "amountMinor": 14120
+    },
+    {
+      "name": "Ghee 500ml",
+      "amountMinor": 32630
+    },
+    {
+      "name": "Ghee 500ml",
+      "amountMinor": 32640
+    },
+    {
+      "name": "Basmati rice 5kg",
+      "amountMinor": 65050
+    },
+    {
+      "name": "Filter coffee",
+      "amountMinor": 8160
+    },
+    {
+      "name": "Curd 500g",
+      "amountMinor": 3970
+    },
+    {
+      "name": "Curd 500g",
+      "amountMinor": 3980
+    },
+    {
+      "name": "Notebook A4",
+      "amountMinor": 6690
+    },
+    {
+      "name": "Ghee 500ml",
+      "amountMinor": 32700
+    },
+    {
+      "name": "Toor dal 1kg",
+      "amountMinor": 19160
+    },
+    {
+      "name": "Ghee 500ml",
+      "amountMinor": 32720
+    },
+    {
+      "name": "Ghee 500ml",
+      "amountMinor": 32730
+    },
+    {
+      "name": "Notebook A4",
+      "amountMinor": 6740
+    },
+    {
+      "name": "Toor dal 1kg",
+      "amountMinor": 19200
+    },
+    {
+      "name": "Notebook A4",
+      "amountMinor": 6760
+    },
+    {
+      "name": "Notebook A4",
+      "amountMinor": 6770
+    },
+    {
+      "name": "Samosa x2",
+      "amountMinor": 4280
+    },
+    {
+      "name": "Masala chai pack",
+      "amountMinor": 12790
+    },
+    {
+      "name": "Samosa x2",
+      "amountMinor": 4300
+    },
+    {
+      "name": "Basmati rice 5kg",
+      "amountMinor": 65210
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": false,
+    "decimalComma": false,
+    "multiColumn": false,
+    "lowContrastOrTilted": false,
+    "longReceipt": true
+  }
+}

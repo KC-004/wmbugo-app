@@ -1,0 +1,218 @@
+{
+ "id": "30-uk-europe-uk",
+ "engine": "paddleocr-ppocrv4-onnx",
+ "width": 560,
+ "height": 678,
+ "blocks": [
+  {
+   "text": "Station Express",
+   "box": {
+    "left": 126,
+    "top": 34,
+    "right": 434,
+    "bottom": 68
+   },
+   "confidence": 0.995
+  },
+  {
+   "text": "Tel 9:00 - 21:00",
+   "box": {
+    "left": 162,
+    "top": 72,
+    "right": 397,
+    "bottom": 99
+   },
+   "confidence": 0.952
+  },
+  {
+   "text": "Date: 10/02/2026",
+   "box": {
+    "left": 23,
+    "top": 142,
+    "right": 256,
+    "bottom": 166
+   },
+   "confidence": 0.994
+  },
+  {
+   "text": "12:00",
+   "box": {
+    "left": 280,
+    "top": 142,
+    "right": 357,
+    "bottom": 167
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "3.25",
+   "box": {
+    "left": 477,
+    "top": 209,
+    "right": 538,
+    "bottom": 236
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Cheddar 400g",
+   "box": {
+    "left": 23,
+    "top": 210,
+    "right": 200,
+    "bottom": 236
+   },
+   "confidence": 0.984
+  },
+  {
+   "text": "Crisps",
+   "box": {
+    "left": 22,
+    "top": 243,
+    "right": 113,
+    "bottom": 271
+   },
+   "confidence": 1
+  },
+  {
+   "text": "1.00",
+   "box": {
+    "left": 476,
+    "top": 244,
+    "right": 539,
+    "bottom": 269
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Cheddar 400g",
+   "box": {
+    "left": 21,
+    "top": 277,
+    "right": 199,
+    "bottom": 306
+   },
+   "confidence": 0.997
+  },
+  {
+   "text": "3.25",
+   "box": {
+    "left": 477,
+    "top": 278,
+    "right": 538,
+    "bottom": 303
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Biscuits",
+   "box": {
+    "left": 21,
+    "top": 311,
+    "right": 142,
+    "bottom": 337
+   },
+   "confidence": 1
+  },
+  {
+   "text": "1.20",
+   "box": {
+    "left": 476,
+    "top": 311,
+    "right": 539,
+    "bottom": 338
+   },
+   "confidence": 1
+  },
+  {
+   "text": "1.89",
+   "box": {
+    "left": 476,
+    "top": 346,
+    "right": 539,
+    "bottom": 371
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Orange juice",
+   "box": {
+    "left": 23,
+    "top": 348,
+    "right": 197,
+    "bottom": 372
+   },
+   "confidence": 0.961
+  },
+  {
+   "text": "10.59",
+   "box": {
+    "left": 462,
+    "top": 413,
+    "right": 538,
+    "bottom": 438
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Subtotal",
+   "box": {
+    "left": 22,
+    "top": 414,
+    "right": 139,
+    "bottom": 438
+   },
+   "confidence": 1
+  },
+  {
+   "text": "VAT",
+   "box": {
+    "left": 21,
+    "top": 449,
+    "right": 70,
+    "bottom": 473
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "2.12",
+   "box": {
+    "left": 476,
+    "top": 449,
+    "right": 539,
+    "bottom": 473
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "12.71",
+   "box": {
+    "left": 462,
+    "top": 514,
+    "right": 538,
+    "bottom": 542
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Total",
+   "box": {
+    "left": 22,
+    "top": 516,
+    "right": 98,
+    "bottom": 541
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Thank you",
+   "box": {
+    "left": 212,
+    "top": 583,
+    "right": 348,
+    "bottom": 612
+   },
+   "confidence": 0.998
+  }
+ ]
+}

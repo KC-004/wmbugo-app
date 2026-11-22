@@ -1,0 +1,398 @@
+{
+ "id": "22-uk-europe-eu",
+ "engine": "paddleocr-ppocrv4-onnx",
+ "width": 760,
+ "height": 746,
+ "blocks": [
+  {
+   "text": "Café Rosengarten",
+   "box": {
+    "left": 216,
+    "top": 35,
+    "right": 544,
+    "bottom": 67
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Open daily 9:00 - 21:00",
+   "box": {
+    "left": 213,
+    "top": 74,
+    "right": 547,
+    "bottom": 101
+   },
+   "confidence": 0.95
+  },
+  {
+   "text": "Datum: 20.09.2026",
+   "box": {
+    "left": 22,
+    "top": 142,
+    "right": 272,
+    "bottom": 167
+   },
+   "confidence": 0.993
+  },
+  {
+   "text": "12:46",
+   "box": {
+    "left": 295,
+    "top": 143,
+    "right": 372,
+    "bottom": 166
+   },
+   "confidence": 0.992
+  },
+  {
+   "text": "QTY",
+   "box": {
+    "left": 384,
+    "top": 209,
+    "right": 434,
+    "bottom": 237
+   },
+   "confidence": 0.916
+  },
+  {
+   "text": "ITEM",
+   "box": {
+    "left": 23,
+    "top": 211,
+    "right": 86,
+    "bottom": 234
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "RATE",
+   "box": {
+    "left": 469,
+    "top": 211,
+    "right": 533,
+    "bottom": 235
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "AMOUNT",
+   "box": {
+    "left": 648,
+    "top": 212,
+    "right": 738,
+    "bottom": 234
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "1",
+   "box": {
+    "left": 411,
+    "top": 243,
+    "right": 433,
+    "bottom": 271
+   },
+   "confidence": 0.974
+  },
+  {
+   "text": "3,89",
+   "box": {
+    "left": 470,
+    "top": 244,
+    "right": 533,
+    "bottom": 270
+   },
+   "confidence": 0.995
+  },
+  {
+   "text": "3,89",
+   "box": {
+    "left": 677,
+    "top": 244,
+    "right": 739,
+    "bottom": 270
+   },
+   "confidence": 0.994
+  },
+  {
+   "text": "Vollkornbrot",
+   "box": {
+    "left": 22,
+    "top": 245,
+    "right": 197,
+    "bottom": 267
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "1",
+   "box": {
+    "left": 411,
+    "top": 278,
+    "right": 433,
+    "bottom": 305
+   },
+   "confidence": 0.987
+  },
+  {
+   "text": "0,99",
+   "box": {
+    "left": 470,
+    "top": 277,
+    "right": 534,
+    "bottom": 305
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "0,99",
+   "box": {
+    "left": 676,
+    "top": 277,
+    "right": 739,
+    "bottom": 305
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "Mineralwasser",
+   "box": {
+    "left": 21,
+    "top": 278,
+    "right": 212,
+    "bottom": 303
+   },
+   "confidence": 1
+  },
+  {
+   "text": "1",
+   "box": {
+    "left": 411,
+    "top": 312,
+    "right": 432,
+    "bottom": 338
+   },
+   "confidence": 0.994
+  },
+  {
+   "text": "Eier 10 Stk",
+   "box": {
+    "left": 21,
+    "top": 312,
+    "right": 185,
+    "bottom": 336
+   },
+   "confidence": 0.96
+  },
+  {
+   "text": "3,19",
+   "box": {
+    "left": 470,
+    "top": 311,
+    "right": 534,
+    "bottom": 340
+   },
+   "confidence": 1
+  },
+  {
+   "text": "3,19",
+   "box": {
+    "left": 676,
+    "top": 311,
+    "right": 739,
+    "bottom": 340
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "1",
+   "box": {
+    "left": 411,
+    "top": 346,
+    "right": 433,
+    "bottom": 373
+   },
+   "confidence": 0.987
+  },
+  {
+   "text": "1,59",
+   "box": {
+    "left": 469,
+    "top": 344,
+    "right": 533,
+    "bottom": 373
+   },
+   "confidence": 1
+  },
+  {
+   "text": "1,59",
+   "box": {
+    "left": 676,
+    "top": 344,
+    "right": 739,
+    "bottom": 373
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Schokolade",
+   "box": {
+    "left": 22,
+    "top": 346,
+    "right": 169,
+    "bottom": 370
+   },
+   "confidence": 1
+  },
+  {
+   "text": "1",
+   "box": {
+    "left": 412,
+    "top": 380,
+    "right": 433,
+    "bottom": 406
+   },
+   "confidence": 0.969
+  },
+  {
+   "text": "2,49",
+   "box": {
+    "left": 470,
+    "top": 379,
+    "right": 534,
+    "bottom": 408
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "Tomaten 500g",
+   "box": {
+    "left": 20,
+    "top": 379,
+    "right": 200,
+    "bottom": 408
+   },
+   "confidence": 0.995
+  },
+  {
+   "text": "2,49",
+   "box": {
+    "left": 676,
+    "top": 380,
+    "right": 739,
+    "bottom": 407
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "1",
+   "box": {
+    "left": 411,
+    "top": 413,
+    "right": 433,
+    "bottom": 440
+   },
+   "confidence": 0.994
+  },
+  {
+   "text": "Joghurt",
+   "box": {
+    "left": 21,
+    "top": 413,
+    "right": 128,
+    "bottom": 441
+   },
+   "confidence": 1
+  },
+  {
+   "text": "0,79",
+   "box": {
+    "left": 470,
+    "top": 414,
+    "right": 533,
+    "bottom": 441
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "0,79",
+   "box": {
+    "left": 677,
+    "top": 414,
+    "right": 738,
+    "bottom": 439
+   },
+   "confidence": 0.985
+  },
+  {
+   "text": "12,94",
+   "box": {
+    "left": 662,
+    "top": 481,
+    "right": 738,
+    "bottom": 509
+   },
+   "confidence": 0.997
+  },
+  {
+   "text": "Zwischensumme",
+   "box": {
+    "left": 24,
+    "top": 484,
+    "right": 212,
+    "bottom": 506
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "MwSt",
+   "box": {
+    "left": 19,
+    "top": 517,
+    "right": 84,
+    "bottom": 542
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "2,46",
+   "box": {
+    "left": 676,
+    "top": 516,
+    "right": 739,
+    "bottom": 545
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "15,40",
+   "box": {
+    "left": 661,
+    "top": 582,
+    "right": 739,
+    "bottom": 612
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Summe",
+   "box": {
+    "left": 23,
+    "top": 586,
+    "right": 98,
+    "bottom": 609
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Thank you",
+   "box": {
+    "left": 313,
+    "top": 653,
+    "right": 447,
+    "bottom": 679
+   },
+   "confidence": 0.999
+  }
+ ]
+}

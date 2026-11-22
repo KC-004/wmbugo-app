@@ -1,0 +1,47 @@
+{
+  "id": "13-us-canada-us",
+  "market": "us-canada",
+  "region": "US",
+  "merchant": "Northside Hardware",
+  "date": "2026-07-24",
+  "currency": "USD",
+  "subtotalMinor": 1575,
+  "taxes": [
+    {
+      "label": "Sales tax",
+      "amountMinor": 114
+    }
+  ],
+  "fees": [],
+  "discounts": [],
+  "totalMinor": 1689,
+  "items": [
+    {
+      "name": "Whole milk 1gal",
+      "amountMinor": 429
+    },
+    {
+      "name": "Pasta 16oz",
+      "amountMinor": 199
+    },
+    {
+      "name": "Pasta 16oz",
+      "amountMinor": 199
+    },
+    {
+      "name": "Cheddar block",
+      "amountMinor": 549
+    },
+    {
+      "name": "Pasta 16oz",
+      "amountMinor": 199
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": false,
+    "decimalComma": false,
+    "multiColumn": true,
+    "lowContrastOrTilted": false,
+    "longReceipt": false
+  }
+}

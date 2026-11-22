@@ -1,0 +1,48 @@
+{
+  "id": "32-gulf-se-asia-gulf",
+  "market": "gulf-se-asia",
+  "region": "AE",
+  "merchant": "سوق النخيل",
+  "date": "2026-06-08",
+  "currency": "AED",
+  "subtotalMinor": 11500,
+  "taxes": [
+    {
+      "label": "VAT",
+      "amountMinor": 633
+    }
+  ],
+  "fees": [
+    {
+      "label": "Service charge",
+      "amountMinor": 1150
+    }
+  ],
+  "discounts": [],
+  "totalMinor": 13283,
+  "items": [
+    {
+      "name": "Rice 5kg",
+      "amountMinor": 3200
+    },
+    {
+      "name": "Saffron 1g",
+      "amountMinor": 2200
+    },
+    {
+      "name": "Olive oil 500ml",
+      "amountMinor": 3600
+    },
+    {
+      "name": "Dates 500g",
+      "amountMinor": 2500
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": true,
+    "decimalComma": false,
+    "multiColumn": false,
+    "lowContrastOrTilted": false,
+    "longReceipt": false
+  }
+}

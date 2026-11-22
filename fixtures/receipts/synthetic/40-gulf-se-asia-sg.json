@@ -1,0 +1,56 @@
+{
+  "id": "40-gulf-se-asia-sg",
+  "market": "gulf-se-asia",
+  "region": "SG",
+  "merchant": "Little India Spices",
+  "date": "2026-04-11",
+  "currency": "SGD",
+  "subtotalMinor": 2360,
+  "taxes": [
+    {
+      "label": "GST",
+      "amountMinor": 234
+    }
+  ],
+  "fees": [
+    {
+      "label": "Service charge",
+      "amountMinor": 236
+    }
+  ],
+  "discounts": [],
+  "totalMinor": 2830,
+  "items": [
+    {
+      "name": "Soy milk",
+      "amountMinor": 190
+    },
+    {
+      "name": "Satay 10 sticks",
+      "amountMinor": 1000
+    },
+    {
+      "name": "Roti prata",
+      "amountMinor": 280
+    },
+    {
+      "name": "Soy milk",
+      "amountMinor": 190
+    },
+    {
+      "name": "Kopi O",
+      "amountMinor": 150
+    },
+    {
+      "name": "Fried noodles",
+      "amountMinor": 550
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": false,
+    "decimalComma": false,
+    "multiColumn": false,
+    "lowContrastOrTilted": true,
+    "longReceipt": false
+  }
+}

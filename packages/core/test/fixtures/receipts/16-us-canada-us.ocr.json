@@ -1,0 +1,268 @@
+{
+ "id": "16-us-canada-us",
+ "engine": "paddleocr-ppocrv4-onnx",
+ "width": 560,
+ "height": 746,
+ "blocks": [
+  {
+   "text": "Lakeview Market",
+   "box": {
+    "left": 125,
+    "top": 34,
+    "right": 433,
+    "bottom": 64
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Tel 9:00 - 21:00",
+   "box": {
+    "left": 163,
+    "top": 73,
+    "right": 395,
+    "bottom": 98
+   },
+   "confidence": 0.961
+  },
+  {
+   "text": "Date: 02/18/2026",
+   "box": {
+    "left": 23,
+    "top": 142,
+    "right": 256,
+    "bottom": 167
+   },
+   "confidence": 0.984
+  },
+  {
+   "text": "15:54",
+   "box": {
+    "left": 281,
+    "top": 143,
+    "right": 357,
+    "bottom": 166
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "5.49",
+   "box": {
+    "left": 477,
+    "top": 210,
+    "right": 539,
+    "bottom": 234
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Cheddar block",
+   "box": {
+    "left": 24,
+    "top": 210,
+    "right": 213,
+    "bottom": 235
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "10.99",
+   "box": {
+    "left": 462,
+    "top": 244,
+    "right": 538,
+    "bottom": 269
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Paper towels",
+   "box": {
+    "left": 22,
+    "top": 244,
+    "right": 198,
+    "bottom": 271
+   },
+   "confidence": 0.997
+  },
+  {
+   "text": "1.99",
+   "box": {
+    "left": 475,
+    "top": 277,
+    "right": 539,
+    "bottom": 304
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Pasta 16oz",
+   "box": {
+    "left": 21,
+    "top": 278,
+    "right": 170,
+    "bottom": 304
+   },
+   "confidence": 0.982
+  },
+  {
+   "text": "4.79",
+   "box": {
+    "left": 477,
+    "top": 311,
+    "right": 538,
+    "bottom": 338
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Granola bars",
+   "box": {
+    "left": 23,
+    "top": 313,
+    "right": 198,
+    "bottom": 337
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "6.49",
+   "box": {
+    "left": 477,
+    "top": 345,
+    "right": 539,
+    "bottom": 372
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Sparkling water",
+   "box": {
+    "left": 22,
+    "top": 346,
+    "right": 241,
+    "bottom": 373
+   },
+   "confidence": 1
+  },
+  {
+   "text": "3.89",
+   "box": {
+    "left": 477,
+    "top": 380,
+    "right": 539,
+    "bottom": 405
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Eggs dozen",
+   "box": {
+    "left": 21,
+    "top": 381,
+    "right": 171,
+    "bottom": 408
+   },
+   "confidence": 0.994
+  },
+  {
+   "text": "12.99",
+   "box": {
+    "left": 463,
+    "top": 415,
+    "right": 538,
+    "bottom": 438
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Ground coffee 12oz",
+   "box": {
+    "left": 23,
+    "top": 415,
+    "right": 285,
+    "bottom": 440
+   },
+   "confidence": 0.98
+  },
+  {
+   "text": "46.63",
+   "box": {
+    "left": 464,
+    "top": 483,
+    "right": 538,
+    "bottom": 506
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Subtotal",
+   "box": {
+    "left": 24,
+    "top": 484,
+    "right": 139,
+    "bottom": 506
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "3.38",
+   "box": {
+    "left": 476,
+    "top": 516,
+    "right": 538,
+    "bottom": 541
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "Sales",
+   "box": {
+    "left": 22,
+    "top": 517,
+    "right": 100,
+    "bottom": 540
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "tax",
+   "box": {
+    "left": 96,
+    "top": 518,
+    "right": 156,
+    "bottom": 541
+   },
+   "confidence": 0.988
+  },
+  {
+   "text": "Total",
+   "box": {
+    "left": 21,
+    "top": 583,
+    "right": 98,
+    "bottom": 609
+   },
+   "confidence": 1
+  },
+  {
+   "text": "50.01",
+   "box": {
+    "left": 462,
+    "top": 583,
+    "right": 537,
+    "bottom": 609
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Thank you",
+   "box": {
+    "left": 213,
+    "top": 653,
+    "right": 347,
+    "bottom": 679
+   },
+   "confidence": 0.999
+  }
+ ]
+}

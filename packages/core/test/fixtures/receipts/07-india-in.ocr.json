@@ -1,0 +1,778 @@
+{
+ "id": "07-india-in",
+ "engine": "paddleocr-ppocrv4-onnx",
+ "width": 560,
+ "height": 1630,
+ "blocks": [
+  {
+   "text": "Annapurna Kitchen",
+   "box": {
+    "left": 102,
+    "top": 33,
+    "right": 459,
+    "bottom": 70
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Tel 9:00 - 21:00",
+   "box": {
+    "left": 161,
+    "top": 73,
+    "right": 398,
+    "bottom": 101
+   },
+   "confidence": 0.984
+  },
+  {
+   "text": "Date: 18/01/2026",
+   "box": {
+    "left": 18,
+    "top": 139,
+    "right": 263,
+    "bottom": 172
+   },
+   "confidence": 0.982
+  },
+  {
+   "text": "14:53",
+   "box": {
+    "left": 254,
+    "top": 141,
+    "right": 359,
+    "bottom": 169
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Toor dal 1kg",
+   "box": {
+    "left": 17,
+    "top": 206,
+    "right": 203,
+    "bottom": 243
+   },
+   "confidence": 0.948
+  },
+  {
+   "text": "189.50",
+   "box": {
+    "left": 445,
+    "top": 209,
+    "right": 539,
+    "bottom": 236
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Mango 1kg",
+   "box": {
+    "left": 17,
+    "top": 241,
+    "right": 160,
+    "bottom": 276
+   },
+   "confidence": 0.991
+  },
+  {
+   "text": "140.10",
+   "box": {
+    "left": 444,
+    "top": 242,
+    "right": 542,
+    "bottom": 273
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Tea 250g",
+   "box": {
+    "left": 17,
+    "top": 275,
+    "right": 148,
+    "bottom": 310
+   },
+   "confidence": 0.997
+  },
+  {
+   "text": "110.20",
+   "box": {
+    "left": 444,
+    "top": 276,
+    "right": 542,
+    "bottom": 307
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Samosa x2",
+   "box": {
+    "left": 18,
+    "top": 310,
+    "right": 159,
+    "bottom": 341
+   },
+   "confidence": 0.993
+  },
+  {
+   "text": "40.30",
+   "box": {
+    "left": 460,
+    "top": 310,
+    "right": 540,
+    "bottom": 341
+   },
+   "confidence": 1
+  },
+  {
+   "text": "38.40",
+   "box": {
+    "left": 460,
+    "top": 344,
+    "right": 542,
+    "bottom": 375
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Curd 500g",
+   "box": {
+    "left": 18,
+    "top": 345,
+    "right": 159,
+    "bottom": 377
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "44.50",
+   "box": {
+    "left": 460,
+    "top": 378,
+    "right": 540,
+    "bottom": 409
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Bath soap",
+   "box": {
+    "left": 18,
+    "top": 379,
+    "right": 159,
+    "bottom": 411
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "90.60",
+   "box": {
+    "left": 459,
+    "top": 411,
+    "right": 543,
+    "bottom": 445
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Paneer 200g",
+   "box": {
+    "left": 18,
+    "top": 413,
+    "right": 189,
+    "bottom": 445
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "125.70",
+   "box": {
+    "left": 446,
+    "top": 446,
+    "right": 542,
+    "bottom": 477
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Masala chai pack",
+   "box": {
+    "left": 18,
+    "top": 447,
+    "right": 261,
+    "bottom": 479
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Basmati rice 5kg",
+   "box": {
+    "left": 16,
+    "top": 478,
+    "right": 263,
+    "bottom": 514
+   },
+   "confidence": 0.963
+  },
+  {
+   "text": "649.80",
+   "box": {
+    "left": 448,
+    "top": 483,
+    "right": 541,
+    "bottom": 510
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Paneer 200g",
+   "box": {
+    "left": 18,
+    "top": 515,
+    "right": 189,
+    "bottom": 547
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "90.90",
+   "box": {
+    "left": 461,
+    "top": 517,
+    "right": 541,
+    "bottom": 544
+   },
+   "confidence": 1
+  },
+  {
+   "text": "126.00",
+   "box": {
+    "left": 446,
+    "top": 548,
+    "right": 542,
+    "bottom": 579
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Masala chai pack",
+   "box": {
+    "left": 18,
+    "top": 549,
+    "right": 261,
+    "bottom": 581
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "81.10",
+   "box": {
+    "left": 460,
+    "top": 582,
+    "right": 542,
+    "bottom": 612
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Filter coffee",
+   "box": {
+    "left": 18,
+    "top": 583,
+    "right": 217,
+    "bottom": 615
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "141.20",
+   "box": {
+    "left": 446,
+    "top": 616,
+    "right": 540,
+    "bottom": 647
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Mango 1kg",
+   "box": {
+    "left": 18,
+    "top": 617,
+    "right": 159,
+    "bottom": 649
+   },
+   "confidence": 0.993
+  },
+  {
+   "text": "Ghee 500ml",
+   "box": {
+    "left": 19,
+    "top": 652,
+    "right": 171,
+    "bottom": 680
+   },
+   "confidence": 0.994
+  },
+  {
+   "text": "326.30",
+   "box": {
+    "left": 447,
+    "top": 652,
+    "right": 539,
+    "bottom": 680
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Ghee 500ml",
+   "box": {
+    "left": 21,
+    "top": 686,
+    "right": 171,
+    "bottom": 714
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "326.40",
+   "box": {
+    "left": 447,
+    "top": 686,
+    "right": 539,
+    "bottom": 714
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Basmati rice 5kg",
+   "box": {
+    "left": 18,
+    "top": 718,
+    "right": 260,
+    "bottom": 751
+   },
+   "confidence": 1
+  },
+  {
+   "text": "650.50",
+   "box": {
+    "left": 448,
+    "top": 720,
+    "right": 539,
+    "bottom": 747
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Filter coffee",
+   "box": {
+    "left": 19,
+    "top": 754,
+    "right": 215,
+    "bottom": 782
+   },
+   "confidence": 0.986
+  },
+  {
+   "text": "81.60",
+   "box": {
+    "left": 460,
+    "top": 754,
+    "right": 540,
+    "bottom": 784
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Curd 500g",
+   "box": {
+    "left": 18,
+    "top": 787,
+    "right": 159,
+    "bottom": 819
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "39.70",
+   "box": {
+    "left": 461,
+    "top": 788,
+    "right": 541,
+    "bottom": 815
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Curd 500g",
+   "box": {
+    "left": 18,
+    "top": 821,
+    "right": 159,
+    "bottom": 853
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "39.80",
+   "box": {
+    "left": 462,
+    "top": 821,
+    "right": 542,
+    "bottom": 852
+   },
+   "confidence": 1
+  },
+  {
+   "text": "66.90",
+   "box": {
+    "left": 462,
+    "top": 854,
+    "right": 542,
+    "bottom": 884
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Notebook A4",
+   "box": {
+    "left": 19,
+    "top": 855,
+    "right": 188,
+    "bottom": 884
+   },
+   "confidence": 0.984
+  },
+  {
+   "text": "327.00",
+   "box": {
+    "left": 446,
+    "top": 887,
+    "right": 540,
+    "bottom": 918
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Ghee 500ml",
+   "box": {
+    "left": 21,
+    "top": 890,
+    "right": 171,
+    "bottom": 918
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "191.60",
+   "box": {
+    "left": 446,
+    "top": 921,
+    "right": 540,
+    "bottom": 952
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Toor dal 1kg",
+   "box": {
+    "left": 18,
+    "top": 922,
+    "right": 202,
+    "bottom": 955
+   },
+   "confidence": 0.963
+  },
+  {
+   "text": "Ghee 500ml",
+   "box": {
+    "left": 18,
+    "top": 955,
+    "right": 172,
+    "bottom": 987
+   },
+   "confidence": 0.985
+  },
+  {
+   "text": "327.20",
+   "box": {
+    "left": 446,
+    "top": 955,
+    "right": 542,
+    "bottom": 986
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Ghee 500ml",
+   "box": {
+    "left": 20,
+    "top": 989,
+    "right": 170,
+    "bottom": 1021
+   },
+   "confidence": 0.997
+  },
+  {
+   "text": "327.30",
+   "box": {
+    "left": 446,
+    "top": 989,
+    "right": 540,
+    "bottom": 1020
+   },
+   "confidence": 1
+  },
+  {
+   "text": "67.40",
+   "box": {
+    "left": 462,
+    "top": 1023,
+    "right": 542,
+    "bottom": 1054
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Notebook A4",
+   "box": {
+    "left": 19,
+    "top": 1025,
+    "right": 188,
+    "bottom": 1054
+   },
+   "confidence": 0.984
+  },
+  {
+   "text": "192.00",
+   "box": {
+    "left": 444,
+    "top": 1057,
+    "right": 540,
+    "bottom": 1088
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Toor dal 1kg",
+   "box": {
+    "left": 18,
+    "top": 1058,
+    "right": 202,
+    "bottom": 1090
+   },
+   "confidence": 0.956
+  },
+  {
+   "text": "67.60",
+   "box": {
+    "left": 460,
+    "top": 1091,
+    "right": 542,
+    "bottom": 1122
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Notebook A4",
+   "box": {
+    "left": 19,
+    "top": 1093,
+    "right": 188,
+    "bottom": 1122
+   },
+   "confidence": 0.984
+  },
+  {
+   "text": "67.70",
+   "box": {
+    "left": 462,
+    "top": 1125,
+    "right": 542,
+    "bottom": 1156
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Notebook A4",
+   "box": {
+    "left": 19,
+    "top": 1127,
+    "right": 188,
+    "bottom": 1156
+   },
+   "confidence": 0.984
+  },
+  {
+   "text": "42.80",
+   "box": {
+    "left": 462,
+    "top": 1159,
+    "right": 542,
+    "bottom": 1190
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Samosa x2",
+   "box": {
+    "left": 19,
+    "top": 1161,
+    "right": 158,
+    "bottom": 1189
+   },
+   "confidence": 0.996
+  },
+  {
+   "text": "127.90",
+   "box": {
+    "left": 446,
+    "top": 1193,
+    "right": 542,
+    "bottom": 1224
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Masala chai pack",
+   "box": {
+    "left": 18,
+    "top": 1194,
+    "right": 261,
+    "bottom": 1226
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Samosa x2",
+   "box": {
+    "left": 18,
+    "top": 1226,
+    "right": 161,
+    "bottom": 1258
+   },
+   "confidence": 0.996
+  },
+  {
+   "text": "43.00",
+   "box": {
+    "left": 460,
+    "top": 1227,
+    "right": 542,
+    "bottom": 1258
+   },
+   "confidence": 1
+  },
+  {
+   "text": "652.10",
+   "box": {
+    "left": 446,
+    "top": 1261,
+    "right": 542,
+    "bottom": 1292
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Basmati rice 5kg",
+   "box": {
+    "left": 18,
+    "top": 1262,
+    "right": 261,
+    "bottom": 1294
+   },
+   "confidence": 0.987
+  },
+  {
+   "text": "Subtotal",
+   "box": {
+    "left": 18,
+    "top": 1328,
+    "right": 142,
+    "bottom": 1360
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "5,833.10",
+   "box": {
+    "left": 417,
+    "top": 1328,
+    "right": 543,
+    "bottom": 1360
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "145.83",
+   "box": {
+    "left": 443,
+    "top": 1362,
+    "right": 543,
+    "bottom": 1396
+   },
+   "confidence": 1
+  },
+  {
+   "text": "CGST",
+   "box": {
+    "left": 19,
+    "top": 1365,
+    "right": 88,
+    "bottom": 1395
+   },
+   "confidence": 1
+  },
+  {
+   "text": "145.83",
+   "box": {
+    "left": 443,
+    "top": 1396,
+    "right": 543,
+    "bottom": 1430
+   },
+   "confidence": 1
+  },
+  {
+   "text": "SGST",
+   "box": {
+    "left": 19,
+    "top": 1399,
+    "right": 88,
+    "bottom": 1429
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Grand Total",
+   "box": {
+    "left": 19,
+    "top": 1463,
+    "right": 187,
+    "bottom": 1499
+   },
+   "confidence": 0.996
+  },
+  {
+   "text": "6,124.76",
+   "box": {
+    "left": 416,
+    "top": 1463,
+    "right": 544,
+    "bottom": 1499
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Thank you",
+   "box": {
+    "left": 210,
+    "top": 1533,
+    "right": 353,
+    "bottom": 1568
+   },
+   "confidence": 0.95
+  }
+ ]
+}

@@ -1,0 +1,218 @@
+{
+ "id": "21-uk-europe-eu",
+ "engine": "paddleocr-ppocrv4-onnx",
+ "width": 560,
+ "height": 678,
+ "blocks": [
+  {
+   "text": "Bäckerei Lindenhof",
+   "box": {
+    "left": 95,
+    "top": 34,
+    "right": 464,
+    "bottom": 64
+   },
+   "confidence": 0.963
+  },
+  {
+   "text": "Tel 9:00 - 21:00",
+   "box": {
+    "left": 163,
+    "top": 73,
+    "right": 395,
+    "bottom": 98
+   },
+   "confidence": 0.961
+  },
+  {
+   "text": "15:04",
+   "box": {
+    "left": 295,
+    "top": 142,
+    "right": 371,
+    "bottom": 167
+   },
+   "confidence": 0.997
+  },
+  {
+   "text": "Datum: 05.07.2026",
+   "box": {
+    "left": 23,
+    "top": 143,
+    "right": 271,
+    "bottom": 165
+   },
+   "confidence": 0.986
+  },
+  {
+   "text": "3,89",
+   "box": {
+    "left": 476,
+    "top": 209,
+    "right": 540,
+    "bottom": 237
+   },
+   "confidence": 0.994
+  },
+  {
+   "text": "Vollkornbrot",
+   "box": {
+    "left": 22,
+    "top": 210,
+    "right": 198,
+    "bottom": 235
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "2,29",
+   "box": {
+    "left": 475,
+    "top": 243,
+    "right": 539,
+    "bottom": 272
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "Butter 250g",
+   "box": {
+    "left": 21,
+    "top": 245,
+    "right": 185,
+    "bottom": 272
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "Mineralwasser",
+   "box": {
+    "left": 20,
+    "top": 277,
+    "right": 213,
+    "bottom": 304
+   },
+   "confidence": 1
+  },
+  {
+   "text": "0,99",
+   "box": {
+    "left": 476,
+    "top": 277,
+    "right": 539,
+    "bottom": 306
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Joghurt",
+   "box": {
+    "left": 23,
+    "top": 311,
+    "right": 128,
+    "bottom": 339
+   },
+   "confidence": 1
+  },
+  {
+   "text": "0,79",
+   "box": {
+    "left": 476,
+    "top": 312,
+    "right": 539,
+    "bottom": 340
+   },
+   "confidence": 0.995
+  },
+  {
+   "text": "Mineralwasser",
+   "box": {
+    "left": 21,
+    "top": 346,
+    "right": 213,
+    "bottom": 371
+   },
+   "confidence": 1
+  },
+  {
+   "text": "0,99",
+   "box": {
+    "left": 477,
+    "top": 347,
+    "right": 539,
+    "bottom": 372
+   },
+   "confidence": 0.997
+  },
+  {
+   "text": "8,95",
+   "box": {
+    "left": 477,
+    "top": 414,
+    "right": 538,
+    "bottom": 441
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "Zwischensumme",
+   "box": {
+    "left": 23,
+    "top": 416,
+    "right": 212,
+    "bottom": 438
+   },
+   "confidence": 1
+  },
+  {
+   "text": "1,70",
+   "box": {
+    "left": 475,
+    "top": 447,
+    "right": 539,
+    "bottom": 475
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "MwSt",
+   "box": {
+    "left": 19,
+    "top": 449,
+    "right": 84,
+    "bottom": 474
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "10,65",
+   "box": {
+    "left": 463,
+    "top": 516,
+    "right": 539,
+    "bottom": 543
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Summe",
+   "box": {
+    "left": 22,
+    "top": 518,
+    "right": 97,
+    "bottom": 541
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Thank you",
+   "box": {
+    "left": 212,
+    "top": 583,
+    "right": 348,
+    "bottom": 612
+   },
+   "confidence": 0.998
+  }
+ ]
+}

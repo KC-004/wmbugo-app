@@ -1,0 +1,60 @@
+{
+  "id": "18-us-canada-us",
+  "market": "us-canada",
+  "region": "US",
+  "merchant": "Oak and Iron Books",
+  "date": "2026-11-23",
+  "currency": "USD",
+  "subtotalMinor": 5429,
+  "taxes": [
+    {
+      "label": "Sales tax",
+      "amountMinor": 354
+    }
+  ],
+  "fees": [],
+  "discounts": [
+    {
+      "label": "Discount",
+      "amountMinor": -543
+    }
+  ],
+  "totalMinor": 5240,
+  "items": [
+    {
+      "name": "Pasta 16oz",
+      "amountMinor": 199
+    },
+    {
+      "name": "Chicken breast",
+      "amountMinor": 1245
+    },
+    {
+      "name": "Olive oil",
+      "amountMinor": 1399
+    },
+    {
+      "name": "Paper towels",
+      "amountMinor": 1099
+    },
+    {
+      "name": "Pasta 16oz",
+      "amountMinor": 199
+    },
+    {
+      "name": "Paper towels",
+      "amountMinor": 1099
+    },
+    {
+      "name": "Bananas",
+      "amountMinor": 189
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": false,
+    "decimalComma": false,
+    "multiColumn": false,
+    "lowContrastOrTilted": false,
+    "longReceipt": false
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "id": "34-gulf-se-asia-gulf",
+  "market": "gulf-se-asia",
+  "region": "AE",
+  "merchant": "Marina Bites",
+  "date": "2026-02-22",
+  "currency": "AED",
+  "subtotalMinor": 4950,
+  "taxes": [
+    {
+      "label": "VAT",
+      "amountMinor": 272
+    }
+  ],
+  "fees": [
+    {
+      "label": "Service charge",
+      "amountMinor": 495
+    }
+  ],
+  "discounts": [],
+  "totalMinor": 5717,
+  "items": [
+    {
+      "name": "Hummus",
+      "amountMinor": 800
+    },
+    {
+      "name": "Arabic bread",
+      "amountMinor": 350
+    },
+    {
+      "name": "Hummus",
+      "amountMinor": 800
+    },
+    {
+      "name": "Saffron 1g",
+      "amountMinor": 2200
+    },
+    {
+      "name": "Hummus",
+      "amountMinor": 800
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": false,
+    "decimalComma": false,
+    "multiColumn": false,
+    "lowContrastOrTilted": false,
+    "longReceipt": false
+  }
+}

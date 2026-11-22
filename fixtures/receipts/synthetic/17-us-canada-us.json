@@ -1,0 +1,51 @@
+{
+  "id": "17-us-canada-us",
+  "market": "us-canada",
+  "region": "US",
+  "merchant": "Corner Pizza House",
+  "date": "2026-05-24",
+  "currency": "USD",
+  "subtotalMinor": 5204,
+  "taxes": [
+    {
+      "label": "Sales tax",
+      "amountMinor": 377
+    }
+  ],
+  "fees": [],
+  "discounts": [],
+  "totalMinor": 5581,
+  "items": [
+    {
+      "name": "Ground coffee 12oz",
+      "amountMinor": 1299
+    },
+    {
+      "name": "Granola bars",
+      "amountMinor": 479
+    },
+    {
+      "name": "Paper towels",
+      "amountMinor": 1099
+    },
+    {
+      "name": "Cheddar block",
+      "amountMinor": 549
+    },
+    {
+      "name": "Granola bars",
+      "amountMinor": 479
+    },
+    {
+      "name": "Ground coffee 12oz",
+      "amountMinor": 1299
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": false,
+    "decimalComma": false,
+    "multiColumn": false,
+    "lowContrastOrTilted": true,
+    "longReceipt": false
+  }
+}

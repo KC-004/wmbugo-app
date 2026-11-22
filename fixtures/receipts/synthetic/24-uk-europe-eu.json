@@ -1,0 +1,51 @@
+{
+  "id": "24-uk-europe-eu",
+  "market": "uk-europe",
+  "region": "DE",
+  "merchant": "Buchhandlung Nord",
+  "date": "2026-03-02",
+  "currency": "EUR",
+  "subtotalMinor": 1704,
+  "taxes": [
+    {
+      "label": "MwSt",
+      "amountMinor": 324
+    }
+  ],
+  "fees": [],
+  "discounts": [],
+  "totalMinor": 2028,
+  "items": [
+    {
+      "name": "Butter 250g",
+      "amountMinor": 229
+    },
+    {
+      "name": "Mineralwasser",
+      "amountMinor": 99
+    },
+    {
+      "name": "Käse Gouda",
+      "amountMinor": 479
+    },
+    {
+      "name": "Käse Gouda",
+      "amountMinor": 479
+    },
+    {
+      "name": "Butter 250g",
+      "amountMinor": 229
+    },
+    {
+      "name": "Apfelsaft 1l",
+      "amountMinor": 189
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": false,
+    "decimalComma": true,
+    "multiColumn": false,
+    "lowContrastOrTilted": true,
+    "longReceipt": false
+  }
+}

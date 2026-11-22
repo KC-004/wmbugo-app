@@ -1,0 +1,52 @@
+{
+  "id": "38-gulf-se-asia-sg",
+  "market": "gulf-se-asia",
+  "region": "SG",
+  "merchant": "Kampong Mart",
+  "date": "2026-01-03",
+  "currency": "SGD",
+  "subtotalMinor": 1750,
+  "taxes": [
+    {
+      "label": "GST",
+      "amountMinor": 173
+    }
+  ],
+  "fees": [
+    {
+      "label": "Service charge",
+      "amountMinor": 175
+    }
+  ],
+  "discounts": [],
+  "totalMinor": 2098,
+  "items": [
+    {
+      "name": "Soy milk",
+      "amountMinor": 190
+    },
+    {
+      "name": "Satay 10 sticks",
+      "amountMinor": 1000
+    },
+    {
+      "name": "Soy milk",
+      "amountMinor": 190
+    },
+    {
+      "name": "Soy milk",
+      "amountMinor": 190
+    },
+    {
+      "name": "Teh tarik",
+      "amountMinor": 180
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": false,
+    "decimalComma": false,
+    "multiColumn": false,
+    "lowContrastOrTilted": true,
+    "longReceipt": false
+  }
+}

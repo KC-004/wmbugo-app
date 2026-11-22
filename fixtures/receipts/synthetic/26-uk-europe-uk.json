@@ -1,0 +1,39 @@
+{
+  "id": "26-uk-europe-uk",
+  "market": "uk-europe",
+  "region": "GB",
+  "merchant": "Elm Park Books",
+  "date": "2026-04-18",
+  "currency": "GBP",
+  "subtotalMinor": 705,
+  "taxes": [
+    {
+      "label": "VAT",
+      "amountMinor": 141
+    }
+  ],
+  "fees": [],
+  "discounts": [],
+  "totalMinor": 846,
+  "items": [
+    {
+      "name": "Tea bags 80",
+      "amountMinor": 215
+    },
+    {
+      "name": "Free range eggs",
+      "amountMinor": 275
+    },
+    {
+      "name": "Tea bags 80",
+      "amountMinor": 215
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": false,
+    "decimalComma": false,
+    "multiColumn": false,
+    "lowContrastOrTilted": false,
+    "longReceipt": false
+  }
+}

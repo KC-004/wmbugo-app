@@ -1,0 +1,43 @@
+{
+  "id": "27-uk-europe-uk",
+  "market": "uk-europe",
+  "region": "GB",
+  "merchant": "Mill Lane Bakery",
+  "date": "2026-05-07",
+  "currency": "GBP",
+  "subtotalMinor": 612,
+  "taxes": [
+    {
+      "label": "VAT",
+      "amountMinor": 122
+    }
+  ],
+  "fees": [],
+  "discounts": [],
+  "totalMinor": 734,
+  "items": [
+    {
+      "name": "Sliced bread",
+      "amountMinor": 129
+    },
+    {
+      "name": "Semi skimmed milk",
+      "amountMinor": 155
+    },
+    {
+      "name": "Butter 250g",
+      "amountMinor": 199
+    },
+    {
+      "name": "Sliced bread",
+      "amountMinor": 129
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": false,
+    "decimalComma": false,
+    "multiColumn": true,
+    "lowContrastOrTilted": false,
+    "longReceipt": false
+  }
+}

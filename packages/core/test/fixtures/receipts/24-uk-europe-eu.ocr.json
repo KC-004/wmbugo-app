@@ -1,0 +1,238 @@
+{
+ "id": "24-uk-europe-eu",
+ "engine": "paddleocr-ppocrv4-onnx",
+ "width": 680,
+ "height": 832,
+ "blocks": [
+  {
+   "text": "Buchhandlung Nord",
+   "box": {
+    "left": 170,
+    "top": 85,
+    "right": 532,
+    "bottom": 135
+   },
+   "confidence": 0.988
+  },
+  {
+   "text": "Tel 9:00 - 21:00",
+   "box": {
+    "left": 229,
+    "top": 127,
+    "right": 469,
+    "bottom": 166
+   },
+   "confidence": 0.972
+  },
+  {
+   "text": "Datum: 02.03.2026",
+   "box": {
+    "left": 85,
+    "top": 191,
+    "right": 344,
+    "bottom": 230
+   },
+   "confidence": 0.991
+  },
+  {
+   "text": "17:28",
+   "box": {
+    "left": 362,
+    "top": 204,
+    "right": 439,
+    "bottom": 230
+   },
+   "confidence": 0.997
+  },
+  {
+   "text": "Butter 250g",
+   "box": {
+    "left": 83,
+    "top": 260,
+    "right": 252,
+    "bottom": 296
+   },
+   "confidence": 0.997
+  },
+  {
+   "text": "2,29",
+   "box": {
+    "left": 541,
+    "top": 277,
+    "right": 604,
+    "bottom": 304
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "Mineralwasser",
+   "box": {
+    "left": 81,
+    "top": 293,
+    "right": 279,
+    "bottom": 329
+   },
+   "confidence": 1
+  },
+  {
+   "text": "0,99",
+   "box": {
+    "left": 539,
+    "top": 311,
+    "right": 603,
+    "bottom": 339
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "Kase Gouda",
+   "box": {
+    "left": 82,
+    "top": 328,
+    "right": 234,
+    "bottom": 361
+   },
+   "confidence": 0.955
+  },
+  {
+   "text": "4,79",
+   "box": {
+    "left": 538,
+    "top": 345,
+    "right": 601,
+    "bottom": 373
+   },
+   "confidence": 0.992
+  },
+  {
+   "text": "Kase Gouda",
+   "box": {
+    "left": 80,
+    "top": 360,
+    "right": 233,
+    "bottom": 396
+   },
+   "confidence": 0.993
+  },
+  {
+   "text": "4,79",
+   "box": {
+    "left": 538,
+    "top": 379,
+    "right": 600,
+    "bottom": 406
+   },
+   "confidence": 0.987
+  },
+  {
+   "text": "Butter 250g",
+   "box": {
+    "left": 79,
+    "top": 395,
+    "right": 247,
+    "bottom": 431
+   },
+   "confidence": 1
+  },
+  {
+   "text": "2,29",
+   "box": {
+    "left": 536,
+    "top": 413,
+    "right": 599,
+    "bottom": 440
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Apfelsaft 1l",
+   "box": {
+    "left": 79,
+    "top": 430,
+    "right": 258,
+    "bottom": 463
+   },
+   "confidence": 0.976
+  },
+  {
+   "text": "1,89",
+   "box": {
+    "left": 533,
+    "top": 447,
+    "right": 598,
+    "bottom": 475
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Zwischensumme",
+   "box": {
+    "left": 76,
+    "top": 497,
+    "right": 273,
+    "bottom": 533
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "17,04",
+   "box": {
+    "left": 518,
+    "top": 513,
+    "right": 596,
+    "bottom": 543
+   },
+   "confidence": 0.997
+  },
+  {
+   "text": "MwSt",
+   "box": {
+    "left": 74,
+    "top": 534,
+    "right": 139,
+    "bottom": 561
+   },
+   "confidence": 1
+  },
+  {
+   "text": "3,24",
+   "box": {
+    "left": 530,
+    "top": 549,
+    "right": 594,
+    "bottom": 577
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "Summe",
+   "box": {
+    "left": 73,
+    "top": 601,
+    "right": 152,
+    "bottom": 631
+   },
+   "confidence": 1
+  },
+  {
+   "text": "20,28",
+   "box": {
+    "left": 515,
+    "top": 615,
+    "right": 591,
+    "bottom": 645
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Thank you",
+   "box": {
+    "left": 261,
+    "top": 674,
+    "right": 400,
+    "bottom": 708
+   },
+   "confidence": 0.999
+  }
+ ]
+}

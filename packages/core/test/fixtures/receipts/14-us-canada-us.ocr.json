@@ -1,0 +1,198 @@
+{
+ "id": "14-us-canada-us",
+ "engine": "paddleocr-ppocrv4-onnx",
+ "width": 560,
+ "height": 644,
+ "blocks": [
+  {
+   "text": "Pine Ridge Diner",
+   "box": {
+    "left": 117,
+    "top": 34,
+    "right": 444,
+    "bottom": 66
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "Tel 9:00 - 21:00",
+   "box": {
+    "left": 162,
+    "top": 72,
+    "right": 396,
+    "bottom": 99
+   },
+   "confidence": 0.981
+  },
+  {
+   "text": "Date: 10/26/2026",
+   "box": {
+    "left": 23,
+    "top": 143,
+    "right": 257,
+    "bottom": 165
+   },
+   "confidence": 0.989
+  },
+  {
+   "text": "14:30",
+   "box": {
+    "left": 280,
+    "top": 143,
+    "right": 357,
+    "bottom": 166
+   },
+   "confidence": 0.996
+  },
+  {
+   "text": "1.99",
+   "box": {
+    "left": 476,
+    "top": 209,
+    "right": 539,
+    "bottom": 235
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Pasta 16oz",
+   "box": {
+    "left": 22,
+    "top": 209,
+    "right": 170,
+    "bottom": 236
+   },
+   "confidence": 0.984
+  },
+  {
+   "text": "Ground coffee 12oz",
+   "box": {
+    "left": 21,
+    "top": 243,
+    "right": 285,
+    "bottom": 270
+   },
+   "confidence": 0.993
+  },
+  {
+   "text": "12.99",
+   "box": {
+    "left": 461,
+    "top": 244,
+    "right": 538,
+    "bottom": 269
+   },
+   "confidence": 1
+  },
+  {
+   "text": "1.99",
+   "box": {
+    "left": 475,
+    "top": 277,
+    "right": 539,
+    "bottom": 304
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Pasta 16oz",
+   "box": {
+    "left": 21,
+    "top": 278,
+    "right": 171,
+    "bottom": 304
+   },
+   "confidence": 0.974
+  },
+  {
+   "text": "10.99",
+   "box": {
+    "left": 461,
+    "top": 311,
+    "right": 539,
+    "bottom": 337
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Paper towels",
+   "box": {
+    "left": 21,
+    "top": 311,
+    "right": 199,
+    "bottom": 340
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Subtotal",
+   "box": {
+    "left": 22,
+    "top": 379,
+    "right": 139,
+    "bottom": 405
+   },
+   "confidence": 1
+  },
+  {
+   "text": "27.96",
+   "box": {
+    "left": 462,
+    "top": 380,
+    "right": 539,
+    "bottom": 405
+   },
+   "confidence": 1
+  },
+  {
+   "text": "2.03",
+   "box": {
+    "left": 476,
+    "top": 414,
+    "right": 539,
+    "bottom": 441
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Sales tax",
+   "box": {
+    "left": 22,
+    "top": 415,
+    "right": 156,
+    "bottom": 439
+   },
+   "confidence": 0.972
+  },
+  {
+   "text": "Total",
+   "box": {
+    "left": 21,
+    "top": 482,
+    "right": 98,
+    "bottom": 508
+   },
+   "confidence": 1
+  },
+  {
+   "text": "29.99",
+   "box": {
+    "left": 462,
+    "top": 482,
+    "right": 538,
+    "bottom": 508
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Thank you",
+   "box": {
+    "left": 212,
+    "top": 550,
+    "right": 347,
+    "bottom": 578
+   },
+   "confidence": 0.999
+  }
+ ]
+}

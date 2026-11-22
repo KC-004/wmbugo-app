@@ -1,0 +1,55 @@
+{
+  "id": "16-us-canada-us",
+  "market": "us-canada",
+  "region": "US",
+  "merchant": "Lakeview Market",
+  "date": "2026-02-18",
+  "currency": "USD",
+  "subtotalMinor": 4663,
+  "taxes": [
+    {
+      "label": "Sales tax",
+      "amountMinor": 338
+    }
+  ],
+  "fees": [],
+  "discounts": [],
+  "totalMinor": 5001,
+  "items": [
+    {
+      "name": "Cheddar block",
+      "amountMinor": 549
+    },
+    {
+      "name": "Paper towels",
+      "amountMinor": 1099
+    },
+    {
+      "name": "Pasta 16oz",
+      "amountMinor": 199
+    },
+    {
+      "name": "Granola bars",
+      "amountMinor": 479
+    },
+    {
+      "name": "Sparkling water",
+      "amountMinor": 649
+    },
+    {
+      "name": "Eggs dozen",
+      "amountMinor": 389
+    },
+    {
+      "name": "Ground coffee 12oz",
+      "amountMinor": 1299
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": false,
+    "decimalComma": false,
+    "multiColumn": false,
+    "lowContrastOrTilted": false,
+    "longReceipt": false
+  }
+}

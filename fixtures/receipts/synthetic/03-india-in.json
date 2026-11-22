@@ -1,0 +1,47 @@
+{
+  "id": "03-india-in",
+  "market": "india",
+  "region": "IN",
+  "merchant": "हरित औषधालय",
+  "date": "2026-07-10",
+  "currency": "INR",
+  "subtotalMinor": 38500,
+  "taxes": [
+    {
+      "label": "CGST",
+      "amountMinor": 962
+    },
+    {
+      "label": "SGST",
+      "amountMinor": 963
+    }
+  ],
+  "fees": [],
+  "discounts": [],
+  "totalMinor": 40425,
+  "items": [
+    {
+      "name": "Masala chai pack",
+      "amountMinor": 12500
+    },
+    {
+      "name": "Mango 1kg",
+      "amountMinor": 14000
+    },
+    {
+      "name": "Samosa x2",
+      "amountMinor": 4000
+    },
+    {
+      "name": "Filter coffee",
+      "amountMinor": 8000
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": true,
+    "decimalComma": false,
+    "multiColumn": false,
+    "lowContrastOrTilted": false,
+    "longReceipt": false
+  }
+}

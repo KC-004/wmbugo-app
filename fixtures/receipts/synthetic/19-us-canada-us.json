@@ -1,0 +1,155 @@
+{
+  "id": "19-us-canada-us",
+  "market": "us-canada",
+  "region": "US",
+  "merchant": "Sunrise Bakery",
+  "date": "2026-09-10",
+  "currency": "USD",
+  "subtotalMinor": 27340,
+  "taxes": [
+    {
+      "label": "Sales tax",
+      "amountMinor": 1982
+    }
+  ],
+  "fees": [],
+  "discounts": [],
+  "totalMinor": 29322,
+  "items": [
+    {
+      "name": "Ground coffee 12oz",
+      "amountMinor": 1299
+    },
+    {
+      "name": "Granola bars",
+      "amountMinor": 489
+    },
+    {
+      "name": "Bananas",
+      "amountMinor": 209
+    },
+    {
+      "name": "Ground coffee 12oz",
+      "amountMinor": 1329
+    },
+    {
+      "name": "Sourdough loaf",
+      "amountMinor": 639
+    },
+    {
+      "name": "Ground coffee 12oz",
+      "amountMinor": 1349
+    },
+    {
+      "name": "Sparkling water",
+      "amountMinor": 709
+    },
+    {
+      "name": "Pasta 16oz",
+      "amountMinor": 269
+    },
+    {
+      "name": "Paper towels",
+      "amountMinor": 1179
+    },
+    {
+      "name": "Bananas",
+      "amountMinor": 279
+    },
+    {
+      "name": "Granola bars",
+      "amountMinor": 579
+    },
+    {
+      "name": "Sourdough loaf",
+      "amountMinor": 709
+    },
+    {
+      "name": "Paper towels",
+      "amountMinor": 1219
+    },
+    {
+      "name": "Sourdough loaf",
+      "amountMinor": 729
+    },
+    {
+      "name": "Whole milk 1gal",
+      "amountMinor": 569
+    },
+    {
+      "name": "Sparkling water",
+      "amountMinor": 799
+    },
+    {
+      "name": "Sparkling water",
+      "amountMinor": 809
+    },
+    {
+      "name": "Ground coffee 12oz",
+      "amountMinor": 1469
+    },
+    {
+      "name": "Chicken breast",
+      "amountMinor": 1425
+    },
+    {
+      "name": "Chicken breast",
+      "amountMinor": 1435
+    },
+    {
+      "name": "Bananas",
+      "amountMinor": 389
+    },
+    {
+      "name": "Sourdough loaf",
+      "amountMinor": 809
+    },
+    {
+      "name": "Eggs dozen",
+      "amountMinor": 609
+    },
+    {
+      "name": "Pasta 16oz",
+      "amountMinor": 429
+    },
+    {
+      "name": "Ground coffee 12oz",
+      "amountMinor": 1539
+    },
+    {
+      "name": "Granola bars",
+      "amountMinor": 729
+    },
+    {
+      "name": "Eggs dozen",
+      "amountMinor": 649
+    },
+    {
+      "name": "Olive oil",
+      "amountMinor": 1669
+    },
+    {
+      "name": "Eggs dozen",
+      "amountMinor": 669
+    },
+    {
+      "name": "Cheddar block",
+      "amountMinor": 839
+    },
+    {
+      "name": "Whole milk 1gal",
+      "amountMinor": 729
+    },
+    {
+      "name": "Granola bars",
+      "amountMinor": 789
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": false,
+    "decimalComma": false,
+    "multiColumn": false,
+    "lowContrastOrTilted": false,
+    "longReceipt": true
+  }
+}

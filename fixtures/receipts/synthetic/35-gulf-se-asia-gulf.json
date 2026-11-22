@@ -1,0 +1,56 @@
+{
+  "id": "35-gulf-se-asia-gulf",
+  "market": "gulf-se-asia",
+  "region": "AE",
+  "merchant": "Souk Spice House",
+  "date": "2026-05-21",
+  "currency": "AED",
+  "subtotalMinor": 10000,
+  "taxes": [
+    {
+      "label": "VAT",
+      "amountMinor": 550
+    }
+  ],
+  "fees": [
+    {
+      "label": "Service charge",
+      "amountMinor": 1000
+    }
+  ],
+  "discounts": [],
+  "totalMinor": 11550,
+  "items": [
+    {
+      "name": "Tea 100 bags",
+      "amountMinor": 1450
+    },
+    {
+      "name": "Tea 100 bags",
+      "amountMinor": 1450
+    },
+    {
+      "name": "Fresh juice",
+      "amountMinor": 1500
+    },
+    {
+      "name": "Olive oil 500ml",
+      "amountMinor": 3600
+    },
+    {
+      "name": "Chicken shawarma",
+      "amountMinor": 1200
+    },
+    {
+      "name": "Hummus",
+      "amountMinor": 800
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": false,
+    "decimalComma": false,
+    "multiColumn": true,
+    "lowContrastOrTilted": false,
+    "longReceipt": false
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "id": "14-us-canada-us",
+  "market": "us-canada",
+  "region": "US",
+  "merchant": "Pine Ridge Diner",
+  "date": "2026-10-26",
+  "currency": "USD",
+  "subtotalMinor": 2796,
+  "taxes": [
+    {
+      "label": "Sales tax",
+      "amountMinor": 203
+    }
+  ],
+  "fees": [],
+  "discounts": [],
+  "totalMinor": 2999,
+  "items": [
+    {
+      "name": "Pasta 16oz",
+      "amountMinor": 199
+    },
+    {
+      "name": "Ground coffee 12oz",
+      "amountMinor": 1299
+    },
+    {
+      "name": "Pasta 16oz",
+      "amountMinor": 199
+    },
+    {
+      "name": "Paper towels",
+      "amountMinor": 1099
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": false,
+    "decimalComma": false,
+    "multiColumn": false,
+    "lowContrastOrTilted": false,
+    "longReceipt": false
+  }
+}

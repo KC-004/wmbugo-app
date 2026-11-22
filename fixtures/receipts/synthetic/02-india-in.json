@@ -1,0 +1,51 @@
+{
+  "id": "02-india-in",
+  "market": "india",
+  "region": "IN",
+  "merchant": "कमल मिठाई घर",
+  "date": "2026-10-19",
+  "currency": "INR",
+  "subtotalMinor": 77400,
+  "taxes": [
+    {
+      "label": "CGST",
+      "amountMinor": 1935
+    },
+    {
+      "label": "SGST",
+      "amountMinor": 1935
+    }
+  ],
+  "fees": [],
+  "discounts": [],
+  "totalMinor": 81270,
+  "items": [
+    {
+      "name": "Bath soap",
+      "amountMinor": 4400
+    },
+    {
+      "name": "Masala chai pack",
+      "amountMinor": 12500
+    },
+    {
+      "name": "Ghee 500ml",
+      "amountMinor": 32500
+    },
+    {
+      "name": "Mango 1kg",
+      "amountMinor": 14000
+    },
+    {
+      "name": "Mango 1kg",
+      "amountMinor": 14000
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": true,
+    "decimalComma": false,
+    "multiColumn": false,
+    "lowContrastOrTilted": false,
+    "longReceipt": false
+  }
+}

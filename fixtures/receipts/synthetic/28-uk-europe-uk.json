@@ -1,0 +1,43 @@
+{
+  "id": "28-uk-europe-uk",
+  "market": "uk-europe",
+  "region": "GB",
+  "merchant": "Penny Hardware",
+  "date": "2026-11-18",
+  "currency": "GBP",
+  "subtotalMinor": 1189,
+  "taxes": [
+    {
+      "label": "VAT",
+      "amountMinor": 238
+    }
+  ],
+  "fees": [],
+  "discounts": [],
+  "totalMinor": 1427,
+  "items": [
+    {
+      "name": "Cheddar 400g",
+      "amountMinor": 325
+    },
+    {
+      "name": "Chicken thighs",
+      "amountMinor": 410
+    },
+    {
+      "name": "Sliced bread",
+      "amountMinor": 129
+    },
+    {
+      "name": "Cheddar 400g",
+      "amountMinor": 325
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": false,
+    "decimalComma": false,
+    "multiColumn": false,
+    "lowContrastOrTilted": false,
+    "longReceipt": false
+  }
+}

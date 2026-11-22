@@ -1,0 +1,258 @@
+{
+ "id": "40-gulf-se-asia-sg",
+ "engine": "paddleocr-ppocrv4-onnx",
+ "width": 560,
+ "height": 746,
+ "blocks": [
+  {
+   "text": "Little India Spices",
+   "box": {
+    "left": 84,
+    "top": 33,
+    "right": 475,
+    "bottom": 68
+   },
+   "confidence": 0.991
+  },
+  {
+   "text": "Open dai1y 9:00 - 21:00",
+   "box": {
+    "left": 114,
+    "top": 74,
+    "right": 447,
+    "bottom": 101
+   },
+   "confidence": 0.977
+  },
+  {
+   "text": "Date: 11/04/2026",
+   "box": {
+    "left": 23,
+    "top": 143,
+    "right": 260,
+    "bottom": 165
+   },
+   "confidence": 0.994
+  },
+  {
+   "text": "19:40",
+   "box": {
+    "left": 256,
+    "top": 143,
+    "right": 356,
+    "bottom": 166
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "1.90",
+   "box": {
+    "left": 477,
+    "top": 208,
+    "right": 538,
+    "bottom": 235
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Soy milk",
+   "box": {
+    "left": 22,
+    "top": 210,
+    "right": 142,
+    "bottom": 236
+   },
+   "confidence": 0.996
+  },
+  {
+   "text": "10.00",
+   "box": {
+    "left": 463,
+    "top": 244,
+    "right": 538,
+    "bottom": 269
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Satay 10 sticks",
+   "box": {
+    "left": 22,
+    "top": 244,
+    "right": 241,
+    "bottom": 271
+   },
+   "confidence": 0.989
+  },
+  {
+   "text": "2.80",
+   "box": {
+    "left": 476,
+    "top": 277,
+    "right": 539,
+    "bottom": 304
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Roti prata",
+   "box": {
+    "left": 20,
+    "top": 277,
+    "right": 172,
+    "bottom": 306
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "1.90",
+   "box": {
+    "left": 477,
+    "top": 310,
+    "right": 538,
+    "bottom": 337
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Soy milk",
+   "box": {
+    "left": 21,
+    "top": 312,
+    "right": 144,
+    "bottom": 340
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "1.50",
+   "box": {
+    "left": 477,
+    "top": 345,
+    "right": 538,
+    "bottom": 372
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Kopi O",
+   "box": {
+    "left": 20,
+    "top": 345,
+    "right": 114,
+    "bottom": 373
+   },
+   "confidence": 0.927
+  },
+  {
+   "text": "5.50",
+   "box": {
+    "left": 477,
+    "top": 380,
+    "right": 538,
+    "bottom": 405
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Fried noodles",
+   "box": {
+    "left": 22,
+    "top": 380,
+    "right": 213,
+    "bottom": 405
+   },
+   "confidence": 1
+  },
+  {
+   "text": "23.60",
+   "box": {
+    "left": 462,
+    "top": 447,
+    "right": 539,
+    "bottom": 474
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Subtotal",
+   "box": {
+    "left": 23,
+    "top": 449,
+    "right": 138,
+    "bottom": 473
+   },
+   "confidence": 1
+  },
+  {
+   "text": "2.36",
+   "box": {
+    "left": 477,
+    "top": 482,
+    "right": 539,
+    "bottom": 507
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Service charge",
+   "box": {
+    "left": 22,
+    "top": 482,
+    "right": 226,
+    "bottom": 509
+   },
+   "confidence": 0.968
+  },
+  {
+   "text": "GST",
+   "box": {
+    "left": 20,
+    "top": 516,
+    "right": 71,
+    "bottom": 542
+   },
+   "confidence": 1
+  },
+  {
+   "text": "2.34",
+   "box": {
+    "left": 476,
+    "top": 515,
+    "right": 539,
+    "bottom": 542
+   },
+   "confidence": 1
+  },
+  {
+   "text": "28.30",
+   "box": {
+    "left": 463,
+    "top": 583,
+    "right": 538,
+    "bottom": 609
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Total",
+   "box": {
+    "left": 21,
+    "top": 585,
+    "right": 96,
+    "bottom": 608
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Thank you",
+   "box": {
+    "left": 213,
+    "top": 651,
+    "right": 348,
+    "bottom": 680
+   },
+   "confidence": 0.999
+  }
+ ]
+}

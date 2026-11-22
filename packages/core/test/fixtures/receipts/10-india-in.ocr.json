@@ -1,0 +1,218 @@
+{
+ "id": "10-india-in",
+ "engine": "paddleocr-ppocrv4-onnx",
+ "width": 680,
+ "height": 798,
+ "blocks": [
+  {
+   "text": "Neem Tree Bakery",
+   "box": {
+    "left": 161,
+    "top": 90,
+    "right": 498,
+    "bottom": 133
+   },
+   "confidence": 0.996
+  },
+  {
+   "text": "Tel 9:00 - 21:00",
+   "box": {
+    "left": 209,
+    "top": 126,
+    "right": 452,
+    "bottom": 167
+   },
+   "confidence": 0.961
+  },
+  {
+   "text": "13:33",
+   "box": {
+    "left": 333,
+    "top": 199,
+    "right": 411,
+    "bottom": 226
+   },
+   "confidence": 0.992
+  },
+  {
+   "text": "Date: 04/05/2026",
+   "box": {
+    "left": 72,
+    "top": 200,
+    "right": 316,
+    "bottom": 238
+   },
+   "confidence": 0.997
+  },
+  {
+   "text": "325.00",
+   "box": {
+    "left": 503,
+    "top": 261,
+    "right": 596,
+    "bottom": 290
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Ghee 500ml",
+   "box": {
+    "left": 75,
+    "top": 272,
+    "right": 227,
+    "bottom": 305
+   },
+   "confidence": 0.997
+  },
+  {
+   "text": "125.00",
+   "box": {
+    "left": 504,
+    "top": 295,
+    "right": 596,
+    "bottom": 322
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Masala chai pack",
+   "box": {
+    "left": 73,
+    "top": 303,
+    "right": 318,
+    "bottom": 341
+   },
+   "confidence": 0.971
+  },
+  {
+   "text": "140.00",
+   "box": {
+    "left": 505,
+    "top": 329,
+    "right": 597,
+    "bottom": 356
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Mango 1kg",
+   "box": {
+    "left": 78,
+    "top": 343,
+    "right": 215,
+    "bottom": 373
+   },
+   "confidence": 0.994
+  },
+  {
+   "text": "38.00",
+   "box": {
+    "left": 522,
+    "top": 363,
+    "right": 600,
+    "bottom": 392
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Curd 500g",
+   "box": {
+    "left": 80,
+    "top": 377,
+    "right": 217,
+    "bottom": 407
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "628.00",
+   "box": {
+    "left": 511,
+    "top": 431,
+    "right": 601,
+    "bottom": 458
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Subtotal",
+   "box": {
+    "left": 82,
+    "top": 445,
+    "right": 204,
+    "bottom": 475
+   },
+   "confidence": 1
+  },
+  {
+   "text": "15.70",
+   "box": {
+    "left": 524,
+    "top": 466,
+    "right": 602,
+    "bottom": 491
+   },
+   "confidence": 1
+  },
+  {
+   "text": "CGST",
+   "box": {
+    "left": 84,
+    "top": 483,
+    "right": 148,
+    "bottom": 507
+   },
+   "confidence": 1
+  },
+  {
+   "text": "15.70",
+   "box": {
+    "left": 525,
+    "top": 498,
+    "right": 604,
+    "bottom": 527
+   },
+   "confidence": 1
+  },
+  {
+   "text": "SGST",
+   "box": {
+    "left": 85,
+    "top": 516,
+    "right": 151,
+    "bottom": 542
+   },
+   "confidence": 1
+  },
+  {
+   "text": "659.40",
+   "box": {
+    "left": 515,
+    "top": 567,
+    "right": 605,
+    "bottom": 595
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Grand Total",
+   "box": {
+    "left": 86,
+    "top": 577,
+    "right": 253,
+    "bottom": 612
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Thank you",
+   "box": {
+    "left": 282,
+    "top": 643,
+    "right": 417,
+    "bottom": 671
+   },
+   "confidence": 0.967
+  }
+ ]
+}

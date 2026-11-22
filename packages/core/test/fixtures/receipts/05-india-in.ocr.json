@@ -1,0 +1,238 @@
+{
+ "id": "05-india-in",
+ "engine": "paddleocr-ppocrv4-onnx",
+ "width": 560,
+ "height": 712,
+ "blocks": [
+  {
+   "text": "Metro Basket",
+   "box": {
+    "left": 155,
+    "top": 34,
+    "right": 402,
+    "bottom": 64
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Tel 9:00 - 21:00",
+   "box": {
+    "left": 162,
+    "top": 73,
+    "right": 395,
+    "bottom": 98
+   },
+   "confidence": 0.948
+  },
+  {
+   "text": "Date: 24/03/2026",
+   "box": {
+    "left": 23,
+    "top": 142,
+    "right": 256,
+    "bottom": 167
+   },
+   "confidence": 0.979
+  },
+  {
+   "text": "17:26",
+   "box": {
+    "left": 279,
+    "top": 142,
+    "right": 358,
+    "bottom": 167
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "90.00",
+   "box": {
+    "left": 464,
+    "top": 210,
+    "right": 538,
+    "bottom": 234
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Paneer 200g",
+   "box": {
+    "left": 22,
+    "top": 210,
+    "right": 186,
+    "bottom": 239
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Basmati rice 5kg",
+   "box": {
+    "left": 20,
+    "top": 243,
+    "right": 257,
+    "bottom": 272
+   },
+   "confidence": 0.997
+  },
+  {
+   "text": "649.00",
+   "box": {
+    "left": 449,
+    "top": 245,
+    "right": 538,
+    "bottom": 268
+   },
+   "confidence": 1
+  },
+  {
+   "text": "125.00",
+   "box": {
+    "left": 447,
+    "top": 277,
+    "right": 538,
+    "bottom": 303
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Masala chai pack",
+   "box": {
+    "left": 20,
+    "top": 278,
+    "right": 256,
+    "bottom": 305
+   },
+   "confidence": 0.985
+  },
+  {
+   "text": "Masala chai pack",
+   "box": {
+    "left": 20,
+    "top": 311,
+    "right": 257,
+    "bottom": 338
+   },
+   "confidence": 0.982
+  },
+  {
+   "text": "125.00",
+   "box": {
+    "left": 448,
+    "top": 312,
+    "right": 538,
+    "bottom": 336
+   },
+   "confidence": 1
+  },
+  {
+   "text": "140.00",
+   "box": {
+    "left": 446,
+    "top": 345,
+    "right": 538,
+    "bottom": 371
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Mango 1kg",
+   "box": {
+    "left": 20,
+    "top": 346,
+    "right": 157,
+    "bottom": 375
+   },
+   "confidence": 0.982
+  },
+  {
+   "text": "Subtotal",
+   "box": {
+    "left": 22,
+    "top": 414,
+    "right": 139,
+    "bottom": 438
+   },
+   "confidence": 1
+  },
+  {
+   "text": "1,129.00",
+   "box": {
+    "left": 420,
+    "top": 414,
+    "right": 537,
+    "bottom": 438
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "CGST",
+   "box": {
+    "left": 22,
+    "top": 449,
+    "right": 85,
+    "bottom": 474
+   },
+   "confidence": 1
+  },
+  {
+   "text": "28.22",
+   "box": {
+    "left": 462,
+    "top": 449,
+    "right": 538,
+    "bottom": 474
+   },
+   "confidence": 1
+  },
+  {
+   "text": "28.23",
+   "box": {
+    "left": 462,
+    "top": 482,
+    "right": 538,
+    "bottom": 507
+   },
+   "confidence": 1
+  },
+  {
+   "text": "SGST",
+   "box": {
+    "left": 22,
+    "top": 483,
+    "right": 86,
+    "bottom": 508
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "Grand Total",
+   "box": {
+    "left": 23,
+    "top": 551,
+    "right": 182,
+    "bottom": 575
+   },
+   "confidence": 0.993
+  },
+  {
+   "text": "1,185.45",
+   "box": {
+    "left": 420,
+    "top": 551,
+    "right": 537,
+    "bottom": 575
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "Thank you",
+   "box": {
+    "left": 213,
+    "top": 619,
+    "right": 347,
+    "bottom": 645
+   },
+   "confidence": 0.999
+  }
+ ]
+}

@@ -1,0 +1,60 @@
+{
+  "id": "36-gulf-se-asia-gulf",
+  "market": "gulf-se-asia",
+  "region": "AE",
+  "merchant": "Crescent Electronics",
+  "date": "2026-05-10",
+  "currency": "AED",
+  "subtotalMinor": 11250,
+  "taxes": [
+    {
+      "label": "VAT",
+      "amountMinor": 619
+    }
+  ],
+  "fees": [
+    {
+      "label": "Service charge",
+      "amountMinor": 1125
+    }
+  ],
+  "discounts": [],
+  "totalMinor": 12994,
+  "items": [
+    {
+      "name": "Fresh juice",
+      "amountMinor": 1500
+    },
+    {
+      "name": "Rice 5kg",
+      "amountMinor": 3200
+    },
+    {
+      "name": "Saffron 1g",
+      "amountMinor": 2200
+    },
+    {
+      "name": "Tea 100 bags",
+      "amountMinor": 1450
+    },
+    {
+      "name": "Falafel box",
+      "amountMinor": 1100
+    },
+    {
+      "name": "Arabic bread",
+      "amountMinor": 350
+    },
+    {
+      "name": "Tea 100 bags",
+      "amountMinor": 1450
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": false,
+    "decimalComma": false,
+    "multiColumn": false,
+    "lowContrastOrTilted": false,
+    "longReceipt": false
+  }
+}

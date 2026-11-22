@@ -1,0 +1,52 @@
+{
+  "id": "33-gulf-se-asia-gulf",
+  "market": "gulf-se-asia",
+  "region": "AE",
+  "merchant": "سوق النخيل",
+  "date": "2026-05-10",
+  "currency": "AED",
+  "subtotalMinor": 9800,
+  "taxes": [
+    {
+      "label": "VAT",
+      "amountMinor": 539
+    }
+  ],
+  "fees": [
+    {
+      "label": "Service charge",
+      "amountMinor": 980
+    }
+  ],
+  "discounts": [],
+  "totalMinor": 11319,
+  "items": [
+    {
+      "name": "Falafel box",
+      "amountMinor": 1100
+    },
+    {
+      "name": "Olive oil 500ml",
+      "amountMinor": 3600
+    },
+    {
+      "name": "Dates 500g",
+      "amountMinor": 2500
+    },
+    {
+      "name": "Falafel box",
+      "amountMinor": 1100
+    },
+    {
+      "name": "Fresh juice",
+      "amountMinor": 1500
+    }
+  ],
+  "traits": {
+    "devanagariOrArabicText": true,
+    "decimalComma": false,
+    "multiColumn": false,
+    "lowContrastOrTilted": false,
+    "longReceipt": false
+  }
+}

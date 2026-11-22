@@ -1,0 +1,268 @@
+{
+ "id": "06-india-in",
+ "engine": "paddleocr-ppocrv4-onnx",
+ "width": 680,
+ "height": 866,
+ "blocks": [
+  {
+   "text": "Raj Stationers",
+   "box": {
+    "left": 204,
+    "top": 81,
+    "right": 509,
+    "bottom": 140
+   },
+   "confidence": 0.992
+  },
+  {
+   "text": "Tel 9:00 - 21:00",
+   "box": {
+    "left": 232,
+    "top": 123,
+    "right": 478,
+    "bottom": 171
+   },
+   "confidence": 0.996
+  },
+  {
+   "text": "Date: 15/01/2026",
+   "box": {
+    "left": 88,
+    "top": 185,
+    "right": 335,
+    "bottom": 230
+   },
+   "confidence": 0.998
+  },
+  {
+   "text": "15:27",
+   "box": {
+    "left": 352,
+    "top": 203,
+    "right": 429,
+    "bottom": 231
+   },
+   "confidence": 0.997
+  },
+  {
+   "text": "Ghee 500ml",
+   "box": {
+    "left": 86,
+    "top": 255,
+    "right": 238,
+    "bottom": 290
+   },
+   "confidence": 0.993
+  },
+  {
+   "text": "325.00",
+   "box": {
+    "left": 515,
+    "top": 279,
+    "right": 607,
+    "bottom": 309
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Curd 500g",
+   "box": {
+    "left": 84,
+    "top": 288,
+    "right": 226,
+    "bottom": 327
+   },
+   "confidence": 0.994
+  },
+  {
+   "text": "38.00",
+   "box": {
+    "left": 527,
+    "top": 313,
+    "right": 606,
+    "bottom": 342
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Filter coffee",
+   "box": {
+    "left": 81,
+    "top": 319,
+    "right": 283,
+    "bottom": 364
+   },
+   "confidence": 1
+  },
+  {
+   "text": "80.00",
+   "box": {
+    "left": 526,
+    "top": 347,
+    "right": 604,
+    "bottom": 376
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Masala chai pack",
+   "box": {
+    "left": 76,
+    "top": 352,
+    "right": 326,
+    "bottom": 402
+   },
+   "confidence": 0.999
+  },
+  {
+   "text": "125.00",
+   "box": {
+    "left": 509,
+    "top": 380,
+    "right": 602,
+    "bottom": 411
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Ghee 500ml",
+   "box": {
+    "left": 80,
+    "top": 390,
+    "right": 235,
+    "bottom": 427
+   },
+   "confidence": 0.958
+  },
+  {
+   "text": "325.00",
+   "box": {
+    "left": 508,
+    "top": 414,
+    "right": 601,
+    "bottom": 445
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Mango",
+   "box": {
+    "left": 79,
+    "top": 426,
+    "right": 165,
+    "bottom": 457
+   },
+   "confidence": 1
+  },
+  {
+   "text": "）1kg",
+   "box": {
+    "left": 150,
+    "top": 432,
+    "right": 215,
+    "bottom": 460
+   },
+   "confidence": 0.896
+  },
+  {
+   "text": "140.00",
+   "box": {
+    "left": 505,
+    "top": 448,
+    "right": 598,
+    "bottom": 479
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Subtotal",
+   "box": {
+    "left": 75,
+    "top": 493,
+    "right": 198,
+    "bottom": 526
+   },
+   "confidence": 1
+  },
+  {
+   "text": "1,033.00",
+   "box": {
+    "left": 471,
+    "top": 513,
+    "right": 596,
+    "bottom": 548
+   },
+   "confidence": 1
+  },
+  {
+   "text": "CGST",
+   "box": {
+    "left": 75,
+    "top": 529,
+    "right": 140,
+    "bottom": 557
+   },
+   "confidence": 1
+  },
+  {
+   "text": "25.82",
+   "box": {
+    "left": 515,
+    "top": 552,
+    "right": 593,
+    "bottom": 581
+   },
+   "confidence": 1
+  },
+  {
+   "text": "SGST",
+   "box": {
+    "left": 73,
+    "top": 563,
+    "right": 139,
+    "bottom": 592
+   },
+   "confidence": 1
+  },
+  {
+   "text": "25.83",
+   "box": {
+    "left": 512,
+    "top": 584,
+    "right": 592,
+    "bottom": 615
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Grand Total",
+   "box": {
+    "left": 68,
+    "top": 629,
+    "right": 233,
+    "bottom": 664
+   },
+   "confidence": 1
+  },
+  {
+   "text": "1,084.65",
+   "box": {
+    "left": 465,
+    "top": 649,
+    "right": 588,
+    "bottom": 684
+   },
+   "confidence": 1
+  },
+  {
+   "text": "Thank you",
+   "box": {
+    "left": 255,
+    "top": 706,
+    "right": 396,
+    "bottom": 743
+   },
+   "confidence": 0.999
+  }
+ ]
+}
