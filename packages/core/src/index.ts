@@ -17,3 +17,4 @@ export * from './capture';
 export * from './planning';
 export * from './insights';
 export * from './backup';
+export * from './export';

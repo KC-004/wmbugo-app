@@ -1,9 +1,10 @@
 import { NativeModules } from 'react-native';
-import { createBackupDocument, openEncryptedPhoto, pickBackupFile, pickCsvFile } from './backupFiles';
+import { createBackupDocument, createCsvDocument, openEncryptedPhoto, pickBackupFile, pickCsvFile } from './backupFiles';
 
 const native = {
   createDocument: jest.fn(),
   createTextDocument: jest.fn(),
+  createCsvDocument: jest.fn(),
   pickDocument: jest.fn(),
   pickCsvDocument: jest.fn(),
   openWrite: jest.fn(),
@@ -115,5 +116,20 @@ describe('the bank file picker (Story 9.6)', () => {
     expect(r.size).toBe(500);
     expect(native.readAt).not.toHaveBeenCalled();
     expect(native.closeRead).toHaveBeenCalledWith(4);
+  });
+});
+
+describe('the CSV save dialog (Story 9.9)', () => {
+  it('a cancelled dialog gives null and opens nothing; a chosen one writes and commits through the same document', async () => {
+    native.createCsvDocument.mockResolvedValue(null);
+    expect(await createCsvDocument('x.csv')).toBeNull();
+    expect(native.openWrite).not.toHaveBeenCalled();
+    native.createCsvDocument.mockResolvedValue('content://doc/9');
+    native.openWrite.mockResolvedValue(3);
+    const doc = (await createCsvDocument('x.csv'))!;
+    await doc.sink.write(new Uint8Array([1, 2]));
+    await doc.commit();
+    expect(native.write).toHaveBeenCalledWith(3, 'AQI=');
+    expect(native.closeWrite).toHaveBeenCalledWith(3);
   });
 });

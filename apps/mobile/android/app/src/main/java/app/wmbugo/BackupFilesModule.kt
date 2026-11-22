@@ -106,6 +106,17 @@ class BackupFilesModule(private val ctx: ReactApplicationContext) : ReactContext
     launch(intent, REQUEST_PICK, promise)
   }
 
+  /** An export is a CSV file, so the save dialog offers a CSV type and keeps the .csv name (Story 9.9). */
+  @ReactMethod
+  fun createCsvDocument(suggestedName: String, promise: Promise) {
+    val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+      addCategory(Intent.CATEGORY_OPENABLE)
+      type = "text/csv"
+      putExtra(Intent.EXTRA_TITLE, suggestedName)
+    }
+    launch(intent, REQUEST_CREATE, promise)
+  }
+
   /** A diagnostics export is plain text, so the save dialog offers a text file (Story 8.10). */
   @ReactMethod
   fun createTextDocument(suggestedName: String, promise: Promise) {

@@ -153,7 +153,7 @@ development_status:
   9-6-import-wizard-choose-a-file-confirm-columns-and-preview: review
   9-7-import-wizard-check-matches-import-and-see-the-summary: review
   9-8-keep-or-delete-imported-files: review
-  9-9-export-transactions-and-account-summaries-as-csv: backlog
+  9-9-export-transactions-and-account-summaries-as-csv: review
   epic-9-retrospective: optional
 
   epic-10: backlog

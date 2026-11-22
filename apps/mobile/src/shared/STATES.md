@@ -38,4 +38,5 @@ is on and is a no-op when it is off).
 | Delete permanently | confirm sheet and re-authentication guard | Recently deleted, detail |
 | Restore from a backup | confirm checkbox and re-authentication guard when app lock is on | Settings › Data, Welcome |
 | Erase all data | scope screen, confirm checkbox, destructive button and re-authentication guard when app lock is on | Settings › Data |
+| Export CSV (transactions or account summary) | confirm sheet (`This file won't be encrypted. Anyone who opens it can read these entries.`) and re-authentication guard when app lock is on; Cancel while writing deletes the partial file | Settings › Data |
 | Turn off app lock, change Lock after | confirm tier: re-authentication guard (`Confirm it's you`) when app lock is on | Settings › Privacy |

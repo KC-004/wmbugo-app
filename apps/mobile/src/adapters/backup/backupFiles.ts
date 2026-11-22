@@ -5,6 +5,7 @@ import { fromBase64, toBase64 } from './base64';
 interface Native {
   createDocument(suggestedName: string): Promise<string | null>;
   createTextDocument(suggestedName: string): Promise<string | null>;
+  createCsvDocument(suggestedName: string): Promise<string | null>;
   pickDocument(): Promise<string | null>;
   pickCsvDocument(): Promise<string | null>;
   openWrite(uri: string): Promise<number>;
@@ -68,6 +69,12 @@ export async function createBackupDocument(suggestedName: string): Promise<Backu
 /** The save dialog for a plain text file (the diagnostics export, Story 8.10). */
 export async function createTextDocument(suggestedName: string): Promise<BackupDocument | null> {
   const uri = await native().createTextDocument(suggestedName);
+  return uri === null ? null : openDocument(uri);
+}
+
+/** The save dialog for a CSV file (Story 9.9): `text/csv`, so the name keeps its `.csv`. */
+export async function createCsvDocument(suggestedName: string): Promise<BackupDocument | null> {
+  const uri = await native().createCsvDocument(suggestedName);
   return uri === null ? null : openDocument(uri);
 }
 

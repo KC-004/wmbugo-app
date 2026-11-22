@@ -12,6 +12,7 @@ import {
   parseSettings,
   retainDaysFor,
   SETTINGS_SQL,
+  utf8Encode,
   type CsvOverrides,
   type CsvReadOptions,
   type CsvReadResult,
@@ -24,7 +25,7 @@ import {
   type SavedCsvFormat,
 } from '@wmbugo/core';
 import { createRnCrypto } from '../../adapters/backup/rnCrypto';
-import { createTextDocument, pickCsvFile } from '../../adapters/backup/backupFiles';
+import { createCsvDocument, pickCsvFile } from '../../adapters/backup/backupFiles';
 import { rnRawFileStore } from '../../adapters/import/rnRawFileStore';
 import { readProfile } from '../../adapters/readProfile';
 import { getServices } from '../../adapters/startApp';
@@ -130,10 +131,10 @@ export const realImportApi: ImportApi = {
     return true;
   },
   async saveRows(csv) {
-    const doc = await createTextDocument('wmbugo-rows-not-imported.csv');
+    const doc = await createCsvDocument('wmbugo-rows-not-imported.csv');
     if (doc === null) return false;
     try {
-      const body = new TextEncoder().encode(csv);
+      const body = utf8Encode(csv);
       const out = new Uint8Array(3 + body.length);
       out.set([0xef, 0xbb, 0xbf], 0);
       out.set(body, 3);

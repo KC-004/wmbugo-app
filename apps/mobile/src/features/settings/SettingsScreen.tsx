@@ -47,15 +47,16 @@ import { hidingBlocksScreenshots } from '../../adapters/recentsPrivacy';
 import { requireReauth } from '../../shared/reauth';
 import { RegionPicker } from '../onboarding/OnboardingFlow';
 import { CategoriesScreen } from '../categories/CategoriesScreen';
+import { ExportScreen } from '../export/ExportScreen';
 import { ImportedFilesScreen, retentionSummary } from '../import/ImportedFilesScreen';
 import { ImportFlow } from '../import/ImportFlow';
 import { RecentlyDeletedScreen } from './RecentlyDeletedScreen';
 import { realSettingsApi, SETTINGS_QUERY_KEY, type SettingsApi, type SettingsData } from './settingsApi';
 
-type Page = 'hub' | 'you' | 'appearance' | 'money' | 'categories' | 'data' | 'deleted' | 'privacy' | 'stays' | 'notifications' | 'backup' | 'restore' | 'import' | 'importedFiles' | 'help' | 'diagnostics' | 'export' | 'erase';
+type Page = 'hub' | 'you' | 'appearance' | 'money' | 'categories' | 'data' | 'deleted' | 'privacy' | 'stays' | 'notifications' | 'backup' | 'restore' | 'import' | 'importedFiles' | 'exportCsv' | 'help' | 'diagnostics' | 'export' | 'erase';
 
 /** Where Back goes from each page. */
-const PARENT: Readonly<Record<Page, Page>> = { hub: 'hub', you: 'hub', appearance: 'you', money: 'you', categories: 'hub', data: 'hub', deleted: 'data', privacy: 'hub', stays: 'privacy', notifications: 'privacy', backup: 'data', restore: 'data', import: 'data', importedFiles: 'data', help: 'hub', diagnostics: 'help', export: 'diagnostics', erase: 'data' };
+const PARENT: Readonly<Record<Page, Page>> = { hub: 'hub', you: 'hub', appearance: 'you', money: 'you', categories: 'hub', data: 'hub', deleted: 'data', privacy: 'hub', stays: 'privacy', notifications: 'privacy', backup: 'data', restore: 'data', import: 'data', importedFiles: 'data', exportCsv: 'data', help: 'hub', diagnostics: 'help', export: 'diagnostics', erase: 'data' };
 
 const THEMES: readonly { v: ThemeChoice; label: string }[] = [
   { v: 'system', label: copy.settings.themeSystem },
@@ -179,7 +180,7 @@ export function SettingsScreen({ api = realSettingsApi, onBack, onReview }: { ap
   };
 
   const title =
-    page === 'hub' ? copy.nav.settings : page === 'you' ? copy.settings.you : page === 'appearance' ? copy.settings.appearance : page === 'money' ? copy.settings.moneyBasics : page === 'categories' ? copy.categories.title : page === 'data' ? copy.deleted.data : page === 'privacy' ? copy.privacy.group : page === 'stays' ? copy.privacy.staysTitle : page === 'notifications' ? copy.notifPrivacy.title : page === 'backup' ? copy.backup.title : page === 'restore' ? copy.restore.title : page === 'import' ? copy.csvImport.title : page === 'importedFiles' ? copy.csvImport.filesTitle : page === 'help' ? copy.diagnostics.helpGroup : page === 'diagnostics' ? copy.diagnostics.title : page === 'export' ? copy.diagnostics.previewTitle : page === 'erase' ? copy.erase.scopeTitle : copy.deleted.recentlyDeleted;
+    page === 'hub' ? copy.nav.settings : page === 'you' ? copy.settings.you : page === 'appearance' ? copy.settings.appearance : page === 'money' ? copy.settings.moneyBasics : page === 'categories' ? copy.categories.title : page === 'data' ? copy.deleted.data : page === 'privacy' ? copy.privacy.group : page === 'stays' ? copy.privacy.staysTitle : page === 'notifications' ? copy.notifPrivacy.title : page === 'backup' ? copy.backup.title : page === 'restore' ? copy.restore.title : page === 'import' ? copy.csvImport.title : page === 'importedFiles' ? copy.csvImport.filesTitle : page === 'exportCsv' ? copy.exportCsv.title : page === 'help' ? copy.diagnostics.helpGroup : page === 'diagnostics' ? copy.diagnostics.title : page === 'export' ? copy.diagnostics.previewTitle : page === 'erase' ? copy.erase.scopeTitle : copy.deleted.recentlyDeleted;
   const back = () => (backupBusy ? undefined : page === 'hub' ? onBack() : setPage(PARENT[page]));
 
   return (
@@ -285,6 +286,7 @@ export function SettingsScreen({ api = realSettingsApi, onBack, onReview }: { ap
           <Row testID="row-backup" label={copy.backup.dataRow} summary={backupSummary(d.settings.lastBackupAt, d.profile.timezoneId)} onPress={() => setPage('backup')} />
           <Row testID="row-restore" label={copy.restore.row} summary={copy.restore.title} onPress={() => setPage('restore')} />
           <Row testID="row-import" label={copy.csvImport.row} summary={copy.csvImport.rowSummary} onPress={() => setPage('import')} />
+          <Row testID="row-export-csv" label={copy.exportCsv.row} summary={copy.exportCsv.rowSummary} onPress={() => setPage('exportCsv')} />
           <Row testID="row-imported-files" label={copy.csvImport.filesRow} summary={retentionSummary(d.settings.importRetention)} onPress={() => setPage('importedFiles')} />
           <Row testID="row-deleted" label={copy.deleted.recentlyDeleted} summary={copy.deleted.keptFor} onPress={() => setPage('deleted')} />
           <StorageRow />
@@ -308,6 +310,8 @@ export function SettingsScreen({ api = realSettingsApi, onBack, onReview }: { ap
         <EraseFlow onBusyChange={setBackupBusy} onExit={() => setPage('data')} />
       ) : page === 'import' ? (
         <ImportFlow locale={d.profile.locale} onBusyChange={setBackupBusy} onExit={() => setPage('data')} {...(onReview ? { onReview } : {})} />
+      ) : page === 'exportCsv' ? (
+        <ExportScreen onBusyChange={setBackupBusy} />
       ) : page === 'importedFiles' ? (
         <ImportedFilesScreen onChanged={refresh} />
       ) : page === 'restore' ? (
@@ -334,7 +338,7 @@ export function SettingsScreen({ api = realSettingsApi, onBack, onReview }: { ap
       ) : page === 'appearance' ? (
         <Appearance d={d} onSet={setSetting} />
       ) : (
-        <Money d={d} api={api} refresh={refresh} onSet={setSetting} />
+        <Money d={d} api={api} refresh={refresh} onSet={setSetting} onExport={() => setPage('exportCsv')} />
       )}
       {note ? (
         <Text accessibilityRole="alert" style={[textStyle('body'), { color: theme.color('semantic-warning') }]}>
@@ -388,11 +392,14 @@ function Money({
   api,
   refresh,
   onSet,
+  onExport,
 }: {
   d: SettingsData;
   api: SettingsApi;
   refresh: () => Promise<unknown>;
   onSet: (key: string, value: unknown) => Promise<void>;
+  /** Opens Export CSV with Transactions and All time (Story 9.9). */
+  onExport: () => void;
 }) {
   const theme = useTheme();
   const [picking, setPicking] = useState(false);
@@ -443,9 +450,12 @@ function Money({
         <Button label={`${d.profile.region?.name ?? d.profile.regionCode} · ${d.profile.currency}`} variant="secondary" onPress={() => setPicking(true)} testID="region-change" />
       </Group>
       {d.hasTransactions ? (
-        <Text testID="currency-locked" style={[textStyle('caption'), muted]}>
-          {copy.settings.currencyLockedNote}
-        </Text>
+        <View style={styles.gap}>
+          <Text testID="currency-locked" style={[textStyle('caption'), muted]}>
+            {copy.settings.currencyLockedNote}
+          </Text>
+          <Button label={copy.exportCsv.currencyLink} variant="text" onPress={onExport} testID="currency-export-link" />
+        </View>
       ) : null}
       {message ? (
         <Text testID="money-message" accessibilityRole="alert" accessibilityLiveRegion="assertive" style={[textStyle('body'), { color: theme.color('semantic-warning') }]}>

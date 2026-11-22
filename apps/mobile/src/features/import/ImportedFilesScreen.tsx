@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { ImportListItem, ImportRetention } from '@wmbugo/core';
 import { copy } from '../../shared/copy';
+import { groupDigits } from '../../shared/groupDigits';
 import { useSheet } from '../../shared/feedback/SheetHost';
 import { useToast } from '../../shared/feedback/ToastHost';
 import { useTheme } from '../../shared/theme/ThemeProvider';
@@ -24,9 +25,6 @@ export function retentionSummary(choice: ImportRetention): string {
 }
 
 const lower = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
-
-/** A count with a comma between thousands (1,170). Counts are not money, so this is plain digit grouping. */
-const groupDigits = (n: number): string => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 
 /** `statement-nov.csv · 3 Nov · 1,170 imported · file kept until 3 Dec`, or `file deleted`. The last parts read as a line, so they start in lower case. */
 export function importLine(item: ImportListItem): string {

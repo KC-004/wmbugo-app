@@ -13,6 +13,12 @@ import type { HomeApi, HomeData } from '../home/homeApi';
 import { authenticate, isDeviceSecure, openSecuritySettings } from '../../adapters/appLock';
 import { useLockStore } from '../../shared/state/lockStore';
 import { hidingBlocksScreenshots } from '../../adapters/recentsPrivacy';
+// The Export CSV screen has its own tests; here only the link to it is checked.
+jest.mock('../export/ExportScreen', () => ({
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.mock factories cannot use import
+  ExportScreen: () => require('react').createElement(require('react-native').Text, { testID: 'export-stub' }, 'Export screen'),
+}));
+
 import { SettingsBridge } from './SettingsBridge';
 import { SettingsScreen } from './SettingsScreen';
 import type { SettingsApi, SettingsData } from './settingsApi';
@@ -284,6 +290,15 @@ describe('Money basics', () => {
     expect(changeSetting).toHaveBeenCalledWith('finance.period_mode', 'calendar_month');
     expect(changeSetting).toHaveBeenCalledWith('finance.first_day_of_week', 'sun');
     expect(changeSetting).toHaveBeenCalledWith('finance.default_account', 'a1');
+  });
+
+  it('the currency explanation links to Export your entries, which opens Export CSV (Story 9.9)', async () => {
+    const { r } = await toMoney(data({ hasTransactions: true }));
+    expect(texts(r)).toContain('Export your entries');
+    act(() => fire(r, 'currency-export-link'));
+    await settle();
+    expect(has(r, 'export-stub')).toBe(true);
+    expect(texts(r)).toContain('Export CSV');
   });
 
   it('with entries, a currency change is blocked with the explanation and nothing changes', async () => {
