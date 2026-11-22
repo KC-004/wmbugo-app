@@ -134,6 +134,7 @@ export function ImportRun({
   const [phase, setPhase] = useState<Phase>(resumeBatchId ? { kind: 'importing', done: 0, total: 0, stopping: false } : { kind: 'checking' });
   const [decisions, setDecisions] = useState<Record<number, RowDecision>>({});
   const cancelled = useRef(false);
+  const running = useRef(false);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -149,11 +150,16 @@ export function ImportRun({
     isCancelled: () => cancelled.current,
   };
 
-  const finish = (r: Awaited<ReturnType<RunApi['run']>>, plan: ImportPlan | null) => {
+  const finish = async (r: Awaited<ReturnType<RunApi['run']>>, plan: ImportPlan | null, batchId = '') => {
+    running.current = false;
     onBusyChange?.(false);
     if (!mounted.current) return;
-    if (r.ok) setPhase({ kind: 'summary', summary: r.value, plan });
-    else setPhase({ kind: 'summary', summary: { batchId: '', status: 'paused', rowCount: 0, committedThroughRow: 0, imported: 0, skipped: 0, review: 0, errors: 0 }, failed: r.code, plan });
+    if (r.ok) return setPhase({ kind: 'summary', summary: r.value, plan });
+    // A failed run leaves its batch paused: find it so Carry on is offered (Epic 9 review).
+    let known = batchId;
+    if (known === '' && r.code === 'IMPORT_FAILED') known = await api.paused().then((p) => p?.batchId ?? '').catch(() => '');
+    if (!mounted.current) return;
+    setPhase({ kind: 'summary', summary: { batchId: known, status: 'paused', rowCount: 0, committedThroughRow: 0, imported: 0, skipped: 0, review: 0, errors: 0 }, failed: r.code, plan });
   };
 
   // Compare the file with what is there, once.
@@ -175,13 +181,15 @@ export function ImportRun({
   }, []);
 
   const carryOn = (batchId: string, plan: ImportPlan | null) => {
+    if (running.current) return;
+    running.current = true;
     cancelled.current = false;
     onBusyChange?.(true);
     setPhase({ kind: 'importing', done: 0, total: 0, stopping: false });
     void api
       .resume(batchId, hooks)
-      .then((r) => finish(r, plan))
-      .catch(() => finish({ ok: false, code: 'IMPORT_FAILED' }, plan));
+      .then((r) => finish(r, plan, batchId))
+      .catch(() => finish({ ok: false, code: 'IMPORT_FAILED' }, plan, batchId));
   };
 
   useEffect(() => {
@@ -190,7 +198,8 @@ export function ImportRun({
   }, []);
 
   const start = (plan: ImportPlan) => {
-    if (!draft) return;
+    if (!draft || running.current) return;
+    running.current = true;
     cancelled.current = false;
     onBusyChange?.(true);
     setPhase({ kind: 'importing', done: 0, total: plan.rows.length, stopping: false });

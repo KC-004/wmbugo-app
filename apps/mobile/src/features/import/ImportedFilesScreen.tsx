@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { ImportListItem, ImportRetention } from '@wmbugo/core';
 import { copy } from '../../shared/copy';
@@ -45,9 +45,16 @@ export function ImportedFilesScreen({ api = realImportedFilesApi, onChanged }: {
   const sheet = useSheet();
   const [data, setData] = useState<ImportedFilesData | null>(null);
 
+  const shown = useRef(false);
+  const toastRef = useRef(toast);
+  toastRef.current = toast;
   const load = useCallback(async () => {
     const d = await api.load().catch(() => null);
-    setData(d);
+    // A reload that fails keeps the list the person was looking at (Epic 9 review).
+    if (d !== null) {
+      shown.current = true;
+      setData(d);
+    } else if (shown.current) toastRef.current.show({ message: copy.csvImport.reloadFailed });
   }, [api]);
   useEffect(() => {
     void load();

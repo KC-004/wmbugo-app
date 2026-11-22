@@ -16,7 +16,7 @@ jest.mock('lottie-react-native', () => ({ __esModule: true, default: () => null 
 jest.mock('../../adapters/startApp', () => ({ getServices: jest.fn() }));
 jest.mock('../../adapters/import/rnRawFileStore', () => ({ rnRawFileStore: {} }));
 jest.mock('../../adapters/backup/rnCrypto', () => ({ createRnCrypto: jest.fn() }));
-jest.mock('../../adapters/backup/backupFiles', () => ({ pickCsvFile: jest.fn(), createTextDocument: jest.fn() }));
+jest.mock('../../adapters/backup/backupFiles', () => ({ pickCsvFile: jest.fn(), createCsvDocument: jest.fn() }));
 
 const live: ReactTestRenderer[] = [];
 afterEach(() => {
@@ -202,14 +202,32 @@ describe('running and the summary (Story 9.7)', () => {
   });
 
   it('a failed run keeps what was added and offers Carry on; a missing raw copy says it cannot carry on', async () => {
-    const failing = fakeRun(planOf(ROWS), { run: jest.fn(async () => ({ ok: false as const, code: 'IMPORT_FAILED' as const })) as never });
+    const failing = fakeRun(planOf(ROWS), { run: jest.fn(async () => ({ ok: false as const, code: 'IMPORT_FAILED' as const })) as never, paused: async () => summary({ status: 'paused' }) });
     const a = await mount((p) => <ImportRun draft={draft} api={failing} locale="en-GB" onDone={p.onDone} />);
     await press(a.r, 'import-start');
     expect(texts(a.r)).toEqual(expect.arrayContaining(["The import couldn't finish", 'What was added is kept, and you can carry on from where it stopped.']));
+    // The failed run's paused batch is found, so the button the text promises is there (Epic 9 review).
+    expect(has(a.r, 'import-resume')).toBe(true);
+    await press(a.r, 'import-resume');
+    expect(failing.resume).toHaveBeenCalledWith('b1', expect.anything());
     const lost = fakeRun(null, { paused: async () => summary({ status: 'paused' }), resume: jest.fn(async () => ({ ok: false as const, code: 'RAW_COPY_MISSING' as const })) as never });
     const b = await mount((p) => <ImportRun draft={null} api={lost} locale="en-GB" resumeBatchId="b1" onDone={p.onDone} />);
     expect(texts(b.r)).toContain("The saved copy of that file is gone, so this import can't carry on. What was added is kept.");
     expect(has(b.r, 'import-resume')).toBe(false);
+  });
+
+  it('a double tap on Import starts one run, not two (Epic 9 review)', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((res) => (release = res));
+    const api = fakeRun(planOf(ROWS), { run: jest.fn(async () => (await gate, { ok: true as const, value: summary() })) as never });
+    const m = await mount((p) => <ImportRun draft={draft} api={api} locale="en-GB" onDone={p.onDone} />);
+    const button = m.r.root.findByProps({ testID: 'import-start' });
+    await act(async () => {
+      button.props.onPress();
+      button.props.onPress();
+    });
+    expect(api.run).toHaveBeenCalledTimes(1);
+    await act(async () => release());
   });
 
   it('rows that could not be read can be saved as a CSV, and the person is told whether it worked', async () => {

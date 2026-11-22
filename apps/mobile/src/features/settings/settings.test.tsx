@@ -19,6 +19,17 @@ jest.mock('../export/ExportScreen', () => ({
   ExportScreen: () => require('react').createElement(require('react-native').Text, { testID: 'export-stub' }, 'Export screen'),
 }));
 
+// The import flow and the Imported files list have their own tests; here only the Data rows that open them are checked.
+jest.mock('../import/ImportFlow', () => ({
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.mock factories cannot use import
+  ImportFlow: (p: { onReview?: () => void }) => require('react').createElement(require('react-native').Text, { testID: 'import-stub', onPress: p.onReview }, 'Import screen'),
+}));
+jest.mock('../import/ImportedFilesScreen', () => ({
+  ...jest.requireActual('../import/ImportedFilesScreen'),
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.mock factories cannot use import
+  ImportedFilesScreen: () => require('react').createElement(require('react-native').Text, { testID: 'files-stub' }, 'Files screen'),
+}));
+
 import { SettingsBridge } from './SettingsBridge';
 import { SettingsScreen } from './SettingsScreen';
 import type { SettingsApi, SettingsData } from './settingsApi';
@@ -531,6 +542,38 @@ describe('Data group and Back up (Story 8.7)', () => {
     expect(texts(r)).toContain('Back up');
     act(() => fire(r, 'settings-back'));
     expect(has(r, 'row-backup')).toBe(true);
+  });
+});
+
+describe('Data rows for import and export (Epic 9 review)', () => {
+  it('Import CSV, Export CSV and Imported files each open their own page, with the page title, and Back returns to Data', async () => {
+    const { r } = await open(data({}));
+    act(() => fire(r, 'group-data'));
+    for (const [row, stub, title] of [
+      ['row-import', 'import-stub', 'Import CSV'],
+      ['row-export-csv', 'export-stub', 'Export CSV'],
+      ['row-imported-files', 'files-stub', 'Imported files'],
+    ] as const) {
+      act(() => fire(r, row));
+      await settle();
+      expect(has(r, stub)).toBe(true);
+      expect(texts(r)).toContain(title);
+      await act(async () => fire(r, 'settings-back'));
+      await settle();
+      expect(has(r, 'row-import')).toBe(true);
+    }
+  });
+
+  it('Review them after an import goes to the review queue through Settings', async () => {
+    const onReview = jest.fn();
+    const f = fakeApi(data({}));
+    const r = mount(<SettingsScreen api={f.api} onBack={jest.fn()} onReview={onReview} />);
+    await settle();
+    act(() => fire(r, 'group-data'));
+    act(() => fire(r, 'row-import'));
+    await settle();
+    act(() => fire(r, 'import-stub'));
+    expect(onReview).toHaveBeenCalledTimes(1);
   });
 });
 

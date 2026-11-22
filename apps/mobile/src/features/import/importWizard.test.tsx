@@ -291,3 +291,97 @@ describe('import wizard: a saved layout (Story 9.6)', () => {
     expect(stepper(m.r)).toBe('Step 1 of 3: Choose a file');
   });
 });
+
+describe('import wizard: more layouts (Epic 9 review)', () => {
+  const MULTI = 'Date,Description,Amount,Account\n13/11/2026,Swiggy,-420.00,Current\n14/11/2026,Salary,500.00,Savings\n15/11/2026,Tesco,-12.00,Current\n';
+  const SEMI = 'Date;Description;Amount\n13/11/2026;Swiggy;-420,00\n14/11/2026;Salary;500,00\n';
+
+  it('a file with an Account column asks which account each name is, blocks until all are answered, and hands on a column choice', async () => {
+    const api = fakeApi(MULTI, {}, TWO);
+    const m = await mount(api);
+    await press(m.r, 'import-choose');
+    await press(m.r, 'import-next');
+    expect(has(m.r, 'import-map-Current-a1')).toBe(true);
+    await press(m.r, 'import-map-Current-a1');
+    await press(m.r, 'import-next');
+    expect(has(m.r, 'import-block')).toBe(true);
+    expect(stepper(m.r)).toBe('Step 2 of 3: Check the columns');
+    await press(m.r, 'import-map-Savings-none');
+    await press(m.r, 'import-next');
+    await press(m.r, 'import-check-matches');
+    expect(m.onContinue).toHaveBeenCalledTimes(1);
+    expect(m.onContinue.mock.calls[0]![0].choice).toEqual({ kind: 'column', map: { Current: 'a1', Savings: null } });
+  });
+
+  it('every value in the Account column gets a row, however many there are', async () => {
+    const rows = Array.from({ length: 25 }, (_, i) => `${String((i % 28) + 1).padStart(2, '0')}/11/2026,Shop,-1.00,Acct${i}`).join('\n');
+    const m = await mount(fakeApi(`Date,Description,Amount,Account\n${rows}\n`, {}, TWO));
+    await press(m.r, 'import-choose');
+    await press(m.r, 'import-next');
+    expect(has(m.r, 'import-map-Acct24-a1')).toBe(true);
+  });
+
+  it('a saved layout with its own delimiter re-reads the file with it and lands on the preview', async () => {
+    const first = readCsv(bytes(SEMI), { delimiter: ';' });
+    if (!first.ok) throw new Error('fixture');
+    const layout: SavedCsvFormat = {
+      id: 'f2',
+      name: 'Semi',
+      headerSignature: headerSignature(first.value.header, ';'),
+      mapping: guessMapping(first.value.header, first.value.sample),
+      overrides: { delimiter: ';' },
+      account: { kind: 'single', accountId: 'a1' },
+    };
+    const m = await mount(fakeApi(SEMI, { savedFormat: async () => layout }));
+    await press(m.r, 'import-choose');
+    expect(stepper(m.r)).toBe('Step 2 of 2: Preview');
+    expect(texts(m.r)).toContain('2 ready to import');
+  });
+
+  it('a saved layout whose account is gone keeps its columns but asks for the account again', async () => {
+    const read = readCsv(bytes(GOOD));
+    if (!read.ok) throw new Error('fixture');
+    const layout: SavedCsvFormat = {
+      id: 'f3',
+      name: 'Old',
+      headerSignature: headerSignature(read.value.header, ','),
+      mapping: guessMapping(read.value.header, read.value.sample),
+      overrides: {},
+      account: { kind: 'single', accountId: 'gone' },
+    };
+    const m = await mount(fakeApi(GOOD, { savedFormat: async () => layout }, TWO));
+    await press(m.r, 'import-choose');
+    expect(stepper(m.r)).toBe('Step 2 of 3: Check the columns');
+    await press(m.r, 'import-account-a2');
+    await press(m.r, 'import-next');
+    await press(m.r, 'import-check-matches');
+    expect(m.onContinue.mock.calls[0]![0].choice).toEqual({ kind: 'single', accountId: 'a2' });
+  });
+
+  it('a file with no heading row never looks up a saved layout', async () => {
+    const api = fakeApi('13/11/2026,Swiggy,-420.00\n14/11/2026,Salary,500.00\n');
+    const m = await mount(api);
+    await press(m.r, 'import-choose');
+    expect(api.savedFormat).not.toHaveBeenCalled();
+    expect(m.r).toBeTruthy();
+  });
+
+  it('a double tap on Check matches saves the layout once and hands on once', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((res) => (release = res));
+    const api = fakeApi(GOOD, { saveFormat: jest.fn(async () => (await gate, { ok: true as const })) as never });
+    const m = await mount(api);
+    await press(m.r, 'import-choose');
+    await press(m.r, 'import-next');
+    await press(m.r, 'import-remember');
+    const button = m.r.root.findAll((n) => n.props.testID === 'import-check-matches' && typeof n.props.onPress === 'function')[0]!;
+    await act(async () => {
+      button.props.onPress();
+      button.props.onPress();
+    });
+    release();
+    await settle();
+    expect(api.saveFormat).toHaveBeenCalledTimes(1);
+    expect(m.onContinue).toHaveBeenCalledTimes(1);
+  });
+});

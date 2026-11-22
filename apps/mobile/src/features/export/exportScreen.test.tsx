@@ -222,6 +222,52 @@ describe('Export CSV (Story 9.9)', () => {
     expect(selected(m.r, 'export-period-all_time')).toBe(true);
   });
 
+  it('leaving the screen while Confirm it is you is open writes nothing, and a second confirm does not start a second export (Epic 9 review)', async () => {
+    let allow!: (ok: boolean) => void;
+    (requireReauth as jest.Mock).mockImplementation(() => new Promise<boolean>((res) => (allow = res)));
+    const f = fakeApi();
+    const m = await mount(f.api);
+    await press(m.r, 'export-button');
+    const confirm = m.r.root.findAll((n) => n.props.testID === 'export-confirm' && typeof n.props.onPress === 'function')[0]!;
+    await act(async () => {
+      confirm.props.onPress();
+      confirm.props.onPress();
+    });
+    expect(requireReauth).toHaveBeenCalledTimes(1);
+    act(() => m.r.unmount());
+    live.splice(live.indexOf(m.r), 1);
+    await act(async () => allow(true));
+    await settle();
+    expect(f.run).not.toHaveBeenCalled();
+  });
+
+  it('Last period with no earlier period says so, not that two dates are needed', async () => {
+    const f = fakeApi({ kind: 'invalid_period', code: 'NO_PERIOD' });
+    const m = await mount(f.api);
+    await press(m.r, 'export-period-last_period');
+    await press(m.r, 'export-button');
+    await press(m.r, 'export-confirm');
+    expect(texts(m.r)).toContain('There is no earlier period to export yet.');
+    expect(texts(m.r)).not.toContain('Enter two dates like 2026-01-31, the first not after the second.');
+  });
+
+  it('dates typed with a stray space are accepted and trimmed', async () => {
+    const f = fakeApi();
+    const m = await mount(f.api);
+    await press(m.r, 'export-period-custom');
+    await type(m.r, 'export-from', ' 2026-03-01 ');
+    await type(m.r, 'export-to', '2026-03-31\n');
+    await press(m.r, 'export-button');
+    await press(m.r, 'export-confirm');
+    expect(f.run).toHaveBeenCalledWith(expect.objectContaining({ custom: { start: '2026-03-01', end: '2026-03-31' } }), expect.any(Object));
+  });
+
+  it('the account summary confirm says balances, not entries', async () => {
+    const m = await mount(fakeApi().api, { initialKind: 'accounts' });
+    await press(m.r, 'export-button');
+    expect(texts(m.r)).toContain("This file won't be encrypted. Anyone who opens it can read these balances.");
+  });
+
   it('the toast wording for one and many', () => {
     expect(exportedText('transactions', 1)).toBe('Exported 1 entry');
     expect(exportedText('transactions', 12345)).toBe('Exported 12,345 entries');

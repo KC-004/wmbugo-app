@@ -53,6 +53,7 @@ export function ExportScreen({ api = realExportApi, initialKind = 'transactions'
   const [run, setRun] = useState<{ done: number; total: number } | null>(null);
   const [failed, setFailed] = useState(false);
   const cancelled = useRef(false);
+  const busy = useRef(false);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -79,7 +80,9 @@ export function ExportScreen({ api = realExportApi, initialKind = 'transactions'
 
   const start = async () => {
     setFailed(false);
-    if (choice === 'custom' && (!isLocalDate(from) || !isLocalDate(to) || from > to)) return setProblem(e.rangeInvalid);
+    const start0 = from.trim();
+    const end0 = to.trim();
+    if (choice === 'custom' && (!isLocalDate(start0) || !isLocalDate(end0) || start0 > end0)) return setProblem(e.rangeInvalid);
     if (!all && picked.length === 0) return setProblem(e.noAccountsChosen);
     setProblem(null);
     sheet.open({
@@ -87,7 +90,7 @@ export function ExportScreen({ api = realExportApi, initialKind = 'transactions'
       title: e.confirmTitle,
       body: (close) => (
         <View style={styles.sheet}>
-          <Text style={[textStyle('body'), { color: theme.color('text-secondary') }]}>{e.confirmBody}</Text>
+          <Text style={[textStyle('body'), { color: theme.color('text-secondary') }]}>{kind === 'transactions' ? e.confirmBody : e.confirmBodyAccounts}</Text>
           <Button
             label={e.confirmExport}
             testID="export-confirm"
@@ -103,15 +106,23 @@ export function ExportScreen({ api = realExportApi, initialKind = 'transactions'
   };
 
   const go = async () => {
-    // Decrypted data leaves wmbugo's control: with app lock on the person proves it is them first.
-    if (!(await requireReauth())) return;
+    // One export at a time: a second tap while `Confirm it's you` is open must not start another (Epic 9 review).
+    if (busy.current) return;
+    busy.current = true;
+    // Decrypted data leaves wmbugo's control: with app lock on the person proves it is them first. If they left the screen meanwhile,
+    // nothing is written.
+    const proven = await requireReauth().catch(() => false);
+    if (!proven || !mounted.current) {
+      busy.current = false;
+      return;
+    }
     cancelled.current = false;
     setRun({ done: 0, total: 0 });
     onBusyChange?.(true);
     let outcome: ExportOutcome;
     try {
       outcome = await api.run(
-        { kind, choice, ...(choice === 'custom' ? { custom: { start: from, end: to } } : {}), accountIds: all ? null : picked, includeNumbers: numbers },
+        { kind, choice, ...(choice === 'custom' ? { custom: { start: from.trim(), end: to.trim() } } : {}), accountIds: all ? null : picked, includeNumbers: numbers },
         {
           onProgress: (done, total) => mounted.current && setRun({ done, total }),
           isCancelled: () => cancelled.current,
@@ -120,12 +131,13 @@ export function ExportScreen({ api = realExportApi, initialKind = 'transactions'
     } catch {
       outcome = { kind: 'failed' };
     }
+    busy.current = false;
     onBusyChange?.(false);
     if (!mounted.current) return;
     setRun(null);
     if (outcome.kind === 'saved') toast.show({ message: exportedText(outcome.export, outcome.count) });
     else if (outcome.kind === 'cancelled') toast.show({ message: e.cancelled });
-    else if (outcome.kind === 'invalid_period') setProblem(e.rangeInvalid);
+    else if (outcome.kind === 'invalid_period') setProblem(outcome.code === 'NO_PERIOD' ? e.noPrevious : e.rangeInvalid);
     else if (outcome.kind === 'failed') setFailed(true);
   };
 

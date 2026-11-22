@@ -85,6 +85,13 @@ function FileSettingsBody({ read, overrides, onApply }: { read: CsvReadResult; o
   );
 }
 
+/** Whether every account a saved layout points at is still one the person can import into. */
+function accountsStillThere(account: CsvAccountChoice | null | undefined, accounts: ImportContext['accounts']): boolean {
+  if (!account) return true;
+  const ids = new Set(accounts.map((a) => a.id));
+  return account.kind === 'single' ? ids.has(account.accountId) : Object.values(account.map).every((id) => id === null || ids.has(id));
+}
+
 /** Which of the user's accounts each name in the file's account column means, or `Don't import these rows`. */
 function AccountMapper({ values, accounts, choice, onChange }: { values: readonly string[]; accounts: ImportContext['accounts']; choice: CsvAccountChoice | null; onChange: (c: CsvAccountChoice) => void }) {
   const theme = useTheme();
@@ -93,7 +100,7 @@ function AccountMapper({ values, accounts, choice, onChange }: { values: readonl
   return (
     <View style={styles.block}>
       <Text style={[textStyle('body'), { color: theme.color('text-secondary') }]}>{copy.csvImport.accountColumnExplain}</Text>
-      {values.slice(0, 20).map((v) => (
+      {values.map((v) => (
         <View key={v} style={styles.block}>
           <Text style={[textStyle('body-medium'), { color: theme.color('text-primary') }]}>{v === '' ? copy.csvImport.accountValueEmpty : v}</Text>
           <View style={styles.chips}>
@@ -166,7 +173,8 @@ export function ImportWizard({ api = realImportApi, onContinue, onBusyChange }: 
       let read = readWith(picked.bytes, {});
       if (!read.ok) return fail(READ_ERROR_COPY[read.code]);
       let overrides: ReadOverrides = {};
-      let match = await api.savedFormat(read.value).catch(() => null);
+      // A file with no heading row has nothing to recognise it by: every such file would share one layout (Epic 9 review).
+      let match = read.value.header.length === 0 ? null : await api.savedFormat(read.value).catch(() => null);
       if (match && needsReread(read.value, match)) {
         const again = readWith(picked.bytes, match.overrides);
         if (again.ok) {
@@ -177,12 +185,14 @@ export function ImportWizard({ api = realImportApi, onContinue, onBusyChange }: 
       if (!mounted.current) return;
       setCtx(c);
       setLoaded({ bytes: picked.bytes, name: picked.name ?? null, read: read.value, overrides });
-      setSaved(match);
+      // A saved layout that names an account that is gone or archived keeps its columns, but the account is asked again on the Columns step.
+      const usable = match !== null && accountsStillThere(match.account, c.accounts) ? match : null;
+      setSaved(usable);
       setRemember(false);
       setShowBlock(false);
       setMapping(match ? match.mapping : guess(read.value));
-      setChoice(match?.account ?? (c.accounts.length === 1 ? { kind: 'single', accountId: c.accounts[0]!.id } : null));
-      setPhase(match ? 'preview' : 'columns');
+      setChoice(usable?.account ?? (c.accounts.length === 1 ? { kind: 'single', accountId: c.accounts[0]!.id } : null));
+      setPhase(usable !== null ? 'preview' : 'columns');
       onBusyChange?.(false);
     } catch {
       fail(copy.csvImport.readFailed);
@@ -273,11 +283,19 @@ export function ImportWizard({ api = realImportApi, onContinue, onBusyChange }: 
     setPhase('preview');
   };
 
+  const going = useRef(false);
   const goOn = async () => {
-    if (!loaded || !mapping || !checked || !ctx || !choice) return;
+    if (going.current || !loaded || !mapping || !checked || !ctx || !choice) return;
     if (checked.validation.okCount === 0) return;
+    if (checked.block !== null) {
+      // The saved layout no longer fits the file (a new account name, say): back to the Columns step, with the reason shown.
+      setShowBlock(true);
+      setPhase('columns');
+      return;
+    }
     const finalChoice = checked.block === null && (mapping.columns.account !== undefined ? choice.kind === 'column' : choice.kind === 'single') ? choice : null;
     if (!finalChoice) return;
+    going.current = true;
     if (remember) {
       const accountName = finalChoice.kind === 'single' ? ctx.accounts.find((a) => a.id === finalChoice.accountId)?.name : undefined;
       // Remembering the layout is a convenience: if it fails the import still goes on, and the Columns step runs again next time.
@@ -285,6 +303,7 @@ export function ImportWizard({ api = realImportApi, onContinue, onBusyChange }: 
         .saveFormat({ name: accountName ?? copy.csvImport.title, headerSignature: signatureOf(loaded.read), mapping, overrides: overridesOf(loaded.read), account: finalChoice })
         .catch(() => undefined);
     }
+    going.current = false;
     onContinue({ bytes: loaded.bytes, fileName: loaded.name, read: loaded.read, mapping, choice: finalChoice, overrides: overridesOf(loaded.read), validation: checked.validation });
   };
 

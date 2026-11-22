@@ -39,3 +39,28 @@ Full list in epic-8-code-review-2026-11-21.md. Summary:
 - Backup key derivation hardening (verifier subkey, header as associated data).
 - Restore notice time zone and string handling.
 - CI symbols upload retention.
+
+## Deferred from: code review of Epic 9 (2026-11-22)
+
+Graded from the reviewers' reports; only the first group was checked against the code.
+
+- `held_pair` review rows (reversal or transfer?) show as plain Waiting: no filter, read-model or detail support, so there is no way to answer the question. Medium, needs a new UI.
+- Reference-based fingerprint has no account in it: two accounts reusing a reference such as `1` collide, and the second row is skipped as already recorded. Unverified.
+- No-reference fingerprint counts occurrences within one file, so an overlapping file starting part-way through a day can duplicate. Unverified.
+- Resume re-plans against the live ledger: a transfer pair whose first leg was committed earlier loses its partner. Unverified.
+- `normalizeHeading` keeps only `[a-z0-9()]`: headings in non-Latin scripts share one layout signature. Unverified.
+- Amounts: Indian lakh grouping (`1,23,456.78`), Swiss `1'234.56` and `1 234.56` with a dot decimal are rejected. Dates: no `DD/MM/YY` or `YYYY/MM/DD`.
+- Zero amount reads as "No amount in this row"; a skipped row with a bad date still counts as an error; `signWarning` compares across interleaved accounts.
+- `readCsv`: an unterminated quote swallows the rest of the file with no warning; UTF-16 odd byte and invalid UTF-8 are altered silently; a bad `headerRow` override can throw.
+- `retain_until` is set when the import starts, not when it completes.
+- `UndoImportReview` restores whole snapshots and loses later edits; `undo_json` is parsed unguarded.
+- `createForeignRow` drops the chosen account and leaves an open candidate on an excluded row.
+- `categoriesByName` is keyed by name only: an expense and an income category with one name collide.
+- `LinkAsTransfer` and `pairWithinFile` do not compare currencies.
+- Export: `All time` and `This year` end today, so future-dated entries are left out; the `time` column uses each entry's own timezone while the header names one; paging has no snapshot; account numbers are never stored so the column is empty.
+- Migration 0028 uses `PRAGMA foreign_keys` inside a transaction (no effect); `source_record.import_batch_id`, `import_batch.format_id` and `import_batch.account_id` have no foreign keys.
+- Startup wiring (`sweepImportOrphans`, `PauseInterruptedImports`, expired-file removal) has no test: cover it with the phone check or extract it with injected dependencies.
+- Phone check: does RNFS `readDir` return the same path string that `save` returned? If not, the orphan sweep deletes every kept copy.
+- Phone check: Kotlin `pickCsvDocument`, `createCsvDocument` and `displayNameOf` have only mocked tests.
+- Several paused imports: the import flow offers only the newest (`LIMIT 1`); the others can be discarded from Imported files.
+- Core export tests do not cover refund, adjustment, reversed or `AMOUNT_NOT_WRITABLE`.

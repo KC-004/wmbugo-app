@@ -95,13 +95,13 @@ class BackupFilesModule(private val ctx: ReactApplicationContext) : ReactContext
     launch(intent, REQUEST_PICK, promise)
   }
 
-  /** The picker for a bank file (Story 9.6): offers CSV and text files first, and still lets the person browse everything. */
+  /** The picker for a bank file (Story 9.6): offers CSV and text files, and `application/octet-stream` because some providers and bank downloads report a CSV that way; the file's content is checked after it is read. */
   @ReactMethod
   fun pickCsvDocument(promise: Promise) {
     val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
       addCategory(Intent.CATEGORY_OPENABLE)
       type = "*/*"
-      putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("text/csv", "text/comma-separated-values", "text/plain", "application/csv", "application/vnd.ms-excel"))
+      putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("text/csv", "text/comma-separated-values", "text/plain", "text/x-csv", "application/csv", "application/vnd.ms-excel", "application/octet-stream"))
     }
     launch(intent, REQUEST_PICK, promise)
   }

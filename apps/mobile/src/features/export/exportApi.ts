@@ -112,7 +112,7 @@ export const realExportApi: ExportApi = {
       const done = request.kind === 'transactions' ? await exportTransactionsCsv(db, options, doc.sink, hooks) : await exportAccountsCsv(db, options, doc.sink, hooks);
       if (!done.ok) {
         // Cancelled, a full destination or a provider error: the partial document is deleted, nothing is left in the person's folder.
-        await doc.abort();
+        await doc.abort().catch(() => undefined);
         return done.code === 'CANCELLED' ? { kind: 'cancelled' } : { kind: 'failed' };
       }
       await doc.commit();
