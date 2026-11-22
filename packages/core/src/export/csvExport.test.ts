@@ -223,6 +223,25 @@ describe('export account summary (Story 9.9)', () => {
     expect(l[9]).toBe('Wallet,cash,active,,,0.00,0.00,,not set,GBP');
   });
 
+  it('says that the balances count reversed entries too, and a cancel that arrives after the query still writes nothing', async () => {
+    const s = await setup();
+    await s.add('Monzo Current', 'bank');
+    const sink = new MemSink();
+    await exportAccountsCsv(s.db, s.opts(), sink);
+    expect(lines(sink.text())[5]).toBe('# Balances include confirmed and reversed entries like the Accounts screen');
+    let calls = 0;
+    const late = await exportAccountsCsv(s.db, s.opts(), new MemSink(), { isCancelled: () => ++calls >= 2 });
+    expect(late).toEqual({ ok: false, code: 'CANCELLED' });
+  });
+
+  it('an account name with a comma or a quote keeps the Filters line in one cell', async () => {
+    const s = await setup();
+    const bank = await s.add('Joint, "main"', 'bank');
+    const sink = new MemSink();
+    await exportAccountsCsv(s.db, s.opts({ accountIds: [bank], accountNames: ['Joint, "main"'] }), sink);
+    expect(lines(sink.text())[1]).toBe('"# Filters: Accounts Joint, ""main"""');
+  });
+
   it('the chosen accounts only, and a failing sink is reported', async () => {
     const s = await setup();
     const bank = await s.add('Monzo Current', 'bank');

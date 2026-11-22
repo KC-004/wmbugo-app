@@ -154,6 +154,18 @@ describe('search, filters and sort (Story 3.6)', () => {
     expect((await find({ statuses: ['waiting', 'reversed'] })).map((r) => r.id)).toEqual([ids.salary]);
   });
 
+  it('an imported transfer pair and a half-covered-day row read Check, not Waiting, in the rows and in both filters (Epic 9 review)', async () => {
+    const { db, find, ids } = await seed();
+    db.raw.exec(`UPDATE "transaction" SET status = 'needs_review' WHERE id IN ('${ids.tea}','${ids.petrol}')`);
+    db.raw.exec(`INSERT INTO review_candidate (id,transaction_id,matched_transaction_id,reason,status,created_at) VALUES ('rc1','${ids.tea}',NULL,'transfer_pair','open',1)`);
+    db.raw.exec(`INSERT INTO review_candidate (id,transaction_id,matched_transaction_id,reason,status,created_at) VALUES ('rc2','${ids.petrol}',NULL,'edge_day','open',1)`);
+    expect((await find({ statuses: ['check'] })).map((r) => r.id).sort()).toEqual([ids.tea, ids.petrol].sort());
+    expect(await find({ statuses: ['waiting'] })).toEqual([]);
+    const rows = await find({});
+    expect(rows.find((r) => r.id === ids.tea)?.check).toBe(true);
+    expect(rows.find((r) => r.id === ids.petrol)?.check).toBe(true);
+  });
+
   it('sorts: newest (default), oldest, highest amount, merchant A to Z; flat sorts have no day headers', async () => {
     const { find, ids } = await seed();
     const order = async (sort: ActivityQuery['sort']) => (await find({ sort })).map((r) => r.id);

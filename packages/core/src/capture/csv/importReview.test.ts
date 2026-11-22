@@ -237,6 +237,14 @@ describe('edge-day rows (Story 9.5, FIN-027)', () => {
     expect((await snapshotTx({ query: (sql: string, p?: readonly (string | number | null)[]) => w.db.query(sql, p ?? []) } as never, w.row))!.sources).toEqual(snap!.sources);
   });
 
+  it('refuses to link a row to itself, and leaves a removed row alone (Epic 9 review)', async () => {
+    const w = await edgeRow();
+    expect(await w.writer.run(LinkEdgeDayRow, { transactionId: w.row, existingId: w.row }, 'user')).toMatchObject({ ok: false, code: 'MATCH_REMOVED' });
+    expect((await w.db.query('SELECT status FROM "transaction" WHERE id = ?', [w.row]))[0]).toEqual(['needs_review']);
+    w.db.raw.exec(`UPDATE "transaction" SET removed_at = 1, removal_kind = 'deleted' WHERE id = '${w.row}'`);
+    expect(await w.writer.run(LinkEdgeDayRow, { transactionId: w.row, existingId: w.existingId }, 'user')).toMatchObject({ ok: false, code: 'ENTRY_NOT_FOUND' });
+  });
+
   it('without a chosen entry the row is just excluded, and a row that is not an edge-day row is refused', async () => {
     const w = await edgeRow();
     expect((await w.writer.run(LinkEdgeDayRow, { transactionId: w.row }, 'user')).ok).toBe(true);

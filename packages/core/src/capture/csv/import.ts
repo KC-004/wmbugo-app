@@ -109,11 +109,13 @@ export const StartCsvImport: UseCase<StartCsvImportInput, { batchId: string }, '
 
 export type FinishStatus = 'completed' | 'paused' | 'abandoned';
 
-export const FinishCsvImport: UseCase<{ batchId: string; status: FinishStatus }, void, 'IMPORT_NOT_FOUND'> = {
+export const FinishCsvImport: UseCase<{ batchId: string; status: FinishStatus }, void, 'IMPORT_NOT_FOUND' | 'IMPORT_NOT_RUNNING'> = {
   name: 'FinishCsvImport',
   async execute(ctx, input) {
     const row = (await ctx.query('SELECT status FROM import_batch WHERE id = ?', [input.batchId]))[0];
     if (!row) return err('IMPORT_NOT_FOUND');
+    // Only a running import can be finished or paused: a discarded or completed one never comes back (Epic 9 review).
+    if (String(row[0]) !== 'importing') return err('IMPORT_NOT_RUNNING');
     const done = input.status !== 'paused';
     await ctx.execute('UPDATE import_batch SET status = ?, completed_at = ? WHERE id = ?', [input.status, done ? ctx.nowMs() : null, input.batchId]);
     ctx.touch('import_batch', input.batchId, { status: input.status });

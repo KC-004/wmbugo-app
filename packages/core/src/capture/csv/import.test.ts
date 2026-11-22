@@ -16,8 +16,9 @@ import { actionFor, ImportCsvBatch, PauseInterruptedImports, type ImportBatchInp
 import { guessMapping } from './mapping';
 import { entriesToImport, planImportFile, readImport, resumeCsvImport, runCsvImport, type ImportJob, type RawFileStore, type RunImportDeps } from './runImport';
 import { readCsv } from './read';
+import { FinishCsvImport } from './import';
 import { cleanFileName, DeleteImportFile, DiscardImport, listImports, retainDaysFor, retainUntilFor, SetImportRetention } from './importFiles';
-import { PurgeExpired } from '../../ledger/purge';
+import { PurgeExpired, RunDailyPurge } from '../../ledger/purge';
 import { parseSettings, SETTINGS_SQL } from '../../profile/settings';
 import type { CsvAccountChoice, CsvProfile } from './rows';
 
@@ -433,6 +434,23 @@ describe('keeping and deleting imported files (Story 9.8)', () => {
     return { s, acc, id: done.value.batchId };
   }
   const row = async (s: Awaited<ReturnType<typeof setup>>, id: string) => (await s.db.query('SELECT raw_path, retain_until, completed_at, file_name, status FROM import_batch WHERE id = ?', [id]))[0]!;
+
+  it('the daily purge reports the expired copy so the app can delete the file (IMP-006)', async () => {
+    const { s, id } = await imported();
+    const raw = String((await row(s, id))[0]);
+    s.clock.advance(31 * DAY);
+    const daily = await s.writer.run(RunDailyPurge, {}, 'system');
+    expect(daily.ok && daily.value.importFiles).toEqual([raw]);
+    expect((await row(s, id))[0]).toBeNull();
+  });
+
+  it('a finished or discarded import cannot be paused or finished again (Epic 9 review)', async () => {
+    const { s, id } = await imported();
+    expect(await s.writer.run(FinishCsvImport, { batchId: id, status: 'paused' }, 'user')).toMatchObject({ ok: false, code: 'IMPORT_NOT_RUNNING' });
+    const before = await row(s, id);
+    expect(await s.writer.run(FinishCsvImport, { batchId: id, status: 'completed' }, 'user')).toMatchObject({ ok: false, code: 'IMPORT_NOT_RUNNING' });
+    expect(await row(s, id)).toEqual(before);
+  });
 
   it('the default keeps the copy 30 days: still there at 29, gone at 31, and the row, the entries and the fingerprints stay', async () => {
     const { s, acc, id } = await imported();

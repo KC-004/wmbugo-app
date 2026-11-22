@@ -1,9 +1,9 @@
 import type { ByteSink } from '../backup/writer';
 import { utf8Encode } from '../backup/format';
 import type { Querier } from '../planning/budgets';
-import { addDays, isLocalDate, periodFor, previousPeriod, type PeriodProfile } from '../profile/period';
+import { isLocalDate, periodFor, previousPeriod, type PeriodProfile } from '../profile/period';
 import { localMinutesOfDay } from '../shared/clock';
-import { csvRow } from '../shared/csv';
+import { csvCell, csvRow } from '../shared/csv';
 import { formatMinorPlain } from '../shared/money';
 import { err, ok, type Result } from '../shared/result';
 
@@ -95,16 +95,17 @@ export interface ExportHooks {
 
 export type ExportError = 'CANCELLED' | 'AMOUNT_NOT_WRITABLE' | 'WRITE_FAILED';
 
-function headerLines(schema: string, o: ExportOptions): string[] {
+function headerLines(schema: string, o: ExportOptions, includes: string): string[] {
   const filters = o.accountIds === null || o.accountNames.length === 0 ? 'all' : o.accountNames.map(oneLine).join('; ');
+  // An account name may hold a comma or a quote: the header lines are quoted like any cell so a spreadsheet keeps each on one line.
   return [
     `# Period ${o.range.start} to ${o.range.end} (inclusive)`,
     `# Filters: Accounts ${filters}`,
     `# Timezone ${oneLine(o.timezoneId)}`,
     `# Currency ${oneLine(o.currency)}`,
     `# Schema ${schema}`,
-    '# Includes confirmed entries only',
-  ];
+    includes,
+  ].map((line) => csvCell(line));
 }
 
 const marks = (n: number) => Array.from({ length: n }, () => '?').join(', ');
@@ -146,7 +147,7 @@ export async function countExportEntries(db: Querier, o: ExportOptions): Promise
  */
 export async function exportTransactionsCsv(db: Querier, o: ExportOptions, sink: ByteSink, hooks: ExportHooks = {}): Promise<Result<{ entries: number }, ExportError>> {
   const total = await countExportEntries(db, o);
-  const head = CSV_BOM + [...headerLines(TRANSACTIONS_SCHEMA, o), csvRow(TRANSACTION_COLUMNS)].join(CSV_EOL) + CSV_EOL;
+  const head = CSV_BOM + [...headerLines(TRANSACTIONS_SCHEMA, o, '# Includes confirmed entries only'), csvRow(TRANSACTION_COLUMNS)].join(CSV_EOL) + CSV_EOL;
   if (!(await write(sink, head))) return err('WRITE_FAILED');
   const f = entryFilter(o);
   const inFilter = (id: string) => o.accountIds === null || o.accountIds.includes(id);
@@ -214,6 +215,8 @@ export async function exportTransactionsCsv(db: Querier, o: ExportOptions, sink:
     cursorId = String(page[page.length - 1]![0]);
     if (page.length < PAGE) break;
   }
+  // A cancel that arrives during the last page still discards the file: cancelling writes nothing.
+  if (hooks.isCancelled?.()) return err('CANCELLED');
   return ok({ entries: done });
 }
 
@@ -235,7 +238,7 @@ export async function exportAccountsCsv(db: Querier, o: ExportOptions, sink: Byt
     [o.range.start, o.range.start, o.range.end, o.range.start, o.range.end, o.range.end, ...(o.accountIds ?? [])],
   );
   if (hooks.isCancelled?.()) return err('CANCELLED');
-  const head = CSV_BOM + [...headerLines(ACCOUNTS_SCHEMA, o), csvRow(ACCOUNT_COLUMNS)].join(CSV_EOL) + CSV_EOL;
+  const head = CSV_BOM + [...headerLines(ACCOUNTS_SCHEMA, o, '# Balances include confirmed and reversed entries like the Accounts screen'), csvRow(ACCOUNT_COLUMNS)].join(CSV_EOL) + CSV_EOL;
   if (!(await write(sink, head))) return err('WRITE_FAILED');
   const lines: string[] = [];
   for (const r of rows) {
@@ -253,9 +256,8 @@ export async function exportAccountsCsv(db: Querier, o: ExportOptions, sink: Byt
     lines.push(csvRow([String(r[1]), String(r[2]), String(r[3]), digits, notSet ? '' : start, inn, out, notSet ? '' : end, notSet ? 'not set' : Number(r[8]) < 0 ? 'owe' : 'have', o.currency]));
   }
   if (lines.length > 0 && !(await write(sink, lines.join(CSV_EOL) + CSV_EOL))) return err('WRITE_FAILED');
+  if (hooks.isCancelled?.()) return err('CANCELLED');
   hooks.onProgress?.(rows.length, rows.length);
   return ok({ accounts: rows.length });
 }
 
-/** The day after a period ends: used by callers that want the first day not covered. */
-export const dayAfter = (date: string): string => addDays(date, 1);

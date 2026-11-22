@@ -108,7 +108,7 @@ export const KeepSeparate: UseCase<{ transactionId: string }, { candidateId: str
     if (c === null) return err('NOT_A_PAIR');
     if (c === 'resolved') return err('ALREADY_RESOLVED');
     const a = await snapshotTx(ctx, input.transactionId);
-    if (!a) return err('ENTRY_NOT_FOUND');
+    if (!a || a.removedAt !== null) return err('ENTRY_NOT_FOUND');
     const now = ctx.nowMs();
     const alsoResolved: string[] = [];
     const txs = [a];
@@ -143,10 +143,11 @@ export const LinkEdgeDayRow: UseCase<{ transactionId: string; existingId?: strin
     if (c === null) return err('NOT_AN_EDGE_DAY_ROW');
     if (c === 'resolved') return err('ALREADY_RESOLVED');
     const row = await snapshotTx(ctx, input.transactionId);
-    if (!row) return err('ENTRY_NOT_FOUND');
+    if (!row || row.removedAt !== null) return err('ENTRY_NOT_FOUND');
     const txs = [row];
     const now = ctx.nowMs();
     if (input.existingId) {
+      if (input.existingId === input.transactionId) return err('MATCH_REMOVED');
       const target = await snapshotTx(ctx, input.existingId);
       if (!target || target.removedAt !== null) return err('MATCH_REMOVED');
       txs.push(target);
