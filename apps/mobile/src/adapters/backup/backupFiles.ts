@@ -11,7 +11,7 @@ interface Native {
   write(handle: number, base64: string): Promise<void>;
   closeWrite(handle: number): Promise<void>;
   deleteDocument(uri: string): Promise<boolean>;
-  openRead(uri: string): Promise<{ handle: number; size: number }>;
+  openRead(uri: string): Promise<{ handle: number; size: number; name?: string | null }>;
   readAt(handle: number, offset: number, length: number): Promise<string>;
   closeRead(handle: number): Promise<void>;
   openDecrypted(srcPath: string, keyHex: string): Promise<number>;
@@ -88,16 +88,17 @@ export async function pickBackupFile(): Promise<{ source: ByteSource; close(): P
 }
 
 /** The picker for a bank file, limited to CSV and text (Story 9.6). Returns the file's bytes (a file over `limit` stops being read), or null when cancelled. */
-export async function pickCsvFile(limit: number): Promise<{ bytes: Uint8Array; size: number } | null> {
+export async function pickCsvFile(limit: number): Promise<{ bytes: Uint8Array; size: number; name: string | null } | null> {
   const uri = await native().pickCsvDocument();
   if (uri === null) return null;
-  const { handle, size } = await native().openRead(uri);
+  const { handle, size, name } = await native().openRead(uri);
+  const fileName = name ?? null;
   try {
-    if (size > limit) return { bytes: new Uint8Array(0), size };
+    if (size > limit) return { bytes: new Uint8Array(0), size, name: fileName };
     const out = new Uint8Array(size);
     const step = 256 * 1024;
     for (let at = 0; at < size; at += step) out.set(fromBase64(await native().readAt(handle, at, Math.min(step, size - at))), at);
-    return { bytes: out, size };
+    return { bytes: out, size, name: fileName };
   } finally {
     await native().closeRead(handle).catch(() => undefined);
   }

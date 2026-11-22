@@ -79,7 +79,7 @@ export const rnfsModule = {
   async readDir(path: string) {
     const names = new Set<string>();
     for (const k of files.keys()) if (k.startsWith(`${path}/`)) names.add(k.slice(path.length + 1).split('/')[0]!);
-    return [...names].map((n) => ({ name: n, path: `${path}/${n}` }));
+    return [...names].map((n) => ({ name: n, path: `${path}/${n}`, isDirectory: () => isDir(`${path}/${n}`), isFile: () => files.has(`${path}/${n}`) }));
   },
   async getFSInfo() {
     return { freeSpace: state.freeSpace, totalSpace: 100_000_000 };

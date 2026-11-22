@@ -11,3 +11,4 @@ export * from './planContext';
 export * from './import';
 export * from './runImport';
 export * from './importReview';
+export * from './importFiles';

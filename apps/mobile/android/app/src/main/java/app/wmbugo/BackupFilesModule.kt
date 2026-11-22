@@ -198,11 +198,22 @@ class BackupFilesModule(private val ctx: ReactApplicationContext) : ReactContext
       val map = Arguments.createMap()
       map.putInt("handle", id)
       map.putDouble("size", channel.size().toDouble())
+      // The file's display name, for the imports list (Story 9.8). The provider may not have one.
+      map.putString("name", displayNameOf(Uri.parse(uri)))
       promise.resolve(map)
     } catch (e: Exception) {
       promise.reject("E_OPEN", e.message, e)
     }
   }
+
+  private fun displayNameOf(uri: Uri): String? =
+    try {
+      ctx.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+        if (c.moveToFirst()) c.getString(0) else null
+      }
+    } catch (e: Exception) {
+      null
+    }
 
   @ReactMethod
   fun readAt(handle: Int, offset: Double, length: Int, promise: Promise) {

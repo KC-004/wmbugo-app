@@ -1,5 +1,5 @@
 import { memoryFiles, rnfsModule } from '../../testing/memoryRnfs';
-import { IMPORTS_DIR, rnRawFileStore } from './rnRawFileStore';
+import { IMPORTS_DIR, rnRawFileStore, sweepImportOrphans } from './rnRawFileStore';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.mock factories cannot use import
 jest.mock('@dr.pogodin/react-native-fs', () => require('../../testing/memoryRnfs').rnfsModule);
@@ -67,5 +67,22 @@ describe('the raw copy of an imported file (Story 9.7)', () => {
     backup.openEncryptedPhoto.mockResolvedValueOnce({ write: async () => Promise.reject(new Error('disk full')), close: async () => undefined, abort });
     await expect(rnRawFileStore.save('import-c.enc', new Uint8Array([1]))).rejects.toThrow('disk full');
     expect(abort).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('the orphan sweep (Story 9.8)', () => {
+  it('deletes copies no import row refers to and keeps the ones that are referenced', async () => {
+    const kept = await rnRawFileStore.save('import-kept.enc', new Uint8Array([1]));
+    const orphan = await rnRawFileStore.save('import-orphan.enc', new Uint8Array([2]));
+    const db = { query: jest.fn(async () => [[kept]]) };
+    expect(await sweepImportOrphans(db)).toBe(1);
+    expect(await rnfsModule.exists(kept)).toBe(true);
+    expect(await rnfsModule.exists(orphan)).toBe(false);
+  });
+
+  it('with no imports folder there is nothing to do and the database is not asked', async () => {
+    const db = { query: jest.fn(async () => []) };
+    expect(await sweepImportOrphans(db)).toBe(0);
+    expect(db.query).not.toHaveBeenCalled();
   });
 });

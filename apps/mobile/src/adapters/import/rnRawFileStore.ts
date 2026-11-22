@@ -1,5 +1,5 @@
 import * as RNFS from '@dr.pogodin/react-native-fs';
-import type { RawFileStore } from '@wmbugo/core';
+import type { RawFileStore, SqlDatabase } from '@wmbugo/core';
 import { openEncryptedPhoto, streamDecrypted } from '../backup/backupFiles';
 import { PRIVATE_DIR } from '../files/rnFileStore';
 import { keychainKeyStore } from '../storage/keychainKeyStore';
@@ -13,6 +13,25 @@ async function deviceKey(): Promise<string> {
   const k = await keychainKeyStore.getKey();
   if (!k) throw new Error('No key');
   return k;
+}
+
+/** The copies the database still points at. */
+export const RAW_PATHS_SQL = 'SELECT raw_path FROM import_batch WHERE raw_path IS NOT NULL';
+
+/**
+ * Deletes copies no import refers to: the app was killed between writing the encrypted file and committing the import row (AD-9).
+ * Runs at app start only, when no import can be running. Returns how many files it deleted.
+ */
+export async function sweepImportOrphans(db: Pick<SqlDatabase, 'query'>, dir: string = IMPORTS_DIR): Promise<number> {
+  if (!(await RNFS.exists(dir))) return 0;
+  const known = new Set((await db.query(RAW_PATHS_SQL)).map((r) => String(r[0])));
+  let removed = 0;
+  for (const f of await RNFS.readDir(dir)) {
+    if (f.isDirectory() || known.has(f.path)) continue;
+    await RNFS.unlink(f.path).catch(() => undefined);
+    removed += 1;
+  }
+  return removed;
 }
 
 /**

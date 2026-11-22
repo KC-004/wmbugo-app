@@ -144,6 +144,8 @@ export const importBatch = sqliteTable(
     review_count: integer('review_count').notNull().default(0),
     error_count: integer('error_count').notNull().default(0),
     raw_path: text('raw_path'),
+    /** The file's display name as the picker gave it (Story 9.8); shown in the imports list and on an entry's Source line. */
+    file_name: text('file_name'),
     retain_until: integer('retain_until'),
     created_at: integer('created_at').notNull(),
     completed_at: integer('completed_at'),

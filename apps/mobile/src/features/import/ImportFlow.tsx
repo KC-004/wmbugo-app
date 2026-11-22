@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { ImportSummary } from '@wmbugo/core';
 import { copy } from '../../shared/copy';
+import { useToast } from '../../shared/feedback/ToastHost';
 import { useTheme } from '../../shared/theme/ThemeProvider';
 import { radii } from '../../shared/theme/tokens';
 import { textStyle } from '../../shared/theme/typography';
@@ -17,6 +18,7 @@ import type { ImportDraft } from './importModel';
  */
 export function ImportFlow({ api = realImportApi, locale = 'en', onExit, onReview, onBusyChange }: { api?: ImportApi; locale?: string; onExit: () => void; onReview?: () => void; onBusyChange?: (busy: boolean) => void }) {
   const theme = useTheme();
+  const toast = useToast();
   const [draft, setDraft] = useState<ImportDraft | null>(null);
   const [interrupted, setInterrupted] = useState<ImportSummary | null>(null);
   const [resuming, setResuming] = useState<string | null>(null);
@@ -48,6 +50,17 @@ export function ImportFlow({ api = realImportApi, locale = 'en', onExit, onRevie
           <View style={styles.actions}>
             <Button label={copy.csvImport.resume} testID="import-interrupted-resume" onPress={() => setResuming(interrupted.batchId)} />
             <Button label={copy.csvImport.notNow} variant="text" testID="import-interrupted-dismiss" onPress={() => setInterrupted(null)} />
+            <Button
+              label={copy.csvImport.discard}
+              variant="text"
+              testID="import-interrupted-discard"
+              onPress={() =>
+                void api
+                  .discard(interrupted.batchId)
+                  .catch(() => false)
+                  .then((ok) => (ok ? setInterrupted(null) : toast.show({ message: copy.csvImport.discardFailed })))
+              }
+            />
           </View>
         </View>
       ) : null}

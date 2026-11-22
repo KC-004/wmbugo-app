@@ -74,6 +74,7 @@ function fakeRun(plan: ImportPlan | null, over: Partial<RunApi> = {}): RunApi & 
     paused: jest.fn(async () => null),
     resume: jest.fn(async () => ({ ok: true as const, value: summary() })),
     saveRows: jest.fn(async () => true),
+    discard: jest.fn(async () => true),
     ...over,
   } as never;
 }
@@ -251,5 +252,19 @@ describe('an interrupted import (Story 9.7)', () => {
     const none = await mount((p) => <ImportFlow api={flowApi(null)} onExit={p.onDone} />);
     expect(has(none.r, 'import-interrupted')).toBe(false);
     expect(has(none.r, 'import-choose')).toBe(true);
+  });
+
+  it('Discard on the interrupted card gives the import up, and a failure says so', async () => {
+    const api = flowApi(summary({ status: 'paused', imported: 10, skipped: 0 }));
+    const m = await mount((p) => <ImportFlow api={api} onExit={p.onDone} />);
+    await press(m.r, 'import-interrupted-discard');
+    expect(api.discard).toHaveBeenCalledWith('b1');
+    expect(has(m.r, 'import-interrupted')).toBe(false);
+    const bad = flowApi(summary({ status: 'paused' }));
+    (bad.discard as jest.Mock).mockResolvedValueOnce(false);
+    const f = await mount((p) => <ImportFlow api={bad} onExit={p.onDone} />);
+    await press(f.r, 'import-interrupted-discard');
+    expect(has(f.r, 'import-interrupted')).toBe(true);
+    expect(texts(f.r)).toContain("The import couldn't be discarded.");
   });
 });

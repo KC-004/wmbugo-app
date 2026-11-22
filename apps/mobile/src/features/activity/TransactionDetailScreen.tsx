@@ -385,7 +385,9 @@ export function TransactionDetailScreen({
             <Text style={[textStyle('label'), muted]}>{copy.detail.source}</Text>
             {data.sources.map((src, i) => (
               <Text key={i} style={[textStyle('body'), ink]}>
-                {sourceLine(src.kind, whenText(src.atMs, d.timezoneId))}
+                {src.fileRow
+                  ? (src.fileName ? copy.csvImport.sourceLine.replace('{file}', src.fileName) : copy.csvImport.sourceLineNoFile).replace('{n}', String(src.fileRow))
+                  : sourceLine(src.kind, whenText(src.atMs, d.timezoneId))}
               </Text>
             ))}
             {data.sources.find((src) => src.kind !== 'manual' && src.reference) ? (

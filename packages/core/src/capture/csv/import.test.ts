@@ -16,6 +16,9 @@ import { actionFor, ImportCsvBatch, PauseInterruptedImports, type ImportBatchInp
 import { guessMapping } from './mapping';
 import { entriesToImport, planImportFile, readImport, resumeCsvImport, runCsvImport, type ImportJob, type RawFileStore, type RunImportDeps } from './runImport';
 import { readCsv } from './read';
+import { cleanFileName, DeleteImportFile, DiscardImport, listImports, retainDaysFor, retainUntilFor, SetImportRetention } from './importFiles';
+import { PurgeExpired } from '../../ledger/purge';
+import { parseSettings, SETTINGS_SQL } from '../../profile/settings';
 import type { CsvAccountChoice, CsvProfile } from './rows';
 
 const NOW = Date.UTC(2026, 10, 25, 10, 0, 0);
@@ -415,5 +418,136 @@ describe('the plan the wizard shows (Story 9.7)', () => {
     const again = await planImportFile(s.deps(), j);
     expect(again!.rows.map((r) => r.class)).toEqual(['already_recorded', 'error']);
     expect(entriesToImport(again!.rows, {})).toBe(0);
+  });
+});
+
+describe('keeping and deleting imported files (Story 9.8)', () => {
+  const DAY = 86_400_000;
+  const text = `${HEAD}20/10/2026,Tesco,-12.50,R1,\n21/10/2026,Boots,-3.00,R2,\n`;
+
+  async function imported(over: Partial<RunImportDeps> = {}, name: string | null = '/storage/emulated/0/Download/statement-nov.csv') {
+    const s = await setup();
+    const acc = await s.add('Monzo Current', 'bank');
+    const done = await runCsvImport(s.deps(over), { ...job(text, { kind: 'single', accountId: acc }), fileName: name });
+    if (!done.ok) throw new Error(done.code);
+    return { s, acc, id: done.value.batchId };
+  }
+  const row = async (s: Awaited<ReturnType<typeof setup>>, id: string) => (await s.db.query('SELECT raw_path, retain_until, completed_at, file_name, status FROM import_batch WHERE id = ?', [id]))[0]!;
+
+  it('the default keeps the copy 30 days: still there at 29, gone at 31, and the row, the entries and the fingerprints stay', async () => {
+    const { s, acc, id } = await imported();
+    const [raw, until, completed] = await row(s, id);
+    expect(raw).not.toBeNull();
+    expect(until).toBe(Number(completed) + 30 * DAY);
+    s.clock.advance(29 * DAY);
+    const early = await s.writer.run(PurgeExpired, {}, 'system');
+    expect(early.ok && early.value.importFiles).toEqual([]);
+    expect((await row(s, id))[0]).not.toBeNull();
+    s.clock.advance(2 * DAY);
+    const late = await s.writer.run(PurgeExpired, {}, 'system');
+    expect(late.ok && late.value.importFiles).toEqual([String(raw)]);
+    expect((await row(s, id))[0]).toBeNull();
+    expect(await s.db.query('SELECT COUNT(*) FROM import_batch')).toEqual([[1]]);
+    expect(await s.db.query('SELECT COUNT(*) FROM source_record WHERE import_batch_id = ?', [id])).toEqual([[2]]);
+    // the same file again is still recognised
+    const again = await planImportFile(s.deps(), job(text, { kind: 'single', accountId: acc }));
+    expect(again!.rows.map((r) => r.class)).toEqual(['already_recorded', 'already_recorded']);
+  });
+
+  it('Deleted after import removes the copy right after the completing commit and clears raw_path', async () => {
+    const files = new MemFiles();
+    const { s, id } = await imported({ retainDays: 0, files });
+    expect((await row(s, id))[0]).toBeNull();
+    expect(files.files.size).toBe(0);
+  });
+
+  it('a paused import keeps its copy whatever the setting, because Resume needs it', async () => {
+    const s = await setup();
+    const acc = await s.add('Monzo Current', 'bank');
+    const files = new MemFiles();
+    let calls = 0;
+    const r = await runCsvImport(s.deps({ retainDays: 0, files, batchRows: 1, isCancelled: () => ++calls > 1 }), job(text, { kind: 'single', accountId: acc }));
+    if (!r.ok) throw new Error(r.code);
+    expect(r.value.status).toBe('paused');
+    expect(files.files.size).toBe(1);
+    expect((await row(s, r.value.batchId))[0]).not.toBeNull();
+  });
+
+  it('Keep until I delete them never expires; a null expiry survives the daily purge', async () => {
+    const { s, id } = await imported({ retainDays: null });
+    expect((await row(s, id))[1]).toBeNull();
+    s.clock.advance(400 * DAY);
+    const purged = await s.writer.run(PurgeExpired, {}, 'system');
+    expect(purged.ok && purged.value.importFiles).toEqual([]);
+    expect((await row(s, id))[0]).not.toBeNull();
+  });
+
+  it('changing the choice applies to finished imports from now: each expiry is worked out again from when it completed', async () => {
+    const { s, id } = await imported();
+    const keep = await s.writer.run(SetImportRetention, { choice: 'keep' }, 'user');
+    expect(keep.ok && keep.value.paths).toEqual([]);
+    expect((await row(s, id))[1]).toBeNull();
+    const thirty = await s.writer.run(SetImportRetention, { choice: 'days_30' }, 'user');
+    expect(thirty.ok && thirty.value.paths).toEqual([]);
+    const [, until, completed] = await row(s, id);
+    expect(until).toBe(Number(completed) + 30 * DAY);
+    const raw = String((await row(s, id))[0]);
+    const now = await s.writer.run(SetImportRetention, { choice: 'delete_after' }, 'user');
+    expect(now.ok && now.value.paths).toEqual([raw]);
+    expect((await row(s, id))[0]).toBeNull();
+    expect(parseSettings(await s.db.query(SETTINGS_SQL)).importRetention).toBe('delete_after');
+  });
+
+  it('only the three choices are accepted', async () => {
+    const { s } = await imported();
+    const bad = await s.writer.run(SetImportRetention, { choice: 'forever' as never }, 'user');
+    expect(bad.ok).toBe(false);
+  });
+
+  it("Delete file now removes a finished import's copy once; a repeat and an unknown import are refused", async () => {
+    const { s, id } = await imported();
+    const raw = String((await row(s, id))[0]);
+    const del = await s.writer.run(DeleteImportFile, { batchId: id }, 'user');
+    expect(del.ok && del.value.path).toBe(raw);
+    const again = await s.writer.run(DeleteImportFile, { batchId: id }, 'user');
+    expect(!again.ok && again.code).toBe('NO_FILE');
+    const missing = await s.writer.run(DeleteImportFile, { batchId: 'nope' }, 'user');
+    expect(!missing.ok && missing.code).toBe('IMPORT_NOT_FOUND');
+    expect(await s.db.query('SELECT COUNT(*) FROM "transaction"')).toEqual([[2]]);
+  });
+
+  it('Discard gives up a paused import: it is abandoned, its copy is released and the entries already added stay', async () => {
+    const s = await setup();
+    const acc = await s.add('Monzo Current', 'bank');
+    let calls = 0;
+    const r = await runCsvImport(s.deps({ batchRows: 1, isCancelled: () => ++calls > 1 }), job(text, { kind: 'single', accountId: acc }));
+    if (!r.ok) throw new Error(r.code);
+    const refused = await s.writer.run(DeleteImportFile, { batchId: r.value.batchId }, 'user');
+    expect(!refused.ok && refused.code).toBe('IMPORT_IN_PROGRESS');
+    const d = await s.writer.run(DiscardImport, { batchId: r.value.batchId }, 'user');
+    expect(d.ok && d.value.path).not.toBeNull();
+    expect((await row(s, r.value.batchId))[4]).toBe('abandoned');
+    expect((await row(s, r.value.batchId))[0]).toBeNull();
+    expect(await s.db.query('SELECT COUNT(*) FROM "transaction"')).toEqual([[1]]);
+  });
+
+  it('the list shows each import with its clean file name, how many entries, and whether a copy is kept until when', async () => {
+    const { s } = await imported();
+    const list = await listImports(s.db);
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ fileName: 'statement-nov.csv', status: 'completed', entries: 2, hasFile: true });
+    expect(list[0]!.keptUntil).toBe(list[0]!.completedAt! + 30 * DAY);
+  });
+
+  it('file names lose folders and control characters, and an empty one is nothing', () => {
+    expect(cleanFileName('/a/b/statement.csv')).toBe('statement.csv');
+    expect(cleanFileName('C:\\x\\y.csv')).toBe('y.csv');
+    expect(cleanFileName('  \u0001\u0002 ')).toBeNull();
+    expect(cleanFileName(null)).toBeNull();
+    expect(cleanFileName('x'.repeat(300))!.length).toBe(120);
+    expect(retainDaysFor('delete_after')).toBe(0);
+    expect(retainDaysFor('days_30')).toBe(30);
+    expect(retainDaysFor('keep')).toBeNull();
+    expect(retainUntilFor('days_30', 1000)).toBe(1000 + 30 * DAY);
   });
 });

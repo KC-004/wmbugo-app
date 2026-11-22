@@ -1,0 +1,1 @@
+ALTER TABLE `import_batch` ADD `file_name` text;

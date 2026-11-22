@@ -123,6 +123,7 @@ export function check(read: CsvReadResult, mapping: CsvMapping, profile: CsvProf
 /** Everything the next screens (Story 9.7) need from the wizard. */
 export interface ImportDraft {
   readonly bytes: Uint8Array;
+  readonly fileName?: string | null;
   readonly read: CsvReadResult;
   readonly mapping: CsvMapping;
   readonly choice: CsvAccountChoice;

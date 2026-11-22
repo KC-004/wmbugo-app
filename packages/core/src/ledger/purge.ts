@@ -4,6 +4,7 @@ import { sha256Hex } from '../shared/sha256';
 import type { UseCase, WriterContext } from '../writer/ledgerWriter';
 import { normalizeMerchant } from '../capture/merchant';
 import { attachmentFileName } from '../capture/attachments';
+import { purgeExpiredImportFiles } from '../capture/csv/importFiles';
 import { profileTimezone } from './accountCommands';
 import { REJECTED_KEEP_DAYS } from './activitySearch';
 
@@ -63,6 +64,8 @@ interface Purged {
   readonly purgedIds: string[];
   /** Attachment files to delete once this has committed. */
   readonly fileNames: string[];
+  /** Encrypted copies of imported files whose keeping time has passed (Story 9.8): paths to delete once this has committed. */
+  readonly importFiles?: string[];
 }
 
 /** Removes one removed entry for good and leaves its tombstone. Returns the attachment files to delete after the commit. */
@@ -116,7 +119,8 @@ async function purgeMany(ctx: WriterContext, ids: readonly string[]): Promise<Pu
 export const PurgeExpired: UseCase<Record<string, never>, Purged, never> = {
   name: 'PurgeExpired',
   async execute(ctx) {
-    return ok(await purgeMany(ctx, await expiredIds(ctx, ctx.nowMs())));
+    const purged = await purgeMany(ctx, await expiredIds(ctx, ctx.nowMs()));
+    return ok({ ...purged, importFiles: await purgeExpiredImportFiles(ctx) });
   },
 };
 
@@ -142,7 +146,8 @@ export const RunDailyPurge: UseCase<Record<string, never>, Purged & { ran: boole
     const last = (await ctx.query('SELECT value_json FROM settings WHERE key = ?', [LAST_PURGE_KEY]))[0];
     if (last && JSON.parse(String(last[0])) === today.value) return ok({ ran: false, purgedIds: [], fileNames: [] });
     const purged = await purgeMany(ctx, await expiredIds(ctx, ctx.nowMs()));
+    const importFiles = await purgeExpiredImportFiles(ctx);
     await ctx.execute('INSERT INTO settings (key, value_json, version, updated_at) VALUES (?, ?, 1, ?) ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at', [LAST_PURGE_KEY, JSON.stringify(today.value), ctx.nowMs()]);
-    return ok({ ran: true, ...purged });
+    return ok({ ran: true, ...purged, importFiles });
   },
 };

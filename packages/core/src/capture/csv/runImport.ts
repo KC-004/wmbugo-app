@@ -17,6 +17,7 @@ import {
   type RowDecision,
 } from './import';
 import type { CsvMapping } from './mapping';
+import { cleanFileName, DropImportRawCopy } from './importFiles';
 import { planCsvImport, type ImportPlan, type PlannedRow } from './plan';
 import { loadImportPlanContext } from './planContext';
 import { readCsv, type CsvReadOptions } from './read';
@@ -47,7 +48,7 @@ export interface RunImportDeps {
   readonly isCancelled?: () => boolean;
   /** Rows committed so far and rows in all. */
   readonly onProgress?: (done: number, total: number) => void;
-  /** How long the raw copy is kept, in days (30 by default); null keeps it until the person deletes it. */
+  /** How long the raw copy is kept, in days (30 by default); 0 deletes it right after the import completes; null keeps it until the person deletes it. */
   readonly retainDays?: number | null;
   /** Rows per batch, at most 500 (a smaller number lets a test cut an import short at many points). */
   readonly batchRows?: number;
@@ -64,6 +65,8 @@ export interface ImportJob {
   readonly formatId?: string | null;
   /** The person's per-row choices, by file row. Rows not listed take their class's default. */
   readonly decisions: Readonly<Record<number, RowDecision>>;
+  /** The file's display name from the picker (Story 9.8). */
+  readonly fileName?: string | null;
 }
 
 export interface ImportSummary {
@@ -140,6 +143,11 @@ async function commitBatches(deps: RunImportDeps, batchId: string, rows: readonl
   }
   const fin = await deps.writer.run(FinishCsvImport, { batchId, status: 'completed' }, 'user');
   if (!fin.ok) return err('IMPORT_FAILED');
+  // `Deleted after import`: the copy goes after the completing commit. A failure here leaves an expired copy that the daily purge removes.
+  if (deps.retainDays === 0) {
+    const dropped = await deps.writer.run(DropImportRawCopy, { batchId }, 'user');
+    if (dropped.ok && dropped.value.path) await deps.files.remove(dropped.value.path).catch(() => undefined);
+  }
   return readSummary(deps, batchId);
 }
 
@@ -209,6 +217,7 @@ export async function runCsvImport(deps: RunImportDeps, job: ImportJob): Promise
       accountId: job.account.kind === 'single' ? job.account.accountId : null,
       rowCount: plan.rows.length,
       rawPath,
+      fileName: cleanFileName(job.fileName),
       retainUntil: retain === null ? null : deps.nowMs() + retain * DAY_MS,
     },
     'user',

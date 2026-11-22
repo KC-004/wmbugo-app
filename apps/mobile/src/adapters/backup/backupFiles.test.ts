@@ -98,11 +98,12 @@ describe('the bank file picker (Story 9.6)', () => {
 
   it('reads the whole file in pieces and closes it', async () => {
     native.pickCsvDocument.mockResolvedValue('content://doc/2');
-    native.openRead.mockResolvedValue({ handle: 4, size: 3 });
+    native.openRead.mockResolvedValue({ handle: 4, size: 3, name: 'statement-nov.csv' });
     native.readAt.mockResolvedValue('AQID');
     const r = (await pickCsvFile(100))!;
     expect(Array.from(r.bytes)).toEqual([1, 2, 3]);
     expect(r.size).toBe(3);
+    expect(r.name).toBe('statement-nov.csv');
     expect(native.closeRead).toHaveBeenCalledWith(4);
   });
 

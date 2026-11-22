@@ -33,6 +33,7 @@ import migrations from '../../drizzle/migrations';
 import { installCrashHandlers } from './crashHandlers';
 import { refreshPermissionViews } from './permissions';
 import { sweepStaging } from './backup/rnBackupPlatform';
+import { rnRawFileStore, sweepImportOrphans } from './import/rnRawFileStore';
 import { localToday, scheduleIntegrityChecks } from './safeMode';
 import { useSafeModeStore } from '../shared/state/safeModeStore';
 import { interruptedEraseDeps } from './backup/rnErase';
@@ -256,6 +257,8 @@ async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
   appStateScheduler.onStartOrResume(async () => {
     const r = await writer.run(RunDailyPurge, {}, 'system');
     if (r.ok) for (const name of r.value.fileNames) await realReceiptFiles.remove(name.replace(/\.enc$/, ''));
+    // Encrypted copies of imported files past their keeping time (Story 9.8); the rows that held them were cleared in the commit.
+    if (r.ok) for (const path of r.value.importFiles ?? []) await rnRawFileStore.remove(path).catch(() => undefined);
   });
   // Bill reminders are scheduled again at start and whenever the app comes back (Story 6.5): the window moves with the day.
   appStateScheduler.onStartOrResume(() => syncReminders().catch(() => log.warn('bills.reminder_sync_threw')));
@@ -272,6 +275,8 @@ async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
   // A backup or restore that was interrupted leaves staging behind: it is swept at every start (Story 8.7). Not after a restore that
   // just held: its journal is already gone and nothing is in staging.
   void sweepStaging().catch(() => undefined);
+  // A copy of an imported file that no import refers to (killed between the file write and the import row) is deleted (Story 9.8).
+  void sweepImportOrphans(started.value.db).catch(() => undefined);
   // An import the app was killed in the middle of is marked paused, so it can be resumed from the row after its last committed batch
   // (Story 9.7). Only at start: on a resume the app may be running one.
   void writer.run(PauseInterruptedImports, {}, 'system').catch(() => undefined);

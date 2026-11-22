@@ -29,6 +29,10 @@ export const SETTING_LOCK_AFTER = 'device.lock_after';
 /** The Home card layout (Story 5.6): a list of `{cardId, hidden, size}` in display order, or null for the PRD order. */
 export const SETTING_HOME_LAYOUT = 'ui.home_layout';
 export const SETTING_THEME_KEY = 'theme';
+/** How long the encrypted copy of an imported bank file is kept (Story 9.8): profile-owned, so a restore brings the choice back. */
+export const SETTING_IMPORT_RETENTION = 'import.raw_retention';
+export type ImportRetention = 'delete_after' | 'days_30' | 'keep';
+export const IMPORT_RETENTION_CHOICES: readonly ImportRetention[] = ['delete_after', 'days_30', 'keep'];
 
 export type LockAfter = 'immediately' | '1m' | '5m' | '15m';
 export const LOCK_AFTER_CHOICES: readonly LockAfter[] = ['immediately', '1m', '5m', '15m'];
@@ -60,6 +64,7 @@ export interface AppSettings {
   readonly notificationDetail: 'full' | 'hidden';
   readonly fullNotificationsOptIn: boolean;
   readonly homeLayout: readonly HomeLayoutEntry[] | null;
+  readonly importRetention: ImportRetention;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -80,6 +85,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   notificationDetail: 'full',
   fullNotificationsOptIn: false,
   homeLayout: null,
+  importRetention: 'days_30',
 };
 
 export const SETTINGS_SQL = 'SELECT key, value_json FROM settings';
@@ -109,6 +115,8 @@ export function validateSetting(key: string, value: unknown): { ok: true; value:
       return oneOf(LOCK_AFTER_CHOICES);
     case SETTING_NOTIFICATION_DETAIL:
       return oneOf(NOTIFICATION_DETAIL_CHOICES);
+    case SETTING_IMPORT_RETENTION:
+      return oneOf(IMPORT_RETENTION_CHOICES);
     case SETTING_LAST_BACKUP_AT:
       return value === null || (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) ? { ok: true, value } : { ok: false };
     case SETTING_HOME_LAYOUT:
@@ -153,6 +161,7 @@ export function parseSettings(rows: readonly (readonly unknown[])[]): AppSetting
     notificationDetail: pick(SETTING_NOTIFICATION_DETAIL, DEFAULT_SETTINGS.notificationDetail),
     fullNotificationsOptIn: pick(SETTING_FULL_NOTIFICATIONS_OPT_IN, DEFAULT_SETTINGS.fullNotificationsOptIn),
     homeLayout: pick<readonly HomeLayoutEntry[] | null>(SETTING_HOME_LAYOUT, null),
+    importRetention: pick(SETTING_IMPORT_RETENTION, DEFAULT_SETTINGS.importRetention),
   };
 }
 

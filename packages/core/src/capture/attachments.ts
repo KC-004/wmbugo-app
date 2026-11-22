@@ -35,16 +35,25 @@ export function orphanFiles(fileNames: readonly string[], referencedIds: Readonl
 }
 
 /** Every source of an entry with its kind and time. Param: transaction id. */
-export const SOURCES_SQL = 'SELECT source_kind, created_at, reference FROM source_record WHERE transaction_id = ? ORDER BY created_at, id';
+export const SOURCES_SQL =
+  'SELECT s.source_kind, s.created_at, s.reference, b.file_name, s.file_row FROM source_record s LEFT JOIN import_batch b ON b.id = s.import_batch_id WHERE s.transaction_id = ? ORDER BY s.created_at, s.id';
 
 export interface SourceLine {
   readonly kind: string;
   readonly atMs: number;
   readonly reference: string | null;
+  /** For a CSV import (Story 9.8): the file's name, when it has one, and the row in it. */
+  readonly fileName?: string | null;
+  readonly fileRow?: number | null;
 }
 
 export function mapSources(rows: readonly (readonly unknown[])[]): SourceLine[] {
-  return rows.map((r) => ({ kind: String(r[0]), atMs: Number(r[1]), reference: r[2] === null ? null : String(r[2]) }));
+  return rows.map((r) => ({
+    kind: String(r[0]),
+    atMs: Number(r[1]),
+    reference: r[2] === null ? null : String(r[2]),
+    ...(r[4] !== null && r[4] !== undefined ? { fileName: r[3] === null || r[3] === undefined ? null : String(r[3]), fileRow: Number(r[4]) } : {}),
+  }));
 }
 
 export type AttachError = 'ENTRY_NOT_FOUND' | 'ENTRY_REMOVED' | 'ALREADY_ATTACHED' | 'DIGEST_INVALID' | 'SIZE_INVALID';

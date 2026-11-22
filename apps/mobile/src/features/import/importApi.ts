@@ -8,6 +8,10 @@ import {
   resumeCsvImport,
   runCsvImport,
   SaveCsvFormat,
+  DiscardImport,
+  parseSettings,
+  retainDaysFor,
+  SETTINGS_SQL,
   type CsvOverrides,
   type CsvReadOptions,
   type CsvReadResult,
@@ -39,6 +43,8 @@ export interface PickedCsv {
   readonly bytes: Uint8Array;
   /** The file's size; over the limit `bytes` is empty and the wizard says the file is too large. */
   readonly size: number;
+  /** The file's display name as the system picker gave it, when it has one. */
+  readonly name?: string | null;
 }
 
 /** The wizard's only doors to the phone: the picker, the profile and accounts, and the saved layouts. */
@@ -63,6 +69,8 @@ export interface RunApi {
   /** The import the app was closed in the middle of, if any. */
   paused(): Promise<ImportSummary | null>;
   resume(batchId: string, hooks: RunHooks): Promise<Result<ImportSummary, RunImportError>>;
+  /** Gives up a paused import: it is abandoned and its copy is deleted. The entries already added stay. */
+  discard(batchId: string): Promise<boolean>;
   /** Saves text as a file the person picks the place for (UTF-8 with a byte order mark so a spreadsheet opens it right). False when cancelled or failed. */
   saveRows(csv: string): Promise<boolean>;
 }
@@ -82,6 +90,8 @@ async function deps(hooks?: RunHooks) {
     crypto: createRnCrypto(),
     nowMs: () => Date.now(),
     profile: { currency: p.currency, timezoneId: p.timezoneId },
+    // How long the copy is kept is the person's choice (Story 9.8): 0 deletes it right after the import completes.
+    retainDays: retainDaysFor(parseSettings(await s.db.query(SETTINGS_SQL)).importRetention),
     ...(hooks ? { isCancelled: hooks.isCancelled, onProgress: hooks.onProgress } : {}),
   };
 }
@@ -103,7 +113,7 @@ export const realImportApi: ImportApi = {
     return planImportFile(await deps(), { bytes: draft.bytes, overrides: toReadOptions(draft.overrides), mapping: draft.mapping, account: draft.choice });
   },
   async run(draft, decisions, hooks) {
-    return runCsvImport(await deps(hooks), { bytes: draft.bytes, overrides: toReadOptions(draft.overrides), mapping: draft.mapping, account: draft.choice, decisions });
+    return runCsvImport(await deps(hooks), { bytes: draft.bytes, overrides: toReadOptions(draft.overrides), mapping: draft.mapping, account: draft.choice, decisions, fileName: draft.fileName ?? null });
   },
   async paused() {
     const rows = await getServices().db.query("SELECT id FROM import_batch WHERE status = 'paused' ORDER BY created_at DESC LIMIT 1");
@@ -112,6 +122,12 @@ export const realImportApi: ImportApi = {
   },
   async resume(batchId, hooks) {
     return resumeCsvImport(await deps(hooks), batchId);
+  },
+  async discard(batchId) {
+    const r = await getServices().writer.run(DiscardImport, { batchId }, 'user');
+    if (!r.ok) return false;
+    if (r.value.path) await rnRawFileStore.remove(r.value.path).catch(() => undefined);
+    return true;
   },
   async saveRows(csv) {
     const doc = await createTextDocument('wmbugo-rows-not-imported.csv');

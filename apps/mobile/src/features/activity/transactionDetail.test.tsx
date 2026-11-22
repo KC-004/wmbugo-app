@@ -481,6 +481,18 @@ describe('receipt photos and sources on the detail (Story 3.11)', () => {
     expect(t).toContain('As recorded: SWIGGY*BLR 8821');
     m.unmount();
   });
+
+  it('an imported entry names its file and row: CSV import · statement-nov.csv · row 57 (Story 9.8)', async () => {
+    const at = Date.UTC(2026, 10, 7, 15, 42);
+    const m = await mountDetail(
+      detail({ sourceKind: 'csv' }),
+      apiWith({}, { sources: [{ kind: 'csv', atMs: at, reference: null, fileName: 'statement-nov.csv', fileRow: 57 }, { kind: 'csv', atMs: at, reference: null, fileName: null, fileRow: 3 }] }),
+    );
+    const t = texts(m.r);
+    expect(t).toContain('CSV import · statement-nov.csv · row 57');
+    expect(t).toContain('CSV import · row 3');
+    m.unmount();
+  });
 });
 
 describe('suggested categories are always overridable (Story 4.4)', () => {

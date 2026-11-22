@@ -20,6 +20,7 @@ type Phase = 'choose' | 'reading' | 'columns' | 'preview';
 
 interface Loaded {
   readonly bytes: Uint8Array;
+  readonly name: string | null;
   readonly read: CsvReadResult;
   readonly overrides: ReadOverrides;
 }
@@ -175,7 +176,7 @@ export function ImportWizard({ api = realImportApi, onContinue, onBusyChange }: 
       }
       if (!mounted.current) return;
       setCtx(c);
-      setLoaded({ bytes: picked.bytes, read: read.value, overrides });
+      setLoaded({ bytes: picked.bytes, name: picked.name ?? null, read: read.value, overrides });
       setSaved(match);
       setRemember(false);
       setShowBlock(false);
@@ -284,7 +285,7 @@ export function ImportWizard({ api = realImportApi, onContinue, onBusyChange }: 
         .saveFormat({ name: accountName ?? copy.csvImport.title, headerSignature: signatureOf(loaded.read), mapping, overrides: overridesOf(loaded.read), account: finalChoice })
         .catch(() => undefined);
     }
-    onContinue({ bytes: loaded.bytes, read: loaded.read, mapping, choice: finalChoice, overrides: overridesOf(loaded.read), validation: checked.validation });
+    onContinue({ bytes: loaded.bytes, fileName: loaded.name, read: loaded.read, mapping, choice: finalChoice, overrides: overridesOf(loaded.read), validation: checked.validation });
   };
 
   const back = () => {

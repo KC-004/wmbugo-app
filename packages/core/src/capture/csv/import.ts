@@ -87,6 +87,8 @@ export interface StartCsvImportInput {
   readonly rowCount: number;
   readonly rawPath: string | null;
   readonly retainUntil: number | null;
+  /** The file's display name (Story 9.8), already cleaned. */
+  readonly fileName?: string | null;
 }
 
 /** Creates the `import_batch` row, after the raw copy is safely on disk (AD-9). */
@@ -96,8 +98,8 @@ export const StartCsvImport: UseCase<StartCsvImportInput, { batchId: string }, '
     if (!/^[0-9a-f]{64}$/.test(input.fileDigest) || !Number.isSafeInteger(input.rowCount) || input.rowCount < 0) return err('IMPORT_INVALID');
     const id = ctx.newId();
     await ctx.execute(
-      "INSERT INTO import_batch (id, file_digest, format_id, mapping_json, account_id, status, row_count, raw_path, retain_until, created_at) VALUES (?, ?, ?, ?, ?, 'importing', ?, ?, ?, ?)",
-      [id, input.fileDigest, input.formatId ?? null, JSON.stringify(input.resume), input.accountId ?? null, input.rowCount, input.rawPath, input.retainUntil, ctx.nowMs()],
+      "INSERT INTO import_batch (id, file_digest, format_id, mapping_json, account_id, status, row_count, raw_path, file_name, retain_until, created_at) VALUES (?, ?, ?, ?, ?, 'importing', ?, ?, ?, ?, ?)",
+      [id, input.fileDigest, input.formatId ?? null, JSON.stringify(input.resume), input.accountId ?? null, input.rowCount, input.rawPath, input.fileName ?? null, input.retainUntil, ctx.nowMs()],
     );
     ctx.touch('import_batch', id, { created: true });
     ctx.emit('ImportsChanged', { batchIds: [id] });

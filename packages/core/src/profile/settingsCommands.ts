@@ -8,7 +8,7 @@ import { planPaydayChange } from './period';
 import { rebuildPeriods } from '../planning/budgetStore';
 import type { Region } from './regions';
 import { sameHomeLayout, type HomeLayoutEntry } from './homeLayout';
-import { parseSettings, SETTING_APP_LOCK, SETTING_LAST_BACKUP_AT, SETTING_FULL_NOTIFICATIONS_OPT_IN, SETTING_NOTIFICATION_DETAIL, SETTING_DEFAULT_ACCOUNT, SETTING_HIDE_AMOUNTS, SETTING_HOME_LAYOUT, SETTINGS_SQL, validateSetting } from './settings';
+import { parseSettings, SETTING_IMPORT_RETENTION, SETTING_APP_LOCK, SETTING_LAST_BACKUP_AT, SETTING_FULL_NOTIFICATIONS_OPT_IN, SETTING_NOTIFICATION_DETAIL, SETTING_DEFAULT_ACCOUNT, SETTING_HIDE_AMOUNTS, SETTING_HOME_LAYOUT, SETTINGS_SQL, validateSetting } from './settings';
 import { nextLocalDate, offsetMinutes, PROMPT_TIMEZONE, SETTING_TZ_MISMATCH_SINCE, SETTING_TZ_PENDING, TIMEZONE_GAP_MINUTES } from './timezone';
 
 async function upsertSetting(ctx: WriterContext, key: string, value: unknown): Promise<void> {
@@ -33,7 +33,7 @@ export const ChangeSetting: UseCase<{ key: string; value: unknown }, void, 'SETT
   name: 'ChangeSetting',
   async execute(ctx, input) {
     // App lock turns on only after the device prompt succeeds (SetAppLock), never through the generic setting path.
-    if (input.key === SETTING_LAST_BACKUP_AT || input.key === SETTING_APP_LOCK || input.key === SETTING_NOTIFICATION_DETAIL || input.key === SETTING_FULL_NOTIFICATIONS_OPT_IN) return err('SETTING_INVALID');
+    if (input.key === SETTING_IMPORT_RETENTION || input.key === SETTING_LAST_BACKUP_AT || input.key === SETTING_APP_LOCK || input.key === SETTING_NOTIFICATION_DETAIL || input.key === SETTING_FULL_NOTIFICATIONS_OPT_IN) return err('SETTING_INVALID');
     const v = validateSetting(input.key, input.value);
     if (!v.ok) return err('SETTING_INVALID');
     if (input.key === SETTING_DEFAULT_ACCOUNT && v.value !== null) {
