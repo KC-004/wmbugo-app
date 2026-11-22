@@ -4,6 +4,7 @@ import { err, ok, type Result } from '../../shared/result';
 import type { LedgerWriter, UseCase } from '../../writer/ledgerWriter';
 import { toHex } from '../../backup/format';
 import {
+  actionFor,
   FinishCsvImport,
   IMPORT_BATCH_ROWS,
   ImportCsvBatch,
@@ -16,7 +17,7 @@ import {
   type RowDecision,
 } from './import';
 import type { CsvMapping } from './mapping';
-import { planCsvImport, type PlannedRow } from './plan';
+import { planCsvImport, type ImportPlan, type PlannedRow } from './plan';
 import { loadImportPlanContext } from './planContext';
 import { readCsv, type CsvReadOptions } from './read';
 import { validateCsvRows, type CsvAccountChoice, type CsvProfile } from './rows';
@@ -158,12 +159,31 @@ interface ResumePayload {
 const asDecisions = (d: Readonly<Record<string, RowDecision>>): Record<number, RowDecision> => Object.fromEntries(Object.entries(d).map(([k, v]) => [Number(k), v]));
 
 /** Reads, validates and plans the file the same way for a first run and a resume. */
-async function planFile(deps: RunImportDeps, bytes: Uint8Array, digest: string, p: ResumePayload) {
+async function planFile(deps: Pick<RunImportDeps, 'db' | 'profile'>, bytes: Uint8Array, digest: string, p: ResumePayload) {
   const read = readCsv(bytes, p.overrides);
   if (!read.ok) return null;
   const validated = validateCsvRows(read.value.rows, p.mapping, deps.profile, p.account);
   const context = await loadImportPlanContext(deps.db, validated.rows, digest);
   return planCsvImport(validated.rows, context);
+}
+
+/**
+ * The plan the `Check matches` step shows: the very same read, validate and plan the run does, so what the person sees is what is
+ * imported. Nothing is written. Null when the file cannot be read.
+ */
+export async function planImportFile(deps: Pick<RunImportDeps, 'db' | 'crypto' | 'profile'>, job: Pick<ImportJob, 'bytes' | 'overrides' | 'mapping' | 'account'>): Promise<ImportPlan | null> {
+  const digest = toHex(deps.crypto.sha256(job.bytes));
+  return planFile(deps, job.bytes, digest, { overrides: job.overrides, mapping: job.mapping, account: job.account, decisions: {} });
+}
+
+/** How many entries an import will create (confirmed, waiting in the review queue or waiting for an amount) with these choices. */
+export function entriesToImport(rows: readonly PlannedRow[], decisions: Readonly<Record<number, RowDecision>>): number {
+  let n = 0;
+  for (const r of rows) {
+    const k = actionFor({ class: r.class, decision: decisions[r.row], ...(r.matchId ? { matchId: r.matchId } : {}) }).kind;
+    if (k === 'confirm' || k === 'review' || k === 'foreign') n += 1;
+  }
+  return n;
 }
 
 /**

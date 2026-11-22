@@ -13,7 +13,7 @@ import { Button } from '../../shared/ui/Button';
 import { CheckRow } from '../../shared/ui/CheckRow';
 import { Chip } from '../../shared/ui/Chip';
 import { StepperHeader } from '../../shared/ui/StepperHeader';
-import { realImportApi, type ImportApi, type ImportContext } from './importApi';
+import { realImportApi, type ImportContext, type WizardApi } from './importApi';
 import { check, columnNames, guess, needsReread, overridesOf, READ_ERROR_COPY, readWith, sampleOf, type ImportDraft, type ReadOverrides } from './importModel';
 
 type Phase = 'choose' | 'reading' | 'columns' | 'preview';
@@ -111,7 +111,7 @@ function AccountMapper({ values, accounts, choice, onChange }: { values: readonl
  * The import wizard's first three steps (Story 9.6, FLOW-11): choose a file, check the columns, preview. A file whose headings match a
  * saved layout skips the middle step. Nothing is written until the person goes on: `onContinue` hands the draft to the next screens.
  */
-export function ImportWizard({ api = realImportApi, onContinue, onBusyChange }: { api?: ImportApi; onContinue: (draft: ImportDraft) => void; onBusyChange?: (busy: boolean) => void }) {
+export function ImportWizard({ api = realImportApi, onContinue, onBusyChange }: { api?: WizardApi; onContinue: (draft: ImportDraft) => void; onBusyChange?: (busy: boolean) => void }) {
   const theme = useTheme();
   const sheet = useSheet();
   const { fontScale } = useWindowDimensions();

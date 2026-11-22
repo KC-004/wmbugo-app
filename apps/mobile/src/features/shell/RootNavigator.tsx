@@ -184,10 +184,10 @@ function TabsWithAdd() {
 }
 
 function SettingsRoute() {
-  const nav = useNavigation<{ goBack: () => void }>();
+  const nav = useNavigation<{ goBack: () => void; navigate: (name: 'ReviewQueue', params: Record<string, never>) => void }>();
   return (
     <ScreenFrame>
-      <SettingsScreen onBack={() => nav.goBack()} />
+      <SettingsScreen onBack={() => nav.goBack()} onReview={() => nav.navigate('ReviewQueue', {})} />
     </ScreenFrame>
   );
 }

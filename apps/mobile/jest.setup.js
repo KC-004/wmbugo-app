@@ -16,3 +16,9 @@ jest.mock('react-native-libsodium', () => ({ __esModule: true, default: {} }));
 
 // Reads and writes a file in the private directory; the notice host is tested with an injected reader.
 jest.mock('./src/adapters/backup/restoreNotice', () => ({ takeRestoreNotice: async () => null, rememberRestoreNotice: async () => undefined }));
+
+// The file system binding pulls in ESM-only packages; everywhere that does not test file behaviour gets the in-memory stand-in.
+jest.mock('@dr.pogodin/react-native-fs', () => require('./src/testing/memoryRnfs').rnfsModule);
+
+// The keychain binding is native and throws on import; tests that need keys mock `keychainKeyStore` itself.
+jest.mock('react-native-keychain', () => ({ __esModule: true }));

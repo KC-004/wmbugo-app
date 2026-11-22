@@ -7,11 +7,13 @@ import { SheetHost } from '../../shared/feedback/SheetHost';
 import { ToastHost } from '../../shared/feedback/ToastHost';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
 import { ImportWizard } from './ImportWizard';
-import type { ImportApi, ImportContext, PickedCsv } from './importApi';
+import type { ImportContext, PickedCsv, WizardApi } from './importApi';
 import type { ImportDraft } from './importModel';
 
 jest.mock('lottie-react-native', () => ({ __esModule: true, default: () => null }));
 jest.mock('../../adapters/startApp', () => ({ getServices: jest.fn() }));
+jest.mock('../../adapters/import/rnRawFileStore', () => ({ rnRawFileStore: {} }));
+jest.mock('../../adapters/backup/rnCrypto', () => ({ createRnCrypto: jest.fn() }));
 jest.mock('../../adapters/backup/backupFiles', () => ({ pickCsvFile: jest.fn() }));
 
 const live: ReactTestRenderer[] = [];
@@ -45,9 +47,9 @@ const AMBIGUOUS = 'Date,Description,Amount\n03/11/2026,Swiggy,-420.00\n04/11/202
 const ONE: ImportContext = { currency: 'GBP', exponent: 2, locale: 'en-GB', timezoneId: 'Europe/London', accounts: [{ id: 'a1', name: 'Monzo Current' }] };
 const TWO: ImportContext = { ...ONE, accounts: [...ONE.accounts, { id: 'a2', name: 'Amex' }] };
 
-function fakeApi(csv: string | null, over: Partial<ImportApi> = {}, ctx: ImportContext | null = ONE) {
+function fakeApi(csv: string | null, over: Partial<WizardApi> = {}, ctx: ImportContext | null = ONE) {
   const picked: PickedCsv | null = csv === null ? null : { bytes: bytes(csv), size: csv.length };
-  const api: ImportApi = {
+  const api: WizardApi = {
     pick: jest.fn(async () => picked),
     context: jest.fn(async () => ctx),
     savedFormat: jest.fn(async () => null),
@@ -57,7 +59,7 @@ function fakeApi(csv: string | null, over: Partial<ImportApi> = {}, ctx: ImportC
   return api;
 }
 
-async function mount(api: ImportApi) {
+async function mount(api: WizardApi) {
   const onContinue = jest.fn<void, [ImportDraft]>();
   const onBusyChange = jest.fn<void, [boolean]>();
   const qc = createQueryClient();

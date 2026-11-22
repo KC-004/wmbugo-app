@@ -14,7 +14,7 @@ import { entryShape, RemoveEntry } from '../../ledger/entryCommands';
 import { SubmitCapture } from '../submitCapture';
 import { actionFor, ImportCsvBatch, PauseInterruptedImports, type ImportBatchInput, type ImportBatchResult, type ImportBatchError, type RowDecision } from './import';
 import { guessMapping } from './mapping';
-import { readImport, resumeCsvImport, runCsvImport, type ImportJob, type RawFileStore, type RunImportDeps } from './runImport';
+import { entriesToImport, planImportFile, readImport, resumeCsvImport, runCsvImport, type ImportJob, type RawFileStore, type RunImportDeps } from './runImport';
 import { readCsv } from './read';
 import type { CsvAccountChoice, CsvProfile } from './rows';
 
@@ -371,5 +371,49 @@ describe('interruption, resume and idempotency (Story 9.4, NFR-12)', () => {
     const tooMany = Array.from({ length: 501 }, (_, i) => ({ row: i + 2, class: 'error' as const, candidate: null, fingerprint: null }));
     const r = await writer.run(ImportCsvBatch, { batchId: 'whatever', rows: tooMany, throughRow: 502 }, 'user');
     expect(r).toMatchObject({ ok: false });
+  });
+});
+
+describe('the plan the wizard shows (Story 9.7)', () => {
+  it('is the plan the run uses: counting what will be created matches what the run creates', async () => {
+    const s = await setup();
+    const acc = await s.add('Monzo Current', 'bank');
+    const text = `${HEAD}20/10/2026,Tesco,-12.50,R1,
+21/10/2026,Boots,-3.00,R2,
+22/10/2026,Salary,2000.00,R3,
+`;
+    const j = job(text, { kind: 'single', accountId: acc });
+    const plan = await planImportFile(s.deps(), j);
+    expect(plan!.rows.map((r) => r.class)).toEqual(['new', 'new', 'new']);
+    expect(entriesToImport(plan!.rows, {})).toBe(3);
+    expect(entriesToImport(plan!.rows, { 2: 'skip' })).toBe(2);
+    const done = await runCsvImport(s.deps(), { ...j, decisions: { 2: 'skip' } });
+    if (!done.ok) throw new Error(done.code);
+    expect(done.value.imported + done.value.review).toBe(2);
+  });
+
+  it('writes nothing, and a second look at the same file still says everything is new', async () => {
+    const s = await setup();
+    const acc = await s.add('Monzo Current', 'bank');
+    const j = job(`${HEAD}20/10/2026,Tesco,-12.50,R1,
+`, { kind: 'single', accountId: acc });
+    await planImportFile(s.deps(), j);
+    await planImportFile(s.deps(), j);
+    expect(await s.db.query('SELECT COUNT(*) FROM import_batch')).toEqual([[0]]);
+    expect(await s.db.query('SELECT COUNT(*) FROM "transaction"')).toEqual([[0]]);
+  });
+
+  it('rows already recorded, errors and skipped rows are not counted as entries', async () => {
+    const s = await setup();
+    const acc = await s.add('Monzo Current', 'bank');
+    const text = `${HEAD}20/10/2026,Tesco,-12.50,R1,
+21/10/2026,Broken,abc,R2,
+`;
+    const j = job(text, { kind: 'single', accountId: acc });
+    const first = await runCsvImport(s.deps(), j);
+    if (!first.ok) throw new Error(first.code);
+    const again = await planImportFile(s.deps(), j);
+    expect(again!.rows.map((r) => r.class)).toEqual(['already_recorded', 'error']);
+    expect(entriesToImport(again!.rows, {})).toBe(0);
   });
 });

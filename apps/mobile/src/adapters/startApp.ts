@@ -13,6 +13,7 @@ import {
   ReleaseBillLinks,
   ReleaseGoalMoves,
   syncBillReminders,
+  PauseInterruptedImports,
   RunDailyPurge,
   createIdGenerator,
   searchIndexer,
@@ -271,6 +272,9 @@ async function startAppOnce(): Promise<Result<StartupOk, StartupErrorCode>> {
   // A backup or restore that was interrupted leaves staging behind: it is swept at every start (Story 8.7). Not after a restore that
   // just held: its journal is already gone and nothing is in staging.
   void sweepStaging().catch(() => undefined);
+  // An import the app was killed in the middle of is marked paused, so it can be resumed from the row after its last committed batch
+  // (Story 9.7). Only at start: on a resume the app may be running one.
+  void writer.run(PauseInterruptedImports, {}, 'system').catch(() => undefined);
   // The first start after a restore that held: every query is invalidated and reminders are planned again from the restored data.
   if (restoreOutcome === 'restored') void writer.run(AnnounceBackupRestored, undefined, 'system').catch(() => undefined);
   // Safe mode (Story 8.12): `quick_check` once after the first frame and once per local day. A failure stops every write.

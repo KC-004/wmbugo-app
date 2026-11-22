@@ -33,7 +33,7 @@ describe('ERASE_LAYOUT lists everything wmbugo keeps in private storage', () => 
     expect(ERASE_LAYOUT.logsDir).toBe('/data/files/private/logs');
     expect(ERASE_LAYOUT.crashesDir).toBe('/data/files/private/crashes');
     expect(ERASE_LAYOUT.markerPath).toBe('/data/files/private/erase.marker');
-    expect(ERASE_LAYOUT.otherPaths).toEqual(expect.arrayContaining(['/data/files/private/restore-notice.txt', '/data/files/private/safety']));
+    expect(ERASE_LAYOUT.otherPaths).toEqual(expect.arrayContaining(['/data/files/private/restore-notice.txt', '/data/files/private/safety', '/data/files/private/imports']));
   });
 
   it('lists no path twice, and nothing outside the app\'s own directories', () => {

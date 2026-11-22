@@ -47,7 +47,7 @@ import { hidingBlocksScreenshots } from '../../adapters/recentsPrivacy';
 import { requireReauth } from '../../shared/reauth';
 import { RegionPicker } from '../onboarding/OnboardingFlow';
 import { CategoriesScreen } from '../categories/CategoriesScreen';
-import { ImportWizard } from '../import/ImportWizard';
+import { ImportFlow } from '../import/ImportFlow';
 import { RecentlyDeletedScreen } from './RecentlyDeletedScreen';
 import { realSettingsApi, SETTINGS_QUERY_KEY, type SettingsApi, type SettingsData } from './settingsApi';
 
@@ -110,7 +110,7 @@ const choiceOf = (rule: { kind: string }): PaydayChoice => (rule.kind === 'day' 
  * Settings (SCR-21). Only the groups whose features exist in this build are listed: You. Each row's one-line
  * summary is part of its spoken label and updates as soon as a change is saved.
  */
-export function SettingsScreen({ api = realSettingsApi, onBack }: { api?: SettingsApi; onBack: () => void }) {
+export function SettingsScreen({ api = realSettingsApi, onBack, onReview }: { api?: SettingsApi; onBack: () => void; onReview?: () => void }) {
   const theme = useTheme();
   const qc = useQueryClient();
   const q = useQuery({ queryKey: SETTINGS_QUERY_KEY, queryFn: () => api.load() });
@@ -178,7 +178,7 @@ export function SettingsScreen({ api = realSettingsApi, onBack }: { api?: Settin
   };
 
   const title =
-    page === 'hub' ? copy.nav.settings : page === 'you' ? copy.settings.you : page === 'appearance' ? copy.settings.appearance : page === 'money' ? copy.settings.moneyBasics : page === 'categories' ? copy.categories.title : page === 'data' ? copy.deleted.data : page === 'privacy' ? copy.privacy.group : page === 'stays' ? copy.privacy.staysTitle : page === 'notifications' ? copy.notifPrivacy.title : page === 'backup' ? copy.backup.title : page === 'restore' ? copy.restore.title : page === 'help' ? copy.diagnostics.helpGroup : page === 'diagnostics' ? copy.diagnostics.title : page === 'export' ? copy.diagnostics.previewTitle : page === 'erase' ? copy.erase.scopeTitle : copy.deleted.recentlyDeleted;
+    page === 'hub' ? copy.nav.settings : page === 'you' ? copy.settings.you : page === 'appearance' ? copy.settings.appearance : page === 'money' ? copy.settings.moneyBasics : page === 'categories' ? copy.categories.title : page === 'data' ? copy.deleted.data : page === 'privacy' ? copy.privacy.group : page === 'stays' ? copy.privacy.staysTitle : page === 'notifications' ? copy.notifPrivacy.title : page === 'backup' ? copy.backup.title : page === 'restore' ? copy.restore.title : page === 'import' ? copy.csvImport.title : page === 'help' ? copy.diagnostics.helpGroup : page === 'diagnostics' ? copy.diagnostics.title : page === 'export' ? copy.diagnostics.previewTitle : page === 'erase' ? copy.erase.scopeTitle : copy.deleted.recentlyDeleted;
   const back = () => (backupBusy ? undefined : page === 'hub' ? onBack() : setPage(PARENT[page]));
 
   return (
@@ -305,7 +305,7 @@ export function SettingsScreen({ api = realSettingsApi, onBack }: { api?: Settin
       ) : page === 'erase' ? (
         <EraseFlow onBusyChange={setBackupBusy} onExit={() => setPage('data')} />
       ) : page === 'import' ? (
-        <ImportWizard onBusyChange={setBackupBusy} onContinue={() => setPage('data')} />
+        <ImportFlow locale={d.profile.locale} onBusyChange={setBackupBusy} onExit={() => setPage('data')} {...(onReview ? { onReview } : {})} />
       ) : page === 'restore' ? (
         <RestoreFlow onBusyChange={setBackupBusy} onExit={() => setPage('data')} />
       ) : page === 'deleted' ? (

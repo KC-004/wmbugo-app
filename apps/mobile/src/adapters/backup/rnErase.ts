@@ -4,6 +4,7 @@ import { RECEIPTS_DIR } from '../files/receiptFiles';
 import { PRIVATE_DIR } from '../files/rnFileStore';
 import { appNotifier } from '../notifier';
 import { deleteDatabaseKey } from '../storage/keychainKeyStore';
+import { IMPORTS_DIR } from '../import/rnRawFileStore';
 import { RESTORE_LAYOUT } from './rnRestore';
 
 /** Everything wmbugo keeps in private storage. Backup and export files the person saved elsewhere are not listed: they are theirs. */
@@ -17,6 +18,8 @@ export const ERASE_LAYOUT: EraseLayout = {
   crashesDir: `${PRIVATE_DIR}/crashes`,
   otherPaths: [
     `${PRIVATE_DIR}/restore-notice.txt`,
+    // The encrypted copies of imported bank files (Story 9.7).
+    IMPORTS_DIR,
     // The safety copies taken before a migration, and decrypted photos kept for viewing.
     `${PRIVATE_DIR}/safety`,
     `${RNFS.CachesDirectoryPath}/wmbugo-view`,
