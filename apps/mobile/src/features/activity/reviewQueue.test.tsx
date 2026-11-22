@@ -45,9 +45,9 @@ const side = (id: string, over: Partial<ReviewSide> = {}): ReviewSide => ({
 });
 const item = (id: string, over: Partial<ReviewItem> = {}): ReviewItem => ({ ...side(id), eventType: 'expense', reason: 'pending', alreadyRecorded: null, foreign: null, ...over });
 
-function dataOf(items: ReviewItem[], needsCategory: ReviewSide[] = []): ReviewData {
+function dataOf(items: ReviewItem[], needsCategory: ReviewSide[] = [], edgeDay: Record<string, ReviewSide[]> = {}): ReviewData {
   return {
-    currency: 'INR', exponent: 2, locale: 'en-IN', items, needsCategory,
+    currency: 'INR', exponent: 2, locale: 'en-IN', items, needsCategory, edgeDay,
     accounts: [{ id: 'a1', name: 'HDFC' }, { id: 'a2', name: 'Cash' }],
     categories: [
       { id: 'cat_food', name: 'Food & Drinks', kind: 'expense' },
@@ -74,7 +74,20 @@ async function mountQueue(first: ReviewData, over: Partial<ReviewApi> = {}, focu
     state.data = dataOf(state.data.items, state.data.needsCategory.filter((e) => e.id !== id));
     return { ok: true as const, value: { previous: [{ id, categoryId: 'cat_uncategorised' }] } };
   });
-  const api: ReviewApi = { load: async () => state.data, approve, confirmForeign, undoDecision, remove, restore: async () => ({ ok: true }), assignCategory, undoCategory: async () => ({ ok: true }), ...over };
+  const linkTransfer = jest.fn(async (id: string) => {
+    state.data = dataOf(state.data.items.filter((i) => i.id !== id && i.alreadyRecorded?.id !== id), state.data.needsCategory, state.data.edgeDay);
+    return { ok: true };
+  });
+  const keepSeparate = jest.fn(async (id: string) => {
+    state.data = dataOf(state.data.items.filter((i) => i.id !== id), state.data.needsCategory, state.data.edgeDay);
+    return { ok: true };
+  });
+  const linkEdgeDay = jest.fn(async (id: string) => {
+    state.data = dataOf(state.data.items.filter((i) => i.id !== id), state.data.needsCategory, state.data.edgeDay);
+    return { ok: true };
+  });
+  const undoImport = jest.fn(async () => ({ ok: true }));
+  const api: ReviewApi = { load: async () => state.data, approve, confirmForeign, undoDecision, remove, restore: async () => ({ ok: true }), assignCategory, undoCategory: async () => ({ ok: true }), linkTransfer, keepSeparate, linkEdgeDay, undoImport, ...over };
   const qc = createQueryClient();
   let r!: ReactTestRenderer;
   await act(async () => {
@@ -98,7 +111,7 @@ async function mountQueue(first: ReviewData, over: Partial<ReviewApi> = {}, focu
   });
   live.push(r);
   await settle();
-  return { r, qc, approve, confirmForeign, undoDecision, remove, assignCategory };
+  return { r, qc, approve, confirmForeign, undoDecision, remove, assignCategory, linkTransfer, keepSeparate, linkEdgeDay, undoImport };
 }
 
 describe('review queue screen (Story 3.10)', () => {
@@ -191,5 +204,81 @@ describe('review queue screen (Story 3.10)', () => {
     await press(m.r, 'review-account-fx2-a2');
     await press(m.r, 'review-confirm-fx2');
     expect(m.confirmForeign).toHaveBeenCalledWith('fx2', 4100, 'a2');
+  });
+});
+
+describe('imported transfer pairs and edge-day rows (Story 9.5)', () => {
+  const out = (over: Partial<ReviewItem> = {}) => item('o1', { merchant: 'CARD PAYMENT', amountMinor: 50_000, account: 'Monzo Current', sourceKind: 'csv', occurredAtMs: Date.UTC(2026, 10, 3, 12), reason: 'transfer_pair', alreadyRecorded: side('i1', { merchant: 'PAYMENT RECEIVED', amountMinor: 50_000, account: 'Amex', sourceKind: 'csv', occurredAtMs: Date.UTC(2026, 10, 4, 12) }), ...over });
+
+  it('a possible transfer shows Money out and Money in side by side with the question and the two choices', async () => {
+    const m = await mountQueue(dataOf([out()]));
+    expect(texts(m.r)).toEqual(expect.arrayContaining(['Money out', 'Money in', 'Same money moving between your accounts?', "Yes, it's a transfer", 'No, keep them separate', 'CSV import']));
+    expect(has(m.r, 'review-approve-o1')).toBe(false); // not the plain Approve card
+  });
+
+  it('reads as one node for TalkBack: the whole pair in a sentence', async () => {
+    const m = await mountQueue(dataOf([out()]));
+    const node = m.r.root.findAll((n) => typeof n.type === 'string' && n.props.testID === 'review-pair-o1')[0]!;
+    expect(node.props.accessible).toBe(true);
+    expect(node.props.accessibilityLabel).toBe('Possible transfer: 500 rupees out of Monzo Current on 3 Nov, 500 rupees into Amex on 4 Nov');
+  });
+
+  it('Yes, it\'s a transfer links them, says Linked as transfer with Undo, and Undo puts the question back', async () => {
+    const m = await mountQueue(dataOf([out()]));
+    await press(m.r, 'review-link-o1');
+    expect(m.linkTransfer).toHaveBeenCalledWith('o1');
+    expect(texts(m.r)).toContain('Linked as transfer');
+    await press(m.r, 'toast-undo');
+    expect(m.undoImport).toHaveBeenCalledWith('o1');
+  });
+
+  it('No, keep them separate keeps both and says Kept separate with Undo', async () => {
+    const m = await mountQueue(dataOf([out()]));
+    await press(m.r, 'review-separate-o1');
+    expect(m.keepSeparate).toHaveBeenCalledWith('o1');
+    expect(texts(m.r)).toContain('Kept separate');
+    await press(m.r, 'toast-undo');
+    expect(m.undoImport).toHaveBeenCalledTimes(1);
+  });
+
+  it('a failed choice says so and changes nothing on screen', async () => {
+    const m = await mountQueue(dataOf([out()]), { linkTransfer: async () => ({ ok: false }) });
+    await press(m.r, 'review-link-o1');
+    expect(has(m.r, 'review-error')).toBe(true);
+    expect(has(m.r, 'review-link-o1')).toBe(true);
+  });
+
+  const edge = (over: Partial<ReviewItem> = {}) => item('e1', { merchant: 'Costa', amountMinor: 210, sourceKind: 'csv', occurredAtMs: Date.UTC(2026, 9, 20, 12), reason: 'edge_day', ...over });
+  const day = [side('x1', { merchant: 'Already here', amountMinor: 999, account: 'HDFC', occurredAtMs: Date.UTC(2026, 9, 20, 8) })];
+
+  it('an edge-day row says the file only partly covers the day, lists what is already recorded that day, and offers Add it, It\'s already here and Edit', async () => {
+    const m = await mountQueue(dataOf([edge()], [], { e1: day }));
+    expect(texts(m.r)).toEqual(expect.arrayContaining(['This file only partly covers 20 Oct, so this may already be recorded.', 'Already recorded that day', 'Already here', 'Add it', "It's already here", 'Edit']));
+  });
+
+  it('Add it confirms the row with the usual approve and its Undo', async () => {
+    const m = await mountQueue(dataOf([edge()], [], { e1: day }));
+    await press(m.r, 'review-add-e1');
+    expect(m.approve).toHaveBeenCalledWith('e1');
+  });
+
+  it('It\'s already here with one entry on that day links to it straight away', async () => {
+    const m = await mountQueue(dataOf([edge()], [], { e1: day }));
+    await press(m.r, 'review-already-e1');
+    expect(m.linkEdgeDay).toHaveBeenCalledWith('e1', 'x1');
+    expect(texts(m.r)).toContain("It's already here");
+  });
+
+  it('with several entries that day the person picks which, or skips the row; with none it is just skipped', async () => {
+    const two = [...day, side('x2', { merchant: 'Other thing', amountMinor: 450 })];
+    const m = await mountQueue(dataOf([edge()], [], { e1: two }));
+    await press(m.r, 'review-already-e1');
+    expect(m.linkEdgeDay).not.toHaveBeenCalled();
+    expect(texts(m.r)).toContain('Which one is it?');
+    await press(m.r, 'review-here-e1-x2');
+    expect(m.linkEdgeDay).toHaveBeenCalledWith('e1', 'x2');
+    const none = await mountQueue(dataOf([edge()], [], { e1: [] }));
+    await press(none.r, 'review-already-e1');
+    expect(none.linkEdgeDay).toHaveBeenCalledWith('e1', undefined);
   });
 });

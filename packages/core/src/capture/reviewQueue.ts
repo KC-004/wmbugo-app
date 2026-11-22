@@ -9,7 +9,7 @@ import { restoreTx, snapshotTx, type TxSnapshot } from './snapshot';
  * of the Activity tab dot), plus confirmed entries that still need a category in their own section (never counted).
  */
 
-export type ReviewReason = 'duplicate' | 'foreign_currency' | 'pending' | 'other';
+export type ReviewReason = 'duplicate' | 'foreign_currency' | 'pending' | 'other' | 'transfer_pair' | 'held_pair' | 'edge_day';
 
 export interface ReviewSide {
   readonly id: string;

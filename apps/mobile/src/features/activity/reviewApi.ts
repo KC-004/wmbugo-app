@@ -1,5 +1,11 @@
 import {
   ApproveCapture,
+  EDGE_DAY_ENTRIES_SQL,
+  edgeDayParams,
+  KeepSeparate,
+  LinkAsTransfer,
+  LinkEdgeDayRow,
+  UndoImportReview,
   BulkRecategorise,
   CATEGORY_LIST_SQL,
   ACCOUNT_LIST_SQL,
@@ -33,6 +39,8 @@ export interface ReviewData {
   readonly needsCategory: ReviewSide[];
   readonly accounts: { id: string; name: string }[];
   readonly categories: { id: string; name: string; kind: string }[];
+  /** For each waiting row from a partly covered day: the entries already recorded that day for its account (Story 9.5). */
+  readonly edgeDay: Readonly<Record<string, ReviewSide[]>>;
 }
 
 type Snap = { ok: true; value: { snapshot: TxSnapshot } } | { ok: false; code: string };
@@ -47,6 +55,14 @@ export interface ReviewApi {
   restore(snapshot: TxSnapshot): Promise<{ ok: boolean }>;
   assignCategory(transactionId: string, categoryId: string): Promise<{ ok: true; value: { previous: { id: string; categoryId: string }[] } } | { ok: false; code: string }>;
   undoCategory(previous: readonly { id: string; categoryId: string }[]): Promise<{ ok: boolean }>;
+  /** Yes, it's a transfer (Story 9.5). */
+  linkTransfer(transactionId: string): Promise<{ ok: boolean }>;
+  /** No, keep them separate. */
+  keepSeparate(transactionId: string): Promise<{ ok: boolean }>;
+  /** It's already here: links the row to a chosen entry, or just skips it when none is chosen. */
+  linkEdgeDay(transactionId: string, existingId?: string): Promise<{ ok: boolean }>;
+  /** Undo for the three choices above. */
+  undoImport(transactionId: string): Promise<{ ok: boolean }>;
 }
 
 export const REVIEW_QUEUE_KEY = ['ledger', 'review'] as const;
@@ -62,11 +78,15 @@ export const realReviewQueueApi: ReviewApi = {
       if (r[10] === null) continue;
       for (const s of mapReviewSides(await db.query(REVIEW_SIDE_SQL, [String(r[10])]))) matched.set(s.id, s);
     }
+    const items = mapReviewItems(rows, matched);
+    const edgeDay: Record<string, ReviewSide[]> = {};
+    for (const it of items) if (it.reason === 'edge_day') edgeDay[it.id] = mapReviewSides(await db.query(EDGE_DAY_ENTRIES_SQL, edgeDayParams(it.id)));
     return {
       currency: p.currency,
       exponent: p.exponent,
       locale: p.locale,
-      items: mapReviewItems(rows, matched),
+      edgeDay,
+      items,
       needsCategory: mapReviewSides(await db.query(NEEDS_CATEGORY_SQL)),
       accounts: mapAccountRows(await db.query(ACCOUNT_LIST_SQL)).filter((a) => a.status === 'active').map((a) => ({ id: a.id, name: a.name })),
       categories: mapCategoryRows(await db.query(CATEGORY_LIST_SQL)).map((c) => ({ id: c.id, name: c.name, kind: c.kind })),
@@ -82,4 +102,8 @@ export const realReviewQueueApi: ReviewApi = {
     return r.ok ? { ok: true, value: { previous: r.value.previous } } : r;
   },
   undoCategory: (previous) => getServices().writer.run(UndoBulkRecategorise, { previous }, 'user'),
+  linkTransfer: (transactionId) => getServices().writer.run(LinkAsTransfer, { transactionId }, 'user'),
+  keepSeparate: (transactionId) => getServices().writer.run(KeepSeparate, { transactionId }, 'user'),
+  linkEdgeDay: (transactionId, existingId) => getServices().writer.run(LinkEdgeDayRow, { transactionId, ...(existingId ? { existingId } : {}) }, 'user'),
+  undoImport: (transactionId) => getServices().writer.run(UndoImportReview, { transactionId }, 'user'),
 };

@@ -24,6 +24,8 @@ import { duplicatePresetOf, editSpecOf, realTransactionApi, transactionKey, type
 import type { AddPreset, EditSpec } from '../add/AddSheet';
 import { realAddApi, type AddApi } from '../add/addApi';
 import { HeldRowActions } from './HeldRowActions';
+import { ImportReviewActions } from './ImportReviewCards';
+import { realReviewQueueApi, type ReviewApi } from './reviewApi';
 import { CategoryPickerSheet } from './CategoryPickerSheet';
 import { ReceiptPhotos } from './ReceiptPhotos';
 import { usePermanentDelete } from './usePermanentDelete';
@@ -74,6 +76,7 @@ export function TransactionDetailScreen({
   onSplit,
   api = realTransactionApi,
   duplicateApi = realAddApi,
+  reviewApi = realReviewQueueApi,
   deletedApi = realDeletedApi,
   billsApi,
 }: {
@@ -85,6 +88,8 @@ export function TransactionDetailScreen({
   onSplit?: (transactionId: string) => void;
   api?: TransactionApi;
   duplicateApi?: Pick<AddApi, 'duplicateInfo' | 'keepBoth' | 'merge' | 'undoResolution'>;
+  /** The choices for an import's waiting questions (Story 9.5): a possible transfer, a partly covered day. */
+  reviewApi?: Pick<ReviewApi, 'approve' | 'undoDecision' | 'linkTransfer' | 'keepSeparate' | 'linkEdgeDay' | 'undoImport'>;
   /** Delete permanently (confirm sheet facts and the purge). */
   deletedApi?: Pick<DeletedApi, 'purgeFacts' | 'purge'>;
   /** Tests inject the bills port; the real one is used otherwise. */
@@ -327,6 +332,7 @@ export function TransactionDetailScreen({
       needsCategory: false,
       categoryGuessed: d.categoryGuessed === true,
       openDuplicate: d.openDuplicate,
+      openReason: d.openReview ?? null,
     });
     const spoken = [title, amountLabel({ amountMinor: d.amountMinor, currency: data.currency, locale: data.locale, kind: AMOUNT_KIND[d.type] ?? 'plain', inline: true }), d.category?.name, accountText].filter(Boolean).join(', ');
     const glyph = d.type === 'transfer' ? ArrowsLeftRight : d.category ? categoryIcon(d.category.icon) : DotsThree;
@@ -454,6 +460,8 @@ export function TransactionDetailScreen({
             <HeldRowActions transactionId={d.id} api={duplicateApi} />
           </View>
         ) : null}
+
+        {d.openReview && d.status === 'needs_review' ? <ImportReviewActions transactionId={d.id} reason={d.openReview} whenMs={d.occurredAtMs} api={reviewApi} /> : null}
 
         {leftError !== null ? (
           <View testID="detail-error" accessibilityRole="alert" accessibilityLiveRegion="assertive" style={styles.splitLine}>

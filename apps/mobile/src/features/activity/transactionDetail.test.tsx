@@ -39,7 +39,7 @@ function fakeApi(d: TransactionDetail | 'missing' = detail()) {
   return { api, load, remove, restore, state };
 }
 
-async function mountDetail(d: TransactionDetail | 'missing', over: { api?: TransactionApi; duplicateApi?: Parameters<typeof TransactionDetailScreen>[0]['duplicateApi']; deletedApi?: Parameters<typeof TransactionDetailScreen>[0]['deletedApi'] } = {}) {
+async function mountDetail(d: TransactionDetail | 'missing', over: { api?: TransactionApi; reviewApi?: Parameters<typeof TransactionDetailScreen>[0]['reviewApi']; duplicateApi?: Parameters<typeof TransactionDetailScreen>[0]['duplicateApi']; deletedApi?: Parameters<typeof TransactionDetailScreen>[0]['deletedApi'] } = {}) {
   const f = fakeApi(d);
   const qc = createQueryClient();
   const onBack = jest.fn();
@@ -52,7 +52,7 @@ async function mountDetail(d: TransactionDetail | 'missing', over: { api?: Trans
         <ThemeProvider>
           <ToastHost bottomOffset={0}>
             <SheetHost>
-              <TransactionDetailScreen transactionId="t1" onBack={onBack} onEdit={onEdit} onDuplicate={onDuplicate} api={over.api ?? f.api} duplicateApi={over.duplicateApi} deletedApi={over.deletedApi ?? { purgeFacts: async () => ({ isTransfer: false, hasRefund: false }), purge: async () => ({ ok: true }) }} />
+              <TransactionDetailScreen transactionId="t1" onBack={onBack} onEdit={onEdit} onDuplicate={onDuplicate} api={over.api ?? f.api} duplicateApi={over.duplicateApi} reviewApi={over.reviewApi} deletedApi={over.deletedApi ?? { purgeFacts: async () => ({ isTransfer: false, hasRefund: false }), purge: async () => ({ ok: true }) }} />
             </SheetHost>
           </ToastHost>
         </ThemeProvider>
@@ -176,6 +176,59 @@ describe('TransactionDetailScreen (Story 3.4)', () => {
     await act(async () => fire(m.r, 'keep-both-t1'));
     await settle();
     expect(keepBoth).toHaveBeenCalledWith('t1');
+    m.unmount();
+  });
+
+  const reviewApi = () => ({
+    approve: jest.fn(async () => ({ ok: true as const, value: { snapshot: { id: 't1' } as TxSnapshot } })),
+    undoDecision: jest.fn(async () => ({ ok: true })),
+    linkTransfer: jest.fn(async () => ({ ok: true })),
+    keepSeparate: jest.fn(async () => ({ ok: true })),
+    linkEdgeDay: jest.fn(async () => ({ ok: true })),
+    undoImport: jest.fn(async () => ({ ok: true })),
+  });
+
+  it('an imported leg that may be a transfer shows the same question and choices as the review queue, each with Undo (the durable path)', async () => {
+    const api = reviewApi();
+    const m = await mountDetail(detail({ status: 'needs_review', resolution: null, sourceKind: 'csv', openReview: 'transfer_pair' }), { reviewApi: api });
+    expect(texts(m.r)).toEqual(expect.arrayContaining(['Same money moving between your accounts?', "Yes, it's a transfer", 'No, keep them separate']));
+    expect(texts(m.r)).toContain('Waiting for you');
+    await act(async () => fire(m.r, 'detail-link-transfer'));
+    await settle();
+    expect(api.linkTransfer).toHaveBeenCalledWith('t1');
+    expect(texts(m.r)).toContain('Linked as transfer');
+    await act(async () => fire(m.r, 'toast-undo'));
+    await settle();
+    expect(api.undoImport).toHaveBeenCalledWith('t1');
+    m.unmount();
+  });
+
+  it('keeping the legs separate from the detail, and a failed choice that says so', async () => {
+    const api = reviewApi();
+    const m = await mountDetail(detail({ status: 'needs_review', resolution: null, sourceKind: 'csv', openReview: 'transfer_pair' }), { reviewApi: api });
+    await act(async () => fire(m.r, 'detail-keep-separate'));
+    await settle();
+    expect(api.keepSeparate).toHaveBeenCalledWith('t1');
+    expect(texts(m.r)).toContain('Kept separate');
+    const bad = { ...api, linkTransfer: jest.fn(async () => ({ ok: false })) };
+    const f = await mountDetail(detail({ status: 'needs_review', resolution: null, sourceKind: 'csv', openReview: 'transfer_pair' }), { reviewApi: bad });
+    await act(async () => fire(f.r, 'detail-link-transfer'));
+    await settle();
+    expect(texts(f.r).some((t) => /couldn't|could not/i.test(t))).toBe(true);
+    m.unmount();
+    f.unmount();
+  });
+
+  it('a row from a partly covered day says so and offers Add it and It\'s already here', async () => {
+    const api = reviewApi();
+    const m = await mountDetail(detail({ status: 'needs_review', resolution: null, sourceKind: 'csv', openReview: 'edge_day' }), { reviewApi: api });
+    expect(texts(m.r)).toContain('This file only partly covers 7 Nov, so this may already be recorded.');
+    await act(async () => fire(m.r, 'detail-already-here'));
+    await settle();
+    expect(api.linkEdgeDay).toHaveBeenCalledWith('t1');
+    await act(async () => fire(m.r, 'detail-add-edge'));
+    await settle();
+    expect(api.approve).toHaveBeenCalledWith('t1');
     m.unmount();
   });
 

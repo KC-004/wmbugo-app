@@ -59,6 +59,8 @@ export interface ActivityRow {
   readonly signedMinor?: number;
   /** Held back as a possible duplicate: shown to be resolved, never counted in Spent or any total. */
   readonly held?: boolean;
+  /** Waiting on a question that is not a duplicate: a possible transfer or a partly covered day (Story 9.5). It shows `Check`. */
+  readonly check?: boolean;
   /** Came from a capture source, not typed by the user: it is rejected (Reject · Not mine), never deleted. */
   readonly captured?: boolean;
   /** Waiting for the user (needs_review) and not a possible duplicate. Counts nowhere until confirmed. */
@@ -85,7 +87,7 @@ export type RowState = 'rejected' | 'reversed' | 'check' | 'currency' | 'waiting
 export function rowState(r: ActivityRow): RowState {
   if (r.rejected) return 'rejected';
   if (r.reversed) return 'reversed';
-  if (r.held) return 'check';
+  if (r.held || r.check) return 'check';
   if (r.waiting && r.foreign) return 'currency';
   if (r.waiting) return 'waiting';
   if (r.needsCategory) return 'needs-category';
@@ -114,7 +116,7 @@ export interface ActivityFilter {
 export function activitySql(filter: ActivityFilter = {}): string {
   const byAccount = filter.accountId ? ' AND EXISTS (SELECT 1 FROM posting pf WHERE pf.transaction_id = t2.id AND pf.account_id = ?)' : '';
   return (
-    'SELECT t.id, t.event_type, t.amount_minor, t.local_date, t.original_description, c.name, c.icon, c.color_token, a.name, (p.posting_kind = \'normal\' AND a.opening_effective_at IS NOT NULL AND t.occurred_at_utc < a.opening_effective_at), p.signed_amount_minor, t.status, (SELECT 1 FROM source_record sr WHERE sr.transaction_id = t.id AND sr.source_kind <> \'manual\' LIMIT 1), t.needs_category, t.capture_resolution, t.foreign_currency, t.foreign_amount_minor, (SELECT 1 FROM review_candidate rc WHERE rc.transaction_id = t.id AND rc.reason = \'duplicate\' AND rc.status = \'open\' LIMIT 1), NULL, (SELECT COUNT(*) FROM split sc WHERE sc.transaction_id = t.id), t.category_guessed FROM "transaction" t LEFT JOIN split s ON s.transaction_id = t.id LEFT JOIN category c ON c.id = s.category_id LEFT JOIN posting p ON p.transaction_id = t.id LEFT JOIN account a ON a.id = p.account_id WHERE t.id IN (SELECT t2.id FROM "transaction" t2 WHERE ' +
+    'SELECT t.id, t.event_type, t.amount_minor, t.local_date, t.original_description, c.name, c.icon, c.color_token, a.name, (p.posting_kind = \'normal\' AND a.opening_effective_at IS NOT NULL AND t.occurred_at_utc < a.opening_effective_at), p.signed_amount_minor, t.status, (SELECT 1 FROM source_record sr WHERE sr.transaction_id = t.id AND sr.source_kind <> \'manual\' LIMIT 1), t.needs_category, t.capture_resolution, t.foreign_currency, t.foreign_amount_minor, (SELECT CASE rc.reason WHEN \'duplicate\' THEN 1 ELSE 2 END FROM review_candidate rc WHERE rc.transaction_id = t.id AND rc.reason IN (\'duplicate\',\'transfer_pair\',\'edge_day\') AND rc.status = \'open\' ORDER BY rc.created_at DESC LIMIT 1), NULL, (SELECT COUNT(*) FROM split sc WHERE sc.transaction_id = t.id), t.category_guessed FROM "transaction" t LEFT JOIN split s ON s.transaction_id = t.id LEFT JOIN category c ON c.id = s.category_id LEFT JOIN posting p ON p.transaction_id = t.id LEFT JOIN account a ON a.id = p.account_id WHERE t.id IN (SELECT t2.id FROM "transaction" t2 WHERE ' +
     ACTIVITY_FILTER +
     byAccount +
     ' ORDER BY t2.local_date DESC, t2.occurred_at_utc DESC, t2.id DESC LIMIT ?) ORDER BY t.local_date DESC, t.occurred_at_utc DESC, t.id DESC, p.signed_amount_minor ASC, s.amount_minor DESC'
@@ -166,7 +168,8 @@ export function mapActivityRows(rows: readonly (readonly unknown[])[]): Activity
       beforeTracking: String(r[1]) !== 'transfer' && String(r[1]) !== 'adjustment' && Number(r[9]) === 1,
       ...(String(r[1]) === 'adjustment' ? { signedMinor: Number(r[10]) } : {}),
       ...(String(r[11]) === 'needs_review' && Number(r[17]) === 1 ? { held: true } : {}),
-      ...(String(r[11]) === 'needs_review' && Number(r[17]) !== 1 ? { waiting: true } : {}),
+      ...(String(r[11]) === 'needs_review' && Number(r[17]) === 2 ? { check: true } : {}),
+      ...(String(r[11]) === 'needs_review' && Number(r[17]) !== 1 && Number(r[17]) !== 2 ? { waiting: true } : {}),
       ...(String(r[11]) === 'reversed' ? { reversed: true } : {}),
       ...(Number(r[12]) === 1 ? { captured: true } : {}),
       ...(Number(r[13]) === 1 ? { needsCategory: true } : {}),
@@ -197,7 +200,7 @@ export function groupByDay(rows: readonly ActivityRow[]): ActivityDay[] {
       days.push(day);
     }
     day.rows.push(r);
-    if (r.held || r.waiting || r.reversed || r.rejected) continue;
+    if (r.held || r.check || r.waiting || r.reversed || r.rejected) continue;
     // With a category filter only the matching splits count.
     const counted = r.matchedMinor ?? r.amountMinor;
     if (r.kind === 'expense') day.expenses += counted;

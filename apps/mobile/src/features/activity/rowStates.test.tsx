@@ -58,6 +58,7 @@ const STATES: { name: string; row: ActivityRow; shows: string[]; spoken: string;
   { name: 'waiting', row: { ...base, id: 'w', waiting: true }, shows: ['waiting'], spoken: 'Swiggy, spent 420 rupees, Food & Drinks, HDFC, waiting, Saturday 7 November', tags: ['waiting'] },
   { name: 'waiting for currency', row: { ...base, id: 'c', waiting: true, foreign: { currency: 'USD', amountMinor: 1299 } }, shows: ['currency', '$12.99'], spoken: 'Swiggy, USD 12.99, waiting for currency, Food & Drinks, HDFC, Saturday 7 November', tags: ['currency'] },
   { name: 'possible duplicate', row: { ...base, id: 'd', held: true }, shows: ['Check'], spoken: 'Swiggy, spent 420 rupees, Food & Drinks, HDFC, possible duplicate, check it, Saturday 7 November', tags: ['Check'] },
+  { name: 'possible transfer or partly covered day (Story 9.5)', row: { ...base, id: 'k', check: true }, shows: ['Check'], spoken: 'Swiggy, spent 420 rupees, Food & Drinks, HDFC, check it, Saturday 7 November', tags: ['Check'] },
   { name: 'reversed', row: { ...base, id: 'v', reversed: true }, shows: ['reversed'], spoken: 'Swiggy, spent 420 rupees, Food & Drinks, HDFC, reversed, Saturday 7 November', tags: ['reversed'] },
   { name: 'before tracking started', row: { ...base, id: 'b', beforeTracking: true }, shows: ['before tracking'], spoken: 'Swiggy, spent 420 rupees, Food & Drinks, HDFC, before tracking started, Saturday 7 November', tags: ['before tracking'] },
 ];

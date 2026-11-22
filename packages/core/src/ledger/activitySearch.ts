@@ -111,8 +111,8 @@ export function amountFromSearch(search: string, exponent: number): number | nul
 }
 
 const STATUS_SQL: Readonly<Record<ActivityStatusFilter, string>> = {
-  waiting: "(t2.status = 'needs_review' AND NOT EXISTS (SELECT 1 FROM review_candidate rc WHERE rc.transaction_id = t2.id AND rc.reason = 'duplicate' AND rc.status = 'open'))",
-  check: "(t2.status = 'needs_review' AND EXISTS (SELECT 1 FROM review_candidate rc WHERE rc.transaction_id = t2.id AND rc.reason = 'duplicate' AND rc.status = 'open'))",
+  waiting: "(t2.status = 'needs_review' AND NOT EXISTS (SELECT 1 FROM review_candidate rc WHERE rc.transaction_id = t2.id AND rc.reason IN ('duplicate','transfer_pair','edge_day') AND rc.status = 'open'))",
+  check: "(t2.status = 'needs_review' AND EXISTS (SELECT 1 FROM review_candidate rc WHERE rc.transaction_id = t2.id AND rc.reason IN ('duplicate','transfer_pair','edge_day') AND rc.status = 'open'))",
   'needs-category': '(t2.needs_category = 1)',
   guessed: '(t2.category_guessed = 1)',
   reversed: "(t2.status = 'reversed')",

@@ -11,6 +11,10 @@ export type CaptureState =
   | 'recorded_needs_category'
   | 'recorded_linked_transfer'
   | 'waiting'
+  /** Imported legs that may be one transfer (Story 9.5): waiting for the person, shown with the `Check` tag. */
+  | 'possible_transfer'
+  /** An imported row from a day its file covers only partly (Story 9.5). */
+  | 'partly_covered_day'
   | 'possible_duplicate'
   | 'scam_blocked'
   | 'rejected';
@@ -21,6 +25,8 @@ export const CAPTURE_STATES: readonly CaptureState[] = [
   'recorded_needs_category',
   'recorded_linked_transfer',
   'waiting',
+  'possible_transfer',
+  'partly_covered_day',
   'possible_duplicate',
   'scam_blocked',
   'rejected',
@@ -42,7 +48,9 @@ export function captureStatusLabel(state: CaptureState): CaptureLabelKey {
     case 'recorded_linked_transfer':
       return 'recordedLinked';
     case 'waiting':
-      return 'waiting';
+    case 'possible_transfer':
+    case 'partly_covered_day':
+      return 'waiting'; // both read `Waiting for you`: the card says which question it is
     case 'possible_duplicate':
       return 'possibleDuplicate';
     case 'scam_blocked':
@@ -73,9 +81,13 @@ export function captureStateOf(t: {
   readonly needsCategory: boolean;
   readonly categoryGuessed?: boolean;
   readonly openDuplicate: boolean;
+  /** The reason of an open review candidate other than a duplicate, when there is one (Story 9.5). */
+  readonly openReason?: 'transfer_pair' | 'edge_day' | null;
 }): CaptureState {
   if (t.resolution === 'rejected' || t.status === 'excluded') return 'rejected';
   if (t.openDuplicate) return 'possible_duplicate';
+  if (t.status === 'needs_review' && t.openReason === 'transfer_pair') return 'possible_transfer';
+  if (t.status === 'needs_review' && t.openReason === 'edge_day') return 'partly_covered_day';
   if (t.status === 'needs_review' || t.status === 'draft') return 'waiting';
   if (t.resolution === 'auto_linked') return 'recorded_linked_transfer';
   if (t.needsCategory) return 'recorded_needs_category';

@@ -188,8 +188,10 @@ describe('possible duplicates are saved, never blocked, and counted nowhere (TXN
 describe('capture status labels (UX-DR82)', () => {
   it('every state and every result code has a label key, and every key is used', () => {
     const keys = CAPTURE_STATES.map(captureStatusLabel);
-    expect(new Set(keys).size).toBe(CAPTURE_STATES.length);
-    expect([...keys].sort()).toEqual([...CAPTURE_LABEL_KEYS].sort());
+    // Every label key is used. Two states may share one: a possible transfer and a partly covered day both read `Waiting for you`
+    // (Story 9.5); the card says which question it is.
+    expect([...new Set(keys)].sort()).toEqual([...CAPTURE_LABEL_KEYS].sort());
+    expect(keys.filter((k) => k === 'waiting')).toHaveLength(3);
     expect(captureStateOfResult('RECORDED')).toBe('recorded');
     expect(captureStateOfResult('ALREADY_SUBMITTED')).toBe('recorded');
     expect(captureStateOfResult('POSSIBLE_DUPLICATE')).toBe('possible_duplicate');

@@ -24,7 +24,8 @@ function tagsOf(row: ActivityRow): { text: string; spoken: string; tone?: 'warni
   if (row.needsCategory && state !== 'reversed') out.push({ text: copy.activity.tagAddCategory.toLowerCase(), spoken: copy.activity.tagAddCategory.toLowerCase() });
   if (state === 'waiting') out.push({ text: copy.activity.tagWaiting.toLowerCase(), spoken: copy.activity.tagWaiting.toLowerCase() });
   if (state === 'currency') out.push({ text: copy.activity.tagCurrency.toLowerCase(), spoken: copy.activity.waitingForCurrency.toLowerCase() });
-  if (state === 'check') out.push({ text: copy.activity.tagCheck, spoken: copy.activity.checkSpoken.toLowerCase(), tone: 'warning' });
+  // A possible duplicate says so; a possible transfer or a partly covered day (Story 9.5) just asks to be checked.
+  if (state === 'check') out.push({ text: copy.activity.tagCheck, spoken: (row.held ? copy.activity.checkSpoken : copy.activity.checkItSpoken).toLowerCase(), tone: 'warning' });
   if (state === 'reversed') out.push({ text: copy.activity.tagReversed.toLowerCase(), spoken: copy.activity.tagReversed.toLowerCase() });
   if (state === 'rejected') out.push({ text: copy.activity.tagRejected.toLowerCase(), spoken: copy.activity.tagRejected.toLowerCase() });
   if (row.beforeTracking) out.push({ text: copy.activity.tagBeforeTracking.toLowerCase(), spoken: copy.activity.beforeTracking.toLowerCase() });

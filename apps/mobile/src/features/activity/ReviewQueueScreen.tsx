@@ -3,7 +3,7 @@ import { foreignMoneyText } from '../../shared/ui/moneyText';
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { categoryFits, parseAmountInput, sourceWords, type ReviewItem, type ReviewSide } from '@wmbugo/core';
+import { categoryFits, parseAmountInput, type ReviewItem, type ReviewSide } from '@wmbugo/core';
 import { announce } from '../../shared/a11y/announce';
 import { copy } from '../../shared/copy';
 import { currencySymbol } from '../../shared/currencySymbol';
@@ -20,19 +20,11 @@ import { Chip } from '../../shared/ui/Chip';
 import { TopBar } from '../../shared/ui/TopBar';
 import { realAddApi, type AddApi } from '../add/addApi';
 import { HeldRowActions } from './HeldRowActions';
+import { EdgeDayCard, TransferPairCard } from './ImportReviewCards';
+import { SideColumn } from './reviewParts';
 import { REVIEW_QUEUE_KEY, realReviewQueueApi, type ReviewApi, type ReviewData } from './reviewApi';
 
 const ALL_CHECKED_MS = 4000;
-const SOURCE_COPY = { addedByYou: copy.review.addedByYou, bankSms: copy.review.bankSms, receipt: copy.review.receipt, csvImport: copy.review.csvImport, other: copy.review.otherSource } as const;
-
-/** "7 Nov, 9:12 pm" (UTC clock of the device; the queue shows when the money moved, close enough for side-by-side). */
-function whenText(ms: number): string {
-  const d = new Date(ms);
-  const day = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' }).format(d);
-  const time = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).format(d).toLowerCase();
-  return `${day}, ${time}`;
-}
-
 /**
  * The review queue (SCR-10): everything waiting for a decision, newest first, with the evidence side by side, and the
  * entries that still need a category in their own section. Every action offers Undo and updates the dot and totals.
@@ -119,6 +111,18 @@ export function ReviewQueueScreen({
       void id;
     });
 
+  /** Yes, it's a transfer, No keep them separate and It's already here: each with its Undo toast (Story 9.5). */
+  const importChoice = (id: string, message: string, call: () => Promise<{ ok: boolean }>) =>
+    run(async () => {
+      const r = await call().catch(() => ({ ok: false }));
+      if (!r.ok) return setError(copy.review.actionFailed);
+      await refresh();
+      toast.show({
+        message,
+        undo: { label: copy.common.undo, onUndo: () => void api.undoImport(id).then(refresh).catch(() => toast.show({ message: copy.add.removeFailed })) },
+      });
+    });
+
   const assign = (id: string, categoryId: string) =>
     run(async () => {
       const r = await api.assignCategory(id, categoryId).catch(() => ({ ok: false as const, code: 'FAILED' }));
@@ -168,6 +172,10 @@ export function ReviewQueueScreen({
                 void decide(item.id, kind === 'delete' ? copy.detail.deleted : copy.detail.rejected, () => api.remove(item.id, kind));
               }}
               onConfirmForeign={(amountMinor, accountId) => void decide(item.id, copy.review.approved, () => api.confirmForeign(item.id, amountMinor, accountId))}
+              edgeDayEntries={data.edgeDay[item.id] ?? []}
+              onLink={() => void importChoice(item.id, copy.review.linkedTransfer, () => api.linkTransfer(item.id))}
+              onSeparate={() => void importChoice(item.id, copy.review.keptSeparate, () => api.keepSeparate(item.id))}
+              onEdgeLink={(existingId) => void importChoice(item.id, copy.review.alreadyHere, () => api.linkEdgeDay(item.id, existingId))}
             />
           </View>
         ))}
@@ -201,23 +209,6 @@ export function ReviewQueueScreen({
   );
 }
 
-function SideColumn({ title, side, data }: { title: string; side: ReviewSide; data: ReviewData }) {
-  const theme = useTheme();
-  const ink = { color: theme.color('text-primary') };
-  const muted = { color: theme.color('text-secondary') };
-  return (
-    <View testID={`review-side-${title}`} style={styles.side}>
-      <Text style={[textStyle('label'), muted]}>{title}</Text>
-      <Amount amountMinor={side.amountMinor} currency={data.currency} direction="neutral" locale={data.locale} />
-      <Text style={[textStyle('body'), ink]}>{whenText(side.occurredAtMs)}</Text>
-      {side.merchant ? <Text style={[textStyle('body-medium'), ink]}>{side.merchant}</Text> : null}
-      {side.account ? <Text style={[textStyle('body'), muted]}>{side.account}</Text> : null}
-      {side.category ? <Text style={[textStyle('body'), muted]}>{side.category}</Text> : null}
-      <Text style={[textStyle('caption'), muted]}>{SOURCE_COPY[sourceWords(side.sourceKind)]}</Text>
-    </View>
-  );
-}
-
 function ReviewCard({
   item,
   data,
@@ -226,6 +217,10 @@ function ReviewCard({
   onEdit,
   onRemove,
   onConfirmForeign,
+  edgeDayEntries,
+  onLink,
+  onSeparate,
+  onEdgeLink,
 }: {
   item: ReviewItem;
   data: ReviewData;
@@ -234,6 +229,10 @@ function ReviewCard({
   onEdit: () => void;
   onRemove: () => void;
   onConfirmForeign: (amountMinor: number, accountId: string) => void;
+  edgeDayEntries: ReviewSide[];
+  onLink: () => void;
+  onSeparate: () => void;
+  onEdgeLink: (existingId?: string) => void;
 }) {
   useAmountsHidden(); // the foreign amount below masks with Hide amounts
   const theme = useTheme();
@@ -260,6 +259,14 @@ function ReviewCard({
         </View>
       </View>
     );
+  }
+
+  if (item.reason === 'transfer_pair' && item.alreadyRecorded) {
+    return <TransferPairCard item={item} other={item.alreadyRecorded} data={data} onLink={onLink} onSeparate={onSeparate} />;
+  }
+
+  if (item.reason === 'edge_day') {
+    return <EdgeDayCard item={item} entries={edgeDayEntries} data={data} onAdd={onApprove} onLink={onEdgeLink} onEdit={onEdit} />;
   }
 
   if (item.foreign) {
