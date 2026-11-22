@@ -129,31 +129,31 @@ development_status:
   7-8-insights-accessibility-privacy-and-performance-pass: review
   epic-7-retrospective: done
 
-  epic-8: in-progress
-  8-1-redacted-logs-local-crash-records-and-the-no-network-guarant: review
-  8-2-privacy-settings-hiding-wmbugo-in-recent-apps-and-what-stays: review
-  8-3-app-lock-with-lockgate-and-re-authentication: review
-  8-4-offer-app-lock-once-after-the-first-saved-entry: review
-  8-5-notification-privacy-hidden-form-and-notification-detail: review
-  8-6-encrypted-backup-format-in-core: review
-  8-7-make-a-backup-with-a-passphrase: review
-  8-8-restorebackup-in-maintenance-mode: review
-  8-9-restore-preview-and-confirmation: review
-  8-10-diagnostics-with-a-preview-before-anything-is-exported: review
-  8-11-storage-retention-and-erase-all-data: review
-  8-12-safe-mode-when-the-data-can-t-be-opened-safely: review
+  epic-8: done
+  8-1-redacted-logs-local-crash-records-and-the-no-network-guarant: done
+  8-2-privacy-settings-hiding-wmbugo-in-recent-apps-and-what-stays: done
+  8-3-app-lock-with-lockgate-and-re-authentication: done
+  8-4-offer-app-lock-once-after-the-first-saved-entry: done
+  8-5-notification-privacy-hidden-form-and-notification-detail: done
+  8-6-encrypted-backup-format-in-core: done
+  8-7-make-a-backup-with-a-passphrase: done
+  8-8-restorebackup-in-maintenance-mode: done
+  8-9-restore-preview-and-confirmation: done
+  8-10-diagnostics-with-a-preview-before-anything-is-exported: done
+  8-11-storage-retention-and-erase-all-data: done
+  8-12-safe-mode-when-the-data-can-t-be-opened-safely: done
   epic-8-retrospective: optional
 
-  epic-9: in-progress
-  9-1-read-any-bank-csv-file-in-core: review
-  9-2-column-mapping-row-validation-and-saved-bank-formats-in-core: review
-  9-3-import-plan-classify-every-row-against-the-ledger-before-wri: review
-  9-4-importcsvbatch-atomic-resumable-idempotent-commit: review
-  9-5-imported-transfer-pairs-and-edge-day-rows-in-the-review-queu: review
-  9-6-import-wizard-choose-a-file-confirm-columns-and-preview: review
-  9-7-import-wizard-check-matches-import-and-see-the-summary: review
-  9-8-keep-or-delete-imported-files: review
-  9-9-export-transactions-and-account-summaries-as-csv: review
+  epic-9: done
+  9-1-read-any-bank-csv-file-in-core: done
+  9-2-column-mapping-row-validation-and-saved-bank-formats-in-core: done
+  9-3-import-plan-classify-every-row-against-the-ledger-before-wri: done
+  9-4-importcsvbatch-atomic-resumable-idempotent-commit: done
+  9-5-imported-transfer-pairs-and-edge-day-rows-in-the-review-queu: done
+  9-6-import-wizard-choose-a-file-confirm-columns-and-preview: done
+  9-7-import-wizard-check-matches-import-and-see-the-summary: done
+  9-8-keep-or-delete-imported-files: done
+  9-9-export-transactions-and-account-summaries-as-csv: done
   epic-9-retrospective: optional
 
   epic-10: backlog
