@@ -73,3 +73,9 @@ Graded from the reviewers' reports; only the first group was checked against the
 - source_spec: `spec-10-1-spike-s3-ocr-engine-choice-and-the-synthetic-receipt-set.md`
   summary: Story 10.6 must tune ONNX Runtime memory (about 1 GB native heap), choose where the 15.6 MB models live, and re-measure on a release build.
   evidence: docs/decisions/S3-ocr-engine.md sections 6 and 8. The spike harness is kept in the session scratch only.
+
+## Deferred from: build of Story 10.2 (2026-11-22)
+
+- source_spec: `spec-10-2-read-receipt-lines-and-fields-in-core.md`
+  summary: Keep unparsed line text and amounts, item quantity and unit price; detect currency from symbols and re-read amounts with the detected exponent; month-first and non-English written dates; count a discount whose item was rejected.
+  evidence: Blind and edge-case reviews of 10.2; the parser was tuned on the 40 synthetic fixtures, so real-photo accuracy is unmeasured (Epic 14 measurement app).
