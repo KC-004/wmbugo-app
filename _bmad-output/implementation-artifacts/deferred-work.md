@@ -85,3 +85,9 @@ Graded from the reviewers' reports; only the first group was checked against the
 - source_spec: `spec-10-3-reconcile-a-receipt-and-allocate-tax-fees-and-discounts-in-c.md`
   summary: Give a mismatch a reason code, check itemCategories length, and merge the Not itemised row when the main category is Uncategorised.
   evidence: Blind and edge-case reviews of 10.3; Story 10.4 shows the mismatch text and should decide what it needs.
+
+## Deferred from: build of Story 10.4 (2026-11-22)
+
+- source_spec: `spec-10-4-review-a-read-receipt-and-save-it-as-one-expense.md`
+  summary: Foreign-currency receipts (Story 3.10 path with the toast `Saved · Check the amount in ₹`), the photo thumbnail and full-screen viewer, a date picker and locale date format, re-deriving the shop defaults after a merchant edit, and a phone check of the review screen and migration 0030.
+  evidence: Story 10.4 spec Implementation Notes; the screen was only tested with react-test-renderer, never on the device.

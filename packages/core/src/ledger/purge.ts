@@ -92,6 +92,7 @@ async function purgeOne(ctx: WriterContext, id: string, out: Purged): Promise<vo
   await ctx.execute("UPDATE review_candidate SET status = 'resolved', resolved_at = ?, matched_transaction_id = NULL WHERE matched_transaction_id = ? AND status = 'open'", [ctx.nowMs(), id]);
   await ctx.execute('UPDATE review_candidate SET matched_transaction_id = NULL WHERE matched_transaction_id = ?', [id]);
   await ctx.execute('DELETE FROM source_record WHERE transaction_id = ?', [id]);
+  await ctx.execute('DELETE FROM receipt_item WHERE transaction_id = ?', [id]);
   await ctx.execute('DELETE FROM split WHERE transaction_id = ?', [id]);
   await ctx.execute('DELETE FROM posting WHERE transaction_id = ?', [id]);
   await ctx.execute('DELETE FROM "transaction" WHERE id = ?', [id]);

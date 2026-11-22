@@ -112,7 +112,7 @@ const choiceOf = (rule: { kind: string }): PaydayChoice => (rule.kind === 'day' 
  * Settings (SCR-21). Only the groups whose features exist in this build are listed: You. Each row's one-line
  * summary is part of its spoken label and updates as soon as a change is saved.
  */
-export function SettingsScreen({ api = realSettingsApi, onBack, onReview }: { api?: SettingsApi; onBack: () => void; onReview?: () => void }) {
+export function SettingsScreen({ api = realSettingsApi, onBack, onReview, onSampleReceipt }: { api?: SettingsApi; onBack: () => void; onReview?: () => void; /** Debug build only: opens the receipt review with a made-up draft. */ onSampleReceipt?: () => void }) {
   const theme = useTheme();
   const qc = useQueryClient();
   const q = useQuery({ queryKey: SETTINGS_QUERY_KEY, queryFn: () => api.load() });
@@ -285,6 +285,7 @@ export function SettingsScreen({ api = realSettingsApi, onBack, onReview }: { ap
         <>
           <Row testID="row-backup" label={copy.backup.dataRow} summary={backupSummary(d.settings.lastBackupAt, d.profile.timezoneId)} onPress={() => setPage('backup')} />
           <Row testID="row-restore" label={copy.restore.row} summary={copy.restore.title} onPress={() => setPage('restore')} />
+          {onSampleReceipt ? <Row testID="row-sample-receipt" label={copy.receiptReview.sample} summary={copy.receiptReview.title} onPress={onSampleReceipt} /> : null}
           <Row testID="row-import" label={copy.csvImport.row} summary={copy.csvImport.rowSummary} onPress={() => setPage('import')} />
           <Row testID="row-export-csv" label={copy.exportCsv.row} summary={copy.exportCsv.rowSummary} onPress={() => setPage('exportCsv')} />
           <Row testID="row-imported-files" label={copy.csvImport.filesRow} summary={retentionSummary(d.settings.importRetention)} onPress={() => setPage('importedFiles')} />

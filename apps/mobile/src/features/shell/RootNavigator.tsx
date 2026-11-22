@@ -1,4 +1,7 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import type { ReceiptDraft } from '@wmbugo/core';
+import { getServices } from '../../adapters/startApp';
+import { readProfile } from '../../adapters/readProfile';
 import { ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { DefaultTheme, NavigationContainer, useIsFocused, useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -29,6 +32,8 @@ import { BudgetsScreen } from '../budgets/BudgetsScreen';
 import { appNotifier } from '../../adapters/notifier';
 import { BudgetDetailScreen } from '../budgets/BudgetDetailScreen';
 import { BillsScreen } from '../bills/BillsScreen';
+import { ReceiptReviewScreen } from '../receipt/ReceiptReviewScreen';
+import { sampleReceiptDraft } from '../receipt/sampleReceipt';
 import { BillDetailScreen } from '../bills/BillDetailScreen';
 import { InsightsScreen } from '../insights/InsightsScreen';
 import { DrillScreen } from '../insights/DrillScreen';
@@ -46,7 +51,7 @@ import { TopBar } from '../../shared/ui/TopBar';
 import { TabBar, type TabRoute } from './TabBar';
 import { markTabFirstFrame } from './navTiming';
 
-type RootParams = { Tabs: undefined; BudgetDetail: { budgetId: string; periodStart?: string }; Accounts: undefined; AccountDetail: { accountId: string }; TransactionDetail: { transactionId: string }; ReviewQueue: { focusId?: string }; Settings: undefined; HomeEdit: undefined; Bills: { focusRuleId?: string } | undefined; BillDetail: { ruleId: string }; Goals: undefined; GoalDetail: { goalId: string }; Budgets: undefined; InsightsDrill: { target: DrillTarget } };
+type RootParams = { Tabs: undefined; BudgetDetail: { budgetId: string; periodStart?: string }; Accounts: undefined; AccountDetail: { accountId: string }; TransactionDetail: { transactionId: string }; ReviewQueue: { focusId?: string }; Settings: undefined; HomeEdit: undefined; Bills: { focusRuleId?: string } | undefined; BillDetail: { ruleId: string }; Goals: undefined; GoalDetail: { goalId: string }; Budgets: undefined; InsightsDrill: { target: DrillTarget }; ReceiptReview: undefined };
 registerInsightsSections();
 const RootStack = createNativeStackNavigator<RootParams>();
 const Tabs = createBottomTabNavigator();
@@ -184,12 +189,22 @@ function TabsWithAdd() {
 }
 
 function SettingsRoute() {
-  const nav = useNavigation<{ goBack: () => void; navigate: (name: 'ReviewQueue', params: Record<string, never>) => void }>();
+  const nav = useNavigation<{ goBack: () => void; navigate: (name: 'ReviewQueue' | 'ReceiptReview', params?: Record<string, never>) => void }>();
   return (
     <ScreenFrame>
-      <SettingsScreen onBack={() => nav.goBack()} onReview={() => nav.navigate('ReviewQueue', {})} />
+      <SettingsScreen onBack={() => nav.goBack()} onReview={() => nav.navigate('ReviewQueue', {})} {...(__DEV__ && process.env.NODE_ENV !== 'test' ? { onSampleReceipt: () => nav.navigate('ReceiptReview') } : {})} />
     </ScreenFrame>
   );
+}
+
+/** Debug build only, until the photo flow (Story 10.6): the receipt review opened with a made-up draft. */
+function ReceiptReviewRoute() {
+  const nav = useNavigation<{ goBack: () => void }>();
+  const [draft, setDraft] = useState<ReceiptDraft | null>(null);
+  useEffect(() => {
+    void readProfile(getServices().db).then((p) => p && setDraft(sampleReceiptDraft(p.currency, p.exponent)));
+  }, []);
+  return draft ? <ReceiptReviewScreen draft={draft} onClose={() => nav.goBack()} /> : <ScreenFrame>{null}</ScreenFrame>;
 }
 
 function AccountsRoute() {
@@ -375,6 +390,7 @@ export function RootNavigator() {
             <RootStack.Screen name="Budgets" component={BudgetsRoute} />
             <RootStack.Screen name="Goals" component={GoalsRoute} />
             <RootStack.Screen name="InsightsDrill" component={InsightsDrillRoute} />
+            <RootStack.Screen name="ReceiptReview" component={ReceiptReviewRoute} />
             <RootStack.Screen name="GoalDetail" component={GoalDetailRoute} />
             <RootStack.Screen name="TransactionDetail" component={TransactionDetailRoute} />
             <RootStack.Screen name="ReviewQueue" component={ReviewQueueRoute} />

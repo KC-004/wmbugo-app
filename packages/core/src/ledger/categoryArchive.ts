@@ -182,6 +182,8 @@ export const DeleteCategory: UseCase<{ categoryId: string }, { deleted: DeletedC
     if (isSystemCategory(me.id)) return err('CATEGORY_READONLY');
     if (all.some((c) => c.parentId === me.id)) return err('HAS_SUBCATEGORIES');
     if (Number((await ctx.query('SELECT COUNT(*) FROM split WHERE category_id = ?', [me.id]))[0]![0]) > 0) return err('IN_USE');
+    // A receipt line keeps the category it was given, so it holds the category too.
+    if (Number((await ctx.query('SELECT COUNT(*) FROM receipt_item WHERE category_id = ?', [me.id]))[0]![0]) > 0) return err('IN_USE');
     await ctx.execute('DELETE FROM category WHERE id = ?', [me.id]);
     ctx.touch('category', me.id, { deleted: true, label: me.name });
     ctx.emit('CategoriesChanged', { categoryIds: [me.id] });
@@ -260,6 +262,7 @@ export const MergeCategory: UseCase<{ fromId: string; intoId: string }, MergeRes
     const before = await fingerprint(ctx, txIds);
     const now = ctx.nowMs();
     for (const s of splits) await ctx.execute('UPDATE split SET category_id = ? WHERE id = ?', [target!.id, s.id]);
+    await ctx.execute(`UPDATE receipt_item SET category_id = ? WHERE category_id IN (${marks(ids.length)})`, [target!.id, ...ids]);
     for (const tx of txIds) {
       await ctx.execute('UPDATE "transaction" SET updated_at = ? WHERE id = ?', [now, tx]);
       const first = splits.find((s) => s.transactionId === tx)!;

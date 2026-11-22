@@ -96,12 +96,15 @@ export function controlA11y(input: {
   selected?: boolean;
   checked?: boolean;
   disabled?: boolean;
+  /** A disclosure row: announced as expanded or collapsed. */
+  expanded?: boolean;
   hint?: string;
 }): ControlA11y {
   const state: AccessibilityState = {};
   if (input.selected !== undefined) state.selected = input.selected;
   if (input.checked !== undefined) state.checked = input.checked;
   if (input.disabled) state.disabled = true;
+  if (input.expanded !== undefined) state.expanded = input.expanded;
   return {
     accessible: true,
     accessibilityRole: input.role ?? 'button',

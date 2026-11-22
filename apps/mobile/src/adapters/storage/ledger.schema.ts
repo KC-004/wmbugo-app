@@ -166,3 +166,29 @@ export const split = sqliteTable(
     check('split_amount_check', sql`${t.amount_minor} >= 0`),
   ],
 );
+
+/**
+ * The lines read from a receipt (Story 10.4, OCR-005). Kept beside the splits: `allocated_minor` is what the item counts for after
+ * its share of tax, fees and whole-bill discounts, and the item's own category lives here as well as in the entry's splits.
+ */
+export const receipt_item = sqliteTable(
+  'receipt_item',
+  {
+    id: text('id').primaryKey(),
+    transaction_id: text('transaction_id')
+      .notNull()
+      .references(() => transaction.id),
+    name: text('name').notNull(),
+    amount_minor: integer('amount_minor').notNull(),
+    discount_minor: integer('discount_minor').notNull().default(0),
+    allocated_minor: integer('allocated_minor').notNull(),
+    category_id: text('category_id')
+      .notNull()
+      .references(() => category.id),
+    line_index: integer('line_index').notNull(),
+  },
+  (t) => [
+    index('receipt_item_tx_idx').on(t.transaction_id, t.line_index),
+    check('receipt_item_amounts_check', sql`${t.amount_minor} >= 0 AND ${t.discount_minor} >= 0 AND ${t.allocated_minor} >= 0`),
+  ],
+);
