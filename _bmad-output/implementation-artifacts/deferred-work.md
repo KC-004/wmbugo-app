@@ -79,3 +79,9 @@ Graded from the reviewers' reports; only the first group was checked against the
 - source_spec: `spec-10-2-read-receipt-lines-and-fields-in-core.md`
   summary: Keep unparsed line text and amounts, item quantity and unit price; detect currency from symbols and re-read amounts with the detected exponent; month-first and non-English written dates; count a discount whose item was rejected.
   evidence: Blind and edge-case reviews of 10.2; the parser was tuned on the 40 synthetic fixtures, so real-photo accuracy is unmeasured (Epic 14 measurement app).
+
+## Deferred from: build of Story 10.3 (2026-11-22)
+
+- source_spec: `spec-10-3-reconcile-a-receipt-and-allocate-tax-fees-and-discounts-in-c.md`
+  summary: Give a mismatch a reason code, check itemCategories length, and merge the Not itemised row when the main category is Uncategorised.
+  evidence: Blind and edge-case reviews of 10.3; Story 10.4 shows the mismatch text and should decide what it needs.

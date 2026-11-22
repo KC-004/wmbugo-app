@@ -14,6 +14,7 @@ export * from './savings';
 export * from './editCommands';
 export * from './activitySearch';
 export * from './splits';
+export * from './allocateReceipt';
 export * from './refunds';
 export * from './bulk';
 export * from './purge';
