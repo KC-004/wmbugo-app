@@ -13,6 +13,9 @@ import {
   AddAttachment,
   ATTACHMENTS_SQL,
   mapAttachments,
+  RECEIPT_ITEMS_SQL,
+  mapReceiptItems,
+  type ReceiptItemView,
   mapSources,
   RemoveAttachment,
   SOURCES_SQL,
@@ -63,6 +66,8 @@ export interface TransactionData {
   readonly removalKind: 'deleted' | 'rejected' | null;
   /** Receipt photos, oldest first. */
   readonly attachments: Attachment[];
+  /** The lines read from a receipt (Story 10.5), in the order printed; empty for any other entry. */
+  readonly receiptItems?: ReceiptItemView[];
   /** Every source with its kind and time. */
   readonly sources: SourceLine[];
   /** Names of the categories this entry was merged away from (Story 4.3), oldest first. Shown as `Originally Fuel`. */
@@ -118,6 +123,7 @@ export const realTransactionApi: TransactionApi = {
       refundableMinor: detail.type === 'expense' ? await db.query(REFUNDABLE_SQL, [transactionId]).then((r) => (r[0] ? Number(r[0][0]) : null)) : null,
       removalKind: await db.query('SELECT removal_kind FROM "transaction" WHERE id = ?', [transactionId]).then((r) => (r[0] && (r[0][0] === 'deleted' || r[0][0] === 'rejected') ? (r[0][0] as 'deleted' | 'rejected') : null)),
       attachments: mapAttachments(await db.query(ATTACHMENTS_SQL, [transactionId])),
+      receiptItems: mapReceiptItems(await db.query(RECEIPT_ITEMS_SQL, [transactionId])),
       sources: mapSources(await db.query(SOURCES_SQL, [transactionId])),
       originalCategories: mapOriginalCategories(await db.query(ORIGINAL_CATEGORIES_SQL, [transactionId])),
       reversedOn: detail.status === 'reversed' ? await db.query('SELECT local_date FROM "transaction" WHERE id = (SELECT reversed_by_id FROM "transaction" WHERE id = ?)', [transactionId]).then((r) => (r[0] ? String(r[0][0]) : null)) : null,

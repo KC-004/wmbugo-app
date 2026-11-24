@@ -112,6 +112,11 @@ export const createSaveReceipt = (deps: { readonly suggester?: CategorySuggester
       }
       for (const it of allocation.items) {
         const src = d.items[it.index]!;
+        // An item the person gave a category of its own is a lesson for later (Epic 11): one event per such item.
+        const chosen = input.itemCategories[it.index];
+        // The item's own words, lower case with single spaces: the merchant normalizer would cut quantities and prefixes off an item name.
+        const key = src.name.toLowerCase().replace(/\s+/g, ' ').trim();
+        if (chosen && key !== '') ctx.emit('ReceiptItemCategorised', { transactionId, itemKey: key, categoryId: chosen, actor: 'user' });
         await ctx.execute('INSERT INTO receipt_item (id, transaction_id, name, amount_minor, discount_minor, allocated_minor, category_id, line_index) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [
           ctx.newId(),
           transactionId,

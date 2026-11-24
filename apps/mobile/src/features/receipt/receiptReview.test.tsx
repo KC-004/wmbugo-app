@@ -9,7 +9,7 @@ import { ThemeProvider } from '../../shared/theme/ThemeProvider';
 import { account, cleanup, fire, has, host, quietAccessibility, settle, tap, texts } from '../add/testKit';
 import { ReceiptReviewScreen } from './ReceiptReviewScreen';
 import type { ReceiptApi, ReceiptContext, SaveReceiptRequest } from './receiptApi';
-import { confirmTotal, initialReview, saveInput, setCharge, setDate, setItemCategory, setMainCategory, setTotal, viewOf } from './receiptReviewModel';
+import { addItem, confirmTotal, editItem, initialReview, removeItem, saveInput, setCharge, setDate, setItemCategory, setMainCategory, setTotal, viewOf } from './receiptReviewModel';
 import { sampleReceiptDraft } from './sampleReceipt';
 
 jest.mock('../../adapters/startApp', () => ({ getServices: jest.fn(), systemClock: { nowMs: () => 0, timezoneId: () => 'Asia/Singapore' } }));
@@ -63,6 +63,36 @@ describe('review model (Story 10.4)', () => {
     const s = init(draft({ total: { value: 5000, certainty: 'sure' } }));
     expect(viewOf(s, TODAY)).toMatchObject({ canSave: false, blocked: 'mismatch' });
     expect(saveInput(s, TODAY)).toBeNull();
+  });
+
+  it('editing an item reruns the allocation, removing one moves its amount to Not itemised, and adding one shrinks it', () => {
+    let s = init(draft({ total: { value: 5400, certainty: 'sure' } }));
+    s = editItem(s, 0, { name: 'Basmati rice', amountMinor: 4000 });
+    expect(s.draft.items[0]).toMatchObject({ name: 'Basmati rice', amountMinor: 4000 });
+    expect(viewOf(s, TODAY).allocation).toMatchObject({ state: 'not_itemised', notItemised: 200 });
+    const removed = removeItem(init(draft({ total: { value: 5400, certainty: 'sure' } })), 1);
+    expect(removed.draft.items).toHaveLength(1);
+    expect(removed.itemChoices).toHaveLength(1);
+    expect(viewOf(removed, TODAY).allocation.state).toBe('not_itemised');
+    // The Not itemised amount shrinks when a missed line is added, and a larger one is a mismatch.
+    const added = addItem(removed, { name: 'Tea', amountMinor: 1800, categoryId: 'cat_food' });
+    expect(viewOf(added, TODAY).allocation.state).not.toBe('mismatch');
+    const tooMuch = addItem(removed, { name: 'Tea', amountMinor: 99999, categoryId: null });
+    expect(viewOf(tooMuch, TODAY).allocation.state).toBe('mismatch');
+    expect(addItem(removed, { name: ' ', amountMinor: 100, categoryId: null })).toBe(removed);
+    // An edit cannot make an amount zero, and an item discount never passes the item.
+    const base = init(draft({ total: { value: 5400, certainty: 'sure' } }));
+    expect(editItem(base, 0, { amountMinor: 0 })).toBe(base);
+    expect(editItem(base, 0, { amountMinor: 1.5 })).toBe(base);
+    const discounted = init(draft({ items: [{ ...draft().items[0]!, discountMinor: 3000 }] }));
+    expect(editItem(discounted, 0, { amountMinor: 1000 }).draft.items[0]!.discountMinor).toBe(1000);
+    // An item can go back to following the main category.
+    expect(setItemCategory(setItemCategory(base, 1, 'cat_shopping'), 1, null).itemChoices[1]).toBeNull();
+  });
+
+  it('only the items the person chose are reported as chosen on save', () => {
+    const s = setItemCategory(init(), 1, 'cat_shopping');
+    expect(saveInput(s, TODAY)!.itemCategories).toEqual([null, 'cat_shopping']);
   });
 
   it('shows Not itemised and still allows Save', () => {
@@ -170,7 +200,7 @@ describe('ReceiptReviewScreen (SCR-23)', () => {
     await act(async () => fire(r, 'receipt-save'));
     await settle();
     expect(save).toHaveBeenCalledTimes(1);
-    expect(save.mock.calls[0]![0]).toMatchObject({ submissionId: 'sub-1', mainCategoryId: 'cat_food', accountId: 'a1', createCash: false, itemCategories: ['cat_food', 'cat_food'] });
+    expect(save.mock.calls[0]![0]).toMatchObject({ submissionId: 'sub-1', mainCategoryId: 'cat_food', accountId: 'a1', createCash: false, itemCategories: [null, null] });
     expect(onSaved).toHaveBeenCalledWith('rx1');
     expect(onClose).toHaveBeenCalled();
     expect(texts(r)).toContain('Saved');
@@ -289,6 +319,69 @@ describe('ReceiptReviewScreen (SCR-23)', () => {
     expect(has(r, 'receipt-load-failed')).toBe(true);
     act(() => fire(r, 'receipt-load-close'));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('an item gets its own category from its chip, the totals regroup without collapsing the list, and save reports only that item as chosen', async () => {
+    const { r, save } = await mount(draft());
+    act(() => fire(r, 'items-toggle'));
+    act(() => fire(r, 'item-chip-1'));
+    await settle();
+    act(() => fire(r, 'pick-category-cat_shopping'));
+    await settle();
+    expect(has(r, 'item-1')).toBe(true); // still open
+    expect(has(r, 'total-cat_shopping')).toBe(true);
+    expect(has(r, 'total-cat_groceries')).toBe(true);
+    await act(async () => fire(r, 'receipt-save'));
+    await settle();
+    expect(save.mock.calls[0]![0].itemCategories).toEqual([null, 'cat_shopping']);
+  });
+
+  it('the custom action Change category on an item row opens the same picker', async () => {
+    const { r } = await mount(draft());
+    act(() => fire(r, 'items-toggle'));
+    const row = host(r, 'item-0');
+    expect(row.props.accessibilityActions).toEqual([{ name: 'changeCategory', label: 'Change category' }]);
+    act(() => row.props.onAccessibilityAction({ nativeEvent: { actionName: 'changeCategory' } }));
+    await settle();
+    expect(has(r, 'pick-category-cat_food')).toBe(true);
+  });
+
+  it('shows an item discount under the item', async () => {
+    const d = draft();
+    const { r } = await mount({ ...d, items: [{ ...d.items[0]!, discountMinor: 100 }, d.items[1]!], total: { value: 5300, certainty: 'sure' } });
+    act(() => fire(r, 'items-toggle'));
+    expect(texts(r).join(' ')).toContain('Discount');
+  });
+
+  it('edits an item name and amount, removes an item (its amount moves to Not itemised), and adds a missed line', async () => {
+    const { r } = await mount(draft());
+    act(() => fire(r, 'items-toggle'));
+    act(() => fire(r, 'item-edit-1'));
+    await settle();
+    act(() => fire(r, 'item-name-input', 'onChangeText', 'Dish soap large'));
+    act(() => fire(r, 'item-save'));
+    await settle();
+    expect(texts(r)).toContain('Dish soap large');
+    act(() => fire(r, 'item-edit-1'));
+    await settle();
+    act(() => fire(r, 'item-remove'));
+    await settle();
+    expect(has(r, 'item-1')).toBe(false);
+    expect(has(r, 'not-itemised')).toBe(true);
+    act(() => fire(r, 'add-item'));
+    await settle();
+    act(() => fire(r, 'item-name-input', 'onChangeText', 'Lemons'));
+    act(() => fire(r, 'item-amount-input', 'onChangeText', '5'));
+    act(() => fire(r, 'item-category-cat_food'));
+    act(() => fire(r, 'item-save'));
+    await settle();
+    expect(texts(r)).toContain('Lemons');
+    act(() => fire(r, 'item-edit-1'));
+    await settle();
+    act(() => fire(r, 'item-amount-input', 'onChangeText', '0'));
+    act(() => fire(r, 'item-save'));
+    await settle();
+    expect(has(r, 'item-error')).toBe(true);
   });
 
   it('with no history the main category is Uncategorised', async () => {

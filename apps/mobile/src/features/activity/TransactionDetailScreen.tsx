@@ -28,6 +28,7 @@ import { ImportReviewActions } from './ImportReviewCards';
 import { realReviewQueueApi, type ReviewApi } from './reviewApi';
 import { CategoryPickerSheet } from './CategoryPickerSheet';
 import { ReceiptPhotos } from './ReceiptPhotos';
+import { ReceiptItemsList } from './ReceiptItemsList';
 import { usePermanentDelete } from './usePermanentDelete';
 import { realDeletedApi, type DeletedApi } from './deletedApi';
 import { TransactionBillSection } from '../bills/TransactionBillSection';
@@ -485,6 +486,8 @@ export function TransactionDetailScreen({
             <Button label={copy.deleted.deletePermanently} variant="text" onPress={() => purge(transactionId, onBack)} testID="detail-purge" />
           </View>
         ) : null}
+
+        {!d.removed && data.receiptItems && data.receiptItems.length > 0 ? <ReceiptItemsList items={data.receiptItems} currency={data.currency} locale={data.locale} /> : null}
 
         {d.removed ? null : (
           <ReceiptPhotos photos={data.attachments} photoPath={api.photoPath} onAdd={api.addPhoto ? () => void addPhoto() : undefined} onRemove={api.removePhoto ? removePhoto : undefined} />

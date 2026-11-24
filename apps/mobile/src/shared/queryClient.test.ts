@@ -52,7 +52,7 @@ describe('query client', () => {
   });
 
   it('every catalogue event has a handler', () => {
-    expect(Object.keys(invalidationHandlers(createQueryClient())).sort()).toEqual(['AccountsChanged', 'BackupRestored', 'BudgetThresholdCrossed', 'BudgetsChanged', 'CapturesRejected', 'CapturesSubmitted', 'CategoriesChanged', 'CategoryAssigned', 'CsvFormatsChanged', 'GoalsChanged', 'ImportsChanged', 'ProfileChanged', 'RecurringChanged', 'TransactionsChanged']);
+    expect(Object.keys(invalidationHandlers(createQueryClient())).sort()).toEqual(['AccountsChanged', 'BackupRestored', 'BudgetThresholdCrossed', 'BudgetsChanged', 'CapturesRejected', 'CapturesSubmitted', 'CategoriesChanged', 'CategoryAssigned', 'CsvFormatsChanged', 'GoalsChanged', 'ImportsChanged', 'ProfileChanged', 'ReceiptItemCategorised', 'RecurringChanged', 'TransactionsChanged']);
   });
 
   it('invalidating twice (redelivery) is harmless', async () => {

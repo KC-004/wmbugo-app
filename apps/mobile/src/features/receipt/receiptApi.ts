@@ -43,7 +43,8 @@ export interface ReceiptContext {
 export interface SaveReceiptRequest {
   readonly submissionId: string;
   readonly draft: ReceiptDraft;
-  readonly itemCategories: readonly string[];
+  /** The category the person chose for each item, or null while it follows the main category. */
+  readonly itemCategories: readonly (string | null)[];
   readonly mainCategoryId: string;
   readonly accountId: string | null;
   readonly createCash: boolean;

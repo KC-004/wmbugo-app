@@ -20,10 +20,11 @@ import { moneyText } from '../../shared/ui/moneyText';
 import { ScreenFrame } from '../../shared/ui/ScreenFrame';
 import { TopBar } from '../../shared/ui/TopBar';
 import { realAddApi, type AddApi } from '../add/addApi';
+import type { CategoryRow } from '@wmbugo/core';
 import { useDuplicateChoices } from '../add/duplicateChoices';
 import { Keypad } from '../add/Keypad';
 import { realReceiptApi, type ReceiptApi, type ReceiptContext } from './receiptApi';
-import { confirmTotal, initialReview, saveInput, setAccount, setCharge, setDate, setMainCategory, setMerchant, setSubtotal, setTotal, viewOf, type ChargeKind, type ReviewState } from './receiptReviewModel';
+import { addItem, confirmTotal, editItem, initialReview, removeItem, saveInput, setAccount, setCharge, setDate, setItemCategory, setMainCategory, setMerchant, setSubtotal, setTotal, viewOf, type ChargeKind, type ReviewState } from './receiptReviewModel';
 
 /** A day that exists on the calendar, written `YYYY-MM-DD`. */
 const isRealDate = (v: string): boolean => {
@@ -33,6 +34,43 @@ const isRealDate = (v: string): boolean => {
   const t = new Date(Date.UTC(y, mo - 1, d));
   return t.getUTCFullYear() === y && t.getUTCMonth() === mo - 1 && t.getUTCDate() === d;
 };
+
+/** One item: its name and amount, and (for a line the reader missed) its category. Removing is offered for an item that exists. */
+function ItemEditor({ initialName, initialMinor, exponent, categories, initialCategoryId, withCategory, onSave, onRemove }: { initialName: string; initialMinor: number | null; exponent: number; categories: readonly CategoryRow[]; initialCategoryId: string | null; withCategory: boolean; onSave: (name: string, minor: number, categoryId: string | null) => void; onRemove?: () => void }) {
+  const theme = useTheme();
+  const [name, setName] = useState(initialName);
+  const [amount, setAmount] = useState(minorToInput(initialMinor, exponent));
+  const [categoryId, setCategoryId] = useState<string | null>(initialCategoryId);
+  const [problem, setProblem] = useState(false);
+  const input = [styles.input, textStyle('body'), { color: theme.color('on-glass-primary'), borderColor: theme.color('on-glass-secondary') }];
+  return (
+    <View style={styles.editor}>
+      <Text style={[textStyle('label'), { color: theme.color('on-glass-primary') }]}>{copy.receiptReview.itemName}</Text>
+      <TextInput testID="item-name-input" accessibilityLabel={copy.receiptReview.itemName} value={name} onChangeText={(t) => { setName(t); setProblem(false); }} maxLength={120} style={input} />
+      <Text style={[textStyle('label'), { color: theme.color('on-glass-primary') }]}>{copy.receiptReview.itemAmount}</Text>
+      <TextInput testID="item-amount-input" accessibilityLabel={copy.receiptReview.itemAmount} value={amount} onChangeText={(t) => { setAmount(t); setProblem(false); }} keyboardType="decimal-pad" style={input} />
+      {withCategory ? (
+        <View style={styles.wrap}>
+          {categories.map((c) => (
+            <Chip onGlass key={c.id} label={c.name} testID={`item-category-${c.id}`} selected={categoryId === c.id} onPress={() => setCategoryId(categoryId === c.id ? null : c.id)} />
+          ))}
+        </View>
+      ) : null}
+      {problem ? <Text testID="item-error" accessibilityRole="alert" style={[textStyle('caption'), { color: theme.color('on-glass-accent') }]}>{copy.receiptReview.itemInvalid}</Text> : null}
+      <Button
+        label={copy.common.save}
+        testID="item-save"
+        onGlass
+        onPress={() => {
+          const parsed = parseAmountInput(amount.trim() === '' ? '0' : amount.trim(), exponent);
+          if (name.trim() === '' || !parsed.ok || parsed.value <= 0) return setProblem(true);
+          onSave(name.trim(), parsed.value, categoryId);
+        }}
+      />
+      {onRemove ? <Button label={copy.receiptReview.removeItem} variant="destructive" testID="item-remove" onPress={onRemove} onGlass /> : null}
+    </View>
+  );
+}
 
 /** The amount keypad in a sheet: what is typed shows above the keys, and Done (or Confirm) returns the exact minor units. */
 function AmountEditor({ initialMinor, exponent, locale, doneLabel, allowZero = false, onDone }: { initialMinor: number | null; exponent: number; locale: string; doneLabel: string; /** A tax, fee or discount can be corrected to nothing; a total cannot. */ allowZero?: boolean; onDone: (minor: number) => void }) {
@@ -184,6 +222,47 @@ export function ReceiptReviewScreen({ draft, api = realReceiptApi, addApi = real
   const editText = (id: string, title: string, initial: string, maxLength: number, apply: (v: string) => void, keyboard?: 'numbers-and-punctuation', validate?: (v: string) => string | null) =>
     sheet.open({ id, title, body: (close) => <TextEditor label={title} initial={initial} maxLength={maxLength} {...(keyboard ? { keyboard } : {})} {...(validate ? { validate } : {})} onDone={(v) => { apply(v.trim()); close(); }} /> });
 
+  const pickCategory = (itemIndex: number) =>
+    sheet.open({
+      id: 'item-category',
+      title: copy.receiptReview.changeCategory,
+      body: (close) => (
+        <View style={styles.wrap}>
+          <Chip onGlass label={copy.receiptReview.followMain} testID="pick-category-main" selected={state.itemChoices[itemIndex] === null} onPress={() => { update((st) => setItemCategory(st, itemIndex, null)); close(); }} />
+          {ctx.categories.map((c) => (
+            <Chip onGlass key={c.id} label={c.name} testID={`pick-category-${c.id}`} selected={state.itemChoices[itemIndex] === c.id} onPress={() => { update((st) => setItemCategory(st, itemIndex, c.id)); close(); }} />
+          ))}
+        </View>
+      ),
+    });
+  const editItemSheet = (index: number) => {
+    const it = state.draft.items[index]!;
+    sheet.open({
+      id: 'edit-item',
+      title: copy.receiptReview.itemTitle,
+      body: (close) => (
+        <ItemEditor
+          initialName={it.name}
+          initialMinor={it.amountMinor}
+          exponent={ctx.exponent}
+          categories={ctx.categories}
+          initialCategoryId={null}
+          withCategory={false}
+          onSave={(name, minor) => { update((st) => editItem(st, index, { name, amountMinor: minor })); close(); }}
+          onRemove={() => { update((st) => removeItem(st, index)); close(); }}
+        />
+      ),
+    });
+  };
+  const addItemSheet = () =>
+    sheet.open({
+      id: 'add-item',
+      title: copy.receiptReview.addItem,
+      body: (close) => (
+        <ItemEditor initialName="" initialMinor={null} exponent={ctx.exponent} categories={ctx.categories} initialCategoryId={null} withCategory onSave={(name, minor, categoryId) => { update((st) => addItem(st, { name, amountMinor: minor, categoryId })); close(); }} />
+      ),
+    });
+
   const d = state.draft;
   const total = d.total.value;
   const discard = () =>
@@ -289,10 +368,30 @@ export function ReceiptReviewScreen({ draft, api = realReceiptApi, addApi = real
           </Pressable>
         ) : null}
         {itemsOpen
-          ? view.allocation.items.map((it) => (
-              <Row key={it.index} testID={`item-${it.index}`} label={d.items[it.index]!.name} a11yLabel={`${d.items[it.index]!.name}, ${money(it.allocatedAmount)}, ${catName(it.categoryId)}`} value={<Amount amountMinor={it.allocatedAmount} currency={ctx.currency} direction="expense" locale={ctx.locale} />} />
-            ))
+          ? view.allocation.items.map((it) => {
+              const src = d.items[it.index]!;
+              return (
+                <View
+                  key={it.index}
+                  testID={`item-${it.index}`}
+                  accessible
+                  accessibilityLabel={`${src.name}, ${money(it.allocatedAmount)}, ${catName(it.categoryId)}`}
+                  accessibilityActions={[{ name: 'changeCategory', label: copy.receiptReview.changeCategory }]}
+                  onAccessibilityAction={(e) => e.nativeEvent.actionName === 'changeCategory' && pickCategory(it.index)}
+                  style={[styles.itemBox, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
+                  <Pressable testID={`item-edit-${it.index}`} {...controlA11y({ label: copy.receiptReview.editField.replace('{field}', src.name), role: 'button' })} onPress={() => editItemSheet(it.index)} style={styles.itemTop}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[textStyle('body'), { color: theme.color('text-primary') }]}>{src.name}</Text>
+                      {src.discountMinor > 0 ? <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{copy.receiptReview.itemDiscount.replace('{amount}', money(src.discountMinor))}</Text> : null}
+                    </View>
+                    <Amount amountMinor={it.allocatedAmount} currency={ctx.currency} direction="expense" locale={ctx.locale} />
+                  </Pressable>
+                  <Chip label={catName(it.categoryId)} testID={`item-chip-${it.index}`} hint={copy.receiptReview.changeCategory} onPress={() => pickCategory(it.index)} />
+                </View>
+              );
+            })
           : null}
+        {itemsOpen && view.allocation.notItemised > 0 ? <Button label={copy.receiptReview.addItem} variant="secondary" testID="add-item" onPress={addItemSheet} /> : null}
 
         {d.subtotal.value !== null ? <Row testID="row-subtotal" label={copy.receiptReview.subtotal} a11yLabel={copy.receiptReview.editField.replace('{field}', copy.receiptReview.subtotal)} value={<Amount amountMinor={d.subtotal.value} currency={ctx.currency} direction="neutral" locale={ctx.locale} />} onPress={() => editAmount('edit-subtotal', copy.receiptReview.subtotal, d.subtotal.value, copy.common.save, (m) => update((s) => setSubtotal(s, m)), true)} /> : null}
         {chargeRows('taxes', copy.receiptReview.tax)}
@@ -333,6 +432,8 @@ const styles = StyleSheet.create({
   thumb: { height: 72, borderWidth: 1, borderRadius: radii.md, alignItems: 'center', justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: radii.md, paddingHorizontal: 12, minHeight: layout.touchMin, paddingVertical: 8 },
   grey: { opacity: 0.8 },
+  itemBox: { borderWidth: 1, borderRadius: radii.md, padding: 8, gap: 4, marginLeft: 12 },
+  itemTop: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: layout.touchMin },
   value: { alignItems: 'flex-end', flexShrink: 1 },
   inline: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },

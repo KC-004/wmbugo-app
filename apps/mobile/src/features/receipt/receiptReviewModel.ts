@@ -1,4 +1,4 @@
-import { allocateReceipt, type ReceiptAllocation, type ReceiptCharge, type ReceiptDraft } from '@wmbugo/core';
+import { allocateReceipt, type ReceiptAllocation, type ReceiptCharge, type ReceiptDraft, type ReceiptItem } from '@wmbugo/core';
 
 /**
  * The receipt review's state (Story 10.4, SCR-23). Pure: every edit returns a new state, and `viewOf` derives what the screen shows,
@@ -42,9 +42,39 @@ export function setCharge(s: ReviewState, kind: ChargeKind, index: number, minor
 /** Changing the main category moves only the items still following it. */
 export const setMainCategory = (s: ReviewState, categoryId: string): ReviewState => ({ ...s, mainCategoryId: categoryId });
 
-export function setItemCategory(s: ReviewState, index: number, categoryId: string): ReviewState {
+/** `null` puts the item back on the main category. */
+export function setItemCategory(s: ReviewState, index: number, categoryId: string | null): ReviewState {
   if (index < 0 || index >= s.itemChoices.length) return s;
   return { ...s, itemChoices: s.itemChoices.map((c, i) => (i === index ? categoryId : c)) };
+}
+
+/** Corrects an item's name or printed amount; its own discount and category stay. A blank name is ignored. */
+export function editItem(s: ReviewState, index: number, patch: { name?: string; amountMinor?: number }): ReviewState {
+  if (index < 0 || index >= s.draft.items.length) return s;
+  if (patch.amountMinor !== undefined && (!Number.isSafeInteger(patch.amountMinor) || patch.amountMinor <= 0)) return s;
+  const items: ReceiptItem[] = s.draft.items.map((it, i) => {
+    if (i !== index) return it;
+    const name = patch.name !== undefined && patch.name.trim() !== '' ? patch.name.trim() : it.name;
+    const amountMinor = patch.amountMinor ?? it.amountMinor;
+    // The item's own discount can never be more than the item.
+    return { ...it, name, amountMinor, discountMinor: Math.min(it.discountMinor, amountMinor), certainty: 'sure' };
+  });
+  return { ...s, draft: { ...s.draft, items } };
+}
+
+/** Takes an item out: its amount goes to Not itemised while the total stays, or the receipt becomes a mismatch if the items now exceed it. */
+export function removeItem(s: ReviewState, index: number): ReviewState {
+  if (index < 0 || index >= s.draft.items.length) return s;
+  return { ...s, draft: { ...s.draft, items: s.draft.items.filter((_, i) => i !== index) }, itemChoices: s.itemChoices.filter((_, i) => i !== index) };
+}
+
+/** A line the reader missed, put at the end in the category the person chose. */
+export function addItem(s: ReviewState, item: { name: string; amountMinor: number; categoryId: string | null }): ReviewState {
+  const name = item.name.trim();
+  if (name === '' || !Number.isSafeInteger(item.amountMinor) || item.amountMinor <= 0) return s;
+  const lineIndex = s.draft.items.reduce((n, i) => Math.max(n, i.lineIndex), -1) + 1;
+  const added: ReceiptItem = { name, amountMinor: item.amountMinor, discountMinor: 0, lineIndex, certainty: 'sure' };
+  return { ...s, draft: { ...s.draft, items: [...s.draft.items, added] }, itemChoices: [...s.itemChoices, item.categoryId] };
 }
 
 export interface ReviewView {
@@ -92,5 +122,6 @@ export function saveInput(s: ReviewState, todayLocal: string) {
   if (!v.canSave) return null;
   // The date defaults to today when none was read, and the draft carries it so the saved entry uses it.
   const draft: ReceiptDraft = s.draft.date.value === null ? { ...s.draft, date: sure(todayLocal) } : s.draft;
-  return { draft, itemCategories: s.itemChoices.map((c) => c ?? s.mainCategoryId), mainCategoryId: s.mainCategoryId, accountId: s.accountId };
+  // Null means the item follows the main category; only the ones the person chose are reported as chosen.
+  return { draft, itemCategories: s.itemChoices, mainCategoryId: s.mainCategoryId, accountId: s.accountId };
 }

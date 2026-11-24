@@ -30,6 +30,8 @@ export const EVENT_CATALOGUE = {
   CapturesSubmitted: { areas: ['captures', 'ledger', 'home', 'widget'] },
   CapturesRejected: { areas: ['captures', 'ledger', 'home', 'widget'] },
   CategoryAssigned: { areas: ['learning', 'insights', 'budgets'] },
+  /** A receipt line was given its own category by the person (Story 10.5): the item learning of Epic 11 reads it. */
+  ReceiptItemCategorised: { areas: ['learning'] },
   CategoriesChanged: { areas: ['ledger', 'budgets', 'insights', 'home', 'plan', 'bills'] },
   BudgetsChanged: { areas: ['budgets', 'home', 'plan', 'insights'] },
   BudgetThresholdCrossed: { areas: ['notifications'] },
@@ -61,6 +63,8 @@ export interface EventPayloads {
    * whether it was a guess nobody had confirmed. Confirming a guess (`Looks right`) carries the same category for both.
    */
   CategoryAssigned: { readonly transactionIds: readonly string[]; readonly previousCategoryId?: string | null; readonly wasGuessed?: boolean };
+  /** The normalized item name, its category and who chose it (always the user): no amount, no shop, no photo. */
+  ReceiptItemCategorised: { readonly transactionId: string; readonly itemKey: string; readonly categoryId: string; readonly actor: 'user' };
   /** Category ids only: pickers, Activity, budgets and insights refresh. */
   CategoriesChanged: { readonly categoryIds: readonly string[] };
   /** Budget ids only: the budget list, Home and Plan refresh. */

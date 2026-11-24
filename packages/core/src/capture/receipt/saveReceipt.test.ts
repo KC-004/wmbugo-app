@@ -13,6 +13,7 @@ import { UNCATEGORISED_ID } from '../../ledger/categories';
 import { NOT_ITEMISED_MEMO } from '../../ledger/splits';
 import { SubmitCapture } from '../submitCapture';
 import { SaveReceipt, type SaveReceiptInput } from './saveReceipt';
+import { mapReceiptItems, RECEIPT_ITEMS_SQL } from './readModel';
 import type { ReceiptCharge, ReceiptDraft, ReceiptItem } from './types';
 
 const NOW = Date.UTC(2026, 10, 8, 10, 0, 0); // 8 Nov 2026 15:30 in Kolkata
@@ -91,6 +92,37 @@ describe('SaveReceipt (Story 10.4)', () => {
     // The account was charged the total.
     const bal = (await db.query("SELECT SUM(signed_amount_minor) FROM posting WHERE account_id = ?", [accountId]))[0]![0];
     expect(bal).toBe(5_000_000 - 5400);
+  });
+
+  it('writes one ReceiptItemCategorised event for each item the person gave a category, with the normalized name and no amount', async () => {
+    const { db, writer, accountId } = await setup();
+    const r = await writer.run(SaveReceipt, base(accountId, { itemCategories: [null, 'cat_shopping'] }), 'user');
+    const id = r.ok ? r.value.transactionId : '';
+    const rows = await db.query("SELECT payload_json FROM outbox WHERE event = 'ReceiptItemCategorised'");
+    expect(rows).toHaveLength(1);
+    expect(JSON.parse(String(rows[0]![0]))).toEqual({ transactionId: id, itemKey: 'soap', categoryId: 'cat_shopping', actor: 'user' });
+    // A name keeps its size and quantity words, and a blank one emits nothing.
+    const two = await writer.run(SaveReceipt, base(accountId, { submissionId: 'r2', draft: draft({ items: [item('  Rice   5KG ', 4200), item('   ', 1800, 0, 1)], discounts: [600] }), itemCategories: ['cat_food', 'cat_food'] }), 'user');
+    expect(two.ok).toBe(true);
+    const keys = (await db.query("SELECT payload_json FROM outbox WHERE event = 'ReceiptItemCategorised'")).map((x) => JSON.parse(String(x[0])).itemKey);
+    expect(keys).toEqual(['soap', 'rice 5kg']);
+    expect(String(rows[0]![0])).not.toMatch(/1800|1620/);
+  });
+
+  it('spending by category uses the split amounts (Groceries 37.80 of a 54.00 receipt), and the saved lines read back in printed order', async () => {
+    const { db, writer, accountId } = await setup();
+    const r = await writer.run(SaveReceipt, base(accountId), 'user');
+    const id = r.ok ? r.value.transactionId : '';
+    const spent = await db.query("SELECT s.category_id, SUM(s.amount_minor) FROM split s JOIN \"transaction\" t ON t.id = s.transaction_id WHERE t.event_type = 'expense' AND t.status = 'confirmed' AND t.removed_at IS NULL GROUP BY s.category_id ORDER BY s.category_id");
+    expect(spent).toEqual([
+      ['cat_groceries', 3780],
+      ['cat_shopping', 1620],
+    ]);
+    const lines = mapReceiptItems(await db.query(RECEIPT_ITEMS_SQL, [id]));
+    expect(lines.map((l) => [l.name, l.allocatedMinor, l.categoryName])).toEqual([
+      ['Rice', 3780, 'Groceries'],
+      ['Soap', 1620, 'Shopping'],
+    ]);
   });
 
   it('keeps what was not itemised as an Uncategorised split flagged not itemised', async () => {

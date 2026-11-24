@@ -161,7 +161,7 @@ development_status:
   10-2-read-receipt-lines-and-fields-in-core: review
   10-3-reconcile-a-receipt-and-allocate-tax-fees-and-discounts-in-c: review
   10-4-review-a-read-receipt-and-save-it-as-one-expense: review
-  10-5-give-each-receipt-item-its-own-category: backlog
+  10-5-give-each-receipt-item-its-own-category: review
   10-6-pick-a-receipt-photo-and-watch-it-being-read: backlog
   10-7-snap-a-receipt-with-the-camera: backlog
   10-8-a-receipt-that-matches-an-entry-attach-to-it-keep-separate-o: backlog

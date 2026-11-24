@@ -230,7 +230,7 @@ describe('event catalogue', () => {
   });
 
   it('uses past-tense names', () => {
-    for (const n of names) expect(n).toMatch(/(Changed|Submitted|AutoApproved|Rejected|Linked|Unlinked|Assigned|Crossed|Restored)$/);
+    for (const n of names) expect(n).toMatch(/(Changed|Submitted|AutoApproved|Rejected|Linked|Unlinked|Assigned|Crossed|Restored|Categorised)$/);
   });
 
   it('maps TransactionsChanged to ledger, budgets, insights, home, widget, plan, bills and goals only', () => {
