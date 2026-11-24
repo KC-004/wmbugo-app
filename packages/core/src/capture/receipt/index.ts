@@ -5,3 +5,5 @@ export * from './parseReceipt';
 export * from './score';
 export * from './saveReceipt';
 export * from './readModel';
+export * from './matchReceipt';
+export * from './attachReceipt';

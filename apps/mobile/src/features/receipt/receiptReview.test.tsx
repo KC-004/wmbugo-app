@@ -8,7 +8,8 @@ import { createQueryClient } from '../../shared/queryClient';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
 import { account, cleanup, fire, has, host, quietAccessibility, settle, tap, texts } from '../add/testKit';
 import { ReceiptReviewScreen } from './ReceiptReviewScreen';
-import type { ReceiptApi, ReceiptContext, SaveReceiptRequest } from './receiptApi';
+import type { ReceiptMatch } from '@wmbugo/core';
+import type { AttachRequest, ReceiptApi, ReceiptContext, SaveReceiptRequest } from './receiptApi';
 import { addItem, confirmTotal, editItem, initialReview, removeItem, saveInput, setCharge, setDate, setItemCategory, setMainCategory, setTotal, viewOf } from './receiptReviewModel';
 import { sampleReceiptDraft } from './sampleReceipt';
 
@@ -103,7 +104,9 @@ describe('review model (Story 10.4)', () => {
   });
 });
 
-function fakeApi(over: Partial<ReceiptContext> = {}) {
+const HDFC_MATCH: ReceiptMatch = { transactionId: 'm1', amountMinor: 5400, localDate: TODAY, occurredAtMs: Date.UTC(2026, 10, 8, 10, 12, 0), merchant: 'Sagar Fresh Mart', accountName: 'HDFC debit', sourceKind: 'sms', status: 'confirmed' };
+
+function fakeApi(over: Partial<ReceiptContext> = {}, found: ReceiptMatch[] = [], itemCount = 0) {
   const categories = mapCategoryRows(SEED_CATEGORIES.filter((c) => c.kind === 'expense').map((c, i) => [c.id, c.name, c.kind, c.budgetType, c.icon, c.color, i, 0]) as never);
   const ctx: ReceiptContext = {
     currency: 'SGD', exponent: 2, locale: 'en-SG', timezoneId: 'Asia/Singapore', todayLocal: TODAY,
@@ -113,14 +116,16 @@ function fakeApi(over: Partial<ReceiptContext> = {}) {
   };
   const save = jest.fn<ReturnType<ReceiptApi['save']>, [SaveReceiptRequest]>(async () => ({ ok: true, value: { transactionId: 'rx1', result: 'RECORDED' } }));
   const remove = jest.fn(async (id: string) => ({ ok: id !== '' }));
-  const api: ReceiptApi = { load: jest.fn(async () => ctx), newSubmissionId: () => 'sub-1', save, remove: (id: string) => remove(id) };
-  return { api, save, remove };
+  const attach = jest.fn<ReturnType<ReceiptApi['attach']>, [AttachRequest]>(async () => ({ ok: true, value: { undo: { before: {} } as never, adjustmentMinor: 0 } }));
+  const undoAttach = jest.fn(async () => ({ ok: true }));
+  const api: ReceiptApi = { load: jest.fn(async () => ctx), newSubmissionId: () => 'sub-1', save, remove: (id: string) => remove(id), matches: jest.fn(async () => found), itemCount: jest.fn(async () => itemCount), attach, undoAttach };
+  return { api, save, remove, attach, undoAttach };
 }
 
 const PHOTO = { attachmentId: 'att1', digest: 'd1', sizeBytes: 10, width: 10, height: 10, provenance: 'photo_picker' as const };
 
-async function mount(d: ReceiptDraft, over: Partial<ReceiptContext> = {}, loadFails = false, withPhoto = false) {
-  const f = fakeApi(over);
+async function mount(d: ReceiptDraft, over: Partial<ReceiptContext> = {}, loadFails = false, withPhoto = false, found: ReceiptMatch[] = [], itemCount = 0) {
+  const f = fakeApi(over, found, itemCount);
   if (loadFails) f.api.load = jest.fn(async () => { throw new Error('no profile'); });
   const onClose = jest.fn();
   const onSaved = jest.fn();
@@ -244,6 +249,86 @@ describe('ReceiptReviewScreen (SCR-23)', () => {
     act(() => fire(b.r, 'discard-confirm'));
     expect(b.onDiscardPhoto).toHaveBeenCalledTimes(1);
     expect(b.save).not.toHaveBeenCalled();
+  });
+
+  it('a probable match shows the prompt with its choices instead of Save, and nothing is attached without a tap', async () => {
+    const a = await mount(draft(), {}, false, true, [HDFC_MATCH]);
+    expect(texts(a.r)).toContain('Matches ₹54.00 HDFC debit 6:12 pm'.replace('₹', 'S$'));
+    expect(has(a.r, 'receipt-save')).toBe(false);
+    expect(has(a.r, 'attach-m1')).toBe(true);
+    expect(has(a.r, 'keep-separate')).toBe(true);
+    expect(has(a.r, 'match-discard')).toBe(true);
+    expect(a.attach).not.toHaveBeenCalled();
+    expect(a.save).not.toHaveBeenCalled();
+    expect(texts(a.r).join(' ')).not.toMatch(/Approve|Reject/);
+  });
+
+  it('shows the date when the match is not from today', async () => {
+    const a = await mount(draft(), {}, false, false, [{ ...HDFC_MATCH, localDate: '2026-11-06', occurredAtMs: Date.UTC(2026, 10, 6, 10, 12, 0) }]);
+    expect(texts(a.r).some((t) => /HDFC debit · 6 Nov, 6:12 pm$/.test(t))).toBe(true);
+  });
+
+  it('lists up to three matches, each with its own Attach to it, and Keep separate and Discard once', async () => {
+    const more = ['m2', 'm3'].map((id) => ({ ...HDFC_MATCH, transactionId: id }));
+    const a = await mount(draft(), {}, false, false, [HDFC_MATCH, ...more]);
+    expect(['m1', 'm2', 'm3'].every((id) => has(a.r, 'attach-' + id))).toBe(true);
+    expect(a.r.root.findAll((n) => typeof n.type === 'string' && n.props.testID === 'keep-separate')).toHaveLength(1);
+  });
+
+  it('Attach to it attaches the reviewed receipt and the photo, toasts Receipt attached with Undo, and Undo restores', async () => {
+    const a = await mount(draft(), {}, false, true, [HDFC_MATCH]);
+    act(() => fire(a.r, 'category-cat_food'));
+    await act(async () => fire(a.r, 'attach-m1'));
+    await settle();
+    expect(a.attach).toHaveBeenCalledTimes(1);
+    expect(a.attach.mock.calls[0]![0]).toMatchObject({ submissionId: 'sub-1', transactionId: 'm1', mainCategoryId: 'cat_food', attachment: { attachmentId: 'att1' } });
+    expect(a.save).not.toHaveBeenCalled();
+    expect(texts(a.r)).toContain('Receipt attached');
+    await act(async () => fire(a.r, 'toast-undo'));
+    expect(a.undoAttach).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks before replacing the items an entry already has', async () => {
+    const a = await mount(draft(), {}, false, true, [HDFC_MATCH], 14);
+    await act(async () => fire(a.r, 'attach-m1'));
+    await settle();
+    expect(texts(a.r)).toContain('Replace its 14 items with these 2?');
+    expect(a.attach).not.toHaveBeenCalled();
+    await act(async () => fire(a.r, 'keep-items'));
+    await settle();
+    expect(a.attach.mock.calls[0]![0]).toMatchObject({ itemsMode: 'keep', attachment: { attachmentId: 'att1' } });
+  });
+
+  it('Keep separate brings Save back and saves a new confirmed expense with keepSeparate', async () => {
+    const a = await mount(draft(), {}, false, false, [HDFC_MATCH]);
+    act(() => fire(a.r, 'keep-separate'));
+    await settle();
+    expect(has(a.r, 'receipt-save')).toBe(true);
+    expect(has(a.r, 'match-prompt')).toBe(false);
+    act(() => fire(a.r, 'category-cat_food'));
+    await act(async () => fire(a.r, 'receipt-save'));
+    await settle();
+    expect(a.save.mock.calls[0]![0]).toMatchObject({ keepSeparate: true });
+  });
+
+  it('Discard writes nothing, deletes the photo, toasts Receipt discarded and closes', async () => {
+    const a = await mount(draft(), {}, false, true, [HDFC_MATCH]);
+    act(() => fire(a.r, 'match-discard'));
+    await settle();
+    expect(a.onDiscardPhoto).toHaveBeenCalledTimes(1);
+    expect(a.onClose).toHaveBeenCalled();
+    expect(a.attach).not.toHaveBeenCalled();
+    expect(a.save).not.toHaveBeenCalled();
+    expect(texts(a.r)).toContain('Receipt discarded');
+  });
+
+  it('a failed attach says nothing was changed and keeps the review open', async () => {
+    const a = await mount(draft(), {}, false, false, [HDFC_MATCH]);
+    a.attach.mockResolvedValueOnce({ ok: false, code: 'ENTRY_REMOVED' });
+    await act(async () => fire(a.r, 'attach-m1'));
+    await settle();
+    expect(texts(a.r)).toContain('Could not attach the receipt. Nothing was changed.');
+    expect(a.onClose).not.toHaveBeenCalled();
   });
 
   it('Back asks to discard: Keep editing returns, Discard closes and writes nothing', async () => {

@@ -42,6 +42,8 @@ export type SubmitInput = {
   readonly sourceKind: CaptureSourceKind;
   /** The source's own reference (bank reference, UPI id); part of the duplicate fingerprint. */
   readonly reference?: string;
+  /** The person chose `Keep separate` for a receipt that looked like a recorded entry: it is confirmed, never held against it (Story 10.8). */
+  readonly keepSeparate?: boolean;
   /** Import anyway: a tombstone does not suppress this submission (Epic 9's per-row Import anyway). */
   readonly ignoreTombstone?: boolean;
   /** A transfer into a savings pot made for a goal (Story 6.7): the goal's allocation is written in the same transaction. */
@@ -63,13 +65,26 @@ export interface Submitted {
   readonly matchedTransactionId?: string;
 }
 
+/** What the matcher treats a capture as: a bank, card or UPI record is a charge (the receipt rule applies to it); manual, receipt and CSV are themselves. */
+function matchSourceOf(kind: CaptureSourceKind): CaptureItem['source'] {
+  return kind === 'manual' ? 'manual' : kind === 'receipt' ? 'receipt' : kind === 'csv' ? 'csv' : 'bank';
+}
+
+/** The recorded amounts worth comparing: the same amount, or (the receipt rule) a charge up to 30% above a receipt, from either side. */
+function amountRange(kind: CaptureSourceKind, amountMinor: number): [number, number] {
+  const source = matchSourceOf(kind);
+  if (source === 'bank') return [Math.ceil((amountMinor * 10) / 13), amountMinor];
+  if (source === 'receipt') return [amountMinor, Math.floor((amountMinor * 13) / 10)];
+  return [amountMinor, amountMinor];
+}
+
 const addDays = (date: string, n: number): string => new Date(Date.UTC(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10)) + n)).toISOString().slice(0, 10);
 
 /** Confirmed, not-removed expense and income entries near the new one, in the shape the matcher compares. */
-async function candidates(ctx: WriterContext, amountMinor: number, localDate: string): Promise<CaptureItem[]> {
+async function candidates(ctx: WriterContext, lowAmountMinor: number, highAmountMinor: number, localDate: string): Promise<CaptureItem[]> {
   const rows = await ctx.query(
-    `SELECT t.id, t.event_type, t.amount_minor, t.local_date, t.occurred_at_utc, t.original_description, p.account_id, COALESCE((SELECT sr.source_kind FROM source_record sr WHERE sr.transaction_id = t.id ORDER BY sr.created_at LIMIT 1), 'manual'), (SELECT sr.reference FROM source_record sr WHERE sr.transaction_id = t.id ORDER BY sr.created_at LIMIT 1) FROM "transaction" t JOIN posting p ON p.transaction_id = t.id AND p.posting_kind = 'normal' WHERE t.status = 'confirmed' AND t.removed_at IS NULL AND t.event_type IN ('expense','income') AND t.amount_minor = ? AND t.local_date BETWEEN ? AND ?`,
-    [amountMinor, addDays(localDate, -1), addDays(localDate, 1)],
+    `SELECT t.id, t.event_type, t.amount_minor, t.local_date, t.occurred_at_utc, t.original_description, p.account_id, COALESCE((SELECT sr.source_kind FROM source_record sr WHERE sr.transaction_id = t.id ORDER BY sr.created_at LIMIT 1), 'manual'), (SELECT sr.reference FROM source_record sr WHERE sr.transaction_id = t.id ORDER BY sr.created_at LIMIT 1) FROM "transaction" t JOIN posting p ON p.transaction_id = t.id AND p.posting_kind = 'normal' WHERE t.status = 'confirmed' AND t.removed_at IS NULL AND t.event_type IN ('expense','income') AND t.amount_minor BETWEEN ? AND ? AND t.local_date BETWEEN ? AND ?`,
+    [lowAmountMinor, highAmountMinor, addDays(localDate, -1), addDays(localDate, 1)],
   );
   return rows.map((r) => ({
     id: String(r[0]),
@@ -81,7 +96,7 @@ async function candidates(ctx: WriterContext, amountMinor: number, localDate: st
     occurredAtMs: Number(r[4]),
     merchant: r[5] === null ? null : String(r[5]),
     accountId: String(r[6]),
-    source: String(r[7]) as CaptureItem['source'],
+    source: matchSourceOf(String(r[7]) as CaptureSourceKind),
   }));
 }
 
@@ -186,7 +201,7 @@ export const createSubmitCapture = (deps: { readonly suggester?: CategorySuggest
     const created = await createEntry(ctx, entry, async (facts) => {
       // A CSV row was matched by the plan: it is confirmed, or waits for the reason the plan gave. It is not matched a second time.
       if (input.sourceKind === 'csv') return { status: input.csv?.review ? 'needs_review' : 'confirmed' };
-      if (facts.newAccount || facts.accountId === null) return { status: 'confirmed' };
+      if (facts.newAccount || facts.accountId === null || input.keepSeparate) return { status: 'confirmed' };
       const item: CaptureItem = {
         id: 'new',
         reference: null,
@@ -197,10 +212,10 @@ export const createSubmitCapture = (deps: { readonly suggester?: CategorySuggest
         occurredAtMs: facts.occurredAtMs,
         merchant: e.merchant ?? null,
         accountId: facts.accountId,
-        source: 'manual',
+        source: matchSourceOf(input.sourceKind),
       };
       // An entry made by Duplicate is never held against the entry it was copied from.
-      const near = (await candidates(ctx, e.amountMinor, facts.localDate)).filter((c) => c.id !== input.copiedFrom);
+      const near = (await candidates(ctx, ...amountRange(input.sourceKind, e.amountMinor), facts.localDate)).filter((c) => c.id !== input.copiedFrom);
       const outcome = matchItem(item, near, { ownedAccountIds: new Set([facts.accountId]) });
       // Saved, never blocked: a possible duplicate waits for review and counts in nothing until it is confirmed.
       return outcome.kind === 'possible_duplicate_of' || outcome.kind === 'duplicate_of' ? { status: 'needs_review', duplicateOf: outcome.id } : { status: 'confirmed' };

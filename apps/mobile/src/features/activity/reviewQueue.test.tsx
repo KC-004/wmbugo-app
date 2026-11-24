@@ -155,6 +155,14 @@ describe('review queue screen (Story 3.10)', () => {
     expect(texts(manual.r)).toContain('Delete');
   });
 
+  it('says Keep separate instead of Keep both when one side is a receipt, with Merge and the source Receipt (Story 10.8)', async () => {
+    const receipt = side('r', { sourceKind: 'receipt', merchant: 'Sagar Fresh Mart' });
+    const m = await mountQueue(dataOf([item('d3', { reason: 'duplicate', alreadyRecorded: receipt })]));
+    const t = texts(m.r);
+    expect(t).toEqual(expect.arrayContaining(['Keep separate', 'Merge', 'Receipt']));
+    expect(t).not.toContain('Keep both');
+  });
+
   it('a pending capture offers Approve, Edit and Reject · Not mine; Approve toasts with Undo and the list updates', async () => {
     const m = await mountQueue(dataOf([item('p1'), item('p2')]));
     expect(texts(m.r)).toEqual(expect.arrayContaining(['Approve', 'Edit', 'Reject · Not mine']));

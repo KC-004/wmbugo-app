@@ -254,7 +254,7 @@ function ReviewCard({
           <SideColumn title={copy.review.alreadyRecorded} side={item.alreadyRecorded} data={data} />
         </View>
         <View style={styles.actions}>
-          <HeldRowActions transactionId={item.id} api={duplicateApi} />
+          <HeldRowActions transactionId={item.id} api={duplicateApi} receiptSide={item.sourceKind === 'receipt' || item.alreadyRecorded.sourceKind === 'receipt'} />
           <Button label={removeLabel} variant="text" onPress={onRemove} testID={`review-remove-${item.id}`} />
         </View>
       </View>

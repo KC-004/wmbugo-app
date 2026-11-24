@@ -25,6 +25,8 @@ interface Undo {
   txs: TxSnapshot[];
   /** Splits created by the merge (the tip split), removed again on Undo. */
   addedSplitIds?: string[];
+  /** Receipt items that moved from the receipt entry to the survivor. */
+  movedReceiptItems?: { ids: string[]; from: string };
   /** Photos the merge dropped because the survivor already had the same image. */
   droppedAttachments?: DroppedAttachment[];
 }
@@ -101,6 +103,8 @@ export const MergeDuplicate: UseCase<{ transactionId: string; categoryId?: strin
       if (survivor.amount >= receiptTotal && other.splits.length > 0) {
         await ctx.execute('DELETE FROM split WHERE transaction_id = ?', [survivorId]);
         await ctx.execute('UPDATE split SET transaction_id = ? WHERE transaction_id = ?', [survivorId, otherId]);
+        undo.movedReceiptItems = { ids: (await ctx.query('SELECT id FROM receipt_item WHERE transaction_id = ?', [otherId])).map((r) => String(r[0])), from: otherId };
+        await ctx.execute('UPDATE receipt_item SET transaction_id = ? WHERE transaction_id = ?', [survivorId, otherId]);
         if (survivor.amount > receiptTotal) {
           const main = [...other.splits].sort((a, b) => b.amount - a.amount)[0]!;
           const tipId = ctx.newId();
@@ -154,6 +158,7 @@ export const UndoDuplicateResolution: UseCase<{ transactionId: string }, void, R
     // An entry purged since (past its keeping period) cannot be put back.
     for (const s of undo.txs) if ((await ctx.query('SELECT 1 FROM "transaction" WHERE id = ?', [s.id])).length === 0) return err('NOTHING_TO_UNDO');
     for (const id of undo.addedSplitIds ?? []) await ctx.execute('DELETE FROM split WHERE id = ?', [id]);
+    for (const id of undo.movedReceiptItems?.ids ?? []) await ctx.execute('UPDATE receipt_item SET transaction_id = ? WHERE id = ?', [undo.movedReceiptItems!.from, id]);
     // Clear every split first: a split the merge moved from one record to the other must not collide when it goes back.
     for (const s of undo.txs) await ctx.execute('DELETE FROM split WHERE transaction_id = ?', [s.id]);
     for (const s of undo.txs) await restoreTx(ctx, s);

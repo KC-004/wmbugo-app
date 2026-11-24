@@ -23,6 +23,8 @@ export interface SaveReceiptInput {
   readonly accountId: string | null;
   /** `Paid with` is Cash and no Cash account exists: it is created with its balance not set, in this same save (as for a manual entry). */
   readonly createCash?: boolean;
+  /** `Keep separate`: the receipt looked like a recorded entry and the person decided it is not. It is confirmed with no duplicate held (Story 10.8). */
+  readonly keepSeparate?: boolean;
   /** The photo, already encrypted on disk under this id (Story 3.11). */
   readonly attachment?: { readonly attachmentId: string; readonly digest: string; readonly sizeBytes: number };
 }
@@ -94,11 +96,13 @@ export const createSaveReceipt = (deps: { readonly suggester?: CategorySuggester
         sourceKind: 'receipt',
         // A receipt is something the person chose to scan: an earlier rejected or deleted match never suppresses it.
         ignoreTombstone: true,
+        ...(input.keepSeparate ? { keepSeparate: true } : {}),
         entry: { kind: 'expense', amountMinor: d.total.value, categoryId: input.mainCategoryId, accountId, ...(merchant ? { merchant } : {}), occurredAtMs: at },
       });
       if (!submitted.ok) return submitted;
       const { transactionId, result } = submitted.value;
       if (result === 'ALREADY_SUBMITTED') return ok({ transactionId, result });
+      if (input.keepSeparate) await ctx.execute("UPDATE \"transaction\" SET capture_resolution = 'user_approved' WHERE id = ?", [transactionId]);
 
       const splits = toSplits(allocation);
       const single = splits.length === 1 && splits[0]!.categoryId === input.mainCategoryId;

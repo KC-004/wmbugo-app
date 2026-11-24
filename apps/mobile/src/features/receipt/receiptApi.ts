@@ -8,7 +8,15 @@ import {
   normalizeMerchant,
   rankCategories,
   RemoveEntry,
+  AttachReceipt,
+  localToInstant,
+  previewReceiptMatches,
+  receiptMatchParams,
+  RECEIPT_MATCH_SQL,
   SaveReceipt,
+  UndoAttachReceipt,
+  type AttachReceiptUndo,
+  type ReceiptMatch,
   toLocalDate,
   UNCATEGORISED_ID,
   type AccountRow,
@@ -49,7 +57,21 @@ export interface SaveReceiptRequest {
   readonly accountId: string | null;
   readonly createCash: boolean;
   readonly attachment?: { readonly attachmentId: string; readonly digest: string; readonly sizeBytes: number };
+  /** `Keep separate` was chosen for a receipt that looked like a recorded entry. */
+  readonly keepSeparate?: boolean;
 }
+
+export interface AttachRequest {
+  readonly submissionId: string;
+  readonly transactionId: string;
+  readonly draft: ReceiptDraft;
+  readonly itemCategories: readonly (string | null)[];
+  readonly mainCategoryId: string;
+  readonly itemsMode?: 'replace' | 'keep';
+  readonly attachment?: { readonly attachmentId: string; readonly digest: string; readonly sizeBytes: number };
+}
+
+export type AttachOutcome = { ok: true; value: { undo: AttachReceiptUndo; adjustmentMinor: number } } | { ok: false; code: string };
 
 export type SaveOutcome = { ok: true; value: { transactionId: string; result: SubmitResult } } | { ok: false; code: string };
 
@@ -59,6 +81,12 @@ export interface ReceiptApi {
   save(request: SaveReceiptRequest): Promise<SaveOutcome>;
   /** Undo: the entry is removed as deleted (a receipt is user-initiated, never rejected as not mine). */
   remove(transactionId: string): Promise<{ ok: boolean }>;
+  /** A dry run of the matcher: recorded expenses this receipt probably is (nothing is written). */
+  matches(draft: ReceiptDraft, timezoneId: string): Promise<ReceiptMatch[]>;
+  /** How many receipt items an entry already has. */
+  itemCount(transactionId: string): Promise<number>;
+  attach(request: AttachRequest): Promise<AttachOutcome>;
+  undoAttach(undo: AttachReceiptUndo): Promise<{ ok: boolean }>;
 }
 
 /** The last confirmed expenses with the account and the biggest category of each, newest first. */
@@ -109,13 +137,30 @@ export const realReceiptApi: ReceiptApi = {
     };
   },
   newSubmissionId: () => getServices().newId(),
-  async save({ submissionId, draft, itemCategories, mainCategoryId, accountId, createCash, attachment }) {
+  async save({ submissionId, draft, itemCategories, mainCategoryId, accountId, createCash, attachment, keepSeparate }) {
     const r = await getServices().writer.run(
       SaveReceipt,
-      { submissionId, draft, itemCategories, mainCategoryId, accountId, ...(createCash ? { createCash: true } : {}), ...(attachment ? { attachment } : {}) },
+      { submissionId, draft, itemCategories, mainCategoryId, accountId, ...(createCash ? { createCash: true } : {}), ...(attachment ? { attachment } : {}), ...(keepSeparate ? { keepSeparate: true } : {}) },
       'user',
     );
     return r.ok ? { ok: true, value: { transactionId: r.value.transactionId, result: r.value.result } } : r;
   },
   remove: (transactionId) => getServices().writer.run(RemoveEntry, { transactionId }, 'user'),
+  async matches(draft, timezoneId) {
+    const total = draft.total.value;
+    const date = draft.date.value;
+    if (total === null || total <= 0 || date === null) return [];
+    const [h, m] = draft.time.value !== null && /^([01]d|2[0-3]):[0-5]d$/.test(draft.time.value) ? draft.time.value.split(':').map(Number) : [12, 0];
+    const at = localToInstant(date, h!, m!, timezoneId);
+    const rows = await getServices().db.query(RECEIPT_MATCH_SQL, receiptMatchParams(total, date));
+    return previewReceiptMatches({ merchant: draft.merchant.value, localDate: date, occurredAtMs: at.ok ? at.value : systemClock.nowMs(), totalMinor: total }, rows);
+  },
+  async itemCount(transactionId) {
+    return Number((await getServices().db.query('SELECT COUNT(*) FROM receipt_item WHERE transaction_id = ?', [transactionId]))[0]?.[0] ?? 0);
+  },
+  async attach(request) {
+    const r = await getServices().writer.run(AttachReceipt, request, 'user');
+    return r.ok ? { ok: true, value: { undo: r.value.undo, adjustmentMinor: r.value.adjustmentMinor } } : r;
+  },
+  undoAttach: (undo) => getServices().writer.run(UndoAttachReceipt, { undo }, 'user'),
 };

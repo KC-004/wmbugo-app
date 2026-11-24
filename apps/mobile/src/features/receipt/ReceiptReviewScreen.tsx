@@ -23,9 +23,28 @@ import { realAddApi, type AddApi } from '../add/addApi';
 import type { CategoryRow } from '@wmbugo/core';
 import { useDuplicateChoices } from '../add/duplicateChoices';
 import { Keypad } from '../add/Keypad';
+import type { ReceiptMatch } from '@wmbugo/core';
 import type { PendingPhoto } from '../../adapters/files/receiptFiles';
 import { realReceiptApi, type ReceiptApi, type ReceiptContext } from './receiptApi';
 import { addItem, confirmTotal, editItem, initialReview, removeItem, saveInput, setAccount, setCharge, setDate, setItemCategory, setMainCategory, setMerchant, setSubtotal, setTotal, viewOf, type ChargeKind, type ReviewState } from './receiptReviewModel';
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+
+/** `Matches ₹2,340 HDFC debit 6:12 pm` today, `... · 6 Nov, 6:12 pm` on another day (the profile time zone). */
+function matchText(template: { today: string; other: string }, atMs: number, localDate: string, todayLocal: string, timezoneId: string): string {
+  let h = 0;
+  let m = 0;
+  try {
+    const parts = new Intl.DateTimeFormat('en-GB', { timeZone: timezoneId, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(atMs).split(':');
+    h = Number(parts[0]);
+    m = Number(parts[1]);
+  } catch {
+    // keep midnight
+  }
+  const time = `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'am' : 'pm'}`;
+  if (localDate === todayLocal) return template.today.replace('{time}', time);
+  return template.other.replace('{date}', `${Number(localDate.slice(8, 10))} ${MONTHS[Number(localDate.slice(5, 7)) - 1] ?? ''}`).replace('{time}', time);
+}
 
 /** A day that exists on the calendar, written `YYYY-MM-DD`. */
 const isRealDate = (v: string): boolean => {
@@ -169,6 +188,9 @@ export function ReceiptReviewScreen({ draft, photo, onDiscardPhoto, api = realRe
   const submission = useRef<string | null>(null);
   const savingRef = useRef(false);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [matches, setMatches] = useState<readonly ReceiptMatch[]>([]);
+  const [separate, setSeparate] = useState(false);
+  const attaching = useRef(false);
 
   useEffect(() => {
     let live = true;
@@ -185,6 +207,21 @@ export function ReceiptReviewScreen({ draft, photo, onDiscardPhoto, api = realRe
       live = false;
     };
   }, [api, draft]);
+
+  // A dry run of the matcher: does this receipt look like a payment that is already recorded? Nothing is written.
+  const matchKey = state ? `${state.draft.merchant.value ?? ''}|${state.draft.total.value ?? ''}|${state.draft.date.value ?? ''}` : '';
+  useEffect(() => {
+    if (!ctx || !state) return;
+    let live = true;
+    void api
+      .matches(state.draft, ctx.timezoneId)
+      .then((m) => live && setMatches(m))
+      .catch(() => live && setMatches([]));
+    return () => {
+      live = false;
+    };
+    // The prompt follows the shop, total and date only.
+  }, [api, ctx, matchKey]);
 
   const discardRef = useRef<(() => void) | null>(null);
   // Android back asks the same question as the Back arrow: nothing is saved unless the person says so.
@@ -266,6 +303,59 @@ export function ReceiptReviewScreen({ draft, photo, onDiscardPhoto, api = realRe
 
   const d = state.draft;
   const total = d.total.value;
+  const holdingForMatch = matches.length > 0 && !separate;
+
+  const matchLine = (m: ReceiptMatch): string => {
+    const line = matchText({ today: copy.receiptReview.matchesToday, other: copy.receiptReview.matchesOther }, m.occurredAtMs, m.localDate, ctx.todayLocal, ctx.timezoneId);
+    return line.replace('{amount}', money(m.amountMinor)).replace('{account}', m.accountName ?? '').replace(/\s+/g, ' ').trim();
+  };
+
+  const discardAll = () => {
+    onDiscardPhoto?.();
+    toast.show({ message: copy.receiptReview.discarded });
+    onClose();
+  };
+
+  const doAttach = async (m: ReceiptMatch, itemsMode?: 'replace' | 'keep') => {
+    const input = saveInput(state, ctx.todayLocal);
+    if (!input || attaching.current) {
+      if (!input) setError(view.blocked === 'total' ? copy.receiptReview.saveHintTotal : copy.receiptReview.saveHintMismatch);
+      return;
+    }
+    attaching.current = true;
+    setError(null);
+    submission.current ??= api.newSubmissionId();
+    const r = await api
+      .attach({ submissionId: submission.current, transactionId: m.transactionId, draft: input.draft, itemCategories: input.itemCategories, mainCategoryId: input.mainCategoryId, ...(itemsMode ? { itemsMode } : {}), ...(photo ? { attachment: { attachmentId: photo.attachmentId, digest: photo.digest, sizeBytes: photo.sizeBytes } } : {}) })
+      .catch(() => ({ ok: false as const, code: 'ERROR' }));
+    attaching.current = false;
+    if (!r.ok) {
+      setError(copy.receiptReview.attachFailed);
+      return;
+    }
+    await invalidateForEvent(qc, 'TransactionsChanged').catch(() => undefined);
+    toast.show({
+      message: copy.receiptReview.attached,
+      undo: { label: copy.common.undo, onUndo: () => void api.undoAttach(r.value.undo).then(() => { onDiscardPhoto?.(); return invalidateForEvent(qc, 'TransactionsChanged'); }).catch(() => undefined) },
+    });
+    onSaved?.(m.transactionId);
+    onClose();
+  };
+
+  const attachTo = async (m: ReceiptMatch) => {
+    const old = await api.itemCount(m.transactionId).catch(() => 0);
+    if (old === 0) return void doAttach(m);
+    sheet.open({
+      id: 'replace-items',
+      title: copy.receiptReview.replaceTitle.replace('{old}', String(old)).replace('{new}', String(d.items.length)),
+      body: (close) => (
+        <View style={styles.editor}>
+          <Button label={copy.receiptReview.replaceItems} testID="replace-items" onPress={() => { close(); void doAttach(m, 'replace'); }} onGlass />
+          <Button label={copy.receiptReview.keepCurrentItems} variant="secondary" testID="keep-items" onPress={() => { close(); void doAttach(m, 'keep'); }} onGlass />
+        </View>
+      ),
+    });
+  };
   const discard = () =>
     sheet.open({
       id: 'receipt-discard',
@@ -287,7 +377,7 @@ export function ReceiptReviewScreen({ draft, photo, onDiscardPhoto, api = realRe
     savingRef.current = true;
     setError(null);
     submission.current ??= api.newSubmissionId();
-    const r = await api.save({ submissionId: submission.current, ...input, createCash: input.accountId === null, ...(photo ? { attachment: { attachmentId: photo.attachmentId, digest: photo.digest, sizeBytes: photo.sizeBytes } } : {}) }).catch(() => ({ ok: false as const, code: 'ERROR' }));
+    const r = await api.save({ submissionId: submission.current, ...input, createCash: input.accountId === null, ...(photo ? { attachment: { attachmentId: photo.attachmentId, digest: photo.digest, sizeBytes: photo.sizeBytes } } : {}), ...(separate ? { keepSeparate: true } : {}) }).catch(() => ({ ok: false as const, code: 'ERROR' }));
     if (!r.ok) {
       savingRef.current = false;
       setError(r.code === 'CURRENCY_DIFFERS' ? copy.receiptReview.currencyDiffers.replace('{currency}', d.currency.value ?? '') : r.code === 'DATE_INVALID' ? copy.receiptReview.dateInvalid : copy.receiptReview.saveFailed);
@@ -318,6 +408,17 @@ export function ReceiptReviewScreen({ draft, photo, onDiscardPhoto, api = realRe
         <View testID="receipt-thumb" accessible accessibilityLabel={copy.receiptReview.thumbMissing} style={[styles.thumb, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
           <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{copy.receiptReview.thumbMissing}</Text>
         </View>
+
+        {holdingForMatch ? (
+          <View testID="match-prompt" accessibilityRole="alert" style={[styles.matchBox, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('accent-primary') }]}>
+            {matches.map((m) => (
+              <View key={m.transactionId} style={styles.matchRow}>
+                <Text testID={`match-${m.transactionId}`} style={[textStyle('body-medium'), { color: theme.color('text-primary') }]}>{matchLine(m)}</Text>
+                <Button label={copy.receiptReview.attachToIt} testID={`attach-${m.transactionId}`} onPress={() => void attachTo(m)} />
+              </View>
+            ))}
+          </View>
+        ) : null}
 
         <Row testID="row-merchant" label={copy.receiptReview.merchant} a11yLabel={copy.receiptReview.editField.replace('{field}', copy.receiptReview.merchant)} value={<Text style={[textStyle('body-medium'), { color: theme.color('text-primary') }]}>{d.merchant.value ?? copy.receiptReview.merchantMissing}</Text>} onPress={() => editText('edit-merchant', copy.receiptReview.merchant, d.merchant.value ?? '', 120, (v) => update((s) => setMerchant(s, v)))} />
 
@@ -422,7 +523,14 @@ export function ReceiptReviewScreen({ draft, photo, onDiscardPhoto, api = realRe
         {error ? <Text testID="save-error" accessibilityRole="alert" style={[textStyle('body'), { color: theme.color('semantic-warning') }]}>{error}</Text> : null}
       </ScrollView>
       <View style={[styles.footer, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
-        <Button label={copy.receiptReview.save} testID="receipt-save" {...(blockedReason ? { disabledReason: blockedReason } : {})} onPress={() => void save()} />
+        {holdingForMatch ? (
+          <View style={styles.matchChoices}>
+            <Button label={copy.receiptReview.keepSeparate} variant="secondary" testID="keep-separate" onPress={() => setSeparate(true)} />
+            <Button label={copy.receiptReview.discardReceipt} variant="destructive" testID="match-discard" onPress={discardAll} />
+          </View>
+        ) : (
+          <Button label={copy.receiptReview.save} testID="receipt-save" {...(blockedReason ? { disabledReason: blockedReason } : {})} onPress={() => void save()} />
+        )}
       </View>
     </ScreenFrame>
   );
@@ -441,4 +549,7 @@ const styles = StyleSheet.create({
   editor: { gap: 12, paddingBottom: 8 },
   input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, minHeight: layout.touchMin },
   footer: { padding: 12, borderTopWidth: 1 },
+  matchBox: { borderWidth: 2, borderRadius: radii.md, padding: 12, gap: 8 },
+  matchRow: { gap: 8 },
+  matchChoices: { gap: 8 },
 });

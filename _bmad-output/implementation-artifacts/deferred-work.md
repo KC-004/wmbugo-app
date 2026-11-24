@@ -103,3 +103,9 @@ Graded from the reviewers' reports; only the first group was checked against the
 - source_spec: `spec-10-7-snap-a-receipt-with-the-camera.md`
   summary: Phone check of the VisionCamera screen (preview, shutter, torch, permission prompt and revocation, long-press and TalkBack action on the plus button, LockGate and app-switcher snapshot, Switch Access) and a size check of the APK after the media3 / CameraX dependencies.
   evidence: Story 10.7 spec Implementation Notes; only a fake camera surface was tested.
+
+## Deferred from: build of Story 10.8 (2026-11-24)
+
+- source_spec: `spec-10-8-a-receipt-that-matches-an-entry-attach-to-it-keep-separate-o.md`
+  summary: Phone check of the match prompt and Attach to it; persist the Attach undo so it survives the toast; the receipt rule uses the entry day, so a receipt printed after midnight or with a wrong date can miss its charge.
+  evidence: Story 10.8 spec Implementation Notes; only react-test-renderer and core tests ran.
