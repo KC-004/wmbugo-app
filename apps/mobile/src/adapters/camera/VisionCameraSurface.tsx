@@ -3,11 +3,11 @@ import { StyleSheet, View } from 'react-native';
 import { Camera, useCameraDevice, usePhotoOutput } from 'react-native-vision-camera';
 import type { CameraSurfaceHandle, CameraSurfaceProps } from './cameraSurface';
 
-/** A torch change that was still pending when the camera closed (a photo was taken, or the screen went away) is expected, not an error. */
-function onCameraError(error: Error): void {
-  if (/not active|OperationCanceled|cancell?ed/i.test(`${error.name} ${error.message}`)) return;
-  console.warn(error);
-}
+/**
+ * Session errors are not shown: a torch change still pending when the camera closed is expected, and a real camera failure already reaches the
+ * person through the shutter (`The camera could not take the photo`). The default handler would put a red box on screen in a debug build.
+ */
+function onCameraError(): void {}
 
 /** The real camera surface (VisionCamera, Story 10.7): the back camera, a preview, and one still photo written to a temporary file. */
 export const VisionCameraSurface = forwardRef<CameraSurfaceHandle, CameraSurfaceProps>(function VisionCameraSurface({ torch, active }, ref) {
