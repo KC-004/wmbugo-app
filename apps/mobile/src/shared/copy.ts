@@ -269,7 +269,7 @@ export const copy = {
     amountLabel: 'Amount',
     amountRequired: 'Error: amount required',
     categoryRequired: 'Error: category required',
-    detailsShow: 'Add details',
+    detailsShow: 'Add shop, date or note',
     detailsHide: 'Hide details',
     merchant: 'Merchant',
     date: 'Date (like 2026-11-08)',
@@ -1777,6 +1777,7 @@ export const copy = {
     removed: 'This entry was removed. Nothing was changed.',
   },
   receiptScan: {
+    snapHint: 'Take a photo and the details fill in for you',
     snap: 'Snap receipt',
     reading: 'Reading receipt…',
     nothingSaved: 'Nothing is saved yet.',

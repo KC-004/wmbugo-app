@@ -1,6 +1,7 @@
-import type { ReactNode } from 'react';
+import type { ComponentType, ReactNode } from 'react';
+import type { IconProps } from 'phosphor-react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Backspace } from 'phosphor-react-native';
+import { Backspace, Eraser } from 'phosphor-react-native';
 import type { KeypadKey } from '@wmbugo/core';
 import { controlA11y } from '../../shared/a11y/labels';
 import { decimalSeparator } from '../../shared/decimalSeparator';
@@ -46,8 +47,23 @@ function ClearKey({ onPress }: { onPress: () => void }) {
   const { focused, onFocus, onBlur } = useFocusRing(true);
   return (
     <FocusRing focused={focused} onGlass radius={radii.md}>
-      <Pressable testID="key-clear" {...controlA11y({ label: copy.add.clear, role: 'button' })} onPress={onPress} onFocus={onFocus} onBlur={onBlur} style={styles.clear}>
+      <Pressable testID="key-clear" {...controlA11y({ label: copy.add.clear, role: 'button' })} onPress={onPress} onFocus={onFocus} onBlur={onBlur} style={[styles.action, { borderColor: resolveColor('dark', 'border-hairline'), backgroundColor: resolveColor('dark', 'bg-surface') }]}>
+        <Icon icon={Eraser} size={18} tint={theme.color('on-glass-primary')} />
         <Text style={[textStyle('label'), { color: theme.color('on-glass-primary') }]}>{copy.add.clear}</Text>
+      </Pressable>
+    </FocusRing>
+  );
+}
+
+/** A button under the keypad (Add details): an outlined pill with an icon, so it reads as something to press, not as loose text. */
+export function KeypadAction({ icon, label, onPress, testID, expanded }: { icon: ComponentType<IconProps>; label: string; onPress: () => void; testID: string; expanded?: boolean }) {
+  const theme = useTheme();
+  const { focused, onFocus, onBlur } = useFocusRing(true);
+  return (
+    <FocusRing focused={focused} onGlass radius={radii.md}>
+      <Pressable testID={testID} {...controlA11y({ label, role: 'button', ...(expanded !== undefined ? { expanded } : {}) })} onPress={onPress} onFocus={onFocus} onBlur={onBlur} style={[styles.action, { borderColor: resolveColor('dark', 'border-hairline'), backgroundColor: resolveColor('dark', 'bg-surface') }]}>
+        <Icon icon={icon} size={18} tint={theme.color('on-glass-primary')} />
+        <Text style={[textStyle('label'), { color: theme.color('on-glass-primary') }]}>{label}</Text>
       </Pressable>
     </FocusRing>
   );
@@ -85,5 +101,5 @@ const styles = StyleSheet.create({
   key: { minWidth: 88, minHeight: KEY_SIZE, borderRadius: radii.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   // Same footprint as a key plus its 4dp focus-ring gap each side, so the bottom row stays aligned.
   spacer: { minWidth: 96, minHeight: KEY_SIZE + 8 },
-  clear: { minHeight: 48, minWidth: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
+  action: { flexDirection: 'row', gap: 6, minHeight: 48, minWidth: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14, borderWidth: 1, borderRadius: radii.md },
 });

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ComponentRef } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { moneyText } from '../../shared/ui/moneyText';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,12 +28,14 @@ import { textStyle } from '../../shared/theme/typography';
 import { Amount } from '../../shared/ui/Amount';
 import { Button } from '../../shared/ui/Button';
 import { Chip } from '../../shared/ui/Chip';
-import { Camera } from 'phosphor-react-native';
+import { Camera, Minus, Plus } from 'phosphor-react-native';
 import { OTHER_CATEGORY_ID } from '@wmbugo/core';
 import { realAddApi, type AddApi, type AddData, type AddKind } from './addApi';
 import { AccountChip, CategoryChips, DetailsPanel, KindSegments, TransferTo } from './AddParts';
 import { useDuplicateChoices } from './duplicateChoices';
-import { Keypad } from './Keypad';
+import { Keypad, KeypadAction } from './Keypad';
+import { controlA11y } from '../../shared/a11y/labels';
+import { Icon } from '../../shared/theme/Icon';
 import { startSaveTiming } from './saveTiming';
 
 const QUICK_COUNT = 6;
@@ -541,9 +543,13 @@ export function AddSheet({
       <KindSegments kind={kind} vertical={fontScale >= 1.3} onChoose={chooseKind} locked={edit !== undefined} />
 
       {kind === 'expense' && onSnap && !edit ? (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-          <Chip onGlass label={copy.receiptScan.snap} icon={Camera} testID="snap-receipt" onPress={onSnap} />
-        </View>
+        <Pressable testID="snap-receipt" {...controlA11y({ label: `${copy.receiptScan.snap}. ${copy.receiptScan.snapHint}`, role: 'button' })} onPress={onSnap} style={[styles.snap, { borderColor: theme.color('on-glass-accent') }]}>
+          <Icon icon={Camera} size={22} tint={theme.color('on-glass-accent')} />
+          <View style={{ flex: 1 }}>
+            <Text style={[textStyle('body-medium'), ink]}>{copy.receiptScan.snap}</Text>
+            <Text style={[textStyle('caption'), secondary]}>{copy.receiptScan.snapHint}</Text>
+          </View>
+        </Pressable>
       ) : null}
       {preset?.photo ? <Text testID="add-photo-attached" style={[textStyle('caption'), { color: theme.color('on-glass-secondary') }]}>{copy.receiptScan.attachedHand}</Text> : null}
 
@@ -639,7 +645,7 @@ export function AddSheet({
         locale={locale}
         onKey={press}
         trailing={
-          <Button label={details ? copy.add.detailsHide : copy.add.detailsShow} variant="text" onGlass onPress={() => setDetails((v) => !v)} testID="details-toggle" />
+          <KeypadAction icon={details ? Minus : Plus} label={details ? copy.add.detailsHide : copy.add.detailsShow} expanded={details} onPress={() => setDetails((v) => !v)} testID="details-toggle" />
         }
       />
       {details ? (
@@ -715,6 +721,7 @@ const styles = StyleSheet.create({
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
   inline: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
   amount: { alignItems: 'center', paddingVertical: 4 },
+  snap: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, minHeight: 52 },
   hiddenInput: { position: 'absolute', width: 1, height: 1, opacity: 0 },
   footer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', gap: 12, paddingVertical: 8, paddingHorizontal: 8, borderRadius: 12 },
 });
