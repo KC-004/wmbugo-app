@@ -1810,6 +1810,7 @@ export const copy = {
     removeItem: 'Remove item',
     addItem: 'Add an item',
     changeCategory: 'Change category',
+    chooseCategory: 'Choose a category',
     followMain: 'Same as the main category',
     dateReadout: 'Date, {date}, not sure, double tap to change',
     dateReadoutSure: 'Date, {date}, double tap to change',

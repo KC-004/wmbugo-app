@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { BackHandler, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
-import { Warning } from 'phosphor-react-native';
-import { applyKey, parseAmountInput, type KeypadKey, type ReceiptDraft } from '@wmbugo/core';
+import { CaretDown, Warning } from 'phosphor-react-native';
+import { applyKey, parseAmountInput, UNCATEGORISED_ID, type KeypadKey, type ReceiptDraft } from '@wmbugo/core';
 import { controlA11y } from '../../shared/a11y/labels';
 import { copy } from '../../shared/copy';
 import { useSheet } from '../../shared/feedback/SheetHost';
@@ -495,8 +495,9 @@ export function ReceiptReviewScreen({ draft, photo, attachTo, onDiscardPhoto, ap
             <Text style={[textStyle('body-medium'), { color: theme.color('text-primary'), flex: 1 }]}>{copy.receiptReview.items.replace('{n}', String(d.items.length))}</Text>
           </Pressable>
         ) : null}
-        {itemsOpen
-          ? view.allocation.items.map((it) => {
+        {itemsOpen ? (
+          <View testID="items-list" style={[styles.itemsCard, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
+          {view.allocation.items.map((it, position) => {
               const src = d.items[it.index]!;
               return (
                 <View
@@ -506,7 +507,7 @@ export function ReceiptReviewScreen({ draft, photo, attachTo, onDiscardPhoto, ap
                   accessibilityLabel={`${src.name}, ${money(it.allocatedAmount)}, ${catName(it.categoryId)}`}
                   accessibilityActions={[{ name: 'changeCategory', label: copy.receiptReview.changeCategory }]}
                   onAccessibilityAction={(e) => e.nativeEvent.actionName === 'changeCategory' && pickCategory(it.index)}
-                  style={[styles.itemBox, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
+                  style={[styles.itemRow, position > 0 ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.color('border-hairline') } : null]}>
                   <Pressable testID={`item-edit-${it.index}`} {...controlA11y({ label: copy.receiptReview.editField.replace('{field}', src.name), role: 'button' })} onPress={() => editItemSheet(it.index)} style={styles.itemTop}>
                     <View style={{ flex: 1 }}>
                       <Text style={[textStyle('body'), { color: theme.color('text-primary') }]}>{src.name}</Text>
@@ -514,11 +515,15 @@ export function ReceiptReviewScreen({ draft, photo, attachTo, onDiscardPhoto, ap
                     </View>
                     <Amount amountMinor={it.allocatedAmount} currency={ctx.currency} direction="expense" locale={ctx.locale} />
                   </Pressable>
-                  <Chip label={catName(it.categoryId)} testID={`item-chip-${it.index}`} hint={copy.receiptReview.changeCategory} onPress={() => pickCategory(it.index)} />
+                  <Pressable testID={`item-chip-${it.index}`} {...controlA11y({ label: catName(it.categoryId), role: 'button', hint: copy.receiptReview.changeCategory })} hitSlop={8} onPress={() => pickCategory(it.index)} style={styles.itemCategory}>
+                    <Text style={[textStyle('caption'), { color: it.categoryId === UNCATEGORISED_ID ? theme.color('text-secondary') : theme.color('accent-primary') }]}>{it.categoryId === UNCATEGORISED_ID ? copy.receiptReview.chooseCategory : catName(it.categoryId)}</Text>
+                    <Icon icon={CaretDown} size={12} tint={theme.color('text-secondary')} />
+                  </Pressable>
                 </View>
               );
-            })
-          : null}
+            })}
+          </View>
+        ) : null}
         {itemsOpen && view.allocation.notItemised > 0 ? <Button label={copy.receiptReview.addItem} variant="secondary" testID="add-item" onPress={addItemSheet} /> : null}
 
         {d.subtotal.value !== null ? <Row testID="row-subtotal" label={copy.receiptReview.subtotal} a11yLabel={copy.receiptReview.editField.replace('{field}', copy.receiptReview.subtotal)} value={<Amount amountMinor={d.subtotal.value} currency={ctx.currency} direction="neutral" locale={ctx.locale} />} onPress={() => editAmount('edit-subtotal', copy.receiptReview.subtotal, d.subtotal.value, copy.common.save, (m) => update((s) => setSubtotal(s, m)), true)} /> : null}
@@ -574,8 +579,10 @@ const styles = StyleSheet.create({
   thumb: { height: 72, borderWidth: 1, borderRadius: radii.md, alignItems: 'center', justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: radii.md, paddingHorizontal: 12, minHeight: layout.touchMin, paddingVertical: 8 },
   grey: { opacity: 0.8 },
-  itemBox: { borderWidth: 1, borderRadius: radii.md, padding: 8, gap: 4, marginLeft: 12 },
-  itemTop: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: layout.touchMin },
+  itemsCard: { borderWidth: 1, borderRadius: radii.md, paddingHorizontal: 12, paddingVertical: 4 },
+  itemRow: { paddingVertical: 6 },
+  itemTop: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 36 },
+  itemCategory: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', minHeight: 28 },
   value: { alignItems: 'flex-end', flexShrink: 1 },
   inline: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
