@@ -104,6 +104,11 @@ android {
         }
     }
 
+    // The OCR models are read as plain files from the assets, so they are stored without compression.
+    androidResources {
+        noCompress += ["onnx"]
+    }
+
     // "capture" dimension: nosms is the store build; sms will later carry SMS capture.
     // Neither flavor declares an SMS permission yet (Epic 13).
     flavorDimensions "capture"
@@ -146,6 +151,11 @@ dependencies {
     implementation("com.facebook.react:react-android")
     // The system prompt behind app lock (Story 8.3).
     implementation("androidx.biometric:biometric:1.1.0")
+    // Receipt reading (Story 10.10, decision S3): PaddleOCR PP-OCRv4 on ONNX Runtime (MIT), no network, no telemetry.
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.19.2")
+    testImplementation("junit:junit:4.13.2")
+    // The desktop runtime lets the JVM tests run the real models on the synthetic receipts.
+    testImplementation("com.microsoft.onnxruntime:onnxruntime:1.19.2")
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")

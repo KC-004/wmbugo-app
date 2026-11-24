@@ -16,6 +16,7 @@ class MainApplication : Application(), ReactApplication {
         PackageList(this).packages.apply {
           add(DeviceCapabilitiesPackage())
           add(ReceiptFilesPackage())
+          add(app.wmbugo.ocr.OcrPackage())
           add(PrivacyPackage())
           add(AppLockPackage())
           add(BackupFilesPackage())

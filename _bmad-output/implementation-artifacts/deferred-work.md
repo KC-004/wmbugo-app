@@ -121,3 +121,9 @@ Graded from the reviewers' reports; only the first group was checked against the
 - source_spec: `spec-10-8-a-receipt-that-matches-an-entry-attach-to-it-keep-separate-o.md`
   summary: AttachReceipt overwrites an entry hand-made splits without asking (only existing receipt items trigger the replace or keep choice).
   evidence: /code-review high on b21ceae..HEAD; the Attach toast Undo restores them. The other findings (match time regex, currency check, malformed link, camera cache file on early close, deleted-entry duplicate, Enter it by hand in attach mode, reveal delay) were fixed.
+
+## Deferred from: build of Story 10.10 (2026-11-24)
+
+- source_spec: `spec-10-10-native-ocr-engine.md`
+  summary: Measure on a phone: scan time and native heap with the arena off, low-end device, release timing (NFR-06, NFR-08); tilted receipts use axis-aligned boxes; vertical text is not rotated; choose abiFilters for the store build.
+  evidence: S3 section 11; only the JVM run and a compile were done.

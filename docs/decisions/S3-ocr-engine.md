@@ -111,3 +111,10 @@ Mobile/OCR engineer sign-off: **pending**. Interim result: PaddleOCR PP-OCRv4 on
 - `packages/core/src/ports/OcrEngine.ts`: `recognise(image: FileRef, signal: AbortSignal): Promise<OcrResult>`, `OcrResult` (image `width`, `height`, `blocks` of `{ text, box, confidence }`) and the typed failures `OCR_UNAVAILABLE` and `CANCELLED`.
 - 40 recorded `OcrResult` fixtures in `packages/core/test/fixtures/receipts/` (from the PaddleOCR pass) for the Story 10.2 and 10.3 parser tests.
 - The synthetic images and ground truth in `fixtures/receipts/synthetic/` and their generator.
+
+## 11. Built in Story 10.10 (2026-11-24)
+
+- `apps/mobile/android/app/src/main/java/app/wmbugo/ocr/`: `OcrMath` (detection resize to a multiple of 32 with the long side at most 960, DB box extraction with unclip 1.5, CTC decoding), `PaddleOcr` (two ONNX Runtime sessions: CPU arena allocator off, memory pattern off, two threads, closed after every scan) and `OcrModule` (`WmbugoOcr`, own thread, cancel between lines). The recognition model's own character list (its `character` metadata) is the dictionary.
+- Models are not in git. `node scripts/fetch-ocr-models.mjs` downloads them into `apps/mobile/android/app/src/main/assets/ocr/` and checks the SHA-256 values in section 8 (item 11); `--check` only verifies. The build packages them uncompressed. A build made without them reports `OCR_UNAVAILABLE`. A release build must run the script first.
+- JVM check (`./gradlew :app:testNosmsDebugUnitTest --tests "app.wmbugo.ocr.*"`): with the real models on 8 synthetic receipts, 133 of 136 recorded lines (97.8%) were read again and the printed total was found in 8 of 8.
+- Not measured: on-device speed and native heap with the arena off, a low-end device, and release-build timing (section 8 items 1, 2, 6 and 10 stay open).

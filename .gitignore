@@ -26,3 +26,6 @@ local.properties
 .DS_Store
 npm-debug.log*
 pnpm-debug.log*
+
+# OCR models (Story 10.10): fetched by scripts/fetch-ocr-models.mjs, pinned by SHA-256
+apps/mobile/android/app/src/main/assets/ocr/

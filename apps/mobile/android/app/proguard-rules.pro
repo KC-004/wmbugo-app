@@ -8,3 +8,6 @@
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
 # Add any project specific keep options here:
+
+# ONNX Runtime looks its classes up from native code (Story 10.10).
+-keep class ai.onnxruntime.** { *; }
