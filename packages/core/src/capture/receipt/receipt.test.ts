@@ -170,6 +170,13 @@ describe('field rules', () => {
     expect(d.total.certainty).toBe('sure');
   });
 
+  it('reads GST lines the engine glued to a rate or an amount as taxes, not items (a real receipt)', () => {
+    const d = parse(rows([['Shop Name'], ['Rice Prawns Fried', '195.00'], ['Chicken Noodles', '225.00'], ['420.00CGST25%', '10.50'], ['420@SGST2.%', '10.50'], ['Total', '441.00']]));
+    expect(d.items.map((i) => i.name)).toEqual(['Rice Prawns Fried', 'Chicken Noodles']);
+    expect(d.taxes.map((t) => t.value)).toEqual([1050, 1050]);
+    expect(d.total.value).toBe(44100);
+  });
+
   it('takes the last amount on the last total line', () => {
     const d = parse(rows([['Shop Name'], ['Thing', '4.00'], ['Total', '4.00'], ['Total paid', '4.00']]));
     expect(d.total.value).toBe(400);

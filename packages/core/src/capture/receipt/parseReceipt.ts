@@ -10,7 +10,11 @@ export const SURE_CONFIDENCE = 0.8;
 
 const SUBTOTAL = /sub\s*-?\s*total|zwischensumme|sous-total|subtotale|subtotal/i;
 const TOTAL = /\b(grand\s*total|total\s*ttc|amount\s*due|net\s*amount|balance\s*due|to\s*pay|total|summe|gesamt|totale|importe|totaal|gesamtbetrag|gesamtsumme|razem|summa|celkem|összesen|jumlah)\b|المجموع|الإجمالي|الاجمالي|कुल/i;
-const TAX = /\b(cgst|sgst|igst|vat|mwst|tva|iva|hst|gst|sales\s*tax|tax)\b/i;
+/**
+ * India's split GST words are read even when the engine glues them to a neighbour ("420.00CGST25%", "420@SGST2.%"): there is no word boundary
+ * before them then, and no other word contains them.
+ */
+const TAX = /cgst|sgst|igst|utgst|\b(vat|mwst|tva|iva|hst|gst|cess|sales\s*tax|tax)\b/i;
 /** A fee line starts with its word ("Delivery 2.00", "Service 10%"); "Room service sandwich" is an item. */
 const FEE = /^\s*(service|delivery|packing)\b|\bservice\s*charge\b/i;
 const DISCOUNT = /\b(discount|savings?|promo|member|rabatt|remise)\b/i;
