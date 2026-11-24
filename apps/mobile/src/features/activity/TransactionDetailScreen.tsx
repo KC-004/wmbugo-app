@@ -75,6 +75,7 @@ export function TransactionDetailScreen({
   onEdit,
   onDuplicate,
   onSplit,
+  onSnapReceipt,
   api = realTransactionApi,
   duplicateApi = realAddApi,
   reviewApi = realReviewQueueApi,
@@ -87,6 +88,8 @@ export function TransactionDetailScreen({
   onDuplicate: (preset: AddPreset) => void;
   /** Opens the split editor. */
   onSplit?: (transactionId: string) => void;
+  /** `Snap receipt to split` (Story 10.9): starts a receipt scan in attach mode for this entry. */
+  onSnapReceipt?: (transactionId: string) => void;
   api?: TransactionApi;
   duplicateApi?: Pick<AddApi, 'duplicateInfo' | 'keepBoth' | 'merge' | 'undoResolution'>;
   /** The choices for an import's waiting questions (Story 9.5): a possible transfer, a partly covered day. */
@@ -122,6 +125,8 @@ export function TransactionDetailScreen({
   }
   const data = q.data ?? null;
   const d = data?.detail ?? null;
+  // A confirmed expense with a shop name and no receipt items yet can be split by a receipt (Story 10.9).
+  const canSnapSplit = onSnapReceipt !== undefined && d !== null && !d.removed && d.type === 'expense' && d.status === 'confirmed' && !!d.merchant && (data?.receiptItems?.length ?? 0) === 0;
 
   const refresh = () => invalidateForEvent(qc, 'TransactionsChanged');
 
@@ -490,7 +495,7 @@ export function TransactionDetailScreen({
         {!d.removed && data.receiptItems && data.receiptItems.length > 0 ? <ReceiptItemsList items={data.receiptItems} currency={data.currency} locale={data.locale} /> : null}
 
         {d.removed ? null : (
-          <ReceiptPhotos photos={data.attachments} photoPath={api.photoPath} onAdd={api.addPhoto ? () => void addPhoto() : undefined} onRemove={api.removePhoto ? removePhoto : undefined} />
+          <ReceiptPhotos photos={data.attachments} photoPath={api.photoPath} onAdd={api.addPhoto ? () => void addPhoto() : undefined} {...(canSnapSplit ? { onSnapSplit: () => onSnapReceipt!(transactionId) } : {})} onRemove={api.removePhoto ? removePhoto : undefined} />
         )}
 
         {d.removed ? null : (

@@ -1,5 +1,6 @@
 import { useCallback, type RefObject } from 'react';
 import { useNavigation } from '@react-navigation/native';
+import { startReceiptScan, type ScanNav } from '../receipt/startReceiptScan';
 import { copy } from '../../shared/copy';
 import { useSheet } from '../../shared/feedback/SheetHost';
 import { useOpenSplit } from '../activity/useOpenSplit';
@@ -9,7 +10,7 @@ import { AddSheet, type AddPreset, type EditSpec } from './AddSheet';
 export function useOpenAddWith(opener?: RefObject<unknown>): (preset?: AddPreset, edit?: EditSpec) => void {
   const sheet = useSheet();
   const openSplit = useOpenSplit();
-  const nav = useNavigation<{ navigate: (s: 'Accounts' | 'ReceiptCamera', p?: { origin: 'add_sheet' }) => void }>();
+  const nav = useNavigation<ScanNav & { navigate(screen: 'Accounts'): void }>();
   return useCallback(
     (preset?: AddPreset, edit?: EditSpec) => {
       sheet.open(
@@ -24,7 +25,7 @@ export function useOpenAddWith(opener?: RefObject<unknown>): (preset?: AddPreset
               onSplit={(id, amount) => openSplit(id, amount)}
               onSnap={() => {
                 close();
-                nav.navigate('ReceiptCamera', { origin: 'add_sheet' });
+                startReceiptScan(nav, { origin: 'add_sheet' });
               }}
               onNewAccount={() => {
                 close();

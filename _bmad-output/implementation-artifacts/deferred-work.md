@@ -109,3 +109,9 @@ Graded from the reviewers' reports; only the first group was checked against the
 - source_spec: `spec-10-8-a-receipt-that-matches-an-entry-attach-to-it-keep-separate-o.md`
   summary: Phone check of the match prompt and Attach to it; persist the Attach undo so it survives the toast; the receipt rule uses the entry day, so a receipt printed after midnight or with a wrong date can miss its charge.
   evidence: Story 10.8 spec Implementation Notes; only react-test-renderer and core tests ran.
+
+## Deferred from: build of Story 10.9 (2026-11-24)
+
+- source_spec: `spec-10-9-snap-a-receipt-to-split-an-entry-and-one-way-in-for-every-re.md`
+  summary: Phone check of Snap receipt to split and the wmbugo://receipt/scan link (lock first, then camera); decide whether the intent filter should require a signed token once the widget exists (Epic 11).
+  evidence: Story 10.9 spec Implementation Notes; react-test-renderer only.

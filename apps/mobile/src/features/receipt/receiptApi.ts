@@ -69,6 +69,15 @@ export interface AttachRequest {
   readonly mainCategoryId: string;
   readonly itemsMode?: 'replace' | 'keep';
   readonly attachment?: { readonly attachmentId: string; readonly digest: string; readonly sizeBytes: number };
+  /** Attach the photo and nothing else. */
+  readonly photoOnly?: boolean;
+}
+
+export interface AttachTarget {
+  readonly amountMinor: number;
+  readonly accountName: string | null;
+  readonly occurredAtMs: number;
+  readonly localDate: string;
 }
 
 export type AttachOutcome = { ok: true; value: { undo: AttachReceiptUndo; adjustmentMinor: number } } | { ok: false; code: string };
@@ -83,6 +92,8 @@ export interface ReceiptApi {
   remove(transactionId: string): Promise<{ ok: boolean }>;
   /** A dry run of the matcher: recorded expenses this receipt probably is (nothing is written). */
   matches(draft: ReceiptDraft, timezoneId: string): Promise<ReceiptMatch[]>;
+  /** The recorded entry a receipt is being attached to (attach mode), or null when it is gone. */
+  entry(transactionId: string): Promise<AttachTarget | null>;
   /** How many receipt items an entry already has. */
   itemCount(transactionId: string): Promise<number>;
   attach(request: AttachRequest): Promise<AttachOutcome>;
@@ -154,6 +165,10 @@ export const realReceiptApi: ReceiptApi = {
     const at = localToInstant(date, h!, m!, timezoneId);
     const rows = await getServices().db.query(RECEIPT_MATCH_SQL, receiptMatchParams(total, date));
     return previewReceiptMatches({ merchant: draft.merchant.value, localDate: date, occurredAtMs: at.ok ? at.value : systemClock.nowMs(), totalMinor: total }, rows);
+  },
+  async entry(transactionId) {
+    const r = (await getServices().db.query("SELECT t.amount_minor, (SELECT a.name FROM posting p JOIN account a ON a.id = p.account_id WHERE p.transaction_id = t.id AND p.posting_kind = 'normal' LIMIT 1), t.occurred_at_utc, t.local_date FROM \"transaction\" t WHERE t.id = ? AND t.removed_at IS NULL AND t.event_type = 'expense'", [transactionId]))[0];
+    return r ? { amountMinor: Number(r[0]), accountName: r[1] === null ? null : String(r[1]), occurredAtMs: Number(r[2]), localDate: String(r[3]) } : null;
   },
   async itemCount(transactionId) {
     return Number((await getServices().db.query('SELECT COUNT(*) FROM receipt_item WHERE transaction_id = ?', [transactionId]))[0]?.[0] ?? 0);

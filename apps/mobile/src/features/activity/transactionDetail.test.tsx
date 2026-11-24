@@ -39,7 +39,7 @@ function fakeApi(d: TransactionDetail | 'missing' = detail()) {
   return { api, load, remove, restore, state };
 }
 
-async function mountDetail(d: TransactionDetail | 'missing', over: { api?: TransactionApi; reviewApi?: Parameters<typeof TransactionDetailScreen>[0]['reviewApi']; duplicateApi?: Parameters<typeof TransactionDetailScreen>[0]['duplicateApi']; deletedApi?: Parameters<typeof TransactionDetailScreen>[0]['deletedApi'] } = {}) {
+async function mountDetail(d: TransactionDetail | 'missing', over: { onSnapReceipt?: (id: string) => void; api?: TransactionApi; reviewApi?: Parameters<typeof TransactionDetailScreen>[0]['reviewApi']; duplicateApi?: Parameters<typeof TransactionDetailScreen>[0]['duplicateApi']; deletedApi?: Parameters<typeof TransactionDetailScreen>[0]['deletedApi'] } = {}) {
   const f = fakeApi(d);
   const qc = createQueryClient();
   const onBack = jest.fn();
@@ -52,7 +52,7 @@ async function mountDetail(d: TransactionDetail | 'missing', over: { api?: Trans
         <ThemeProvider>
           <ToastHost bottomOffset={0}>
             <SheetHost>
-              <TransactionDetailScreen transactionId="t1" onBack={onBack} onEdit={onEdit} onDuplicate={onDuplicate} api={over.api ?? f.api} duplicateApi={over.duplicateApi} reviewApi={over.reviewApi} deletedApi={over.deletedApi ?? { purgeFacts: async () => ({ isTransfer: false, hasRefund: false }), purge: async () => ({ ok: true }) }} />
+              <TransactionDetailScreen transactionId="t1" onBack={onBack} onEdit={onEdit} onDuplicate={onDuplicate} {...(over.onSnapReceipt ? { onSnapReceipt: over.onSnapReceipt } : {})} api={over.api ?? f.api} duplicateApi={over.duplicateApi} reviewApi={over.reviewApi} deletedApi={over.deletedApi ?? { purgeFacts: async () => ({ isTransfer: false, hasRefund: false }), purge: async () => ({ ok: true }) }} />
             </SheetHost>
           </ToastHost>
         </ThemeProvider>
@@ -426,6 +426,25 @@ describe('receipt photos and sources on the detail (Story 3.11)', () => {
     const load = jest.fn<Promise<TransactionData | 'missing' | null>, [string]>(async () => ({ ...data(d), ...extra }));
     return { api: { ...f.api, load, ...over } as TransactionApi };
   };
+
+  it('offers Snap receipt to split beside Add receipt photo for a confirmed expense with a shop and no receipt items, and starts attach mode (Story 10.9)', async () => {
+    const onSnapReceipt = jest.fn();
+    const m = await mountDetail(detail(), { onSnapReceipt, ...apiWith({ addPhoto: jest.fn() as never }) });
+    expect(texts(m.r)).toEqual(expect.arrayContaining(['Add receipt photo', 'Snap receipt to split']));
+    act(() => fire(m.r, 'photo-snap-split'));
+    expect(onSnapReceipt).toHaveBeenCalledWith('t1');
+    m.unmount();
+  });
+
+  it('does not offer it when the entry already has receipt items or no shop name', async () => {
+    const onSnapReceipt = jest.fn();
+    const withItems = await mountDetail(detail(), { onSnapReceipt, ...apiWith({ addPhoto: jest.fn() as never }, { receiptItems: [{ name: 'Rice', amountMinor: 100, discountMinor: 0, allocatedMinor: 100, categoryId: 'cat_food', categoryName: 'Food & Drinks', lineIndex: 0 }] }) });
+    expect(texts(withItems.r)).not.toContain('Snap receipt to split');
+    withItems.unmount();
+    const noShop = await mountDetail(detail({ merchant: null }), { onSnapReceipt });
+    expect(texts(noShop.r)).not.toContain('Snap receipt to split');
+    noShop.unmount();
+  });
 
   it('Add receipt photo records the photo and toasts Photo added; a duplicate says This photo is already attached', async () => {
     const addPhoto = jest.fn<ReturnType<NonNullable<TransactionApi['addPhoto']>>, [string]>(async () => 'added');

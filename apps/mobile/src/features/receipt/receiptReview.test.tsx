@@ -9,7 +9,7 @@ import { ThemeProvider } from '../../shared/theme/ThemeProvider';
 import { account, cleanup, fire, has, host, quietAccessibility, settle, tap, texts } from '../add/testKit';
 import { ReceiptReviewScreen } from './ReceiptReviewScreen';
 import type { ReceiptMatch } from '@wmbugo/core';
-import type { AttachRequest, ReceiptApi, ReceiptContext, SaveReceiptRequest } from './receiptApi';
+import type { AttachRequest, AttachTarget, ReceiptApi, ReceiptContext, SaveReceiptRequest } from './receiptApi';
 import { addItem, confirmTotal, editItem, initialReview, removeItem, saveInput, setCharge, setDate, setItemCategory, setMainCategory, setTotal, viewOf } from './receiptReviewModel';
 import { sampleReceiptDraft } from './sampleReceipt';
 
@@ -106,7 +106,7 @@ describe('review model (Story 10.4)', () => {
 
 const HDFC_MATCH: ReceiptMatch = { transactionId: 'm1', amountMinor: 5400, localDate: TODAY, occurredAtMs: Date.UTC(2026, 10, 8, 10, 12, 0), merchant: 'Sagar Fresh Mart', accountName: 'HDFC debit', sourceKind: 'sms', status: 'confirmed' };
 
-function fakeApi(over: Partial<ReceiptContext> = {}, found: ReceiptMatch[] = [], itemCount = 0) {
+function fakeApi(over: Partial<ReceiptContext> = {}, found: ReceiptMatch[] = [], itemCount = 0, target: AttachTarget | null = null) {
   const categories = mapCategoryRows(SEED_CATEGORIES.filter((c) => c.kind === 'expense').map((c, i) => [c.id, c.name, c.kind, c.budgetType, c.icon, c.color, i, 0]) as never);
   const ctx: ReceiptContext = {
     currency: 'SGD', exponent: 2, locale: 'en-SG', timezoneId: 'Asia/Singapore', todayLocal: TODAY,
@@ -118,14 +118,14 @@ function fakeApi(over: Partial<ReceiptContext> = {}, found: ReceiptMatch[] = [],
   const remove = jest.fn(async (id: string) => ({ ok: id !== '' }));
   const attach = jest.fn<ReturnType<ReceiptApi['attach']>, [AttachRequest]>(async () => ({ ok: true, value: { undo: { before: {} } as never, adjustmentMinor: 0 } }));
   const undoAttach = jest.fn(async () => ({ ok: true }));
-  const api: ReceiptApi = { load: jest.fn(async () => ctx), newSubmissionId: () => 'sub-1', save, remove: (id: string) => remove(id), matches: jest.fn(async () => found), itemCount: jest.fn(async () => itemCount), attach, undoAttach };
+  const api: ReceiptApi = { load: jest.fn(async () => ctx), newSubmissionId: () => 'sub-1', save, remove: (id: string) => remove(id), matches: jest.fn(async () => found), entry: jest.fn(async () => target), itemCount: jest.fn(async () => itemCount), attach, undoAttach };
   return { api, save, remove, attach, undoAttach };
 }
 
 const PHOTO = { attachmentId: 'att1', digest: 'd1', sizeBytes: 10, width: 10, height: 10, provenance: 'photo_picker' as const };
 
-async function mount(d: ReceiptDraft, over: Partial<ReceiptContext> = {}, loadFails = false, withPhoto = false, found: ReceiptMatch[] = [], itemCount = 0) {
-  const f = fakeApi(over, found, itemCount);
+async function mount(d: ReceiptDraft, over: Partial<ReceiptContext> = {}, loadFails = false, withPhoto = false, found: ReceiptMatch[] = [], itemCount = 0, attach?: { to: string; target: AttachTarget | null }) {
+  const f = fakeApi(over, found, itemCount, attach?.target ?? null);
   if (loadFails) f.api.load = jest.fn(async () => { throw new Error('no profile'); });
   const onClose = jest.fn();
   const onSaved = jest.fn();
@@ -138,7 +138,7 @@ async function mount(d: ReceiptDraft, over: Partial<ReceiptContext> = {}, loadFa
         <QueryClientProvider client={createQueryClient()}>
           <ToastHost>
             <SheetHost>
-              <ReceiptReviewScreen draft={d} {...(withPhoto ? { photo: PHOTO, onDiscardPhoto } : {})} api={f.api} addApi={addApi} onClose={onClose} onSaved={onSaved} />
+              <ReceiptReviewScreen draft={d} {...(attach ? { attachTo: attach.to } : {})} {...(withPhoto ? { photo: PHOTO, onDiscardPhoto } : {})} api={f.api} addApi={addApi} onClose={onClose} onSaved={onSaved} />
             </SheetHost>
           </ToastHost>
         </QueryClientProvider>
@@ -324,7 +324,7 @@ describe('ReceiptReviewScreen (SCR-23)', () => {
 
   it('a failed attach says nothing was changed and keeps the review open', async () => {
     const a = await mount(draft(), {}, false, false, [HDFC_MATCH]);
-    a.attach.mockResolvedValueOnce({ ok: false, code: 'ENTRY_REMOVED' });
+    a.attach.mockResolvedValueOnce({ ok: false, code: 'RECEIPT_MISMATCH' });
     await act(async () => fire(a.r, 'attach-m1'));
     await settle();
     expect(texts(a.r)).toContain('Could not attach the receipt. Nothing was changed.');

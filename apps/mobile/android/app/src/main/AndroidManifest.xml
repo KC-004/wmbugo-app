@@ -41,6 +41,13 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
+        <!-- Story 10.9: wmbugo://receipt/scan?attachTo=<id> starts a receipt scan (widget, notification action). It opens inside the app, behind the lock. -->
+        <intent-filter>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="wmbugo" android:host="receipt" android:pathPrefix="/scan" />
+        </intent-filter>
       </activity>
     </application>
 </manifest>

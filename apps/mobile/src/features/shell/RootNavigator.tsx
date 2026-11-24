@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ReceiptDraft } from '@wmbugo/core';
 import { getServices } from '../../adapters/startApp';
 import { readProfile } from '../../adapters/readProfile';
-import { ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Linking, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { DefaultTheme, NavigationContainer, useIsFocused, useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -33,10 +33,11 @@ import { appNotifier } from '../../adapters/notifier';
 import { BudgetDetailScreen } from '../budgets/BudgetDetailScreen';
 import { BillsScreen } from '../bills/BillsScreen';
 import { ReceiptReviewScreen } from '../receipt/ReceiptReviewScreen';
-import { ReceiptScanScreen } from '../receipt/ReceiptScanScreen';
+import { ReceiptScanFlow } from '../receipt/ReceiptScanFlow';
+import { scanLinkRequest, startReceiptScan, type ScanNav, type ScanParams } from '../receipt/startReceiptScan';
 import { ReceiptCameraScreen } from '../receipt/ReceiptCameraScreen';
 import type { CameraSurface } from '../../adapters/camera/cameraSurface';
-import { discardTempPhoto, realReceiptFiles, type PendingPhoto } from '../../adapters/files/receiptFiles';
+import { discardTempPhoto } from '../../adapters/files/receiptFiles';
 import { sampleReceiptDraft } from '../receipt/sampleReceipt';
 import { BillDetailScreen } from '../bills/BillDetailScreen';
 import { InsightsScreen } from '../insights/InsightsScreen';
@@ -55,7 +56,7 @@ import { TopBar } from '../../shared/ui/TopBar';
 import { TabBar, type TabRoute } from './TabBar';
 import { markTabFirstFrame } from './navTiming';
 
-type RootParams = { Tabs: undefined; BudgetDetail: { budgetId: string; periodStart?: string }; Accounts: undefined; AccountDetail: { accountId: string }; TransactionDetail: { transactionId: string }; ReviewQueue: { focusId?: string }; Settings: undefined; HomeEdit: undefined; Bills: { focusRuleId?: string } | undefined; BillDetail: { ruleId: string }; Goals: undefined; GoalDetail: { goalId: string }; Budgets: undefined; InsightsDrill: { target: DrillTarget }; ReceiptReview: undefined; ReceiptScan: { origin?: 'add_sheet' | 'plus_long_press'; uri?: string; provenance?: 'photo_picker' | 'camera'; tempPath?: string } | undefined; ReceiptCamera: { origin?: 'add_sheet' | 'plus_long_press' } | undefined };
+type RootParams = { Tabs: undefined; BudgetDetail: { budgetId: string; periodStart?: string }; Accounts: undefined; AccountDetail: { accountId: string }; TransactionDetail: { transactionId: string }; ReviewQueue: { focusId?: string }; Settings: undefined; HomeEdit: undefined; Bills: { focusRuleId?: string } | undefined; BillDetail: { ruleId: string }; Goals: undefined; GoalDetail: { goalId: string }; Budgets: undefined; InsightsDrill: { target: DrillTarget }; ReceiptReview: undefined; ReceiptScan: ScanParams | undefined; ReceiptCamera: ScanParams | undefined };
 registerInsightsSections();
 const RootStack = createNativeStackNavigator<RootParams>();
 const Tabs = createBottomTabNavigator();
@@ -182,7 +183,7 @@ function TabsWithAdd() {
       <Tabs.Navigator
         initialRouteName="Home"
         screenOptions={{ headerShown: false, tabBarPosition: nav.kind === 'rail' ? 'left' : 'bottom' }}
-        tabBar={(props) => <TabBar {...props} onAdd={onAdd} onSnap={() => root.navigate('ReceiptCamera', { origin: 'plus_long_press' })} addRef={opener} reviewDot={reviewDot} />}>
+        tabBar={(props) => <TabBar {...props} onAdd={onAdd} onSnap={() => startReceiptScan(root, { origin: 'plus_long_press' })} addRef={opener} reviewDot={reviewDot} />}>
         <Tabs.Screen name="Home" component={HomeStack} />
         <Tabs.Screen name="Activity" component={ActivityStack} />
         <Tabs.Screen name="Insights" component={InsightsStack} />
@@ -211,33 +212,30 @@ function ReceiptReviewRoute() {
   return draft ? <ReceiptReviewScreen draft={draft} onClose={() => nav.goBack()} /> : <ScreenFrame>{null}</ScreenFrame>;
 }
 
-/** Pick a receipt photo, watch it being read, then the review (Story 10.6). Cancel returns to the Add sheet when it started there. */
+/** Where a scan goes back to: the Add sheet when it started there, otherwise just back (the entry detail, the tab it was long-pressed from). */
+function useScanLeave(origin: ScanParams['origin'] | undefined, goBack: () => void) {
+  const openAdd = useOpenAddWith();
+  return () => {
+    goBack();
+    if (origin === 'add_sheet') openAdd();
+  };
+}
+
+/** Pick a receipt photo or use the one the camera took, watch it read, then review it (Stories 10.6 to 10.9). */
 function ReceiptScanRoute() {
   const nav = useNavigation<{ goBack: () => void; replace: (s: 'TransactionDetail', p: { transactionId: string }) => void }>();
   const route = useRoute<RouteProp<RootParams, 'ReceiptScan'>>();
   const openAdd = useOpenAddWith();
-  const [read, setRead] = useState<{ draft: ReceiptDraft; photo: PendingPhoto } | null>(null);
-  const saved = useRef(false);
-  const origin = route.params?.origin;
-  const leave = () => {
-    nav.goBack();
-    if (origin === 'add_sheet') openAdd();
-  };
-  useEffect(
-    () => () => {
-      if (read && !saved.current) void realReceiptFiles.remove(read.photo.attachmentId).catch(() => undefined);
-    },
-    [read],
-  );
-  if (read)
-    return <ReceiptReviewScreen draft={read.draft} photo={read.photo} onSaved={() => (saved.current = true)} onClose={() => nav.goBack()} />;
+  const params = route.params;
+  const leave = useScanLeave(params?.origin, () => nav.goBack());
   return (
-    <ReceiptScanScreen
-      {...(route.params?.uri ? { uri: route.params.uri } : {})}
-      {...(route.params?.provenance ? { provenance: route.params.provenance } : {})}
-      {...(route.params?.tempPath ? { onTaken: () => void discardTempPhoto(route.params!.tempPath!).catch(() => undefined) } : {})}
-      onCancel={leave}
-      onRead={(draft, photo) => setRead({ draft, photo })}
+    <ReceiptScanFlow
+      {...(params?.uri ? { uri: params.uri } : {})}
+      {...(params?.provenance ? { provenance: params.provenance } : {})}
+      {...(params?.attachTo ? { attachTo: params.attachTo } : {})}
+      {...(params?.tempPath ? { onTaken: () => void discardTempPhoto(params.tempPath!).catch(() => undefined) } : {})}
+      onLeave={leave}
+      onClose={() => nav.goBack()}
       onByHand={(photo) => {
         nav.goBack();
         openAdd({ kind: 'expense', accountId: null, photo: { attachmentId: photo.attachmentId, digest: photo.digest, sizeBytes: photo.sizeBytes } });
@@ -249,10 +247,12 @@ function ReceiptScanRoute() {
 
 /** The receipt camera (Story 10.7). The photo goes to the same intake and reading as the picker, with provenance `camera`. */
 function ReceiptCameraRoute() {
-  const nav = useNavigation<{ goBack: () => void; replace: (s: 'ReceiptScan', p: { origin?: 'add_sheet' | 'plus_long_press'; uri?: string; provenance?: 'camera'; tempPath?: string }) => void }>();
+  const nav = useNavigation<{ goBack: () => void; replace: (s: 'ReceiptScan', p: ScanParams) => void }>();
   const route = useRoute<RouteProp<RootParams, 'ReceiptCamera'>>();
   const openAdd = useOpenAddWith();
-  const origin = route.params?.origin;
+  const params = route.params;
+  const origin = params?.origin ?? 'plus_long_press';
+  const carry = { origin, ...(params?.attachTo ? { attachTo: params.attachTo } : {}) };
   // Loaded when the camera first opens, so no other screen (or test) pays for the native camera module.
   const [Surface, setSurface] = useState<CameraSurface | null>(null);
   useEffect(() => {
@@ -262,24 +262,36 @@ function ReceiptCameraRoute() {
       live = false;
     };
   }, []);
-  const leave = () => {
-    nav.goBack();
-    if (origin === 'add_sheet') openAdd();
-  };
+  const leave = useScanLeave(origin, () => nav.goBack());
   if (!Surface) return <ScreenFrame>{null}</ScreenFrame>;
   return (
     <ReceiptCameraScreen
       Surface={Surface}
       discardTemp={discardTempPhoto}
       onClose={leave}
-      onUse={(path) => nav.replace('ReceiptScan', { ...(origin ? { origin } : {}), uri: `file://${path}`, provenance: 'camera', tempPath: path })}
-      onPickPhoto={() => nav.replace('ReceiptScan', origin ? { origin } : {})}
+      onUse={(path) => nav.replace('ReceiptScan', { ...carry, uri: `file://${path}`, provenance: 'camera', tempPath: path })}
+      onPickPhoto={() => nav.replace('ReceiptScan', carry)}
       onByHand={() => {
         nav.goBack();
         openAdd();
       }}
     />
   );
+}
+
+/** A `wmbugo://receipt/scan` link (the widget, a notification action) starts the same scan, behind the same lock (Story 10.9). */
+function ScanLinkHost() {
+  const nav = useNavigation<{ navigate: (s: 'ReceiptCamera' | 'ReceiptScan', p: ScanParams) => void }>();
+  useEffect(() => {
+    const open = (url?: string | null) => {
+      const request = url ? scanLinkRequest(url) : null;
+      if (request) startReceiptScan(nav, request);
+    };
+    void Linking.getInitialURL().then(open).catch(() => undefined);
+    const sub = Linking.addEventListener('url', (e) => open(e.url));
+    return () => sub.remove();
+  }, [nav]);
+  return null;
 }
 
 function AccountsRoute() {
@@ -418,7 +430,7 @@ function BudgetDetailRoute() {
 }
 
 function TransactionDetailRoute() {
-  const nav = useNavigation<{ goBack: () => void }>();
+  const nav = useNavigation<{ goBack: () => void; navigate: ScanNav['navigate'] }>();
   const route = useRoute<RouteProp<RootParams, 'TransactionDetail'>>();
   const openAdd = useOpenAddWith();
   const openSplit = useOpenSplit();
@@ -430,6 +442,7 @@ function TransactionDetailRoute() {
         onEdit={(spec) => openAdd(undefined, spec)}
         onDuplicate={(preset) => openAdd(preset)}
         onSplit={(id) => openSplit(id)}
+        onSnapReceipt={(id) => startReceiptScan(nav, { origin: 'entry_detail', attachTo: id })}
       />
     </ScreenFrame>
   );
@@ -452,6 +465,7 @@ export function RootNavigator() {
       <ToastHost bottomOffset={88 + insets.bottom}>
         <SheetHost>
           <AppLockOfferHost />
+          <ScanLinkHost />
           <RestoreNoticeHost />
           <View style={styles.fill}>
           <SafeModeBanner />

@@ -1766,6 +1766,16 @@ export const copy = {
     failed: 'The camera could not take the photo. Nothing was saved.',
     snapAction: 'Snap receipt',
   },
+  receiptSplit: {
+    snap: 'Snap receipt to split',
+    header: 'Splitting {amount} · {account} · {time}',
+    headerOther: 'Splitting {amount} · {account} · {date}, {time}',
+    attachAndSplit: 'Attach and split',
+    photoOnly: 'Attach photo only',
+    tip: '{amount} will be shown as Tip / adjustment',
+    exceeds: 'This receipt totals {receipt} but the entry is {entry}. Check the total, or attach the photo only.',
+    removed: 'This entry was removed. Nothing was changed.',
+  },
   receiptScan: {
     snap: 'Snap receipt',
     reading: 'Reading receipt…',

@@ -35,11 +35,14 @@ export function ReceiptPhotos({
   photos,
   photoPath,
   onAdd,
+  onSnapSplit,
   onRemove,
 }: {
   photos: readonly Attachment[];
   photoPath?: (id: string) => Promise<string>;
   onAdd?: () => void;
+  /** `Snap receipt to split` (Story 10.9): offered beside Add receipt photo for an entry a receipt could split. */
+  onSnapSplit?: () => void;
   onRemove?: (attachmentId: string) => Promise<void>;
 }) {
   const theme = useTheme();
@@ -79,6 +82,7 @@ export function ReceiptPhotos({
         </View>
       ) : null}
       {onAdd ? <Button label={copy.photo.add} variant="secondary" onPress={onAdd} testID="photo-add" /> : null}
+      {onSnapSplit ? <Button label={copy.receiptSplit.snap} variant="secondary" onPress={onSnapSplit} testID="photo-snap-split" /> : null}
       <Modal visible={open !== null} animationType="fade" onRequestClose={() => setOpen(null)} transparent={false}>
         <View testID="photo-viewer" style={[styles.viewer, { backgroundColor: theme.color('bg-canvas') }]}>
           {viewing ? <Image source={{ uri: `file://${viewing}` }} style={styles.full} resizeMode="contain" accessibilityLabel={copy.photo.thumb} /> : null}

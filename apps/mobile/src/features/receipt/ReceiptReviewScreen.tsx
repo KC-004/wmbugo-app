@@ -24,6 +24,7 @@ import type { CategoryRow } from '@wmbugo/core';
 import { useDuplicateChoices } from '../add/duplicateChoices';
 import { Keypad } from '../add/Keypad';
 import type { ReceiptMatch } from '@wmbugo/core';
+import type { AttachTarget } from './receiptApi';
 import type { PendingPhoto } from '../../adapters/files/receiptFiles';
 import { realReceiptApi, type ReceiptApi, type ReceiptContext } from './receiptApi';
 import { addItem, confirmTotal, editItem, initialReview, removeItem, saveInput, setAccount, setCharge, setDate, setItemCategory, setMainCategory, setMerchant, setSubtotal, setTotal, viewOf, type ChargeKind, type ReviewState } from './receiptReviewModel';
@@ -173,7 +174,7 @@ function Row({ label, value, onPress, testID, a11yLabel, warn, children }: { lab
  * The receipt review (SCR-23, Story 10.4): what was read, every field correctable, the allocation rerunning after each edit, and one Save.
  * It is opened with a `ReceiptDraft`; the photo arrives with the photo flow (Story 10.6).
  */
-export function ReceiptReviewScreen({ draft, photo, onDiscardPhoto, api = realReceiptApi, addApi = realAddApi, onClose, onSaved }: { draft: ReceiptDraft; /** The pending photo (Story 10.6): saved as the entry's attachment, deleted when the receipt is discarded. */ photo?: PendingPhoto; onDiscardPhoto?: () => void; api?: ReceiptApi; addApi?: AddApi; onClose: () => void; onSaved?: (transactionId: string) => void }) {
+export function ReceiptReviewScreen({ draft, photo, attachTo, onDiscardPhoto, api = realReceiptApi, addApi = realAddApi, onClose, onSaved }: { draft: ReceiptDraft; /** The pending photo (Story 10.6): saved as the entry's attachment, deleted when the receipt is discarded. */ photo?: PendingPhoto; /** Attach mode (Story 10.9): the recorded entry this receipt splits. No match prompt; the footer is `Attach and split`. */ attachTo?: string; onDiscardPhoto?: () => void; api?: ReceiptApi; addApi?: AddApi; onClose: () => void; onSaved?: (transactionId: string) => void }) {
   const theme = useTheme();
   const sheet = useSheet();
   const toast = useToast();
@@ -190,6 +191,7 @@ export function ReceiptReviewScreen({ draft, photo, onDiscardPhoto, api = realRe
   const [loadFailed, setLoadFailed] = useState(false);
   const [matches, setMatches] = useState<readonly ReceiptMatch[]>([]);
   const [separate, setSeparate] = useState(false);
+  const [target, setTarget] = useState<AttachTarget | null | undefined>(attachTo ? undefined : null);
   const attaching = useRef(false);
 
   useEffect(() => {
@@ -209,9 +211,21 @@ export function ReceiptReviewScreen({ draft, photo, onDiscardPhoto, api = realRe
   }, [api, draft]);
 
   // A dry run of the matcher: does this receipt look like a payment that is already recorded? Nothing is written.
+  useEffect(() => {
+    if (!attachTo) return;
+    let live = true;
+    void api
+      .entry(attachTo)
+      .then((t) => live && setTarget(t))
+      .catch(() => live && setTarget(null));
+    return () => {
+      live = false;
+    };
+  }, [api, attachTo]);
+
   const matchKey = state ? `${state.draft.merchant.value ?? ''}|${state.draft.total.value ?? ''}|${state.draft.date.value ?? ''}` : '';
   useEffect(() => {
-    if (!ctx || !state) return;
+    if (!ctx || !state || attachTo) return;
     let live = true;
     void api
       .matches(state.draft, ctx.timezoneId)
@@ -221,7 +235,7 @@ export function ReceiptReviewScreen({ draft, photo, onDiscardPhoto, api = realRe
       live = false;
     };
     // The prompt follows the shop, total and date only.
-  }, [api, ctx, matchKey]);
+  }, [api, ctx, matchKey, attachTo]);
 
   const discardRef = useRef<(() => void) | null>(null);
   // Android back asks the same question as the Back arrow: nothing is saved unless the person says so.
@@ -303,7 +317,14 @@ export function ReceiptReviewScreen({ draft, photo, onDiscardPhoto, api = realRe
 
   const d = state.draft;
   const total = d.total.value;
-  const holdingForMatch = matches.length > 0 && !separate;
+  const holdingForMatch = !attachTo && matches.length > 0 && !separate;
+  const splitting = attachTo !== undefined && target ? target : null;
+  const exceeds = splitting !== null && total !== null && total > splitting.amountMinor;
+  const adjustment = splitting !== null && total !== null && total < splitting.amountMinor ? splitting.amountMinor - total : 0;
+  const splitHeader =
+    splitting === null
+      ? ''
+      : matchText({ today: copy.receiptSplit.header, other: copy.receiptSplit.headerOther }, splitting.occurredAtMs, splitting.localDate, ctx.todayLocal, ctx.timezoneId).replace('{amount}', money(splitting.amountMinor)).replace('{account}', splitting.accountName ?? '');
 
   const matchLine = (m: ReceiptMatch): string => {
     const line = matchText({ today: copy.receiptReview.matchesToday, other: copy.receiptReview.matchesOther }, m.occurredAtMs, m.localDate, ctx.todayLocal, ctx.timezoneId);
@@ -316,8 +337,8 @@ export function ReceiptReviewScreen({ draft, photo, onDiscardPhoto, api = realRe
     onClose();
   };
 
-  const doAttach = async (m: ReceiptMatch, itemsMode?: 'replace' | 'keep') => {
-    const input = saveInput(state, ctx.todayLocal);
+  const doAttach = async (m: { transactionId: string }, itemsMode?: 'replace' | 'keep', photoOnly = false) => {
+    const input = saveInput(state, ctx.todayLocal) ?? (photoOnly ? { draft: state.draft, itemCategories: state.itemChoices, mainCategoryId: state.mainCategoryId } : null);
     if (!input || attaching.current) {
       if (!input) setError(view.blocked === 'total' ? copy.receiptReview.saveHintTotal : copy.receiptReview.saveHintMismatch);
       return;
@@ -326,11 +347,11 @@ export function ReceiptReviewScreen({ draft, photo, onDiscardPhoto, api = realRe
     setError(null);
     submission.current ??= api.newSubmissionId();
     const r = await api
-      .attach({ submissionId: submission.current, transactionId: m.transactionId, draft: input.draft, itemCategories: input.itemCategories, mainCategoryId: input.mainCategoryId, ...(itemsMode ? { itemsMode } : {}), ...(photo ? { attachment: { attachmentId: photo.attachmentId, digest: photo.digest, sizeBytes: photo.sizeBytes } } : {}) })
+      .attach({ submissionId: submission.current, transactionId: m.transactionId, draft: input.draft, itemCategories: input.itemCategories, mainCategoryId: input.mainCategoryId, ...(itemsMode ? { itemsMode } : {}), ...(photoOnly ? { photoOnly: true } : {}), ...(photo ? { attachment: { attachmentId: photo.attachmentId, digest: photo.digest, sizeBytes: photo.sizeBytes } } : {}) })
       .catch(() => ({ ok: false as const, code: 'ERROR' }));
     attaching.current = false;
     if (!r.ok) {
-      setError(copy.receiptReview.attachFailed);
+      setError(r.code === 'ENTRY_REMOVED' || r.code === 'ENTRY_NOT_FOUND' ? copy.receiptSplit.removed : copy.receiptReview.attachFailed);
       return;
     }
     await invalidateForEvent(qc, 'TransactionsChanged').catch(() => undefined);
@@ -342,7 +363,7 @@ export function ReceiptReviewScreen({ draft, photo, onDiscardPhoto, api = realRe
     onClose();
   };
 
-  const attachTo = async (m: ReceiptMatch) => {
+  const attachToMatch = async (m: ReceiptMatch) => {
     const old = await api.itemCount(m.transactionId).catch(() => 0);
     if (old === 0) return void doAttach(m);
     sheet.open({
@@ -409,12 +430,17 @@ export function ReceiptReviewScreen({ draft, photo, onDiscardPhoto, api = realRe
           <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{copy.receiptReview.thumbMissing}</Text>
         </View>
 
+        {splitting ? (
+          <Text testID="split-header" accessibilityRole="header" style={[textStyle('body-medium'), { color: theme.color('text-primary') }]}>{splitHeader}</Text>
+        ) : null}
+        {attachTo && target === null ? <Text testID="split-removed" accessibilityRole="alert" style={[textStyle('body'), { color: theme.color('semantic-warning') }]}>{copy.receiptSplit.removed}</Text> : null}
+
         {holdingForMatch ? (
           <View testID="match-prompt" accessibilityRole="alert" style={[styles.matchBox, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('accent-primary') }]}>
             {matches.map((m) => (
               <View key={m.transactionId} style={styles.matchRow}>
                 <Text testID={`match-${m.transactionId}`} style={[textStyle('body-medium'), { color: theme.color('text-primary') }]}>{matchLine(m)}</Text>
-                <Button label={copy.receiptReview.attachToIt} testID={`attach-${m.transactionId}`} onPress={() => void attachTo(m)} />
+                <Button label={copy.receiptReview.attachToIt} testID={`attach-${m.transactionId}`} onPress={() => void attachToMatch(m)} />
               </View>
             ))}
           </View>
@@ -520,10 +546,17 @@ export function ReceiptReviewScreen({ draft, photo, onDiscardPhoto, api = realRe
             {mismatchText}
           </Text>
         ) : null}
+        {adjustment > 0 ? <Text testID="split-tip" style={[textStyle('body'), { color: theme.color('text-secondary') }]}>{copy.receiptSplit.tip.replace('{amount}', money(adjustment))}</Text> : null}
+        {exceeds && splitting ? <Text testID="split-exceeds" accessibilityRole="alert" style={[textStyle('body'), { color: theme.color('semantic-warning') }]}>{copy.receiptSplit.exceeds.replace('{receipt}', money(total ?? 0)).replace('{entry}', money(splitting.amountMinor))}</Text> : null}
         {error ? <Text testID="save-error" accessibilityRole="alert" style={[textStyle('body'), { color: theme.color('semantic-warning') }]}>{error}</Text> : null}
       </ScrollView>
       <View style={[styles.footer, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
-        {holdingForMatch ? (
+        {attachTo ? (
+          <View style={styles.matchChoices}>
+            <Button label={copy.receiptSplit.attachAndSplit} testID="split-attach" {...(target === undefined || target === null ? { disabledReason: copy.receiptSplit.removed } : exceeds ? { disabledReason: copy.receiptSplit.exceeds.replace('{receipt}', money(total ?? 0)).replace('{entry}', money(target.amountMinor)) } : blockedReason ? { disabledReason: blockedReason } : {})} onPress={() => void attachToMatch({ transactionId: attachTo } as ReceiptMatch)} />
+            {exceeds ? <Button label={copy.receiptSplit.photoOnly} variant="secondary" testID="split-photo-only" onPress={() => void doAttach({ transactionId: attachTo }, undefined, true)} /> : null}
+          </View>
+        ) : holdingForMatch ? (
           <View style={styles.matchChoices}>
             <Button label={copy.receiptReview.keepSeparate} variant="secondary" testID="keep-separate" onPress={() => setSeparate(true)} />
             <Button label={copy.receiptReview.discardReceipt} variant="destructive" testID="match-discard" onPress={discardAll} />
