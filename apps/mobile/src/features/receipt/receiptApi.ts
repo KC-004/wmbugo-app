@@ -161,7 +161,7 @@ export const realReceiptApi: ReceiptApi = {
     const total = draft.total.value;
     const date = draft.date.value;
     if (total === null || total <= 0 || date === null) return [];
-    const [h, m] = draft.time.value !== null && /^([01]d|2[0-3]):[0-5]d$/.test(draft.time.value) ? draft.time.value.split(':').map(Number) : [12, 0];
+    const [h, m] = draft.time.value !== null && /^([01]\d|2[0-3]):[0-5]\d$/.test(draft.time.value) ? draft.time.value.split(':').map(Number) : [12, 0];
     const at = localToInstant(date, h!, m!, timezoneId);
     const rows = await getServices().db.query(RECEIPT_MATCH_SQL, receiptMatchParams(total, date));
     return previewReceiptMatches({ merchant: draft.merchant.value, localDate: date, occurredAtMs: at.ok ? at.value : systemClock.nowMs(), totalMinor: total }, rows);

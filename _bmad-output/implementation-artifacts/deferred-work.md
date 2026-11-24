@@ -115,3 +115,9 @@ Graded from the reviewers' reports; only the first group was checked against the
 - source_spec: `spec-10-9-snap-a-receipt-to-split-an-entry-and-one-way-in-for-every-re.md`
   summary: Phone check of Snap receipt to split and the wmbugo://receipt/scan link (lock first, then camera); decide whether the intent filter should require a signed token once the widget exists (Epic 11).
   evidence: Story 10.9 spec Implementation Notes; react-test-renderer only.
+
+## Deferred from: code review of Epic 10 stories 10.5 to 10.9 (2026-11-24)
+
+- source_spec: `spec-10-8-a-receipt-that-matches-an-entry-attach-to-it-keep-separate-o.md`
+  summary: AttachReceipt overwrites an entry hand-made splits without asking (only existing receipt items trigger the replace or keep choice).
+  evidence: /code-review high on b21ceae..HEAD; the Attach toast Undo restores them. The other findings (match time regex, currency check, malformed link, camera cache file on early close, deleted-entry duplicate, Enter it by hand in attach mode, reveal delay) were fixed.

@@ -39,6 +39,15 @@ export function startReceiptScan(nav: ScanNav, request: ScanRequest): void {
 
 /** `wmbugo://receipt/scan?attachTo=<id>` (optionally `&origin=widget`). Anything else is not a scan link. */
 export function scanLinkRequest(url: string): ScanRequest | null {
+  try {
+    return parseScanLink(url);
+  } catch {
+    // A malformed escape in a link from outside the app is not a scan link.
+    return null;
+  }
+}
+
+function parseScanLink(url: string): ScanRequest | null {
   const m = /^wmbugo:\/\/receipt\/scan(?:\?(.*))?$/.exec(url.trim());
   if (!m) return null;
   const query = new Map<string, string>();

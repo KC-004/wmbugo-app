@@ -93,6 +93,18 @@ describe('the receipt camera (Story 10.7)', () => {
     expect(discardTemp).toHaveBeenCalledWith('/cache/shot.jpg');
   });
 
+  it('deletes a photo that arrives after the screen has gone away', async () => {
+    perms.permissionState.mockResolvedValue('granted');
+    let resolve!: (p: string) => void;
+    capture.mockImplementationOnce(() => new Promise<string>((r) => (resolve = r)));
+    const { r, discardTemp } = mount();
+    await settle();
+    act(() => void fire(r, 'camera-shutter'));
+    act(() => r.unmount());
+    await act(async () => resolve('/cache/late.jpg'));
+    expect(discardTemp).toHaveBeenCalledWith('/cache/late.jpg');
+  });
+
   it('the Light toggle switches the torch, and a failed capture says nothing was saved', async () => {
     perms.permissionState.mockResolvedValue('granted');
     const { r } = mount();

@@ -4,6 +4,7 @@ import type { ReceiptDraft } from '@wmbugo/core';
 import type { PendingPhoto } from '../../adapters/files/receiptFiles';
 import { ScanLoader } from '../../shared/brand/ScanLoader';
 import { copy } from '../../shared/copy';
+import { useReducedMotion } from '../../shared/a11y/useReducedMotion';
 import { useTheme } from '../../shared/theme/ThemeProvider';
 import { textStyle } from '../../shared/theme/typography';
 import { Button } from '../../shared/ui/Button';
@@ -32,6 +33,7 @@ export function ReceiptScanScreen({
   onByHand,
   onOpenEntry,
   onTaken,
+  allowByHand = true,
 }: {
   /** An image already chosen (Story 10.7 camera, or 10.9 for a shared image). Without it the Photo Picker opens. */
   uri?: string;
@@ -44,8 +46,11 @@ export function ReceiptScanScreen({
   onOpenEntry: (transactionId: string) => void;
   /** Called once the image has been taken in (or failed to be), so a camera's temporary file can be deleted. */
   onTaken?: () => void;
+  /** False in attach mode: typing a new entry would record the same payment twice, so the way out is back to the entry. */
+  allowByHand?: boolean;
 }) {
   const theme = useTheme();
+  const reduced = useReducedMotion();
   const [phase, setPhase] = useState<Phase>({ kind: 'working', photo: null, reading: false });
   const [shown, setShown] = useState(0);
   const [total, setTotal] = useState(0);
@@ -81,15 +86,17 @@ export function ReceiptScanScreen({
       setNames(items);
       setTotal(items.length);
       // Item names appear one by one under the photo, then the review opens.
+      // At most about a second and a half in all, and none when motion is reduced.
+      const pause = reduced ? 0 : Math.min(REVEAL_MS, Math.floor(1500 / Math.max(1, items.length)));
       for (let i = 1; i <= items.length; i++) {
-        await new Promise((r) => setTimeout(r, REVEAL_MS));
+        if (pause > 0) await new Promise((r) => setTimeout(r, pause));
         if (!live.current || ctl.signal.aborted) return;
         setShown(i);
       }
       handedOver.current = true;
       onRead(out.draft, photo);
     },
-    [api, onRead],
+    [api, onRead, reduced],
   );
 
   useEffect(() => {
@@ -172,7 +179,7 @@ export function ReceiptScanScreen({
         <View style={styles.content}>
           <Text testID="scan-error" accessibilityRole="alert" style={[textStyle('body'), { color: theme.color('semantic-warning') }]}>{phase.message}</Text>
           {phase.retry && phase.photo ? <Button label={copy.receiptScan.tryAgain} testID="scan-retry" onPress={() => void read(phase.photo as PendingPhoto)} /> : null}
-          <Button label={copy.receiptScan.byHand} variant={phase.retry ? 'text' : 'primary'} testID="scan-by-hand" onPress={() => byHand(phase.photo)} />
+          {allowByHand ? <Button label={copy.receiptScan.byHand} variant={phase.retry ? 'text' : 'primary'} testID="scan-by-hand" onPress={() => byHand(phase.photo)} /> : <Button label={copy.common.close} variant="text" testID="scan-close-error" onPress={cancel} />}
         </View>
       ) : null}
       {phase.kind === 'duplicate' ? (

@@ -31,7 +31,8 @@ export type AttachReceiptError =
   | 'SUBMISSION_INVALID'
   | 'RECEIPT_EXCEEDS_ENTRY'
   | 'ITEMS_CHOICE_REQUIRED'
-  | 'NOT_AN_EXPENSE';
+  | 'NOT_AN_EXPENSE'
+  | 'CURRENCY_DIFFERS';
 
 /** Everything `UndoAttachReceipt` needs to put the entry back exactly as it was. */
 export interface AttachReceiptUndo {
@@ -75,6 +76,8 @@ export const AttachReceipt: UseCase<AttachReceiptInput, AttachedReceipt, AttachR
 
     const d = input.draft;
     if (!input.photoOnly) {
+      const profile = (await ctx.query('SELECT currency_code FROM profile LIMIT 1'))[0];
+      if (profile && d.currency.value !== null && d.currency.value.trim().toUpperCase() !== String(profile[0])) return err('CURRENCY_DIFFERS');
       if (d.total.value === null || d.total.value <= 0) return err('TOTAL_REQUIRED');
       if (input.itemCategories.length !== d.items.length) return err('SUBMISSION_INVALID');
     }

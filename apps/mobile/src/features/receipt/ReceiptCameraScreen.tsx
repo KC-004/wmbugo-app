@@ -91,14 +91,16 @@ export function ReceiptCameraScreen({
     setFailed(false);
     try {
       const path = await surface.current.capture();
+      // The screen went away while the camera was working: the photo is not kept.
+      if (!live.current) return void Promise.resolve(discardTemp(path)).catch(() => undefined);
       pending.current = path;
-      if (live.current) setShot(path);
+      setShot(path);
     } catch {
       if (live.current) setFailed(true);
     } finally {
       busy.current = false;
     }
-  }, []);
+  }, [discardTemp]);
 
   const retake = () => {
     const p = pending.current;

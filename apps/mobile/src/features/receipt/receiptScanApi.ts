@@ -22,7 +22,7 @@ export const realScanApi: ScanApi = {
   engine: realOcrEngine,
   newId: () => getServices().newId(),
   async findByDigest(digest) {
-    const rows = await getServices().db.query('SELECT transaction_id FROM attachment WHERE digest = ? LIMIT 1', [digest]);
+    const rows = await getServices().db.query('SELECT a.transaction_id FROM attachment a JOIN "transaction" t ON t.id = a.transaction_id WHERE a.digest = ? AND t.removed_at IS NULL LIMIT 1', [digest]);
     return rows.length > 0 ? String(rows[0]?.[0]) : null;
   },
   async profile() {

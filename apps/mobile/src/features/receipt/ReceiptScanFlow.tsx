@@ -61,6 +61,7 @@ export function ReceiptScanFlow({
   return (
     <ReceiptScanScreen
       api={scanApi}
+      allowByHand={!attachTo}
       {...(uri ? { uri } : {})}
       {...(provenance ? { provenance } : {})}
       {...(onTaken ? { onTaken } : {})}

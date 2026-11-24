@@ -47,6 +47,8 @@ describe('startReceiptScan, the one entry (Story 10.9)', () => {
     expect(scanLinkRequest('wmbugo://receipt/scan?origin=bogus')).toEqual({ origin: 'widget' });
     expect(scanLinkRequest('wmbugo://receipt/other')).toBeNull();
     expect(scanLinkRequest('https://example.com/receipt/scan')).toBeNull();
+    // A malformed escape from outside the app is not a scan link, and never throws.
+    expect(scanLinkRequest('wmbugo://receipt/scan?attachTo=%E0%A4%A')).toBeNull();
   });
 });
 
@@ -168,6 +170,15 @@ describe('attach mode: Snap receipt to split (Story 10.9)', () => {
     await act(async () => fire(m.r, 'split-photo-only'));
     await settle();
     expect(m.attach.mock.calls[0]![0]).toMatchObject({ transactionId: 'tx1', photoOnly: true, attachment: { attachmentId: 'att1' } });
+  });
+
+  it('has no Enter it by hand when the read fails: the way out is back to the entry', async () => {
+    const failing = mountFlow({ uri: 'file:///x.jpg', attachTo: 'tx1', target: entry(1500) });
+    (failing.scan.engine.recognise as jest.Mock).mockResolvedValueOnce({ width: 10, height: 10, blocks: [] });
+    await act(async () => new Promise((res) => setTimeout(res, 50)));
+    await settle();
+    expect(has(failing.r, 'scan-by-hand')).toBe(false);
+    expect(has(failing.r, 'scan-close-error')).toBe(true);
   });
 
   it('says the entry was removed when it is gone, and writes nothing', async () => {

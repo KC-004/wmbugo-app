@@ -155,6 +155,14 @@ describe('AttachReceipt (Story 10.8)', () => {
     expect(splits.reduce((n, s) => n + Number(s[1]), 0)).toBe(115_000);
   });
 
+  it('refuses a receipt read in another currency, as a save does', async () => {
+    const env = await setup();
+    const sms = await existing(env, { id: 'sms-1', amount: 234_000, source: 'sms', accountId: env.cardId });
+    const usd = { ...RECEIPT, currency: { value: 'USD', certainty: 'sure' as const } };
+    expect(await attach(env, sms.transactionId, { draft: usd })).toEqual({ ok: false, code: 'CURRENCY_DIFFERS' });
+    expect((await env.db.query('SELECT COUNT(*) FROM receipt_item'))[0]![0]).toBe(0);
+  });
+
   it('refuses a receipt that totals more than the entry and changes nothing', async () => {
     const env = await setup();
     const card = await existing(env, { id: 'c', amount: 200_000, source: 'sms', accountId: env.cardId });
