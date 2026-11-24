@@ -26,7 +26,7 @@ function Key({ k, glyph, onKey, onLong, label }: { k: KeypadKey; glyph: string |
   const theme = useTheme();
   const { focused, onFocus, onBlur } = useFocusRing();
   return (
-    <FocusRing focused={focused} radius={radii.md}>
+    <FocusRing focused={focused} radius={radii.md} style={styles.cell}>
       <Pressable
         testID={`key-${k}`}
         {...controlA11y({ label, role: 'button' })}
@@ -103,7 +103,8 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 6 },
   clearRow: { alignItems: 'center' },
   round: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  key: { flex: 1, minWidth: 0, minHeight: KEY_SIZE, borderRadius: radii.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  cell: { flex: 1, minWidth: 0 },
+  key: { minHeight: KEY_SIZE, borderRadius: radii.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   // Same footprint as a key plus its 4dp focus-ring gap each side, so the bottom row stays aligned.
   spacer: { flex: 1, minHeight: KEY_SIZE },
   action: { flexDirection: 'row', gap: 6, minHeight: 48, minWidth: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14, borderWidth: 1, borderRadius: radii.md },

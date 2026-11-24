@@ -720,5 +720,5 @@ const styles = StyleSheet.create({
   clearSlot: { position: 'absolute', right: 0, top: 10 },
   snap: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 18, paddingHorizontal: 12, minHeight: 36 },
   hiddenInput: { position: 'absolute', width: 1, height: 1, opacity: 0 },
-  footer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', gap: 12, paddingVertical: 8, paddingHorizontal: 8, borderRadius: 12 },
+  footer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 8, borderRadius: 12 },
 });

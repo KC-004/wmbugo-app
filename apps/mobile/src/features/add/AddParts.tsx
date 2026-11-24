@@ -55,7 +55,7 @@ function CategoryCell({ category, selected, onPress }: { category: CategoryRow; 
       onPress={onPress}
       style={[styles.cell, { borderColor: selected ? theme.color('accent-primary') : resolveColor('dark', 'border-hairline'), backgroundColor: selected ? resolveColor('dark', 'bg-muted') : resolveColor('dark', 'bg-surface'), borderWidth: selected ? 2 : 1 }]}>
       <Icon icon={categoryIcon(category.icon)} size={18} selected={selected} tint={theme.color('on-glass-primary')} />
-      <Text numberOfLines={1} style={[textStyle('caption'), { color: theme.color('on-glass-primary'), fontWeight: selected ? '600' : '400' }]}>{category.name}</Text>
+      <Text numberOfLines={2} style={[textStyle('caption'), { textAlign: 'center', color: theme.color('on-glass-primary'), fontWeight: selected ? '600' : '400' }]}>{category.name}</Text>
     </Pressable>
   );
 }
@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
   strip: { flexDirection: 'row', gap: 4, paddingRight: 8 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  cell: { flexBasis: '18%', flexGrow: 1, minHeight: 52, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, paddingVertical: 4, gap: 2 },
+  cell: { flexBasis: '18%', flexGrow: 1, minHeight: 58, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2, paddingVertical: 4, gap: 2 },
   details: { gap: 8 },
   input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, minHeight: layout.touchMin },
 });

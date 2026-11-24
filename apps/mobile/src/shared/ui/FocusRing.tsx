@@ -33,12 +33,15 @@ export function FocusRing({
   radius = radii.md,
   children,
   testID,
+  style,
 }: {
   focused: boolean;
   onGlass?: boolean;
   radius?: number;
   children: ReactNode;
   testID?: string;
+  /** Extra layout for the wrapper (a key that shares a row's width). */
+  style?: ViewStyle;
 }) {
   const theme = useTheme();
   return (
@@ -46,6 +49,7 @@ export function FocusRing({
       testID={testID}
       style={[
         styles.ring,
+        style,
         {
           borderRadius: radius + layout.focusRingOffset + layout.focusRingWidth,
           borderColor: focused ? theme.color(onGlass ? 'focus-ring-on-glass' : 'focus-ring') : 'transparent',
