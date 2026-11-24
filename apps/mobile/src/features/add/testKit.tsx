@@ -84,7 +84,7 @@ export function fakeApi(over: Partial<AddData> = {}, counts = new Map<string, nu
   return { api, record, recordTransfer, remove, load, defaultAccountFor, duplicateInfo, keepBoth, merge, undoResolution, editTx, restoreTransaction };
 }
 
-export function mount(api: AddApi, close = jest.fn(), onNewAccount?: () => void, preset?: AddPreset, editSpec?: EditSpec) {
+export function mount(api: AddApi, close = jest.fn(), onNewAccount?: () => void, preset?: AddPreset, editSpec?: EditSpec, onSnap?: () => void) {
   const qc = createQueryClient();
   clients.push(qc);
   let r!: ReactTestRenderer;
@@ -94,7 +94,7 @@ export function mount(api: AddApi, close = jest.fn(), onNewAccount?: () => void,
         <ThemeProvider>
           <ToastHost bottomOffset={0}>
             <SheetHost>
-            <AddSheet api={api} close={close} onNewAccount={onNewAccount} preset={preset} edit={editSpec} now={() => Date.UTC(2026, 10, 8, 10, 0, 0)} />
+            <AddSheet api={api} close={close} onNewAccount={onNewAccount} onSnap={onSnap} preset={preset} edit={editSpec} now={() => Date.UTC(2026, 10, 8, 10, 0, 0)} />
             </SheetHost>
           </ToastHost>
         </ThemeProvider>

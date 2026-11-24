@@ -117,11 +117,14 @@ function fakeApi(over: Partial<ReceiptContext> = {}) {
   return { api, save, remove };
 }
 
-async function mount(d: ReceiptDraft, over: Partial<ReceiptContext> = {}, loadFails = false) {
+const PHOTO = { attachmentId: 'att1', digest: 'd1', sizeBytes: 10, width: 10, height: 10, provenance: 'photo_picker' as const };
+
+async function mount(d: ReceiptDraft, over: Partial<ReceiptContext> = {}, loadFails = false, withPhoto = false) {
   const f = fakeApi(over);
   if (loadFails) f.api.load = jest.fn(async () => { throw new Error('no profile'); });
   const onClose = jest.fn();
   const onSaved = jest.fn();
+  const onDiscardPhoto = jest.fn();
   const addApi = { duplicateInfo: jest.fn(async () => null), keepBoth: jest.fn(), merge: jest.fn(), undoResolution: jest.fn() } as never;
   let r!: ReactTestRenderer;
   await act(async () => {
@@ -130,7 +133,7 @@ async function mount(d: ReceiptDraft, over: Partial<ReceiptContext> = {}, loadFa
         <QueryClientProvider client={createQueryClient()}>
           <ToastHost>
             <SheetHost>
-              <ReceiptReviewScreen draft={d} api={f.api} addApi={addApi} onClose={onClose} onSaved={onSaved} />
+              <ReceiptReviewScreen draft={d} {...(withPhoto ? { photo: PHOTO, onDiscardPhoto } : {})} api={f.api} addApi={addApi} onClose={onClose} onSaved={onSaved} />
             </SheetHost>
           </ToastHost>
         </QueryClientProvider>
@@ -138,7 +141,7 @@ async function mount(d: ReceiptDraft, over: Partial<ReceiptContext> = {}, loadFa
     );
   });
   await settle();
-  return { r, onClose, onSaved, ...f };
+  return { r, onClose, onSaved, onDiscardPhoto, ...f };
 }
 
 describe('ReceiptReviewScreen (SCR-23)', () => {
@@ -226,6 +229,21 @@ describe('ReceiptReviewScreen (SCR-23)', () => {
     await act(async () => fire(r, 'receipt-save'));
     await settle();
     expect(save.mock.calls.map((c) => c[0].submissionId)).toEqual(['sub-1', 'sub-1']);
+  });
+
+  it('saves the pending photo as the entry attachment, and discarding deletes it', async () => {
+    const a = await mount(draft(), {}, false, true);
+    act(() => fire(a.r, 'category-cat_food'));
+    await act(async () => fire(a.r, 'receipt-save'));
+    await settle();
+    expect(a.save.mock.calls[0]![0]).toMatchObject({ attachment: { attachmentId: 'att1', digest: 'd1', sizeBytes: 10 } });
+    expect(a.onDiscardPhoto).not.toHaveBeenCalled();
+    const b = await mount(draft(), {}, false, true);
+    act(() => fire(b.r, 'receipt-close'));
+    await settle();
+    act(() => fire(b.r, 'discard-confirm'));
+    expect(b.onDiscardPhoto).toHaveBeenCalledTimes(1);
+    expect(b.save).not.toHaveBeenCalled();
   });
 
   it('Back asks to discard: Keep editing returns, Discard closes and writes nothing', async () => {

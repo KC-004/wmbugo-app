@@ -28,6 +28,7 @@ import { textStyle } from '../../shared/theme/typography';
 import { Amount } from '../../shared/ui/Amount';
 import { Button } from '../../shared/ui/Button';
 import { Chip } from '../../shared/ui/Chip';
+import { Camera } from 'phosphor-react-native';
 import { OTHER_CATEGORY_ID } from '@wmbugo/core';
 import { realAddApi, type AddApi, type AddData, type AddKind } from './addApi';
 import { AccountChip, CategoryChips, DetailsPanel, KindSegments, TransferTo } from './AddParts';
@@ -38,6 +39,13 @@ import { startSaveTiming } from './saveTiming';
 const QUICK_COUNT = 6;
 
 type FieldError = 'amount' | 'category' | 'date' | 'same' | 'fee' | 'from' | null;
+
+/** A receipt photo already encrypted in private storage (Story 10.6): the entry saved from this sheet gets it as its attachment. */
+export interface PendingAttachment {
+  readonly attachmentId: string;
+  readonly digest: string;
+  readonly sizeBytes: number;
+}
 
 /** Opened from an account: what the sheet starts with. From is `accountId`; Pay card bill also fixes To. */
 export interface AddPreset {
@@ -57,6 +65,8 @@ export interface AddPreset {
   readonly note?: string | null;
   readonly paymentMethod?: PaymentMethod | null;
   readonly copiedFrom?: string;
+  /** `Enter it by hand` after a receipt could not be read: the photo is attached when the entry saves, deleted if the sheet is dismissed first. */
+  readonly photo?: PendingAttachment;
   /** A move into savings for a goal (Story 6.7): the header says `For Goa trip` and the transfer counts toward it. */
   readonly goal?: { readonly id: string; readonly name: string; readonly setAsideMinor: number };
 }
@@ -97,6 +107,7 @@ export function AddSheet({
   api = realAddApi,
   close,
   onNewAccount,
+  onSnap,
   preset,
   edit,
   onSplit,
@@ -106,6 +117,8 @@ export function AddSheet({
   close: () => void;
   /** Opens the add-account screen (the sheet closes first). */
   onNewAccount?: () => void;
+  /** The `Snap receipt` chip (Story 10.6): leaves the sheet for the receipt scan. */
+  onSnap?: () => void;
   /** Opened from an account: the type and the account (the From side of a transfer) are chosen already, the amount is empty. */
   preset?: AddPreset;
   /** Editing an existing entry. */
@@ -133,6 +146,13 @@ export function AddSheet({
   const goalTag = preset?.goal && kind === 'transfer' && (!preset.toAccountId || toAccountId === preset.toAccountId) ? preset.goal : null;
   const [owedWarned, setOwedWarned] = useState<string | null>(null);
   const presetApplied = useRef(false);
+  const photoKept = useRef(false);
+  useEffect(() => {
+    const photo = preset?.photo;
+    return () => {
+      if (photo && !photoKept.current) void api.discardPending?.(photo.attachmentId);
+    };
+  }, []);
   const [feeText, setFeeText] = useState('');
   const [feeCategoryId, setFeeCategoryId] = useState(OTHER_CATEGORY_ID);
   const [warned, setWarned] = useState<string | null>(null);
@@ -367,6 +387,10 @@ export function AddSheet({
         return;
       }
       const id = r.value.transactionId;
+      if (preset?.photo) {
+        photoKept.current = true;
+        await api.attachPending?.(id, preset.photo).catch(() => undefined);
+      }
       await refresh();
       // Saved, never blocked; if it looks like something already recorded it waits, counted nowhere, for the user's answer.
       if (r.value.result === 'POSSIBLE_DUPLICATE') duplicate.offer(id);
@@ -515,6 +539,13 @@ export function AddSheet({
     <View>
     <ScrollView style={{ maxHeight: Math.max(280, height - insets.top - 190) }} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
       <KindSegments kind={kind} vertical={fontScale >= 1.3} onChoose={chooseKind} locked={edit !== undefined} />
+
+      {kind === 'expense' && onSnap && !edit ? (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          <Chip onGlass label={copy.receiptScan.snap} icon={Camera} testID="snap-receipt" onPress={onSnap} />
+        </View>
+      ) : null}
+      {preset?.photo ? <Text testID="add-photo-attached" style={[textStyle('caption'), { color: theme.color('on-glass-secondary') }]}>{copy.receiptScan.attachedHand}</Text> : null}
 
       {kind === 'transfer' ? null : (
         <CategoryChips

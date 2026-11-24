@@ -119,6 +119,75 @@ class ReceiptFilesModule(private val ctx: ReactApplicationContext) : ReactContex
     }.start()
   }
 
+  /**
+   * Story 10.6 intake: applies the EXIF orientation, scales to at most 2,048 px on the long edge, re-encodes as JPEG quality 85 (which
+   * carries no EXIF, so location and camera data are gone) and writes only that copy, encrypted, to destPath. The original is never
+   * copied. Resolves { digest, size, width, height } of the processed copy.
+   */
+  @ReactMethod
+  fun prepareReceiptImage(uri: String, destPath: String, keyHex: String, promise: Promise) {
+    Thread {
+      val dest = File(destPath)
+      try {
+        val key = deriveKey(keyHex)
+        val source = Uri.parse(uri)
+        val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        ctx.contentResolver.openInputStream(source).use { input ->
+          if (input == null) throw IllegalStateException("Cannot open the image")
+          android.graphics.BitmapFactory.decodeStream(input, null, bounds)
+        }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw IllegalStateException("Not an image")
+        var sample = 1
+        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= MAX_EDGE) sample *= 2
+        val decoded = ctx.contentResolver.openInputStream(source).use { input ->
+          android.graphics.BitmapFactory.decodeStream(input, null, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample })
+        } ?: throw IllegalStateException("Cannot read the image")
+        val orientation = ctx.contentResolver.openInputStream(source).use { input ->
+          if (input == null) android.media.ExifInterface.ORIENTATION_NORMAL
+          else android.media.ExifInterface(input).getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION, android.media.ExifInterface.ORIENTATION_NORMAL)
+        }
+        val matrix = android.graphics.Matrix()
+        when (orientation) {
+          android.media.ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+          android.media.ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+          android.media.ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
+          android.media.ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.postScale(-1f, 1f)
+          android.media.ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.postScale(1f, -1f)
+          android.media.ExifInterface.ORIENTATION_TRANSPOSE -> { matrix.postRotate(90f); matrix.postScale(-1f, 1f) }
+          android.media.ExifInterface.ORIENTATION_TRANSVERSE -> { matrix.postRotate(270f); matrix.postScale(-1f, 1f) }
+        }
+        val long = maxOf(decoded.width, decoded.height)
+        if (long > MAX_EDGE) {
+          val f = MAX_EDGE.toFloat() / long
+          matrix.postScale(f, f)
+        }
+        val out = android.graphics.Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, matrix, true)
+        val jpeg = java.io.ByteArrayOutputStream().also { out.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, it) }.toByteArray()
+        val width = out.width
+        val height = out.height
+        if (out !== decoded) decoded.recycle()
+        out.recycle()
+        dest.parentFile?.mkdirs()
+        val iv = ByteArray(IV_BYTES).also { SecureRandom().nextBytes(it) }
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(128, iv))
+        FileOutputStream(dest).use { o ->
+          o.write(iv)
+          o.write(cipher.doFinal(jpeg))
+        }
+        val map = Arguments.createMap()
+        map.putString("digest", MessageDigest.getInstance("SHA-256").digest(jpeg).joinToString("") { "%02x".format(it) })
+        map.putDouble("size", jpeg.size.toDouble())
+        map.putInt("width", width)
+        map.putInt("height", height)
+        promise.resolve(map)
+      } catch (e: Throwable) {
+        dest.delete()
+        promise.reject("E_PREPARE", e.message, e)
+      }
+    }.start()
+  }
+
   /** Decrypts into the cache folder for display and resolves the plain file path. The cache is cleared with clearViewCache. */
   @ReactMethod
   fun decryptToCache(srcPath: String, keyHex: String, name: String, promise: Promise) {
@@ -167,6 +236,7 @@ class ReceiptFilesModule(private val ctx: ReactApplicationContext) : ReactContex
     const val IV_BYTES = 12
     const val MAX_BYTES = 25L * 1024 * 1024
     const val VIEW_DIR = "receipt-view"
+    const val MAX_EDGE = 2048
   }
 }
 

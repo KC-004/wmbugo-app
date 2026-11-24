@@ -33,6 +33,8 @@ import { appNotifier } from '../../adapters/notifier';
 import { BudgetDetailScreen } from '../budgets/BudgetDetailScreen';
 import { BillsScreen } from '../bills/BillsScreen';
 import { ReceiptReviewScreen } from '../receipt/ReceiptReviewScreen';
+import { ReceiptScanScreen } from '../receipt/ReceiptScanScreen';
+import { realReceiptFiles, type PendingPhoto } from '../../adapters/files/receiptFiles';
 import { sampleReceiptDraft } from '../receipt/sampleReceipt';
 import { BillDetailScreen } from '../bills/BillDetailScreen';
 import { InsightsScreen } from '../insights/InsightsScreen';
@@ -51,7 +53,7 @@ import { TopBar } from '../../shared/ui/TopBar';
 import { TabBar, type TabRoute } from './TabBar';
 import { markTabFirstFrame } from './navTiming';
 
-type RootParams = { Tabs: undefined; BudgetDetail: { budgetId: string; periodStart?: string }; Accounts: undefined; AccountDetail: { accountId: string }; TransactionDetail: { transactionId: string }; ReviewQueue: { focusId?: string }; Settings: undefined; HomeEdit: undefined; Bills: { focusRuleId?: string } | undefined; BillDetail: { ruleId: string }; Goals: undefined; GoalDetail: { goalId: string }; Budgets: undefined; InsightsDrill: { target: DrillTarget }; ReceiptReview: undefined };
+type RootParams = { Tabs: undefined; BudgetDetail: { budgetId: string; periodStart?: string }; Accounts: undefined; AccountDetail: { accountId: string }; TransactionDetail: { transactionId: string }; ReviewQueue: { focusId?: string }; Settings: undefined; HomeEdit: undefined; Bills: { focusRuleId?: string } | undefined; BillDetail: { ruleId: string }; Goals: undefined; GoalDetail: { goalId: string }; Budgets: undefined; InsightsDrill: { target: DrillTarget }; ReceiptReview: undefined; ReceiptScan: { origin?: 'add_sheet'; uri?: string } | undefined };
 registerInsightsSections();
 const RootStack = createNativeStackNavigator<RootParams>();
 const Tabs = createBottomTabNavigator();
@@ -205,6 +207,40 @@ function ReceiptReviewRoute() {
     void readProfile(getServices().db).then((p) => p && setDraft(sampleReceiptDraft(p.currency, p.exponent)));
   }, []);
   return draft ? <ReceiptReviewScreen draft={draft} onClose={() => nav.goBack()} /> : <ScreenFrame>{null}</ScreenFrame>;
+}
+
+/** Pick a receipt photo, watch it being read, then the review (Story 10.6). Cancel returns to the Add sheet when it started there. */
+function ReceiptScanRoute() {
+  const nav = useNavigation<{ goBack: () => void; replace: (s: 'TransactionDetail', p: { transactionId: string }) => void }>();
+  const route = useRoute<RouteProp<RootParams, 'ReceiptScan'>>();
+  const openAdd = useOpenAddWith();
+  const [read, setRead] = useState<{ draft: ReceiptDraft; photo: PendingPhoto } | null>(null);
+  const saved = useRef(false);
+  const origin = route.params?.origin;
+  const leave = () => {
+    nav.goBack();
+    if (origin === 'add_sheet') openAdd();
+  };
+  useEffect(
+    () => () => {
+      if (read && !saved.current) void realReceiptFiles.remove(read.photo.attachmentId).catch(() => undefined);
+    },
+    [read],
+  );
+  if (read)
+    return <ReceiptReviewScreen draft={read.draft} photo={read.photo} onSaved={() => (saved.current = true)} onClose={() => nav.goBack()} />;
+  return (
+    <ReceiptScanScreen
+      {...(route.params?.uri ? { uri: route.params.uri } : {})}
+      onCancel={leave}
+      onRead={(draft, photo) => setRead({ draft, photo })}
+      onByHand={(photo) => {
+        nav.goBack();
+        openAdd({ kind: 'expense', accountId: null, photo: { attachmentId: photo.attachmentId, digest: photo.digest, sizeBytes: photo.sizeBytes } });
+      }}
+      onOpenEntry={(transactionId) => nav.replace('TransactionDetail', { transactionId })}
+    />
+  );
 }
 
 function AccountsRoute() {
@@ -391,6 +427,7 @@ export function RootNavigator() {
             <RootStack.Screen name="Goals" component={GoalsRoute} />
             <RootStack.Screen name="InsightsDrill" component={InsightsDrillRoute} />
             <RootStack.Screen name="ReceiptReview" component={ReceiptReviewRoute} />
+            <RootStack.Screen name="ReceiptScan" component={ReceiptScanRoute} />
             <RootStack.Screen name="GoalDetail" component={GoalDetailRoute} />
             <RootStack.Screen name="TransactionDetail" component={TransactionDetailRoute} />
             <RootStack.Screen name="ReviewQueue" component={ReviewQueueRoute} />

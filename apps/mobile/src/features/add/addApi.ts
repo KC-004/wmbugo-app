@@ -1,4 +1,5 @@
 import {
+  AddAttachment,
   ACCOUNT_LIST_SQL,
   categoryFits,
   CATEGORY_LIST_SQL,
@@ -36,6 +37,7 @@ import {
 } from '@wmbugo/core';
 import { getServices, systemClock } from '../../adapters/startApp';
 import { readProfile } from '../../adapters/readProfile';
+import { realReceiptFiles } from '../../adapters/files/receiptFiles';
 
 /** The sheet's three segments. */
 export type AddKind = EntryKind | 'transfer';
@@ -81,6 +83,10 @@ export interface AddApi {
   keepBoth(transactionId: string): Promise<{ ok: boolean }>;
   merge(transactionId: string, categoryId?: string): Promise<{ ok: boolean; code?: string }>;
   undoResolution(transactionId: string): Promise<{ ok: boolean }>;
+  /** Attaches a photo that is already encrypted in private storage (Story 10.6) to the entry just saved. */
+  attachPending?(transactionId: string, photo: { attachmentId: string; digest: string; sizeBytes: number }): Promise<void>;
+  /** Deletes a pending photo whose sheet was dismissed without saving. */
+  discardPending?(attachmentId: string): Promise<void>;
   /** Income form, Refunds chip: recent expenses with something left to refund. */
   refundables?(): Promise<RefundableExpense[]>;
   /** Records a refund (linked to an expense when `originalId` is given, else unlinked into Other). */
@@ -160,6 +166,11 @@ export const realAddApi: AddApi = {
   keepBoth: (transactionId) => getServices().writer.run(KeepBoth, { transactionId }, 'user'),
   merge: (transactionId, categoryId) => getServices().writer.run(MergeDuplicate, { transactionId, ...(categoryId ? { categoryId } : {}) }, 'user'),
   undoResolution: (transactionId) => getServices().writer.run(UndoDuplicateResolution, { transactionId }, 'user'),
+  async attachPending(transactionId, photo) {
+    const r = await getServices().writer.run(AddAttachment, { transactionId, ...photo }, 'user');
+    if (!r.ok) await realReceiptFiles.remove(photo.attachmentId).catch(() => undefined);
+  },
+  discardPending: (attachmentId) => realReceiptFiles.remove(attachmentId).catch(() => undefined),
   async refundables() {
     return mapRefundable(await getServices().db.query(RECENT_REFUNDABLE_SQL));
   },

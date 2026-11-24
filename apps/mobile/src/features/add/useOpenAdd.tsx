@@ -9,7 +9,7 @@ import { AddSheet, type AddPreset, type EditSpec } from './AddSheet';
 export function useOpenAddWith(opener?: RefObject<unknown>): (preset?: AddPreset, edit?: EditSpec) => void {
   const sheet = useSheet();
   const openSplit = useOpenSplit();
-  const nav = useNavigation<{ navigate: (s: 'Accounts') => void }>();
+  const nav = useNavigation<{ navigate: (s: 'Accounts' | 'ReceiptScan', p?: { origin: 'add_sheet' }) => void }>();
   return useCallback(
     (preset?: AddPreset, edit?: EditSpec) => {
       sheet.open(
@@ -22,6 +22,10 @@ export function useOpenAddWith(opener?: RefObject<unknown>): (preset?: AddPreset
               preset={preset}
               edit={edit}
               onSplit={(id, amount) => openSplit(id, amount)}
+              onSnap={() => {
+                close();
+                nav.navigate('ReceiptScan', { origin: 'add_sheet' });
+              }}
               onNewAccount={() => {
                 close();
                 nav.navigate('Accounts');

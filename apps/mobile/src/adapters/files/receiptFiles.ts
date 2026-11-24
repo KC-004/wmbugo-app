@@ -63,3 +63,29 @@ export const realReceiptFiles: ReceiptFiles = {
     return orphans.length;
   },
 };
+
+/** A receipt photo taken in for reading (Story 10.6): the processed copy is already encrypted in private storage but no attachment row refers to it yet. */
+export interface PendingPhoto {
+  readonly attachmentId: string;
+  readonly digest: string;
+  readonly sizeBytes: number;
+  readonly width: number;
+  readonly height: number;
+  /** Where it came from. Kept with the pending photo only: the attachment table has no column for it. */
+  readonly provenance: 'photo_picker' | 'camera';
+}
+
+/** The photo side of scanning: the picker, the intake (orientation, size, JPEG, no EXIF, encrypted) and a plain copy for the engine. */
+export interface ReceiptScanFiles extends ReceiptFiles {
+  prepare(uri: string, attachmentId: string): Promise<{ digest: string; size: number; width: number; height: number }>;
+}
+
+export const realScanFiles: ReceiptScanFiles = {
+  ...realReceiptFiles,
+  async prepare(uri, attachmentId) {
+    await RNFS.mkdir(RECEIPTS_DIR);
+    const prepare = (NativeModules.WmbugoReceiptFiles as { prepareReceiptImage?: (uri: string, dest: string, keyHex: string) => Promise<{ digest: string; size: number; width: number; height: number }> } | undefined)?.prepareReceiptImage;
+    if (!prepare) throw new Error('Receipt files are not available');
+    return prepare(uri, filePath(attachmentId), await key());
+  },
+};

@@ -23,6 +23,7 @@ import { realAddApi, type AddApi } from '../add/addApi';
 import type { CategoryRow } from '@wmbugo/core';
 import { useDuplicateChoices } from '../add/duplicateChoices';
 import { Keypad } from '../add/Keypad';
+import type { PendingPhoto } from '../../adapters/files/receiptFiles';
 import { realReceiptApi, type ReceiptApi, type ReceiptContext } from './receiptApi';
 import { addItem, confirmTotal, editItem, initialReview, removeItem, saveInput, setAccount, setCharge, setDate, setItemCategory, setMainCategory, setMerchant, setSubtotal, setTotal, viewOf, type ChargeKind, type ReviewState } from './receiptReviewModel';
 
@@ -153,7 +154,7 @@ function Row({ label, value, onPress, testID, a11yLabel, warn, children }: { lab
  * The receipt review (SCR-23, Story 10.4): what was read, every field correctable, the allocation rerunning after each edit, and one Save.
  * It is opened with a `ReceiptDraft`; the photo arrives with the photo flow (Story 10.6).
  */
-export function ReceiptReviewScreen({ draft, api = realReceiptApi, addApi = realAddApi, onClose, onSaved }: { draft: ReceiptDraft; api?: ReceiptApi; addApi?: AddApi; onClose: () => void; onSaved?: (transactionId: string) => void }) {
+export function ReceiptReviewScreen({ draft, photo, onDiscardPhoto, api = realReceiptApi, addApi = realAddApi, onClose, onSaved }: { draft: ReceiptDraft; /** The pending photo (Story 10.6): saved as the entry's attachment, deleted when the receipt is discarded. */ photo?: PendingPhoto; onDiscardPhoto?: () => void; api?: ReceiptApi; addApi?: AddApi; onClose: () => void; onSaved?: (transactionId: string) => void }) {
   const theme = useTheme();
   const sheet = useSheet();
   const toast = useToast();
@@ -272,7 +273,7 @@ export function ReceiptReviewScreen({ draft, api = realReceiptApi, addApi = real
       body: (close) => (
         <View style={styles.editor}>
           <Text style={[textStyle('body'), { color: theme.color('on-glass-primary') }]}>{copy.receiptReview.discardBody}</Text>
-          <Button label={copy.receiptReview.discard} variant="destructive" testID="discard-confirm" onPress={() => { close(); onClose(); }} onGlass />
+          <Button label={copy.receiptReview.discard} variant="destructive" testID="discard-confirm" onPress={() => { close(); onDiscardPhoto?.(); onClose(); }} onGlass />
           <Button label={copy.receiptReview.keepEditing} variant="text" testID="discard-keep" onPress={close} onGlass />
         </View>
       ),
@@ -286,7 +287,7 @@ export function ReceiptReviewScreen({ draft, api = realReceiptApi, addApi = real
     savingRef.current = true;
     setError(null);
     submission.current ??= api.newSubmissionId();
-    const r = await api.save({ submissionId: submission.current, ...input, createCash: input.accountId === null }).catch(() => ({ ok: false as const, code: 'ERROR' }));
+    const r = await api.save({ submissionId: submission.current, ...input, createCash: input.accountId === null, ...(photo ? { attachment: { attachmentId: photo.attachmentId, digest: photo.digest, sizeBytes: photo.sizeBytes } } : {}) }).catch(() => ({ ok: false as const, code: 'ERROR' }));
     if (!r.ok) {
       savingRef.current = false;
       setError(r.code === 'CURRENCY_DIFFERS' ? copy.receiptReview.currencyDiffers.replace('{currency}', d.currency.value ?? '') : r.code === 'DATE_INVALID' ? copy.receiptReview.dateInvalid : copy.receiptReview.saveFailed);
