@@ -31,6 +31,7 @@ export function ReceiptScanScreen({
   onRead,
   onByHand,
   onOpenEntry,
+  onTaken,
 }: {
   /** An image already chosen (Story 10.7 camera, or 10.9 for a shared image). Without it the Photo Picker opens. */
   uri?: string;
@@ -41,6 +42,8 @@ export function ReceiptScanScreen({
   /** The photo stays: it becomes the attachment of the entry she types, and is deleted if she dismisses that sheet. */
   onByHand: (photo: PendingPhoto) => void;
   onOpenEntry: (transactionId: string) => void;
+  /** Called once the image has been taken in (or failed to be), so a camera's temporary file can be deleted. */
+  onTaken?: () => void;
 }) {
   const theme = useTheme();
   const [phase, setPhase] = useState<Phase>({ kind: 'working', photo: null, reading: false });
@@ -107,6 +110,7 @@ export function ReceiptScanScreen({
         }
       }
       const taken = await intakePhoto(api, source, provenance);
+      onTaken?.();
       if (cancelled) {
         if (taken.kind === 'ready') await api.files.remove(taken.photo.attachmentId).catch(() => undefined);
         return;

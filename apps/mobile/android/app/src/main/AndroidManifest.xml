@@ -11,6 +11,10 @@
          the allowlist check honest without masking an INTERNET added to main. -->
     <!-- App lock (Story 8.3) needs the system biometric prompt; the old fingerprint permission stays out. -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <!-- Snap receipt (Story 10.7): asked in context, the first time the camera opens. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- VisionCamera pulls in media3 (video), which declares ACCESS_NETWORK_STATE. wmbugo never uses the network, so the allowlist stays honest. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
     <uses-permission android:name="android.permission.USE_FINGERPRINT" tools:node="remove" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" tools:node="remove" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" tools:node="remove" />

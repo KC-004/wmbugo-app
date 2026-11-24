@@ -30,7 +30,7 @@ const TABS: Record<TabRoute, { label: string; icon: IconComponent }> = {
  * solid rail with the ＋ at the top. Slots are at least 64 x 56dp; there are no badges; a long press
  * shows the tab's label in a tooltip.
  */
-export function TabBar({ state, navigation, onAdd, addRef, reviewDot = false }: BottomTabBarProps & { onAdd: () => void; addRef?: AddButtonRef; /** Entries wait for the user: a small dot on Activity, no count. */ reviewDot?: boolean }) {
+export function TabBar({ state, navigation, onAdd, onSnap, addRef, reviewDot = false }: BottomTabBarProps & { onAdd: () => void; onSnap?: () => void; addRef?: AddButtonRef; /** Entries wait for the user: a small dot on Activity, no count. */ reviewDot?: boolean }) {
   const { width } = useWindowDimensions();
   const nav = navLayout(width);
   const rail = nav.kind === 'rail';
@@ -56,14 +56,14 @@ export function TabBar({ state, navigation, onAdd, addRef, reviewDot = false }: 
   };
 
   if (rail) {
-    return <Rail top={insets.top}>{[<AddButton key="add" onPress={onAdd} buttonRef={addRef} />, ...TAB_ROUTES.map(slot)]}</Rail>;
+    return <Rail top={insets.top}>{[<AddButton key="add" onPress={onAdd} {...(onSnap ? { onSnap } : {})} buttonRef={addRef} />, ...TAB_ROUTES.map(slot)]}</Rail>;
   }
   return (
     <Glass testID="tab-bar" style={[styles.bar, { marginBottom: 8 + insets.bottom }]}>
       {slot('Home')}
       {slot('Activity')}
       <View style={styles.addSlot}>
-        <AddButton onPress={onAdd} buttonRef={addRef} />
+        <AddButton onPress={onAdd} {...(onSnap ? { onSnap } : {})} buttonRef={addRef} />
       </View>
       {slot('Insights')}
       {slot('Plan')}

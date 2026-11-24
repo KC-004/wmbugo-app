@@ -6,13 +6,30 @@ import { appNotifier } from './notifier';
  * it): the feature that needs it, the in-context rationale, what still works when it is denied, and how revocation is
  * handled. Nothing is ever requested during onboarding.
  */
-export type PermissionKind = 'notifications';
+export type PermissionKind = 'notifications' | 'camera';
+
+/** The camera permission lives in VisionCamera's factory; it is loaded only when the camera is first used so no other screen pays for it. */
+async function cameraFactory(): Promise<{ cameraPermissionStatus: string; requestCameraPermission(): Promise<boolean> }> {
+  // Metro's inline require loads the module on first use only; a dynamic import would be split into its own chunk.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  return (require('react-native-vision-camera') as { VisionCamera: { cameraPermissionStatus: string; requestCameraPermission(): Promise<boolean> } }).VisionCamera;
+}
+
+const cameraState = (status: string): NotificationPermission => (status === 'authorized' ? 'granted' : status === 'not-determined' ? 'undetermined' : 'denied');
 
 /** The only way the app asks for a runtime permission. Screens call it from a just-in-time sheet the user answered Yes to. */
 export async function requestPermission(kind: PermissionKind): Promise<NotificationPermission> {
   switch (kind) {
     case 'notifications':
       return appNotifier.requestPermission();
+    case 'camera':
+      try {
+        const camera = await cameraFactory();
+        await camera.requestCameraPermission();
+        return cameraState(camera.cameraPermissionStatus);
+      } catch {
+        return 'denied';
+      }
   }
 }
 
@@ -21,6 +38,12 @@ export async function permissionState(kind: PermissionKind): Promise<Notificatio
   switch (kind) {
     case 'notifications':
       return appNotifier.available ? appNotifier.permission() : 'denied';
+    case 'camera':
+      try {
+        return cameraState((await cameraFactory()).cameraPermissionStatus);
+      } catch {
+        return 'denied';
+      }
   }
 }
 

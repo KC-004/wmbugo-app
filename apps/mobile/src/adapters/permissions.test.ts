@@ -73,3 +73,32 @@ describe('requestPermission and revocation', () => {
     expect(appNotifier.requestPermission).not.toHaveBeenCalled();
   });
 });
+
+describe('the camera permission (Story 10.7)', () => {
+  const vision = { VisionCamera: { cameraPermissionStatus: 'not-determined', requestCameraPermission: jest.fn(async () => true) } };
+  beforeEach(() => {
+    jest.resetModules();
+    jest.doMock('react-native-vision-camera', () => vision, { virtual: true });
+  });
+
+  it('asks through VisionCamera, never PermissionsAndroid, and reports the new state', async () => {
+    const spy = jest.spyOn(PermissionsAndroid, 'request');
+    vision.VisionCamera.requestCameraPermission.mockImplementationOnce(async () => {
+      vision.VisionCamera.cameraPermissionStatus = 'authorized';
+      return true;
+    });
+    const p = jest.requireActual<typeof import('./permissions')>('./permissions');
+    expect(await p.permissionState('camera')).toBe('undetermined');
+    expect(await p.requestPermission('camera')).toBe('granted');
+    expect(spy).not.toHaveBeenCalled();
+    vision.VisionCamera.cameraPermissionStatus = 'denied';
+    expect(await p.permissionState('camera')).toBe('denied');
+  });
+
+  it('is denied (never a crash) when the camera module cannot load', async () => {
+    jest.doMock('react-native-vision-camera', () => { throw new Error('no native module'); }, { virtual: true });
+    const p = jest.requireActual<typeof import('./permissions')>('./permissions');
+    expect(await p.permissionState('camera')).toBe('denied');
+    expect(await p.requestPermission('camera')).toBe('denied');
+  });
+});

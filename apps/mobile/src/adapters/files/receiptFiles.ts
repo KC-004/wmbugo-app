@@ -89,3 +89,8 @@ export const realScanFiles: ReceiptScanFiles = {
     return prepare(uri, filePath(attachmentId), await key());
   },
 };
+
+/** Deletes a camera temporary file once it has been taken in (nothing is left in the cache or written to the gallery). */
+export async function discardTempPhoto(path: string): Promise<void> {
+  if (await RNFS.exists(path)) await RNFS.unlink(path);
+}

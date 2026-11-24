@@ -34,7 +34,9 @@ import { BudgetDetailScreen } from '../budgets/BudgetDetailScreen';
 import { BillsScreen } from '../bills/BillsScreen';
 import { ReceiptReviewScreen } from '../receipt/ReceiptReviewScreen';
 import { ReceiptScanScreen } from '../receipt/ReceiptScanScreen';
-import { realReceiptFiles, type PendingPhoto } from '../../adapters/files/receiptFiles';
+import { ReceiptCameraScreen } from '../receipt/ReceiptCameraScreen';
+import type { CameraSurface } from '../../adapters/camera/cameraSurface';
+import { discardTempPhoto, realReceiptFiles, type PendingPhoto } from '../../adapters/files/receiptFiles';
 import { sampleReceiptDraft } from '../receipt/sampleReceipt';
 import { BillDetailScreen } from '../bills/BillDetailScreen';
 import { InsightsScreen } from '../insights/InsightsScreen';
@@ -53,7 +55,7 @@ import { TopBar } from '../../shared/ui/TopBar';
 import { TabBar, type TabRoute } from './TabBar';
 import { markTabFirstFrame } from './navTiming';
 
-type RootParams = { Tabs: undefined; BudgetDetail: { budgetId: string; periodStart?: string }; Accounts: undefined; AccountDetail: { accountId: string }; TransactionDetail: { transactionId: string }; ReviewQueue: { focusId?: string }; Settings: undefined; HomeEdit: undefined; Bills: { focusRuleId?: string } | undefined; BillDetail: { ruleId: string }; Goals: undefined; GoalDetail: { goalId: string }; Budgets: undefined; InsightsDrill: { target: DrillTarget }; ReceiptReview: undefined; ReceiptScan: { origin?: 'add_sheet'; uri?: string } | undefined };
+type RootParams = { Tabs: undefined; BudgetDetail: { budgetId: string; periodStart?: string }; Accounts: undefined; AccountDetail: { accountId: string }; TransactionDetail: { transactionId: string }; ReviewQueue: { focusId?: string }; Settings: undefined; HomeEdit: undefined; Bills: { focusRuleId?: string } | undefined; BillDetail: { ruleId: string }; Goals: undefined; GoalDetail: { goalId: string }; Budgets: undefined; InsightsDrill: { target: DrillTarget }; ReceiptReview: undefined; ReceiptScan: { origin?: 'add_sheet' | 'plus_long_press'; uri?: string; provenance?: 'photo_picker' | 'camera'; tempPath?: string } | undefined; ReceiptCamera: { origin?: 'add_sheet' | 'plus_long_press' } | undefined };
 registerInsightsSections();
 const RootStack = createNativeStackNavigator<RootParams>();
 const Tabs = createBottomTabNavigator();
@@ -180,7 +182,7 @@ function TabsWithAdd() {
       <Tabs.Navigator
         initialRouteName="Home"
         screenOptions={{ headerShown: false, tabBarPosition: nav.kind === 'rail' ? 'left' : 'bottom' }}
-        tabBar={(props) => <TabBar {...props} onAdd={onAdd} addRef={opener} reviewDot={reviewDot} />}>
+        tabBar={(props) => <TabBar {...props} onAdd={onAdd} onSnap={() => root.navigate('ReceiptCamera', { origin: 'plus_long_press' })} addRef={opener} reviewDot={reviewDot} />}>
         <Tabs.Screen name="Home" component={HomeStack} />
         <Tabs.Screen name="Activity" component={ActivityStack} />
         <Tabs.Screen name="Insights" component={InsightsStack} />
@@ -232,6 +234,8 @@ function ReceiptScanRoute() {
   return (
     <ReceiptScanScreen
       {...(route.params?.uri ? { uri: route.params.uri } : {})}
+      {...(route.params?.provenance ? { provenance: route.params.provenance } : {})}
+      {...(route.params?.tempPath ? { onTaken: () => void discardTempPhoto(route.params!.tempPath!).catch(() => undefined) } : {})}
       onCancel={leave}
       onRead={(draft, photo) => setRead({ draft, photo })}
       onByHand={(photo) => {
@@ -239,6 +243,41 @@ function ReceiptScanRoute() {
         openAdd({ kind: 'expense', accountId: null, photo: { attachmentId: photo.attachmentId, digest: photo.digest, sizeBytes: photo.sizeBytes } });
       }}
       onOpenEntry={(transactionId) => nav.replace('TransactionDetail', { transactionId })}
+    />
+  );
+}
+
+/** The receipt camera (Story 10.7). The photo goes to the same intake and reading as the picker, with provenance `camera`. */
+function ReceiptCameraRoute() {
+  const nav = useNavigation<{ goBack: () => void; replace: (s: 'ReceiptScan', p: { origin?: 'add_sheet' | 'plus_long_press'; uri?: string; provenance?: 'camera'; tempPath?: string }) => void }>();
+  const route = useRoute<RouteProp<RootParams, 'ReceiptCamera'>>();
+  const openAdd = useOpenAddWith();
+  const origin = route.params?.origin;
+  // Loaded when the camera first opens, so no other screen (or test) pays for the native camera module.
+  const [Surface, setSurface] = useState<CameraSurface | null>(null);
+  useEffect(() => {
+    let live = true;
+    void import('../../adapters/camera/VisionCameraSurface').then((m) => live && setSurface(() => m.VisionCameraSurface));
+    return () => {
+      live = false;
+    };
+  }, []);
+  const leave = () => {
+    nav.goBack();
+    if (origin === 'add_sheet') openAdd();
+  };
+  if (!Surface) return <ScreenFrame>{null}</ScreenFrame>;
+  return (
+    <ReceiptCameraScreen
+      Surface={Surface}
+      discardTemp={discardTempPhoto}
+      onClose={leave}
+      onUse={(path) => nav.replace('ReceiptScan', { ...(origin ? { origin } : {}), uri: `file://${path}`, provenance: 'camera', tempPath: path })}
+      onPickPhoto={() => nav.replace('ReceiptScan', origin ? { origin } : {})}
+      onByHand={() => {
+        nav.goBack();
+        openAdd();
+      }}
     />
   );
 }
@@ -428,6 +467,7 @@ export function RootNavigator() {
             <RootStack.Screen name="InsightsDrill" component={InsightsDrillRoute} />
             <RootStack.Screen name="ReceiptReview" component={ReceiptReviewRoute} />
             <RootStack.Screen name="ReceiptScan" component={ReceiptScanRoute} />
+            <RootStack.Screen name="ReceiptCamera" component={ReceiptCameraRoute} />
             <RootStack.Screen name="GoalDetail" component={GoalDetailRoute} />
             <RootStack.Screen name="TransactionDetail" component={TransactionDetailRoute} />
             <RootStack.Screen name="ReviewQueue" component={ReviewQueueRoute} />

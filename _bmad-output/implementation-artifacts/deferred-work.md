@@ -97,3 +97,9 @@ Graded from the reviewers' reports; only the first group was checked against the
 - source_spec: `spec-10-6-pick-a-receipt-photo-and-watch-it-being-read.md`
   summary: Build the native PaddleOCR / ONNX engine (`WmbugoOcr`: det + rec models, `enableCpuMemArena(false)`, free sessions after a scan), decide where the 15.6 MB models live, then run the NFR-06 / NFR-08 benchmarks and the airplane-mode Maestro run on a release build.
   evidence: Story 10.6 spec Implementation Notes; the adapter returns OCR_UNAVAILABLE until the module exists. Phone check of prepareReceiptImage (EXIF rotation, 2,048 px, no EXIF) is also open.
+
+## Deferred from: build of Story 10.7 (2026-11-24)
+
+- source_spec: `spec-10-7-snap-a-receipt-with-the-camera.md`
+  summary: Phone check of the VisionCamera screen (preview, shutter, torch, permission prompt and revocation, long-press and TalkBack action on the plus button, LockGate and app-switcher snapshot, Switch Access) and a size check of the APK after the media3 / CameraX dependencies.
+  evidence: Story 10.7 spec Implementation Notes; only a fake camera surface was tested.

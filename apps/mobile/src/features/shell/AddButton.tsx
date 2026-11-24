@@ -16,7 +16,7 @@ import { FocusRing, useFocusRing } from '../../shared/ui/FocusRing';
  */
 export type AddButtonRef = RefObject<ComponentRef<typeof Pressable> | null>;
 
-export function AddButton({ onPress, buttonRef }: { onPress: () => void; buttonRef?: AddButtonRef }) {
+export function AddButton({ onPress, onSnap, buttonRef }: { onPress: () => void; /** Long-press and the TalkBack action `Snap receipt` (Story 10.7). */ onSnap?: () => void; buttonRef?: AddButtonRef }) {
   const { focused, onFocus, onBlur } = useFocusRing(true);
   // In safe mode nothing can be added: the button stays focusable and says why (Story 8.12).
   const safe = useSafeModeStore((s) => s.reason !== null);
@@ -27,6 +27,7 @@ export function AddButton({ onPress, buttonRef }: { onPress: () => void; buttonR
         testID="add-button"
         {...controlA11y({ label: copy.nav.addEntry, role: 'button', ...(safe ? { disabled: true, hint: copy.safeMode.disabledAdd } : {}) })}
         onPress={safe ? undefined : onPress}
+        {...(onSnap && !safe ? { onLongPress: onSnap, accessibilityActions: [{ name: 'snapReceipt', label: copy.receiptCamera.snapAction }], onAccessibilityAction: (e: { nativeEvent: { actionName: string } }) => { if (e.nativeEvent.actionName === 'snapReceipt') onSnap(); } } : {})}
         onFocus={onFocus}
         onBlur={onBlur}
         style={[styles.button, elevation.addButton, safe ? { opacity: 0.4 } : null]}>
