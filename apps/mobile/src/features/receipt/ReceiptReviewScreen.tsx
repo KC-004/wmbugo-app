@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { BackHandler, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
-import { CaretDown, Warning } from 'phosphor-react-native';
+import { CaretDown, CaretRight, CaretUp, Warning } from 'phosphor-react-native';
 import { applyKey, parseAmountInput, UNCATEGORISED_ID, type KeypadKey, type ReceiptDraft } from '@wmbugo/core';
 import { controlA11y } from '../../shared/a11y/labels';
 import { copy } from '../../shared/copy';
@@ -12,7 +12,15 @@ import { invalidateForEvent } from '../../shared/queryClient';
 import { Icon } from '../../shared/theme/Icon';
 import { useTheme } from '../../shared/theme/ThemeProvider';
 import { layout, radii } from '../../shared/theme/tokens';
-import { textStyle } from '../../shared/theme/typography';
+import { textStyle as roleStyle, type TypeRole } from '../../shared/theme/typography';
+
+/** The review shows a whole receipt on one screen, so its text is two points smaller than the rest of the app (never under the 12 floor). */
+const COMPACT: Partial<Record<TypeRole, { size: number; line: number }>> = { body: { size: 14, line: 20 }, 'body-medium': { size: 14, line: 20 }, label: { size: 13, line: 18 }, caption: { size: 12, line: 16 } };
+function textStyle(role: TypeRole) {
+  const base = roleStyle(role);
+  const c = COMPACT[role];
+  return c ? { ...base, fontSize: c.size, lineHeight: c.line } : base;
+}
 import { Amount } from '../../shared/ui/Amount';
 import { Button } from '../../shared/ui/Button';
 import { Chip } from '../../shared/ui/Chip';
@@ -156,6 +164,7 @@ function Row({ label, value, onPress, testID, a11yLabel, warn, children }: { lab
       <Text style={[textStyle('body'), { color: theme.color('text-secondary'), flex: 1 }]}>{label}</Text>
       <View style={styles.value}>{value}</View>
       {children}
+      {onPress ? <Icon icon={CaretRight} size={14} tint={theme.color('text-secondary')} /> : null}
     </>
   );
   const box = [styles.row, { backgroundColor: theme.color('bg-surface'), borderColor: warn ? theme.color('semantic-warning') : theme.color('border-hairline') }];
@@ -426,9 +435,12 @@ export function ReceiptReviewScreen({ draft, photo, attachTo, onDiscardPhoto, ap
     <ScreenFrame testID="receipt-review">
       <TopBar title={copy.receiptReview.title} onBack={discard} backTestID="receipt-close" />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <Text testID="receipt-intro" style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{copy.receiptReview.intro}</Text>
+        {photo ? (
         <View testID="receipt-thumb" accessible accessibilityLabel={copy.receiptReview.thumbMissing} style={[styles.thumb, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
           <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{copy.receiptReview.thumbMissing}</Text>
         </View>
+        ) : null}
 
         {splitting ? (
           <Text testID="split-header" accessibilityRole="header" style={[textStyle('body-medium'), { color: theme.color('text-primary') }]}>{splitHeader}</Text>
@@ -445,7 +457,6 @@ export function ReceiptReviewScreen({ draft, photo, attachTo, onDiscardPhoto, ap
             ))}
           </View>
         ) : null}
-
         <Row testID="row-merchant" label={copy.receiptReview.merchant} a11yLabel={copy.receiptReview.editField.replace('{field}', copy.receiptReview.merchant)} value={<Text style={[textStyle('body-medium'), { color: theme.color('text-primary') }]}>{d.merchant.value ?? copy.receiptReview.merchantMissing}</Text>} onPress={() => editText('edit-merchant', copy.receiptReview.merchant, d.merchant.value ?? '', 120, (v) => update((s) => setMerchant(s, v)))} />
 
         <Row
@@ -492,7 +503,11 @@ export function ReceiptReviewScreen({ draft, photo, attachTo, onDiscardPhoto, ap
 
         {d.items.length > 0 ? (
           <Pressable testID="items-toggle" {...controlA11y({ label: copy.receiptReview.items.replace('{n}', String(d.items.length)), role: 'button', expanded: itemsOpen })} onPress={() => setItemsOpen((v) => !v)} style={[styles.row, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
-            <Text style={[textStyle('body-medium'), { color: theme.color('text-primary'), flex: 1 }]}>{copy.receiptReview.items.replace('{n}', String(d.items.length))}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[textStyle('body-medium'), { color: theme.color('text-primary') }]}>{copy.receiptReview.items.replace('{n}', String(d.items.length))}</Text>
+              {itemsOpen ? null : <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{copy.receiptReview.itemsHint}</Text>}
+            </View>
+            <Icon icon={itemsOpen ? CaretUp : CaretDown} size={14} tint={theme.color('text-secondary')} />
           </Pressable>
         ) : null}
         {itemsOpen ? (
@@ -515,8 +530,8 @@ export function ReceiptReviewScreen({ draft, photo, attachTo, onDiscardPhoto, ap
                     </View>
                     <Amount amountMinor={it.allocatedAmount} currency={ctx.currency} direction="expense" locale={ctx.locale} />
                   </Pressable>
-                  <Pressable testID={`item-chip-${it.index}`} {...controlA11y({ label: catName(it.categoryId), role: 'button', hint: copy.receiptReview.changeCategory })} hitSlop={8} onPress={() => pickCategory(it.index)} style={styles.itemCategory}>
-                    <Text style={[textStyle('caption'), { color: it.categoryId === UNCATEGORISED_ID ? theme.color('text-secondary') : theme.color('accent-primary') }]}>{it.categoryId === UNCATEGORISED_ID ? copy.receiptReview.chooseCategory : catName(it.categoryId)}</Text>
+                  <Pressable testID={`item-chip-${it.index}`} {...controlA11y({ label: catName(it.categoryId), role: 'button', hint: copy.receiptReview.changeCategory })} hitSlop={8} onPress={() => pickCategory(it.index)} style={[styles.itemCategory, { borderColor: it.categoryId === UNCATEGORISED_ID ? theme.color('semantic-warning') : theme.color('accent-primary') }]}>
+                    <Text style={[textStyle('caption'), { color: theme.color('text-primary') }]}>{it.categoryId === UNCATEGORISED_ID ? copy.receiptReview.chooseCategory : copy.receiptReview.categoryFor.replace('{name}', catName(it.categoryId))}</Text>
                     <Icon icon={CaretDown} size={12} tint={theme.color('text-secondary')} />
                   </Pressable>
                 </View>
@@ -524,7 +539,12 @@ export function ReceiptReviewScreen({ draft, photo, attachTo, onDiscardPhoto, ap
             })}
           </View>
         ) : null}
-        {itemsOpen && view.allocation.notItemised > 0 ? <Button label={copy.receiptReview.addItem} variant="secondary" testID="add-item" onPress={addItemSheet} /> : null}
+        {itemsOpen && view.allocation.notItemised > 0 ? (
+          <View style={styles.addItem}>
+            <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{copy.receiptReview.addItemHint}</Text>
+            <Button label={copy.receiptReview.addItem} variant="secondary" testID="add-item" onPress={addItemSheet} />
+          </View>
+        ) : null}
 
         {d.subtotal.value !== null ? <Row testID="row-subtotal" label={copy.receiptReview.subtotal} a11yLabel={copy.receiptReview.editField.replace('{field}', copy.receiptReview.subtotal)} value={<Amount amountMinor={d.subtotal.value} currency={ctx.currency} direction="neutral" locale={ctx.locale} />} onPress={() => editAmount('edit-subtotal', copy.receiptReview.subtotal, d.subtotal.value, copy.common.save, (m) => update((s) => setSubtotal(s, m)), true)} /> : null}
         {chargeRows('taxes', copy.receiptReview.tax)}
@@ -575,14 +595,15 @@ export function ReceiptReviewScreen({ draft, photo, attachTo, onDiscardPhoto, ap
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 16, gap: 8, paddingBottom: 24 },
+  content: { padding: 12, gap: 6, paddingBottom: 16 },
   thumb: { height: 72, borderWidth: 1, borderRadius: radii.md, alignItems: 'center', justifyContent: 'center' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: radii.md, paddingHorizontal: 12, minHeight: layout.touchMin, paddingVertical: 8 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: radii.md, paddingHorizontal: 12, minHeight: 44, paddingVertical: 4 },
   grey: { opacity: 0.8 },
+  addItem: { gap: 4 },
   itemsCard: { borderWidth: 1, borderRadius: radii.md, paddingHorizontal: 12, paddingVertical: 4 },
   itemRow: { paddingVertical: 6 },
   itemTop: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 36 },
-  itemCategory: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', minHeight: 28 },
+  itemCategory: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', minHeight: 32, borderWidth: 1, borderRadius: 16, paddingHorizontal: 10, marginTop: 2 },
   value: { alignItems: 'flex-end', flexShrink: 1 },
   inline: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },

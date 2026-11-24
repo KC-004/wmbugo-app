@@ -164,9 +164,9 @@ describe('ReceiptReviewScreen (SCR-23)', () => {
     expect(has(r, 'receipt-save')).toBe(true);
   });
 
-  it('an unsure total is highlighted with Tap to confirm total, Save is disabled but focusable with its hint, and confirming enables Save', async () => {
+  it('an unsure total is highlighted with Check the total, then tap it to confirm, Save is disabled but focusable with its hint, and confirming enables Save', async () => {
     const { r, save } = await mount(draft({ total: { value: 5400, certainty: 'unsure' } }));
-    expect(texts(r)).toContain('Tap to confirm total');
+    expect(texts(r)).toContain('Check the total, then tap it to confirm');
     const btn = host(r, 'receipt-save');
     expect(btn.props.accessibilityState).toMatchObject({ disabled: true });
     expect(btn.props.accessibilityHint).toContain('Confirm the total to save');
@@ -177,7 +177,7 @@ describe('ReceiptReviewScreen (SCR-23)', () => {
     expect(host(r, 'amount-editor-text').props.children).toBe('54');
     act(() => fire(r, 'amount-editor-done'));
     await settle();
-    expect(texts(r)).not.toContain('Tap to confirm total');
+    expect(texts(r)).not.toContain('Check the total, then tap it to confirm');
     expect(host(r, 'receipt-save').props.accessibilityState).not.toMatchObject({ disabled: true });
   });
 
@@ -198,7 +198,7 @@ describe('ReceiptReviewScreen (SCR-23)', () => {
   it('shows Not itemised as a grey row with its hint, and Save is normal', async () => {
     const { r } = await mount(draft({ total: { value: 6000, certainty: 'sure' } }));
     expect(has(r, 'not-itemised')).toBe(true);
-    expect(texts(r).join(' ')).toContain("Lines we couldn't read. Counted as Uncategorised.");
+    expect(texts(r).join(' ')).toContain("Part of the total we couldn't match to an item. It counts as Uncategorised. Add the missing items to split it.");
     expect(host(r, 'receipt-save').props.accessibilityState).not.toMatchObject({ disabled: true });
   });
 
