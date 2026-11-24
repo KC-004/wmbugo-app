@@ -37,7 +37,7 @@ describe('Add sheet layout', () => {
     const a = await mountReady();
     const quickIds = (r: ReactTestRenderer) => r.root.findAll((n) => typeof n.type === 'string' && /^category-cat_/.test(String(n.props.testID))).map((n) => n.props.testID);
     expect(quickIds(a.r).slice(0, 3)).toEqual(['category-cat_food', 'category-cat_groceries', 'category-cat_transport']);
-    expect(quickIds(a.r)).toHaveLength(7);
+    expect(quickIds(a.r)).toHaveLength(4);
     act(() => fire(a.r, 'category-more'));
     expect(quickIds(a.r)).toHaveLength(14);
     expect(has(a.r, 'category-cat_uncategorised')).toBe(true);
@@ -337,10 +337,10 @@ describe('saving', () => {
 
   it('prefills the date and time with now in the profile timezone and leaves them out when untouched', async () => {
     const { r, record } = await mountReady();
+    tap(r, '2'); // the details panel takes the keypad's place, so the amount is typed first
     act(() => fire(r, 'details-toggle'));
     expect(find(r, 'date-input', 'onChangeText').props.value).toBe('2026-11-08');
     expect(find(r, 'time-input', 'onChangeText').props.value).toBe('18:00');
-    tap(r, '2');
     act(() => fire(r, 'category-cat_food'));
     await act(async () => fire(r, 'save'));
     expect(record.mock.calls[0]![0]).not.toHaveProperty('occurredAtMs');

@@ -61,7 +61,7 @@ function CategoryCell({ category, selected, onPress }: { category: CategoryRow; 
 }
 
 /**
- * Quick categories (most used first) as a grid of four tiles per row, with More for the full list (the keypad steps aside while it is open, so
+ * Quick categories (most used first) as one row of four tiles, with More for the full list (the keypad steps aside while it is open, so
  * the sheet keeps one size). `Error: category required` sits under them.
  */
 export function CategoryChips({
@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
   strip: { flexDirection: 'row', gap: 4, paddingRight: 8 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  cell: { flexBasis: '23.5%', flexGrow: 1, minHeight: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, paddingVertical: 4, gap: 2 },
+  cell: { flexBasis: '18%', flexGrow: 1, minHeight: 52, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, paddingVertical: 4, gap: 2 },
   details: { gap: 8 },
   input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, minHeight: layout.touchMin },
 });

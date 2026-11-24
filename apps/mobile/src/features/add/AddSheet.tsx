@@ -33,12 +33,12 @@ import { OTHER_CATEGORY_ID } from '@wmbugo/core';
 import { realAddApi, type AddApi, type AddData, type AddKind } from './addApi';
 import { AccountChip, CategoryChips, DetailsPanel, KindSegments, TransferTo } from './AddParts';
 import { useDuplicateChoices } from './duplicateChoices';
-import { Keypad, KeypadAction } from './Keypad';
+import { ClearKey, Keypad, KeypadAction } from './Keypad';
 import { controlA11y } from '../../shared/a11y/labels';
 import { Icon } from '../../shared/theme/Icon';
 import { startSaveTiming } from './saveTiming';
 
-const QUICK_COUNT = 7;
+const QUICK_COUNT = 4;
 
 type FieldError = 'amount' | 'category' | 'date' | 'same' | 'fee' | 'from' | null;
 
@@ -549,6 +549,9 @@ export function AddSheet({
         accessibilityLabel={`${copy.add.amountLabel} ${typedAmountLabel(text, data?.currency ?? 'INR')}`}
         accessibilityLiveRegion="polite"
         style={styles.amount}>
+        <View style={styles.clearSlot}>
+          <ClearKey onPress={() => press('clear')} />
+        </View>
         {data ? (
           <Amount amountMinor={minor} currency={data.currency} direction={kind === 'income' ? 'income' : kind === 'transfer' ? 'neutral' : 'expense'} role="display-amount" hidden={false} locale={locale} color={error === 'amount' ? 'on-glass-accent' : 'on-glass-primary'} />
         ) : null}
@@ -639,16 +642,7 @@ export function AddSheet({
         />
       ) : null}
 
-      {showAllCategories ? null : (
-      <Keypad
-        exponent={exponent}
-        locale={locale}
-        onKey={press}
-        trailing={
-          <KeypadAction icon={details ? Minus : Plus} label={details ? copy.add.detailsHide : copy.add.detailsShow} expanded={details} onPress={() => setDetails((v) => !v)} testID="details-toggle" />
-        }
-      />
-      )}
+      {showAllCategories ? null : <Keypad exponent={exponent} locale={locale} onKey={press} clearBeside />}
       {details ? (
         <DetailsPanel
           kind={kind}
@@ -710,6 +704,7 @@ export function AddSheet({
 
     </ScrollView>
     <View style={[styles.footer, { backgroundColor: theme.color('glass-fallback') }]} testID="add-footer">
+      <KeypadAction icon={details ? Minus : Plus} label={details ? copy.add.detailsHide : copy.add.detailsShow} expanded={details} onPress={() => setDetails((v) => !v)} testID="details-toggle" />
       {edit ? null : <Button label={copy.add.saveAnother} variant="secondary-on-footer" onPress={() => void save(true)} testID="save-another" />}
       <Button label={copy.add.save} onPress={() => void save(false)} testID="save" />
     </View>
@@ -722,6 +717,7 @@ const styles = StyleSheet.create({
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
   inline: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
   amount: { alignItems: 'center', paddingVertical: 0 },
+  clearSlot: { position: 'absolute', right: 0, top: 10 },
   snap: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 18, paddingHorizontal: 12, minHeight: 36 },
   hiddenInput: { position: 'absolute', width: 1, height: 1, opacity: 0 },
   footer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', gap: 12, paddingVertical: 8, paddingHorizontal: 8, borderRadius: 12 },
