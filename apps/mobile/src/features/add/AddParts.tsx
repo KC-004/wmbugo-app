@@ -1,4 +1,7 @@
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { CaretUp, DotsThree } from 'phosphor-react-native';
+import { controlA11y } from '../../shared/a11y/labels';
+import { Icon } from '../../shared/theme/Icon';
 import { PAYMENT_METHODS, type AccountRow, type CategoryRow, type PaymentMethod } from '@wmbugo/core';
 import { copy } from '../../shared/copy';
 import { resolveColor } from '../../shared/theme/colors';
@@ -41,7 +44,26 @@ export function KindSegments({ kind, vertical, onChoose, locked = false }: { kin
   );
 }
 
-/** Quick categories (most used first) with More for the full list; `Error: category required` sits under them. */
+/** One category as a small tile: its icon over its name. Selected is filled and carries a check-like weight, never colour alone. */
+function CategoryCell({ category, selected, onPress }: { category: CategoryRow; selected: boolean; onPress: () => void }) {
+  const theme = useTheme();
+  const a11y = controlA11y({ label: category.name, role: 'button', selected });
+  return (
+    <Pressable
+      testID={`category-${category.id}`}
+      {...a11y}
+      onPress={onPress}
+      style={[styles.cell, { borderColor: selected ? theme.color('accent-primary') : resolveColor('dark', 'border-hairline'), backgroundColor: selected ? resolveColor('dark', 'bg-muted') : resolveColor('dark', 'bg-surface'), borderWidth: selected ? 2 : 1 }]}>
+      <Icon icon={categoryIcon(category.icon)} size={18} selected={selected} tint={theme.color('on-glass-primary')} />
+      <Text numberOfLines={1} style={[textStyle('caption'), { color: theme.color('on-glass-primary'), fontWeight: selected ? '600' : '400' }]}>{category.name}</Text>
+    </Pressable>
+  );
+}
+
+/**
+ * Quick categories (most used first) as a grid of four tiles per row, with More for the full list (the keypad steps aside while it is open, so
+ * the sheet keeps one size). `Error: category required` sits under them.
+ */
 export function CategoryChips({
   quick,
   all,
@@ -61,24 +83,21 @@ export function CategoryChips({
 }) {
   const theme = useTheme();
   const listed = showAll ? all : quick;
-  const chips = listed.map((c) => (
-    <Chip onGlass key={c.id} label={c.name} icon={categoryIcon(c.icon)} testID={`category-${c.id}`} selected={selectedId === c.id} onPress={() => onPick(c.id)} />
-  ));
-  const more = all.length > quick.length ? <Chip onGlass label={showAll ? copy.add.fewer : copy.add.more} testID="category-more" onPress={onToggleAll} /> : null;
+  const hasMore = all.length > quick.length;
   return (
     <>
       <Text accessibilityRole="header" style={[textStyle('label'), { color: theme.color('on-glass-primary') }]}>{copy.add.category}</Text>
-      {showAll ? (
-        <View style={styles.wrap} testID="category-chips">
-          {chips}
-          {more}
-        </View>
-      ) : (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} testID="category-chips" keyboardShouldPersistTaps="handled" contentContainerStyle={styles.strip}>
-          {chips}
-          {more}
-        </ScrollView>
-      )}
+      <View style={styles.grid} testID="category-chips">
+        {listed.map((c) => (
+          <CategoryCell key={c.id} category={c} selected={selectedId === c.id} onPress={() => onPick(c.id)} />
+        ))}
+        {hasMore ? (
+          <Pressable testID="category-more" {...controlA11y({ label: showAll ? copy.add.fewer : copy.add.more, role: 'button' })} onPress={onToggleAll} style={[styles.cell, { borderColor: resolveColor('dark', 'border-hairline'), borderStyle: 'dashed', borderWidth: 1 }]}>
+            <Icon icon={showAll ? CaretUp : DotsThree} size={18} tint={theme.color('on-glass-primary')} />
+            <Text numberOfLines={1} style={[textStyle('caption'), { color: theme.color('on-glass-primary') }]}>{showAll ? copy.add.fewer : copy.add.more}</Text>
+          </Pressable>
+        ) : null}
+      </View>
       {error ? (
         <Text testID="category-error" accessibilityRole="alert" accessibilityLiveRegion="assertive" style={[textStyle('caption'), { color: theme.color('on-glass-accent') }]}>
           {copy.add.categoryRequired}
@@ -253,6 +272,8 @@ const styles = StyleSheet.create({
   column: { flexDirection: 'column', alignItems: 'flex-start' },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
   strip: { flexDirection: 'row', gap: 4, paddingRight: 8 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  cell: { flexBasis: '23.5%', flexGrow: 1, minHeight: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, paddingVertical: 4, gap: 2 },
   details: { gap: 8 },
   input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, minHeight: layout.touchMin },
 });

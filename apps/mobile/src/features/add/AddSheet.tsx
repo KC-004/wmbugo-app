@@ -38,7 +38,7 @@ import { controlA11y } from '../../shared/a11y/labels';
 import { Icon } from '../../shared/theme/Icon';
 import { startSaveTiming } from './saveTiming';
 
-const QUICK_COUNT = 6;
+const QUICK_COUNT = 7;
 
 type FieldError = 'amount' | 'category' | 'date' | 'same' | 'fee' | 'from' | null;
 
@@ -263,6 +263,7 @@ export function AddSheet({
   }, [isRefund, api]);
 
   const chooseCategory = (id: string) => {
+    setShowAllCategories(false); // the full list closes on a choice, and the keypad comes back
     setCategoryId(id);
     setDraft({ categoryId: id });
     if (error === 'category') setError(null);
@@ -542,15 +543,40 @@ export function AddSheet({
     <ScrollView style={{ maxHeight: Math.max(280, height - insets.top - 190) }} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
       <KindSegments kind={kind} vertical={fontScale >= 1.3} onChoose={chooseKind} locked={edit !== undefined} />
 
-      {kind === 'expense' && onSnap && !edit ? (
-        <Pressable testID="snap-receipt" {...controlA11y({ label: `${copy.receiptScan.snap}. ${copy.receiptScan.snapHint}`, role: 'button' })} onPress={onSnap} style={[styles.snap, { borderColor: theme.color('on-glass-accent') }]}>
-          <Icon icon={Camera} size={22} tint={theme.color('on-glass-accent')} />
-          <View style={{ flex: 1 }}>
-            <Text style={[textStyle('body-medium'), ink]}>{copy.receiptScan.snap}</Text>
-            <Text style={[textStyle('caption'), secondary]}>{copy.receiptScan.snapHint}</Text>
-          </View>
-        </Pressable>
+      <View
+        testID="typed-amount"
+        accessible
+        accessibilityLabel={`${copy.add.amountLabel} ${typedAmountLabel(text, data?.currency ?? 'INR')}`}
+        accessibilityLiveRegion="polite"
+        style={styles.amount}>
+        {data ? (
+          <Amount amountMinor={minor} currency={data.currency} direction={kind === 'income' ? 'income' : kind === 'transfer' ? 'neutral' : 'expense'} role="display-amount" hidden={false} locale={locale} color={error === 'amount' ? 'on-glass-accent' : 'on-glass-primary'} />
+        ) : null}
+      </View>
+      {/* Takes hardware number keys and Backspace; the soft keyboard stays closed (the keypad is the input). */}
+      <TextInput
+        ref={amountRef}
+        testID="amount-input"
+        accessible={false}
+        importantForAccessibility="no"
+        autoFocus
+        showSoftInputOnFocus={false}
+        caretHidden
+        value=""
+        onChangeText={() => undefined}
+        onKeyPress={(e) => {
+          const key = keypadKeyFromHardware(e.nativeEvent.key);
+          if (key) press(key);
+        }}
+        style={styles.hiddenInput}
+      />
+      {error === 'amount' ? (
+        <Text testID="amount-error" accessibilityRole="alert" accessibilityLiveRegion="assertive" style={[textStyle('body-medium'), { color: theme.color('on-glass-accent') }]}>
+          {copy.add.amountRequired}
+        </Text>
       ) : null}
+
+
       {preset?.photo ? <Text testID="add-photo-attached" style={[textStyle('caption'), { color: theme.color('on-glass-secondary') }]}>{copy.receiptScan.attachedHand}</Text> : null}
 
       {kind === 'transfer' ? null : (
@@ -589,6 +615,12 @@ export function AddSheet({
           setPickingAccount(false);
         }}
       />
+      {kind === 'expense' && onSnap && !edit ? (
+        <Pressable testID="snap-receipt" {...controlA11y({ label: `${copy.receiptScan.snap}. ${copy.receiptScan.snapHint}`, role: 'button' })} onPress={onSnap} style={[styles.snap, { borderColor: theme.color('on-glass-accent') }]}>
+          <Icon icon={Camera} size={18} tint={theme.color('on-glass-accent')} />
+          <Text style={[textStyle('label'), ink]}>{copy.receiptScan.snap}</Text>
+        </Pressable>
+      ) : null}
       </View>
 
       {kind === 'transfer' && data ? (
@@ -607,39 +639,7 @@ export function AddSheet({
         />
       ) : null}
 
-      <View
-        testID="typed-amount"
-        accessible
-        accessibilityLabel={`${copy.add.amountLabel} ${typedAmountLabel(text, data?.currency ?? 'INR')}`}
-        accessibilityLiveRegion="polite"
-        style={styles.amount}>
-        {data ? (
-          <Amount amountMinor={minor} currency={data.currency} direction={kind === 'income' ? 'income' : kind === 'transfer' ? 'neutral' : 'expense'} role="display-amount" hidden={false} locale={locale} color={error === 'amount' ? 'on-glass-accent' : 'on-glass-primary'} />
-        ) : null}
-      </View>
-      {/* Takes hardware number keys and Backspace; the soft keyboard stays closed (the keypad is the input). */}
-      <TextInput
-        ref={amountRef}
-        testID="amount-input"
-        accessible={false}
-        importantForAccessibility="no"
-        autoFocus
-        showSoftInputOnFocus={false}
-        caretHidden
-        value=""
-        onChangeText={() => undefined}
-        onKeyPress={(e) => {
-          const key = keypadKeyFromHardware(e.nativeEvent.key);
-          if (key) press(key);
-        }}
-        style={styles.hiddenInput}
-      />
-      {error === 'amount' ? (
-        <Text testID="amount-error" accessibilityRole="alert" accessibilityLiveRegion="assertive" style={[textStyle('body-medium'), { color: theme.color('on-glass-accent') }]}>
-          {copy.add.amountRequired}
-        </Text>
-      ) : null}
-
+      {showAllCategories ? null : (
       <Keypad
         exponent={exponent}
         locale={locale}
@@ -648,6 +648,7 @@ export function AddSheet({
           <KeypadAction icon={details ? Minus : Plus} label={details ? copy.add.detailsHide : copy.add.detailsShow} expanded={details} onPress={() => setDetails((v) => !v)} testID="details-toggle" />
         }
       />
+      )}
       {details ? (
         <DetailsPanel
           kind={kind}
@@ -717,11 +718,11 @@ export function AddSheet({
 }
 
 const styles = StyleSheet.create({
-  content: { gap: 8, paddingBottom: 8 },
+  content: { gap: 6, paddingBottom: 4 },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
   inline: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
-  amount: { alignItems: 'center', paddingVertical: 4 },
-  snap: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, minHeight: 52 },
+  amount: { alignItems: 'center', paddingVertical: 0 },
+  snap: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 18, paddingHorizontal: 12, minHeight: 36 },
   hiddenInput: { position: 'absolute', width: 1, height: 1, opacity: 0 },
   footer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', gap: 12, paddingVertical: 8, paddingHorizontal: 8, borderRadius: 12 },
 });

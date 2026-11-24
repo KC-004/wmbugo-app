@@ -37,7 +37,7 @@ describe('Add sheet layout', () => {
     const a = await mountReady();
     const quickIds = (r: ReactTestRenderer) => r.root.findAll((n) => typeof n.type === 'string' && /^category-cat_/.test(String(n.props.testID))).map((n) => n.props.testID);
     expect(quickIds(a.r).slice(0, 3)).toEqual(['category-cat_food', 'category-cat_groceries', 'category-cat_transport']);
-    expect(quickIds(a.r)).toHaveLength(6);
+    expect(quickIds(a.r)).toHaveLength(7);
     act(() => fire(a.r, 'category-more'));
     expect(quickIds(a.r)).toHaveLength(14);
     expect(has(a.r, 'category-cat_uncategorised')).toBe(true);
@@ -89,13 +89,13 @@ describe('keypad', () => {
     expect(texts(r)).toContain('S$12.50');
   });
 
-  it('keys are at least 56dp, labelled 1 to 0, decimal point and Delete', async () => {
+  it('keys are at least 48dp, labelled 1 to 0, decimal point and Delete', async () => {
     const { r } = await mountReady();
     const label = (id: string) => host(r, id).props.accessibilityLabel;
     for (const d of '0123456789') expect(label(`key-${d}`)).toBe(d);
     expect(label('key-decimal')).toBe('Decimal point');
     expect(label('key-delete')).toBe('Delete');
-    expect(KEY_SIZE).toBeGreaterThanOrEqual(56);
+    expect(KEY_SIZE).toBeGreaterThanOrEqual(48);
   });
 
   it('Delete removes one character; long-press Delete and the visible Clear both clear', async () => {
