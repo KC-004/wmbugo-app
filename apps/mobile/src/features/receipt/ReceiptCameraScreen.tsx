@@ -94,6 +94,8 @@ export function ReceiptCameraScreen({
       // The screen went away while the camera was working: the photo is not kept.
       if (!live.current) return void Promise.resolve(discardTemp(path)).catch(() => undefined);
       pending.current = path;
+      // The live camera closes now: the light goes off first, so no torch change is left pending on it.
+      setTorch(false);
       setShot(path);
     } catch {
       if (live.current) setFailed(true);
