@@ -31,6 +31,8 @@ import { realAddApi, type AddApi } from '../add/addApi';
 import type { CategoryRow } from '@wmbugo/core';
 import { useDuplicateChoices } from '../add/duplicateChoices';
 import { Keypad } from '../add/Keypad';
+import { CategoryCell } from '../add/AddParts';
+import { CategoryChip } from '../categories/CategoryChip';
 import type { ReceiptMatch } from '@wmbugo/core';
 import type { AttachTarget } from './receiptApi';
 import type { PendingPhoto } from '../../adapters/files/receiptFiles';
@@ -275,6 +277,7 @@ export function ReceiptReviewScreen({ draft, photo, attachTo, onDiscardPhoto, ap
     );
 
   const money = (minor: number) => moneyText(minor, ctx.currency, ctx.locale);
+  const catOf = (id: string) => ctx.categories.find((c) => c.id === id);
   const catName = (id: string) => ctx.categories.find((c) => c.id === id)?.name ?? copy.receiptReview.notItemised;
   const accountName = ctx.accounts.find((a) => a.id === state.accountId)?.name ?? copy.receiptReview.cash;
 
@@ -429,7 +432,7 @@ export function ReceiptReviewScreen({ draft, photo, attachTo, onDiscardPhoto, ap
   const mismatchText = copy.receiptReview.mismatch.replace('{read}', money(view.readMinor)).replace('{total}', money(total ?? 0));
   const blockedReason = view.blocked === 'total' ? copy.receiptReview.saveHintTotal : view.blocked === 'mismatch' ? copy.receiptReview.saveHintMismatch : undefined;
   const dateText = view.date;
-  const chips = (showAll ? ctx.categories : ctx.quick).map((c) => <Chip key={c.id} label={c.name} testID={`category-${c.id}`} selected={state.mainCategoryId === c.id} onPress={() => update((s) => setMainCategory(s, c.id))} />);
+  const chips = (showAll ? ctx.categories : ctx.quick).map((c) => <CategoryCell key={c.id} category={c} wide selected={state.mainCategoryId === c.id} onPress={() => update((s) => setMainCategory(s, c.id))} />);
 
   return (
     <ScreenFrame testID="receipt-review">
@@ -531,6 +534,7 @@ export function ReceiptReviewScreen({ draft, photo, attachTo, onDiscardPhoto, ap
                     <Amount amountMinor={it.allocatedAmount} currency={ctx.currency} direction="expense" locale={ctx.locale} />
                   </Pressable>
                   <Pressable testID={`item-chip-${it.index}`} {...controlA11y({ label: catName(it.categoryId), role: 'button', hint: copy.receiptReview.changeCategory })} hitSlop={8} onPress={() => pickCategory(it.index)} style={[styles.itemCategory, { borderColor: it.categoryId === UNCATEGORISED_ID ? theme.color('semantic-warning') : theme.color('accent-primary') }]}>
+                    {it.categoryId === UNCATEGORISED_ID ? null : <CategoryChip categoryId={it.categoryId} icon={catOf(it.categoryId)?.icon ?? 'Tag'} colour={catOf(it.categoryId)?.colorToken ?? 'cat-sky'} size={20} />}
                     <Text style={[textStyle('caption'), { color: theme.color('text-primary') }]}>{it.categoryId === UNCATEGORISED_ID ? copy.receiptReview.chooseCategory : copy.receiptReview.categoryFor.replace('{name}', catName(it.categoryId))}</Text>
                     <Icon icon={CaretDown} size={12} tint={theme.color('text-secondary')} />
                   </Pressable>
@@ -603,10 +607,10 @@ const styles = StyleSheet.create({
   itemsCard: { borderWidth: 1, borderRadius: radii.md, paddingHorizontal: 12, paddingVertical: 4 },
   itemRow: { paddingVertical: 6 },
   itemTop: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 36 },
-  itemCategory: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', minHeight: 32, borderWidth: 1, borderRadius: 16, paddingHorizontal: 10, marginTop: 2 },
+  itemCategory: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', minHeight: 32, borderWidth: 1, borderRadius: 16, paddingLeft: 6, paddingRight: 10, marginTop: 2 },
   value: { alignItems: 'flex-end', flexShrink: 1 },
   inline: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   editor: { gap: 12, paddingBottom: 8 },
   input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, minHeight: layout.touchMin },
   footer: { padding: 12, borderTopWidth: 1 },

@@ -5,12 +5,12 @@ import { Icon } from '../../shared/theme/Icon';
 import { PAYMENT_METHODS, type AccountRow, type CategoryRow, type PaymentMethod } from '@wmbugo/core';
 import { copy } from '../../shared/copy';
 import { resolveColor } from '../../shared/theme/colors';
+import { CategoryChip } from '../categories/CategoryChip';
 import { useTheme } from '../../shared/theme/ThemeProvider';
 import { layout } from '../../shared/theme/tokens';
 import { textStyle } from '../../shared/theme/typography';
 import { Chip } from '../../shared/ui/Chip';
 import type { AddKind } from './addApi';
-import { categoryIcon } from './categoryIcons';
 
 const KINDS: readonly AddKind[] = ['expense', 'income', 'transfer'];
 const KIND_LABEL: Readonly<Record<AddKind, string>> = { expense: copy.add.expense, income: copy.add.income, transfer: copy.add.transfer };
@@ -44,8 +44,11 @@ export function KindSegments({ kind, vertical, onChoose, locked = false }: { kin
   );
 }
 
-/** One category as a small tile: its icon over its name. Selected is filled and carries a check-like weight, never colour alone. */
-function CategoryCell({ category, selected, onPress }: { category: CategoryRow; selected: boolean; onPress: () => void }) {
+/**
+ * One category as a tile, its icon in the category's own colour. Compact (the quick row): the icon over the name. Wide (the full list):
+ * the icon beside the name, so long names wrap at word breaks instead of inside a word. Selected is filled and bold, never colour alone.
+ */
+export function CategoryCell({ category, selected, wide, onPress }: { category: CategoryRow; selected: boolean; wide: boolean; onPress: () => void }) {
   const theme = useTheme();
   const a11y = controlA11y({ label: category.name, role: 'button', selected });
   return (
@@ -53,9 +56,12 @@ function CategoryCell({ category, selected, onPress }: { category: CategoryRow; 
       testID={`category-${category.id}`}
       {...a11y}
       onPress={onPress}
-      style={[styles.cell, { borderColor: selected ? theme.color('accent-primary') : resolveColor('dark', 'border-hairline'), backgroundColor: selected ? resolveColor('dark', 'bg-muted') : resolveColor('dark', 'bg-surface'), borderWidth: selected ? 2 : 1 }]}>
-      <Icon icon={categoryIcon(category.icon)} size={18} selected={selected} tint={theme.color('on-glass-primary')} />
-      <Text numberOfLines={2} style={[textStyle('caption'), { textAlign: 'center', color: theme.color('on-glass-primary'), fontWeight: selected ? '600' : '400' }]}>{category.name}</Text>
+      style={[
+        wide ? styles.cellWide : styles.cell,
+        { borderColor: selected ? theme.color('accent-primary') : resolveColor('dark', 'border-hairline'), backgroundColor: selected ? resolveColor('dark', 'bg-muted') : resolveColor('dark', 'bg-surface'), borderWidth: selected ? 2 : 1 },
+      ]}>
+      <CategoryChip categoryId={category.id} icon={category.icon} colour={category.colorToken} size={wide ? 30 : 32} />
+      <Text numberOfLines={2} style={[textStyle('caption'), wide ? styles.nameWide : styles.name, { color: theme.color('on-glass-primary'), fontWeight: selected ? '600' : '400' }]}>{category.name}</Text>
     </Pressable>
   );
 }
@@ -89,12 +95,14 @@ export function CategoryChips({
       <Text accessibilityRole="header" style={[textStyle('label'), { color: theme.color('on-glass-primary') }]}>{copy.add.category}</Text>
       <View style={styles.grid} testID="category-chips">
         {listed.map((c) => (
-          <CategoryCell key={c.id} category={c} selected={selectedId === c.id} onPress={() => onPick(c.id)} />
+          <CategoryCell key={c.id} category={c} selected={selectedId === c.id} wide={showAll} onPress={() => onPick(c.id)} />
         ))}
         {hasMore ? (
-          <Pressable testID="category-more" {...controlA11y({ label: showAll ? copy.add.fewer : copy.add.more, role: 'button' })} onPress={onToggleAll} style={[styles.cell, { borderColor: resolveColor('dark', 'border-hairline'), borderStyle: 'dashed', borderWidth: 1 }]}>
-            <Icon icon={showAll ? CaretUp : DotsThree} size={18} tint={theme.color('on-glass-primary')} />
-            <Text numberOfLines={1} style={[textStyle('caption'), { color: theme.color('on-glass-primary') }]}>{showAll ? copy.add.fewer : copy.add.more}</Text>
+          <Pressable testID="category-more" {...controlA11y({ label: showAll ? copy.add.fewer : copy.add.more, role: 'button' })} onPress={onToggleAll} style={[showAll ? styles.cellWide : styles.cell, { borderColor: resolveColor('dark', 'border-hairline'), borderStyle: 'dashed', borderWidth: 1 }]}>
+            <View style={styles.iconDisc}>
+              <Icon icon={showAll ? CaretUp : DotsThree} size={20} tint={theme.color('on-glass-primary')} />
+            </View>
+            <Text numberOfLines={1} style={[textStyle('caption'), showAll ? styles.nameWide : styles.name, { color: theme.color('on-glass-primary') }]}>{showAll ? copy.add.fewer : copy.add.more}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -273,7 +281,11 @@ const styles = StyleSheet.create({
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
   strip: { flexDirection: 'row', gap: 4, paddingRight: 8 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  cell: { flexBasis: '18%', flexGrow: 1, minHeight: 58, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2, paddingVertical: 4, gap: 2 },
+  cell: { flexBasis: '18%', flexGrow: 1, minHeight: 64, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2, paddingVertical: 4, gap: 3 },
+  cellWide: { flexBasis: '48%', flexGrow: 1, minHeight: 48, borderRadius: 12, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, gap: 8 },
+  iconDisc: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  name: { textAlign: 'center' },
+  nameWide: { flex: 1, textAlign: 'left' },
   details: { gap: 8 },
   input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, minHeight: layout.touchMin },
 });

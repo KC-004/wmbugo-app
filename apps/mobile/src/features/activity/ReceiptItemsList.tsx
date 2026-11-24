@@ -8,6 +8,7 @@ import { radii } from '../../shared/theme/tokens';
 import { textStyle } from '../../shared/theme/typography';
 import { Amount } from '../../shared/ui/Amount';
 import { moneyText } from '../../shared/ui/moneyText';
+import { CategoryChip } from '../categories/CategoryChip';
 
 /** The lines read from a saved receipt (Story 10.5): `Items (N)` collapsed, one row each when opened, read-only. */
 export function ReceiptItemsList({ items, currency, locale }: { items: readonly ReceiptItemView[]; currency: CurrencyCode; locale: string }) {
@@ -25,6 +26,7 @@ export function ReceiptItemsList({ items, currency, locale }: { items: readonly 
       {open
         ? items.map((it, i) => (
             <View key={it.lineIndex} testID={`detail-item-${i}`} accessible accessibilityLabel={`${it.name}, ${moneyText(it.allocatedMinor, currency, locale)}, ${it.categoryName}`} style={styles.item}>
+              <CategoryChip categoryId={it.categoryId} icon={it.categoryIcon ?? 'Tag'} colour={it.categoryColor ?? 'cat-sky'} size={30} />
               <View style={{ flex: 1 }}>
                 <Text style={[textStyle('body'), { color: theme.color('text-primary') }]}>{it.name}</Text>
                 <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>
