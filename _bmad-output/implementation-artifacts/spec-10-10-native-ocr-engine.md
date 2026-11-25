@@ -2,7 +2,7 @@
 title: 'The native receipt reading engine'
 type: 'feature'
 created: '2026-11-24'
-status: 'in-review'
+status: 'done'
 route: 'oneshot'
 baseline_commit: '1127156'
 context: ['{project-root}/_bmad-output/implementation-artifacts/epic-10-context.md']

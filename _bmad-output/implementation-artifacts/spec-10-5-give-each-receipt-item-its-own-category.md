@@ -2,7 +2,7 @@
 title: 'Give each receipt item its own category'
 type: 'feature'
 created: '2026-11-22'
-status: 'in-review'
+status: 'done'
 route: 'dispatch'
 review_loop_iteration: 0
 baseline_commit: 'b21ceae4749fcb1cde8e69d5a46e2a3f298e0729'

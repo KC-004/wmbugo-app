@@ -2,7 +2,7 @@
 title: 'Snap a receipt to split an entry, and one way in for every receipt source'
 type: 'feature'
 created: '2026-11-24'
-status: 'in-review'
+status: 'done'
 route: 'dispatch'
 review_loop_iteration: 0
 baseline_commit: '3d5b930'

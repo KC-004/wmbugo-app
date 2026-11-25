@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 11-08-2026 09:43
-last_updated: 11-22-2026 16:03
+last_updated: 11-26-2026 00:00
 project: wmbugo-app
 project_key: NOKEY
 tracking_system: file-system
@@ -156,16 +156,17 @@ development_status:
   9-9-export-transactions-and-account-summaries-as-csv: done
   epic-9-retrospective: done
 
-  epic-10: in-progress
-  10-1-spike-s3-ocr-engine-choice-and-the-synthetic-receipt-set: review
-  10-2-read-receipt-lines-and-fields-in-core: review
-  10-3-reconcile-a-receipt-and-allocate-tax-fees-and-discounts-in-c: review
-  10-4-review-a-read-receipt-and-save-it-as-one-expense: review
-  10-5-give-each-receipt-item-its-own-category: review
-  10-6-pick-a-receipt-photo-and-watch-it-being-read: review
-  10-7-snap-a-receipt-with-the-camera: review
-  10-8-a-receipt-that-matches-an-entry-attach-to-it-keep-separate-o: review
-  10-9-snap-a-receipt-to-split-an-entry-and-one-way-in-for-every-re: review
+  epic-10: done
+  10-1-spike-s3-ocr-engine-choice-and-the-synthetic-receipt-set: done
+  10-2-read-receipt-lines-and-fields-in-core: done
+  10-3-reconcile-a-receipt-and-allocate-tax-fees-and-discounts-in-c: done
+  10-4-review-a-read-receipt-and-save-it-as-one-expense: done
+  10-5-give-each-receipt-item-its-own-category: done
+  10-6-pick-a-receipt-photo-and-watch-it-being-read: done
+  10-7-snap-a-receipt-with-the-camera: done
+  10-8-a-receipt-that-matches-an-entry-attach-to-it-keep-separate-o: done
+  10-9-snap-a-receipt-to-split-an-entry-and-one-way-in-for-every-re: done
+  10-10-native-ocr-engine: done
   epic-10-retrospective: optional
 
   epic-11: backlog
@@ -566,3 +567,11 @@ action_items:
     owner: "Amelia"
     status: open
     ref: "_bmad-output/implementation-artifacts/epic-9-retro-2026-11-22.md"
+  - id: "epic-10-phone-check-of-unchecked-receipt-flows"
+    epic: 10
+    action: "Phone check of the receipt flows not yet tried: photo picker, attach to a matching
+      entry, split an entry, the wmbugo://receipt/scan link with app lock, TalkBack and large
+      text, scan time and memory, and a release build"
+    owner: "KCPK"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-10-code-review-2026-11-25.md"
