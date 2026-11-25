@@ -38,7 +38,7 @@ import type { ReceiptMatch } from '@wmbugo/core';
 import type { AttachTarget } from './receiptApi';
 import type { PendingPhoto } from '../../adapters/files/receiptFiles';
 import { realReceiptApi, type ReceiptApi, type ReceiptContext } from './receiptApi';
-import { addItem, confirmTotal, editItem, initialReview, removeItem, saveInput, setAccount, setCharge, setCurrency, setDate, setItemCategory, setMainCategory, setMerchant, setSubtotal, setTotal, viewOf, type ChargeKind, type ReviewState } from './receiptReviewModel';
+import { addCharge, addItem, confirmTotal, editItem, initialReview, removeCharge, removeItem, saveInput, setAccount, setCharge, setCurrency, setDate, setItemCategory, setMainCategory, setMerchant, setSubtotal, setTotal, viewOf, type ChargeKind, type ReviewState } from './receiptReviewModel';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 
@@ -105,7 +105,7 @@ function ItemEditor({ initialName, initialMinor, exponent, categories, initialCa
 }
 
 /** The amount keypad in a sheet: what is typed shows above the keys, and Done (or Confirm) returns the exact minor units. */
-function AmountEditor({ initialMinor, exponent, locale, doneLabel, allowZero = false, onDone }: { initialMinor: number | null; exponent: number; locale: string; doneLabel: string; /** A tax, fee or discount can be corrected to nothing; a total cannot. */ allowZero?: boolean; onDone: (minor: number) => void }) {
+function AmountEditor({ initialMinor, exponent, locale, doneLabel, allowZero = false, onRemove, onDone }: { initialMinor: number | null; exponent: number; locale: string; doneLabel: string; /** A tax, fee or discount can be corrected to nothing; a total cannot. */ allowZero?: boolean; /** Offered for a tax, fee or discount. */ onRemove?: () => void; onDone: (minor: number) => void }) {
   const theme = useTheme();
   const [text, setText] = useState(minorToInput(initialMinor, exponent));
   const parsed = parseAmountInput(text === '' ? '0' : text, exponent);
@@ -118,6 +118,7 @@ function AmountEditor({ initialMinor, exponent, locale, doneLabel, allowZero = f
       </Text>
       <Keypad exponent={exponent} locale={locale} onKey={(k: KeypadKey) => setText((t) => applyKey(t, k, exponent))} />
       <Button label={doneLabel} testID="amount-editor-done" {...(!valid ? { disabledReason: copy.receiptReview.totalMissing } : {})} onPress={() => valid && onDone(minor)} onGlass />
+      {onRemove ? <Button label={copy.receiptReview.removeLine} variant="destructive" testID="charge-remove" onPress={onRemove} onGlass /> : null}
     </View>
   );
 }
@@ -450,9 +451,16 @@ export function ReceiptReviewScreen({ draft, photo, attachTo, onDiscardPhoto, ap
     onClose();
   };
 
+  const editCharge = (kind: ChargeKind, label: string, index: number, current: number) =>
+    sheet.open({
+      id: `edit-${kind}-${index}`,
+      title: label,
+      body: (close) => <AmountEditor initialMinor={current} exponent={ctx.exponent} locale={ctx.locale} doneLabel={copy.common.save} allowZero onDone={(m) => { update((s) => setCharge(s, kind, index, m)); close(); }} onRemove={() => { update((s) => removeCharge(s, kind, index)); close(); }} />,
+    });
+
   const chargeRows = (kind: ChargeKind, label: string) =>
     d[kind].map((c, i) => (
-      <Row key={`${kind}-${i}`} testID={`row-${kind}-${i}`} label={`${kind === 'taxes' && view.allocation.taxIncluded ? copy.receiptReview.taxIncluded : label}${c.label && c.label.toLowerCase() !== label.toLowerCase() ? ` · ${c.label}` : ''}`} a11yLabel={readValue(label, money(c.value))} value={<Amount amountMinor={c.value} currency={ctx.currency} direction={kind === 'discounts' ? 'income' : 'neutral'} locale={ctx.locale} />} onPress={() => editAmount(`edit-${kind}-${i}`, label, c.value, copy.common.save, (m) => update((s) => setCharge(s, kind, i, m)), true)} />
+      <Row key={`${kind}-${i}`} testID={`row-${kind}-${i}`} label={`${kind === 'taxes' && view.allocation.taxIncluded ? copy.receiptReview.taxIncluded : label}${c.label && c.label.toLowerCase() !== label.toLowerCase() ? ` · ${c.label}` : ''}`} a11yLabel={readValue(label, money(c.value))} value={<Amount amountMinor={c.value} currency={ctx.currency} direction={kind === 'discounts' ? 'income' : 'neutral'} locale={ctx.locale} />} onPress={() => editCharge(kind, label, i, c.value)} />
     ));
 
   const mismatchText = copy.receiptReview.mismatch.replace('{read}', money(view.readMinor)).replace('{total}', money(total ?? 0));
@@ -551,12 +559,14 @@ export function ReceiptReviewScreen({ draft, photo, attachTo, onDiscardPhoto, ap
           <View testID="items-list" style={[styles.itemsCard, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
           {view.allocation.items.map((it, position) => {
               const src = d.items[it.index]!;
+              // The row shows the price as printed; tax and charges belong to the bill and count in the category totals.
+              const printed = Math.max(0, src.amountMinor - src.discountMinor);
               return (
                 <View
                   key={it.index}
                   testID={`item-${it.index}`}
                   accessible
-                  accessibilityLabel={`${src.name}, ${money(it.allocatedAmount)}, ${catName(it.categoryId)}`}
+                  accessibilityLabel={`${src.name}, ${money(printed)}, ${catName(it.categoryId)}`}
                   accessibilityActions={[{ name: 'changeCategory', label: copy.receiptReview.changeCategory }]}
                   onAccessibilityAction={(e) => e.nativeEvent.actionName === 'changeCategory' && pickCategory(it.index)}
                   style={[styles.itemRow, position > 0 ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.color('border-hairline') } : null]}>
@@ -565,7 +575,7 @@ export function ReceiptReviewScreen({ draft, photo, attachTo, onDiscardPhoto, ap
                       <Text style={[textStyle('body'), { color: theme.color('text-primary') }]}>{src.name}</Text>
                       {src.discountMinor > 0 ? <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{copy.receiptReview.itemDiscount.replace('{amount}', money(src.discountMinor))}</Text> : null}
                     </View>
-                    <Amount amountMinor={it.allocatedAmount} currency={ctx.currency} direction="expense" locale={ctx.locale} />
+                    <Amount amountMinor={printed} currency={ctx.currency} direction="expense" locale={ctx.locale} />
                   </Pressable>
                   <ItemCategoryButton testID={`item-chip-${it.index}`} label={it.categoryId === UNCATEGORISED_ID ? copy.receiptReview.chooseCategory : copy.receiptReview.categoryFor.replace('{name}', catName(it.categoryId))} unset={it.categoryId === UNCATEGORISED_ID} onPress={() => pickCategory(it.index)}>
                     {it.categoryId === UNCATEGORISED_ID ? null : <CategoryChip categoryId={it.categoryId} icon={catOf(it.categoryId)?.icon ?? 'Tag'} colour={catOf(it.categoryId)?.colorToken ?? 'cat-sky'} size={20} />}
@@ -575,15 +585,16 @@ export function ReceiptReviewScreen({ draft, photo, attachTo, onDiscardPhoto, ap
             })}
           </View>
         ) : null}
-        {itemsOpen && view.allocation.notItemised > 0 ? (
+        {itemsOpen || d.items.length === 0 ? (
           <View style={styles.addItem}>
-            <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{copy.receiptReview.addItemHint}</Text>
+            <Text testID="add-item-hint" style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{view.allocation.notItemised > 0 ? copy.receiptReview.addItemHint : copy.receiptReview.addItemOverHint}</Text>
             <Button label={copy.receiptReview.addItem} variant="secondary" testID="add-item" onPress={addItemSheet} />
           </View>
         ) : null}
 
         {d.subtotal.value !== null ? <Row testID="row-subtotal" label={copy.receiptReview.subtotal} a11yLabel={readValue(copy.receiptReview.subtotal, money(d.subtotal.value))} value={<Amount amountMinor={d.subtotal.value} currency={ctx.currency} direction="neutral" locale={ctx.locale} />} onPress={() => editAmount('edit-subtotal', copy.receiptReview.subtotal, d.subtotal.value, copy.common.save, (m) => update((s) => setSubtotal(s, m)), true)} /> : null}
         {chargeRows('taxes', copy.receiptReview.tax)}
+        <Button label={copy.receiptReview.addTax} variant="secondary" testID="add-tax" onPress={() => editAmount('add-tax', copy.receiptReview.tax, null, copy.common.save, (m) => update((s) => addCharge(s, 'taxes', copy.receiptReview.tax, m)))} />
         {chargeRows('fees', copy.receiptReview.fees)}
         {chargeRows('discounts', copy.receiptReview.discount)}
 

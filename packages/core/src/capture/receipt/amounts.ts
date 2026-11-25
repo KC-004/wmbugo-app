@@ -61,6 +61,12 @@ export function parseDigits(raw: string, exponent: number, regionDecimal: '.' | 
   return r.ok ? { minor: r.value, hasDecimal } : null;
 }
 
+/**
+ * Puts back the space the engine drops between two columns ("1212.00212.00" is a quantity and price, then the amount). Only where both
+ * numbers end in two decimals after the same mark, so "1.234,56" and "1,234,567.00" stay whole.
+ */
+export const separateGluedAmounts = (text: string): string => text.replace(/([.,])(\d{2})(?=\d{1,6}\1\d{2}(?![.,]?\d))/g, '$1$2 ');
+
 /** Replaces dates and times by spaces (same length) so their digits are never read as amounts. */
 export function maskDatesAndTimes(text: string): string {
   let s = text;

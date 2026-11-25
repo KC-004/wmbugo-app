@@ -2,7 +2,7 @@ import type { OcrResult } from '../../ports/OcrEngine';
 import { err, ok, type Result } from '../../shared/result';
 import { getCurrency, SUPPORTED_CURRENCIES } from '../../shared/currency';
 import { taxIsIncluded } from '../../ledger/allocateReceipt';
-import { findAmounts, maskDatesAndTimes, type AmountToken } from './amounts';
+import { findAmounts, maskDatesAndTimes, separateGluedAmounts, type AmountToken } from './amounts';
 import { groupLines, type Line } from './lines';
 import type { Certainty, ParseReceiptOptions, ReceiptCharge, ReceiptDraft, ReceiptField, ReceiptItem } from './types';
 
@@ -55,7 +55,8 @@ const PAID = /total\s+(paid|tendered|received)\b/i;
 const ROUNDING = /\bround(ing|ed)?\s*(off|adj)/i;
 
 const classify = (text: string): Kind => {
-  if (TALLY.test(text)) return 'info';
+  // "Total Qty: 23   Sub Total 4543.00" printed on one line is the subtotal.
+  if (TALLY.test(text)) return /\bsub\b/i.test(text) ? 'subtotal' : 'info';
   if (PAID.test(text)) return 'paid';
   if (SUBTOTAL.test(text)) return 'subtotal';
   if (TOTAL.test(text)) return 'total';
@@ -92,6 +93,32 @@ const settleKinds = (rows: readonly Row[]): Row[] => {
     if (r.kind === 'paid') return { ...r, kind: hasTotal ? 'info' : 'total' };
     return r;
   });
+};
+
+const leftEdge = (line: Line): number => Math.min(...line.blocks.map((b) => b.box.left));
+const lineHeight = (line: Line): number => Math.max(...line.blocks.map((b) => b.box.bottom - b.box.top));
+const allCaps = (text: string): boolean => text === text.toUpperCase();
+
+/**
+ * Whether a line is the rest of a long item name: words only, starting under the name above, directly after it. A heading in capitals
+ * under a name in small letters is not.
+ */
+const continuesName = (item: Row, next: Row, name: string): boolean => {
+  const text = next.line.text.trim();
+  if (next.kind !== 'generic' || next.amounts.length > 0 || next.latinLetters < 2 || next.otherLetters > 0) return false;
+  if (text.length > 32 || /\d{3,}/.test(text) || CONTACT.test(text) || (allCaps(text) && !allCaps(name))) return false;
+  return Math.abs(leftEdge(next.line) - leftEdge(item.line)) <= 1.5 * lineHeight(item.line);
+};
+
+/** A name printed over up to three lines, joined. */
+const fullName = (rows: readonly Row[], item: ReceiptItem, itemEnd: number): string => {
+  const first = rows[item.lineIndex]!;
+  let name = item.name;
+  for (let i = item.lineIndex + 1; i < Math.min(item.lineIndex + 3, itemEnd); i++) {
+    if (!continuesName(first, rows[i]!, item.name)) break;
+    name = `${name} ${rows[i]!.line.text.trim()}`;
+  }
+  return name;
 };
 
 /**
@@ -190,7 +217,7 @@ function readMerchant(rows: readonly Row[], height: number): ReceiptField<string
 export function parseReceipt(ocr: OcrResult, opts: ParseReceiptOptions): Result<ReceiptDraft, 'UNREADABLE'> {
   const currency = getCurrency(opts.profileCurrency);
   const exponent = currency.ok ? currency.value.exponent : 2;
-  const lines = groupLines(ocr.blocks, ocr.width, ocr.height);
+  const lines = groupLines(ocr.blocks, ocr.width, ocr.height).map((l) => ({ ...l, text: separateGluedAmounts(l.text) }));
   if (lines.length === 0) return err('UNREADABLE');
 
   const classified: Row[] = lines.map((line, index) => {
@@ -266,7 +293,8 @@ export function parseReceipt(ocr: OcrResult, opts: ParseReceiptOptions): Result<
     }
   }
   // Attach item discounts to the item printed directly above.
-  const itemsWithDiscount: ReceiptItem[] = items.map((it) => {
+  const itemsWithDiscount: ReceiptItem[] = items.map((read) => {
+    const it = { ...read, name: fullName(rows, read, itemEnd) };
     for (const [lineIndex, amount] of itemDiscounts) {
       const prevIndex = lineIndex - 1;
       if (prevIndex === it.lineIndex) return { ...it, discountMinor: it.discountMinor + amount };
@@ -277,6 +305,15 @@ export function parseReceipt(ocr: OcrResult, opts: ParseReceiptOptions): Result<
   const itemsNet = itemsWithDiscount.reduce((s, i) => s + i.amountMinor - i.discountMinor, 0);
 
   const sum = (charges: readonly ReceiptCharge[]): number => charges.reduce((s, c) => s + c.value, 0);
+
+  // The bill is rounded but the rounding line was not read. The charges overshoot the total by less than one whole unit, and either the
+  // total is a whole amount or the subtotal shows that every item was read: that small amount is the rounding.
+  const printed = totals.length > 0 ? totals[totals.length - 1]!.minor : null;
+  const unit = 10 ** exponent;
+  if (printed !== null && (printed % unit === 0 || subtotal.value === itemsNet)) {
+    const over = itemsNet + sum(taxes) + sum(fees) - sum(discounts) - printed;
+    if (over > 0 && over < unit) discounts.push({ label: 'Round off', value: over, certainty: 'unsure' });
+  }
 
   // Total: the last amount on a line with a total keyword; two different candidates, or a sum that does not add up, make it unsure.
   let total: ReceiptField<number>;

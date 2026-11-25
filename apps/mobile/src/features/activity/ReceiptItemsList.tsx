@@ -25,8 +25,10 @@ export function ReceiptItemsList({ items, currency, locale }: { items: readonly 
       </Pressable>
       {open ? <Text testID="detail-items-note" style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{copy.receiptReview.itemsRecord}</Text> : null}
       {open
-        ? items.map((it, i) => (
-            <View key={it.lineIndex} testID={`detail-item-${i}`} accessible accessibilityLabel={`${it.name}, ${moneyText(it.allocatedMinor, currency, locale)}, ${it.categoryName}`} style={styles.item}>
+        ? items.map((it, i) => {
+            const printed = Math.max(0, it.amountMinor - it.discountMinor);
+            return (
+            <View key={it.lineIndex} testID={`detail-item-${i}`} accessible accessibilityLabel={`${it.name}, ${moneyText(printed, currency, locale)}, ${it.categoryName}`} style={styles.item}>
               <CategoryChip categoryId={it.categoryId} icon={it.categoryIcon ?? 'Tag'} colour={it.categoryColor ?? 'cat-sky'} size={30} />
               <View style={{ flex: 1 }}>
                 <Text style={[textStyle('body'), { color: theme.color('text-primary') }]}>{it.name}</Text>
@@ -34,9 +36,10 @@ export function ReceiptItemsList({ items, currency, locale }: { items: readonly 
                   {it.discountMinor > 0 ? `${it.categoryName} · ${copy.receiptReview.itemDiscount.replace('{amount}', moneyText(it.discountMinor, currency, locale))}` : it.categoryName}
                 </Text>
               </View>
-              <Amount amountMinor={it.allocatedMinor} currency={currency} direction="expense" locale={locale} />
+              <Amount amountMinor={printed} currency={currency} direction="expense" locale={locale} />
             </View>
-          ))
+            );
+          })
         : null}
     </View>
   );

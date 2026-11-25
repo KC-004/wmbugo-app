@@ -1,5 +1,5 @@
 import type { OcrBlock, OcrResult } from '../../ports/OcrEngine';
-import { findAmounts, parseDigits } from './amounts';
+import { findAmounts, parseDigits, separateGluedAmounts } from './amounts';
 import { groupLines } from './lines';
 import { parseReceipt, SURE_CONFIDENCE } from './parseReceipt';
 import { allocateReceipt } from '../../ledger/allocateReceipt';
@@ -432,5 +432,62 @@ describe('Epic 10 review fixes', () => {
     const d = read([['Bread', '6.90'], ['Total', '6.90'], ['VAT included', '1.15']]);
     expect(d.total).toEqual({ value: 690, certainty: 'sure' });
     expect(allocateReceipt(d, [null], 'cat_food')).toMatchObject({ state: 'reconciled', taxIncluded: true });
+  });
+});
+
+describe('a restaurant bill with wrapped names and joined columns', () => {
+  const bill = (roundOff: string) =>
+    parse(
+      rows([
+        ['Shop Name'],
+        ['Item', 'Amount'],
+        ['Crispy Sticks 2', '194.00388.00'],
+        ['Garlic Roast 2', '230.00 460.00'],
+        ['Masala Dosa'],
+        ['Ghee Dosa', '1212.00212.00'],
+        ['Kokum Cooler (', '1158.00158.00'],
+        ['Real Fruit )'],
+        ['Total Qty: 6 Sub Total', '1218.00'],
+        ['CGST@2.52.5%', '30.45'],
+        ['SGST@2.52.5%', '30.45'],
+        [roundOff],
+        ['Grand Total', '1278.00'],
+      ]),
+      { region: 'IN', profileCurrency: 'INR' },
+    );
+
+  it('reads every item with its whole name and its line amount', () => {
+    const d = bill('Thank you');
+    expect(d.items.map((i) => [i.name, i.amountMinor])).toEqual([
+      ['Crispy Sticks', 38800],
+      ['Garlic Roast Masala Dosa', 46000],
+      ['Ghee Dosa', 21200],
+      ['Kokum Cooler ( Real Fruit )', 15800],
+    ]);
+    expect(d.subtotal.value).toBe(121800);
+  });
+
+  it('adds up when the rounding line cannot be read', () => {
+    const d = bill('RoLnd olf');
+    expect(d.discounts.map((x) => x.value)).toEqual([90]);
+    expect(allocateReceipt(d, d.items.map(() => null), 'cat_food').state).toBe('reconciled');
+  });
+
+  it('reads the rounding from a whole total when neither the subtotal nor the rounding line was read', () => {
+    const d = parse(rows([['Shop Name'], ['Thali', '4543.00'], ['CGST 2.5%', '113.58'], ['SGST 2.5%', '113.58'], ['Grand Total', '4770.00']]), { region: 'IN', profileCurrency: 'INR' });
+    expect(d.subtotal.value).toBeNull();
+    expect(d.discounts.map((x) => [x.label, x.value])).toEqual([['Round off', 16]]);
+    expect(allocateReceipt(d, [null], 'cat_food')).toMatchObject({ state: 'reconciled' });
+  });
+
+  it('does not call a difference rounding when the total has paise and no subtotal confirms the items', () => {
+    const d = parse(rows([['Shop Name'], ['Thali', '10.00'], ['Grand Total', '9.50']]), { region: 'IN', profileCurrency: 'INR' });
+    expect(d.discounts).toHaveLength(0);
+  });
+
+  it('keeps thousands marks whole and does not take a heading as part of a name', () => {
+    expect(separateGluedAmounts('1.234,56 1,234,567.00')).toBe('1.234,56 1,234,567.00');
+    const d = parse(rows([['Shop Name'], ['Tea', '2.00'], ['DRINKS'], ['Coffee', '3.00'], ['Total', '5.00']]));
+    expect(d.items.map((i) => i.name)).toEqual(['Tea', 'Coffee']);
   });
 });

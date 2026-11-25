@@ -652,6 +652,7 @@ The product owner accepted the redesign of the Add sheet and the receipt review.
 - Saved receipt lines are kept as the record of the paper receipt; later edits to the entry do not change them.
 - A receipt read in another currency can be corrected to the profile currency; saving a foreign amount is still deferred.
 - A tax already included in the item prices is shown and not added again.
+- Item rows, on the review and on a saved entry, show the printed price less the item's own discount. Tax, fees and whole-bill discounts show against the bill and are shared into the category totals only.
 
 ### FR Coverage Map
 

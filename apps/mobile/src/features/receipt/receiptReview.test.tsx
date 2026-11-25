@@ -567,6 +567,47 @@ describe('ReceiptReviewScreen (SCR-23)', () => {
     expect(has(r, 'item-error')).toBe(true);
   });
 
+  it('can add an item when the items already make the total, and with no items read', async () => {
+    const full = await mount(draft());
+    act(() => fire(full.r, 'items-toggle'));
+    expect(has(full.r, 'add-item')).toBe(true);
+    const none = await mount(draft({ items: [], discounts: [] }));
+    act(() => fire(none.r, 'add-item'));
+    await settle();
+    act(() => fire(none.r, 'item-name-input', 'onChangeText', 'Tea'));
+    act(() => fire(none.r, 'item-amount-input', 'onChangeText', '5'));
+    act(() => fire(none.r, 'item-save'));
+    await settle();
+    expect(has(none.r, 'items-toggle')).toBe(true);
+  });
+
+  it('removes a charge and adds a tax, rerunning the allocation', async () => {
+    const { r, save } = await mount(draft({ total: { value: 5900, certainty: 'sure' } }));
+    act(() => fire(r, 'row-discounts-0'));
+    await settle();
+    act(() => fire(r, 'charge-remove'));
+    await settle();
+    expect(has(r, 'row-discounts-0')).toBe(false);
+    expect(has(r, 'mismatch-warning')).toBe(true);
+    act(() => fire(r, 'row-total'));
+    await settle();
+    act(() => fire(r, 'key-clear'));
+    tap(r, '63');
+    act(() => fire(r, 'amount-editor-done'));
+    await settle();
+    act(() => fire(r, 'add-tax'));
+    await settle();
+    expect(has(r, 'charge-remove')).toBe(false);
+    tap(r, '3');
+    act(() => fire(r, 'amount-editor-done'));
+    await settle();
+    expect(has(r, 'row-taxes-0')).toBe(true);
+    await act(async () => fire(r, 'receipt-save'));
+    await settle();
+    expect(save.mock.calls[0]![0].draft.taxes.map((t) => t.value)).toEqual([300]);
+    expect(save.mock.calls[0]![0].draft.discounts).toEqual([]);
+  });
+
   it('with no history the main category is Uncategorised', async () => {
     const { r } = await mount(draft(), { defaultCategoryId: UNCATEGORISED_ID });
     expect(has(r, `total-${UNCATEGORISED_ID}`)).toBe(true);

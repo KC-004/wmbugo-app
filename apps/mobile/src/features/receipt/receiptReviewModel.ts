@@ -42,6 +42,19 @@ export function setCharge(s: ReviewState, kind: ChargeKind, index: number, minor
   return { ...s, draft: { ...s.draft, [kind]: list.map((c, i) => (i === index ? { ...c, value: minor, certainty: 'sure' as const } : c)) } };
 }
 
+/** Takes out a tax, fee or discount that was misread or does not belong. */
+export function removeCharge(s: ReviewState, kind: ChargeKind, index: number): ReviewState {
+  const list: readonly ReceiptCharge[] = s.draft[kind];
+  if (index < 0 || index >= list.length) return s;
+  return { ...s, draft: { ...s.draft, [kind]: list.filter((_, i) => i !== index) } };
+}
+
+/** A tax, fee or discount the reader missed. */
+export function addCharge(s: ReviewState, kind: ChargeKind, label: string, minor: number): ReviewState {
+  if (!Number.isSafeInteger(minor) || minor <= 0) return s;
+  return { ...s, draft: { ...s.draft, [kind]: [...s.draft[kind], { label, value: minor, certainty: 'sure' as const }] } };
+}
+
 /** Changing the main category moves only the items still following it. */
 export const setMainCategory = (s: ReviewState, categoryId: string): ReviewState => ({ ...s, mainCategoryId: categoryId });
 
