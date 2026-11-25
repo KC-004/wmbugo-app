@@ -12,8 +12,7 @@ import {
   toLocalDate,
   type RefundableExpense,
   type KeypadKey,
-  type PaymentMethod,
-} from '@wmbugo/core';
+  type PaymentMethod, type CategoryRow } from '@wmbugo/core';
 import { announce } from '../../shared/a11y/announce';
 import { systemClock } from '../../adapters/startApp';
 import { typedAmountLabel } from '../../shared/a11y/labels';
@@ -25,6 +24,7 @@ import { cancelAppLockOffer, scheduleAppLockOffer } from '../lock/appLockOfferBu
 import { useUiStore } from '../../shared/state/uiStore';
 import { useTheme } from '../../shared/theme/ThemeProvider';
 import { textStyle } from '../../shared/theme/typography';
+import { FocusRing, useFocusRing } from '../../shared/ui/FocusRing';
 import { Amount } from '../../shared/ui/Amount';
 import { Button } from '../../shared/ui/Button';
 import { Chip } from '../../shared/ui/Chip';
@@ -39,6 +39,28 @@ import { Icon } from '../../shared/theme/Icon';
 import { startSaveTiming } from './saveTiming';
 
 const QUICK_COUNT = 4;
+
+/** The quick tiles, with a category chosen from the full list in the last place so the choice stays visible. */
+const quickWithSelected = (quick: readonly CategoryRow[], all: readonly CategoryRow[], selectedId: string | null): readonly CategoryRow[] => {
+  const shown = quick.slice(0, QUICK_COUNT);
+  const chosen = all.find((c) => c.id === selectedId);
+  if (!chosen || shown.some((c) => c.id === selectedId)) return shown;
+  return [...shown.slice(0, QUICK_COUNT - 1), chosen];
+};
+
+/** `Snap receipt` beside the account chip. */
+function SnapButton({ onPress }: { onPress: () => void }) {
+  const theme = useTheme();
+  const { focused, onFocus, onBlur } = useFocusRing(true);
+  return (
+    <FocusRing focused={focused} onGlass radius={24}>
+      <Pressable testID="snap-receipt" {...controlA11y({ label: `${copy.receiptScan.snap}. ${copy.receiptScan.snapHint}`, role: 'button' })} onPress={onPress} onFocus={onFocus} onBlur={onBlur} style={[styles.snap, { borderColor: theme.color('on-glass-accent') }]}>
+        <Icon icon={Camera} size={18} tint={theme.color('on-glass-accent')} />
+        <Text style={[textStyle('label'), { color: theme.color('on-glass-primary') }]}>{copy.receiptScan.snap}</Text>
+      </Pressable>
+    </FocusRing>
+  );
+}
 
 type FieldError = 'amount' | 'category' | 'date' | 'same' | 'fee' | 'from' | null;
 
@@ -584,7 +606,7 @@ export function AddSheet({
 
       {kind === 'transfer' ? null : (
         <CategoryChips
-          quick={(data?.quick ?? []).slice(0, QUICK_COUNT)}
+          quick={quickWithSelected(data?.quick ?? [], data?.categories ?? [], categoryId)}
           all={data?.categories ?? []}
           showAll={showAllCategories}
           selectedId={categoryId}
@@ -619,10 +641,7 @@ export function AddSheet({
         }}
       />
       {kind === 'expense' && onSnap && !edit ? (
-        <Pressable testID="snap-receipt" {...controlA11y({ label: `${copy.receiptScan.snap}. ${copy.receiptScan.snapHint}`, role: 'button' })} onPress={onSnap} style={[styles.snap, { borderColor: theme.color('on-glass-accent') }]}>
-          <Icon icon={Camera} size={18} tint={theme.color('on-glass-accent')} />
-          <Text style={[textStyle('label'), ink]}>{copy.receiptScan.snap}</Text>
-        </Pressable>
+        <SnapButton onPress={onSnap} />
       ) : null}
       </View>
 
@@ -718,7 +737,7 @@ const styles = StyleSheet.create({
   inline: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
   amount: { alignItems: 'center', paddingVertical: 0 },
   clearSlot: { position: 'absolute', right: 0, top: 10 },
-  snap: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 18, paddingHorizontal: 12, minHeight: 36 },
+  snap: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 24, paddingHorizontal: 12, minHeight: 48 },
   hiddenInput: { position: 'absolute', width: 1, height: 1, opacity: 0 },
   footer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 8, borderRadius: 12 },
 });

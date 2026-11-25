@@ -127,3 +127,18 @@ Graded from the reviewers' reports; only the first group was checked against the
 - source_spec: `spec-10-10-native-ocr-engine.md`
   summary: Measure on a phone: scan time and native heap with the arena off, low-end device, release timing (NFR-06, NFR-08); tilted receipts use axis-aligned boxes; vertical text is not rotated; choose abiFilters for the store build.
   evidence: S3 section 11; only the JVM run and a compile were done.
+
+## Deferred from: code review of Epic 10 stories 10.1-10.4 and 10.10 (2026-11-25)
+
+Details in `epic-10-code-review-2026-11-25.md`.
+
+- Zero-decimal currencies accept every integer as an amount (medium).
+- No right-aligned number column detection, though Story 10.2 and S3 section 5 say there is (medium).
+- The 90% merchant target cannot be met with non-Latin names; needs a product owner ruling (medium).
+- S3 evidence for ML Kit is incomplete and GATE-05 is unsigned (medium).
+- No open-source licence notices for the OCR models and ONNX Runtime (medium, Epic 14).
+- 16 KB page alignment of the ONNX Runtime libraries is unverified; inspect the release APK.
+- `Clear` inside the amount's accessible group may be unreachable or cover long amounts; check with TalkBack and large text.
+- No test of the real `WmbugoOcr` bridge payload; needs an instrumented test.
+- The S2 schema document does not match the `receipt_item` table.
+- The debug sample receipt route is still present and its gate is untested.

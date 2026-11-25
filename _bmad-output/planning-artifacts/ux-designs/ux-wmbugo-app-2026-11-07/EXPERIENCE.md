@@ -505,3 +505,7 @@ No open UX questions. Two build-phase items remain; neither blocks the UX spec:
 2. **Widget library** (spike). Build-phase technical spike; the widget's content and layout are fixed above.
 
 **PRD follow-up edits** (not UX questions): the PRD needs edits matching the overspent wording, light glass, primary-button gradient, accent themes, category colour, restore copy, Learned merchants location and day-header Spent rows in Deviations from PRD.
+
+## Accepted deviations (2026-11-25)
+
+The Add sheet and receipt review were redesigned. See "Accepted deviations" in `planning-artifacts/epics.md`; it wins over this document.

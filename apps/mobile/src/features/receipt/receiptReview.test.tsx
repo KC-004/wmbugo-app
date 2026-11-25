@@ -1,4 +1,5 @@
-import { Text } from 'react-native';
+import { BackHandler, Text } from 'react-native';
+import { copy } from '../../shared/copy';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { mapCategoryRows, SEED_CATEGORIES, UNCATEGORISED_ID, type ReceiptDraft } from '@wmbugo/core';
@@ -184,7 +185,7 @@ describe('ReceiptReviewScreen (SCR-23)', () => {
   it('a missing date shows today with date? and the TalkBack text, and Save stays enabled', async () => {
     const { r } = await mount(draft({ date: { value: null, certainty: 'missing' } }));
     expect(texts(r)).toEqual(expect.arrayContaining([TODAY, 'Date?']));
-    expect(host(r, 'row-date').props.accessibilityLabel).toBe(`Date, ${TODAY}, not sure, double tap to change`);
+    expect(host(r, 'row-date').props.accessibilityLabel).toBe('Date, 8 Nov, not sure, double tap to change');
     expect(host(r, 'receipt-save').props.accessibilityState).not.toMatchObject({ disabled: true });
   });
 
@@ -363,6 +364,85 @@ describe('ReceiptReviewScreen (SCR-23)', () => {
     await act(async () => fire(r, 'receipt-save'));
     await settle();
     expect(texts(r)).not.toContain('Saved');
+    expect(texts(r)).toContain(copy.duplicate.looksRecorded);
+  });
+
+  it('choosing another Paid with account saves that account', async () => {
+    const { r, save } = await mount(draft());
+    act(() => fire(r, 'paid-with-chip'));
+    act(() => fire(r, 'account-option-a2'));
+    await act(async () => fire(r, 'receipt-save'));
+    await settle();
+    expect(save.mock.calls[0]![0]).toMatchObject({ accountId: 'a2', createCash: false });
+  });
+
+  it('with one account and no Cash account, either can be chosen', async () => {
+    const { r, save } = await mount(draft(), { accounts: [account('a1', 'DBS')], defaultAccountId: null, cashAccountId: null });
+    act(() => fire(r, 'paid-with-chip'));
+    expect(has(r, 'account-option-cash')).toBe(true);
+    act(() => fire(r, 'account-option-a1'));
+    act(() => fire(r, 'paid-with-chip'));
+    act(() => fire(r, 'account-option-cash'));
+    act(() => fire(r, 'paid-with-chip'));
+    act(() => fire(r, 'account-option-a1'));
+    await act(async () => fire(r, 'receipt-save'));
+    await settle();
+    expect(save.mock.calls[0]![0]).toMatchObject({ accountId: 'a1', createCash: false });
+  });
+
+  it('a receipt read in another currency can be put right before saving', async () => {
+    const { r, save } = await mount(draft({ currency: { value: 'USD', certainty: 'unsure' } }));
+    expect(texts(r).join(' ')).not.toContain('{profile}');
+    act(() => fire(r, 'row-currency'));
+    expect(has(r, 'row-currency')).toBe(false);
+    await act(async () => fire(r, 'receipt-save'));
+    await settle();
+    expect(save.mock.calls[0]![0].draft.currency.value).toBe('SGD');
+  });
+
+  it('rows and totals speak their values', async () => {
+    const { r } = await mount(draft());
+    expect(host(r, 'row-merchant').props.accessibilityLabel).toBe('Merchant, Sample Fresh Mart, double tap to change');
+    expect(host(r, 'row-discounts-0').props.accessibilityLabel).toContain('S$6.00');
+    expect(host(r, 'total-cat_groceries').props.accessibilityLabel).toMatch(/^Groceries, 54 .*dollars/);
+    act(() => fire(r, 'items-toggle'));
+    expect(host(r, 'item-chip-0').props.accessibilityLabel).toBe('Category: Groceries');
+  });
+
+  it('refuses a date after today in the date editor', async () => {
+    const { r } = await mount(draft());
+    act(() => fire(r, 'row-date'));
+    await settle();
+    act(() => fire(r, 'text-editor-input', 'onChangeText', '2026-11-09'));
+    act(() => fire(r, 'text-editor-done'));
+    await settle();
+    expect(texts(r)).toContain(copy.receiptReview.dateFuture);
+  });
+
+  it('shows the first four categories, keeping the chosen one among them, and no photo placeholder', async () => {
+    const all = mapCategoryRows(SEED_CATEGORIES.filter((c) => c.kind === 'expense').map((c, i) => [c.id, c.name, c.kind, c.budgetType, c.icon, c.color, i, 0]) as never);
+    const { r } = await mount(draft(), { quick: all.slice(0, 4), defaultCategoryId: all[8]!.id }, false, true);
+    expect(has(r, `category-${all[8]!.id}`)).toBe(true);
+    expect(has(r, `category-${all[3]!.id}`)).toBe(false);
+    expect(has(r, 'receipt-thumb')).toBe(false);
+  });
+
+  it('Android Back asks to discard, and closes at once while the review has not loaded', async () => {
+    const listeners: (() => boolean | null | undefined)[] = [];
+    const spy = jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_e, f) => {
+      listeners.push(f as () => boolean);
+      return { remove: () => undefined };
+    });
+    const loaded = await mount(draft());
+    act(() => void listeners[listeners.length - 1]!());
+    await settle();
+    expect(texts(loaded.r)).toContain('Nothing will be saved.');
+    expect(loaded.onClose).not.toHaveBeenCalled();
+    listeners.length = 0;
+    const failed = await mount(draft(), {}, true);
+    act(() => void listeners[0]!());
+    expect(failed.onClose).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
   });
 
   it('another currency shows its own message, and an impossible date its own', async () => {
@@ -370,7 +450,7 @@ describe('ReceiptReviewScreen (SCR-23)', () => {
     save.mockResolvedValueOnce({ ok: false, code: 'CURRENCY_DIFFERS' });
     await act(async () => fire(r, 'receipt-save'));
     await settle();
-    expect(texts(r).join(' ')).toContain('This receipt is in USD.');
+    expect(texts(r).join(' ')).toContain('This receipt is in USD, which cannot be saved yet.');
     save.mockResolvedValueOnce({ ok: false, code: 'DATE_INVALID' });
     await act(async () => fire(r, 'receipt-save'));
     await settle();

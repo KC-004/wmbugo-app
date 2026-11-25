@@ -20,7 +20,12 @@ export interface ReceiptAllocation {
   readonly items: readonly AllocatedItem[];
   /** Per category, the allocated item amounts (not the Not itemised amount). Insertion order follows the printed item order. */
   readonly categoryTotals: Readonly<Record<string, number>>;
+  /** The printed tax is part of the item prices, so it is not added again. */
+  readonly taxIncluded?: true;
 }
+
+/** Prices that include the tax: the items, with fees and discounts, already make the total (the usual receipt in the UK, EU, India and Singapore). */
+export const taxIsIncluded = (itemsMinor: number, feesMinor: number, discountsMinor: number, totalMinor: number): boolean => itemsMinor + feesMinor - discountsMinor === totalMinor;
 
 /** floor(a * b / c) for non-negative integers, exact even where a * b passes 2^53. */
 const mulDivFloor = (a: number, b: number, c: number): number => Number((BigInt(a) * BigInt(b)) / BigInt(c));
@@ -51,12 +56,12 @@ function spread(amount: number, weights: readonly number[]): number[] {
  */
 export function allocateReceipt(draft: ReceiptDraft, itemCategories: readonly (string | null | undefined)[], mainCategory: string): ReceiptAllocation {
   const items = draft.items;
-  const taxes = draft.taxes.reduce((n, t) => n + t.value, 0);
+  const printedTax = draft.taxes.reduce((n, t) => n + t.value, 0);
   const fees = draft.fees.reduce((n, t) => n + t.value, 0);
   const discounts = draft.discounts.reduce((n, t) => n + t.value, 0);
   const categoryOf = (i: number): string => itemCategories[i] || mainCategory;
 
-  const numbers = [taxes, fees, discounts, draft.total.value ?? 0, ...items.flatMap((i) => [i.amountMinor, i.discountMinor])];
+  const numbers = [printedTax, fees, discounts, draft.total.value ?? 0, ...items.flatMap((i) => [i.amountMinor, i.discountMinor])];
   // Amounts that are not whole minor units, or are negative, cannot be shared exactly: report them instead of guessing.
   if (!numbers.every((n) => Number.isSafeInteger(n) && n >= 0)) return { state: 'mismatch', notItemised: 0, mismatch: 0, items: [], categoryTotals: {} };
 
@@ -73,6 +78,8 @@ export function allocateReceipt(draft: ReceiptDraft, itemCategories: readonly (s
     if (n < 0) excess += -n;
     return Math.max(0, n);
   });
+  const included = printedTax > 0 && excess === 0 && draft.total.value !== null && taxIsIncluded(net.reduce((n, a) => n + a, 0), fees, discounts, draft.total.value);
+  const taxes = included ? 0 : printedTax;
   const taxShare = spread(taxes, net);
   const feeShare = spread(fees, net);
   const discountShare = spread(discounts, net);
@@ -102,7 +109,7 @@ export function allocateReceipt(draft: ReceiptDraft, itemCategories: readonly (s
   if (excess > 0) return { state: 'mismatch', notItemised: 0, mismatch: excess, items: out, categoryTotals };
   if (read > total) return { state: 'mismatch', notItemised: 0, mismatch: read - total, items: out, categoryTotals };
   if (read < total) return { state: 'not_itemised', notItemised: total - read, mismatch: 0, items: out, categoryTotals };
-  return { state: 'reconciled', notItemised: 0, mismatch: 0, items: out, categoryTotals };
+  return { state: 'reconciled', notItemised: 0, mismatch: 0, items: out, categoryTotals, ...(included ? { taxIncluded: true as const } : {}) };
 }
 
 /**

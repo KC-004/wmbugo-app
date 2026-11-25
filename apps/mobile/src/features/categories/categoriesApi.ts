@@ -92,7 +92,7 @@ export const realCategoriesApi: CategoriesApi = {
   archive: (categoryId) => run(getServices().writer.run(ArchiveCategory, { categoryId }, 'user')),
   restore: (categoryId) => run(getServices().writer.run(RestoreCategory, { categoryId }, 'user')),
   merge: (fromId, intoId) => run(getServices().writer.run(MergeCategory, { fromId, intoId }, 'user')),
-  undoMerge: (r) => run(getServices().writer.run(UndoMergeCategory, { previous: r.previous, archivedIds: r.archivedIds, targetId: r.targetId }, 'user')),
+  undoMerge: (r) => run(getServices().writer.run(UndoMergeCategory, { previous: r.previous, previousItems: r.previousItems, archivedIds: r.archivedIds, targetId: r.targetId }, 'user')),
   remove: (categoryId) => run(getServices().writer.run(DeleteCategory, { categoryId }, 'user')),
   undoRemove: (deleted) => run(getServices().writer.run(UndoDeleteCategory, { deleted }, 'user')),
 };

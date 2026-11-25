@@ -1,5 +1,5 @@
 import { NativeModules } from 'react-native';
-import { CANCELLED, OCR_UNAVAILABLE, type FileRef, type OcrEngine, type OcrResult } from '@wmbugo/core';
+import { CANCELLED, isOcrFailure, OCR_FAILED, OCR_UNAVAILABLE, type FileRef, type OcrEngine, type OcrResult } from '@wmbugo/core';
 
 /** What the native engine module offers. It is absent until the PaddleOCR / ONNX engine of Story 10.1's decision is built into the app. */
 interface NativeOcr {
@@ -31,8 +31,10 @@ export function createOcrEngine(native: () => NativeOcr | undefined = () => Nati
           blocks: out.blocks.map((b) => ({ text: b.text, box: { left: b.left, top: b.top, right: b.right, bottom: b.bottom }, confidence: b.confidence })),
         };
       } catch (e) {
-        if (typeof e === 'object' && e !== null && ((e as { code?: unknown }).code === CANCELLED || (e as { code?: unknown }).code === OCR_UNAVAILABLE)) throw e;
-        throw { code: OCR_UNAVAILABLE, detail: e instanceof Error ? e.message : 'Engine failed' };
+        if (isOcrFailure(e)) throw e;
+        const detail = e instanceof Error ? e.message : 'Engine failed';
+        // Only a model that is missing or will not load means this phone cannot read receipts.
+        throw { code: (e as { code?: unknown } | null)?.code === 'E_UNAVAILABLE' ? OCR_UNAVAILABLE : OCR_FAILED, detail };
       } finally {
         if (onAbort) signal.removeEventListener('abort', onAbort);
       }

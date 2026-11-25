@@ -378,3 +378,15 @@ describe('draft', () => {
     expect(useUiStore.getState().addDraft).toEqual({ kind: 'expense', typedText: '', categoryId: null });
   });
 });
+
+describe('a category from More', () => {
+  it('hides the keypad while the list is open, then shows the choice among the quick tiles', async () => {
+    const { r } = await mountReady();
+    act(() => fire(r, 'category-more'));
+    expect(has(r, 'keypad')).toBe(false);
+    act(() => fire(r, 'category-cat_travel'));
+    expect(has(r, 'keypad')).toBe(true);
+    expect(host(r, 'category-cat_travel').props.accessibilityState.selected).toBe(true);
+    expect(r.root.findAll((n) => typeof n.type === 'string' && /^category-cat_/.test(String(n.props.testID)))).toHaveLength(4);
+  });
+});

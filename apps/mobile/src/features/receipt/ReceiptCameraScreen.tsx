@@ -42,6 +42,7 @@ export function ReceiptCameraScreen({
   const [torch, setTorch] = useState(false);
   const [shot, setShot] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const [broken, setBroken] = useState(false);
   const surface = useRef<CameraSurfaceHandle>(null);
   const busy = useRef(false);
   const pending = useRef<string | null>(null);
@@ -135,7 +136,7 @@ export function ReceiptCameraScreen({
 
   return (
     <View testID="receipt-camera" style={[styles.fill, { backgroundColor: theme.color('bg-canvas') }]}>
-      {access === 'granted' && shot === null ? <Surface ref={surface} torch={torch} active /> : null}
+      {access === 'granted' && shot === null ? <Surface ref={surface} torch={torch} active onError={() => setBroken(true)} /> : null}
       {shot !== null ? <Image testID="camera-preview" accessibilityLabel={copy.receiptCamera.preview} source={{ uri: `file://${shot}` }} style={styles.fill} resizeMode="contain" /> : null}
 
       <View style={styles.top}>
@@ -150,6 +151,7 @@ export function ReceiptCameraScreen({
         ) : null}
       </View>
 
+      {broken && shot === null && !failed ? <Text testID="camera-broken" accessibilityRole="alert" style={[textStyle('body'), styles.failed, { color: ink }]}>{copy.receiptCamera.broken}</Text> : null}
       {failed ? <Text testID="camera-failed" accessibilityRole="alert" style={[textStyle('body'), styles.failed, { color: ink }]}>{copy.receiptCamera.failed}</Text> : null}
 
       <View style={styles.bottom}>

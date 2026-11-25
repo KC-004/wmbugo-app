@@ -10,6 +10,7 @@ import { useTheme } from '../../shared/theme/ThemeProvider';
 import { layout } from '../../shared/theme/tokens';
 import { textStyle } from '../../shared/theme/typography';
 import { Chip } from '../../shared/ui/Chip';
+import { FocusRing, useFocusRing } from '../../shared/ui/FocusRing';
 import type { AddKind } from './addApi';
 
 const KINDS: readonly AddKind[] = ['expense', 'income', 'transfer'];
@@ -48,21 +49,41 @@ export function KindSegments({ kind, vertical, onChoose, locked = false }: { kin
  * One category as a tile, its icon in the category's own colour. Compact (the quick row): the icon over the name. Wide (the full list):
  * the icon beside the name, so long names wrap at word breaks instead of inside a word. Selected is filled and bold, never colour alone.
  */
-export function CategoryCell({ category, selected, wide, onPress }: { category: CategoryRow; selected: boolean; wide: boolean; onPress: () => void }) {
+export function CategoryCell({ category, selected, wide, onGlass = true, onPress }: { category: CategoryRow; selected: boolean; wide: boolean; /** On the dark glass of a sheet; false on a page, where the tile follows the theme. */ onGlass?: boolean; onPress: () => void }) {
   const theme = useTheme();
+  const { focused, onFocus, onBlur } = useFocusRing(onGlass);
   const a11y = controlA11y({ label: category.name, role: 'button', selected });
+  const surface = (name: 'bg-muted' | 'bg-surface' | 'border-hairline') => (onGlass ? resolveColor('dark', name) : theme.color(name));
   return (
-    <Pressable
-      testID={`category-${category.id}`}
-      {...a11y}
-      onPress={onPress}
-      style={[
-        wide ? styles.cellWide : styles.cell,
-        { borderColor: selected ? theme.color('accent-primary') : resolveColor('dark', 'border-hairline'), backgroundColor: selected ? resolveColor('dark', 'bg-muted') : resolveColor('dark', 'bg-surface'), borderWidth: selected ? 2 : 1 },
-      ]}>
-      <CategoryChip categoryId={category.id} icon={category.icon} colour={category.colorToken} size={wide ? 30 : 32} />
-      <Text numberOfLines={2} style={[textStyle('caption'), wide ? styles.nameWide : styles.name, { color: theme.color('on-glass-primary'), fontWeight: selected ? '600' : '400' }]}>{category.name}</Text>
-    </Pressable>
+    <FocusRing focused={focused} onGlass={onGlass} radius={12} style={wide ? styles.cellWideRing : styles.cellRing}>
+      <Pressable
+        testID={`category-${category.id}`}
+        {...a11y}
+        onPress={onPress}
+        onFocus={onFocus}
+        onBlur={onBlur}
+        style={[wide ? styles.cellWide : styles.cell, { borderColor: selected ? theme.color('accent-primary') : surface('border-hairline'), backgroundColor: surface(selected ? 'bg-muted' : 'bg-surface'), borderWidth: selected ? 2 : 1 }]}>
+        <CategoryChip categoryId={category.id} icon={category.icon} colour={category.colorToken} size={wide ? 30 : 32} onDark={onGlass} />
+        <Text numberOfLines={2} style={[textStyle('caption'), wide ? styles.nameWide : styles.name, { color: theme.color(onGlass ? 'on-glass-primary' : 'text-primary'), fontWeight: selected ? '600' : '400' }]}>{category.name}</Text>
+      </Pressable>
+    </FocusRing>
+  );
+}
+
+/** The last tile of the grid: opens or closes the full list. */
+function MoreCell({ showAll, onPress }: { showAll: boolean; onPress: () => void }) {
+  const theme = useTheme();
+  const { focused, onFocus, onBlur } = useFocusRing(true);
+  const label = showAll ? copy.add.fewer : copy.add.more;
+  return (
+    <FocusRing focused={focused} onGlass radius={12} style={showAll ? styles.cellWideRing : styles.cellRing}>
+      <Pressable testID="category-more" {...controlA11y({ label, role: 'button' })} onPress={onPress} onFocus={onFocus} onBlur={onBlur} style={[showAll ? styles.cellWide : styles.cell, { borderColor: resolveColor('dark', 'border-hairline'), borderStyle: 'dashed', borderWidth: 1 }]}>
+        <View style={styles.iconDisc}>
+          <Icon icon={showAll ? CaretUp : DotsThree} size={20} tint={theme.color('on-glass-primary')} />
+        </View>
+        <Text numberOfLines={1} style={[textStyle('caption'), showAll ? styles.nameWide : styles.name, { color: theme.color('on-glass-primary') }]}>{label}</Text>
+      </Pressable>
+    </FocusRing>
   );
 }
 
@@ -97,14 +118,7 @@ export function CategoryChips({
         {listed.map((c) => (
           <CategoryCell key={c.id} category={c} selected={selectedId === c.id} wide={showAll} onPress={() => onPick(c.id)} />
         ))}
-        {hasMore ? (
-          <Pressable testID="category-more" {...controlA11y({ label: showAll ? copy.add.fewer : copy.add.more, role: 'button' })} onPress={onToggleAll} style={[showAll ? styles.cellWide : styles.cell, { borderColor: resolveColor('dark', 'border-hairline'), borderStyle: 'dashed', borderWidth: 1 }]}>
-            <View style={styles.iconDisc}>
-              <Icon icon={showAll ? CaretUp : DotsThree} size={20} tint={theme.color('on-glass-primary')} />
-            </View>
-            <Text numberOfLines={1} style={[textStyle('caption'), showAll ? styles.nameWide : styles.name, { color: theme.color('on-glass-primary') }]}>{showAll ? copy.add.fewer : copy.add.more}</Text>
-          </Pressable>
-        ) : null}
+        {hasMore ? <MoreCell showAll={showAll} onPress={onToggleAll} /> : null}
       </View>
       {error ? (
         <Text testID="category-error" accessibilityRole="alert" accessibilityLiveRegion="assertive" style={[textStyle('caption'), { color: theme.color('on-glass-accent') }]}>
@@ -281,8 +295,10 @@ const styles = StyleSheet.create({
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
   strip: { flexDirection: 'row', gap: 4, paddingRight: 8 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  cell: { flexBasis: '18%', flexGrow: 1, minHeight: 64, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2, paddingVertical: 4, gap: 3 },
-  cellWide: { flexBasis: '48%', flexGrow: 1, minHeight: 48, borderRadius: 12, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, gap: 8 },
+  cellRing: { flexBasis: '18%', flexGrow: 1 },
+  cellWideRing: { flexBasis: '46%', flexGrow: 1 },
+  cell: { flexGrow: 1, minHeight: 64, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2, paddingVertical: 4, gap: 3 },
+  cellWide: { flexGrow: 1, minHeight: 48, borderRadius: 12, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, gap: 8 },
   iconDisc: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   name: { textAlign: 'center' },
   nameWide: { flex: 1, textAlign: 'left' },

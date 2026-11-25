@@ -14,7 +14,16 @@ export interface AmountToken {
 
 const MASKS = [/\b\d{4}-\d{1,2}-\d{1,2}\b/g, /\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b/g, /\b\d{1,2}:\d{2}(?::\d{2})?\b/g];
 const MINUS = String.fromCharCode(0x2212);
-const TOKEN = /(?<![\p{L}\d])([-(]|−)?(?:[£$€₹¥]\s?)?(\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?:[.,]\d+)?|\d(?:[\d.,']*\d)?)(?![\p{L}\d])(?!\s?%)(-|\))?/gu;
+/** Regions that write a space between thousands. Elsewhere a space separates columns: in "1 649.00" the 1 is a quantity. */
+const SPACE_GROUP_REGIONS = new Set(['FR', 'SE', 'NO', 'FI', 'PL', 'CZ', 'SK', 'HU', 'PT', 'ZA']);
+
+/** A currency mark may be printed against the digits, and a tax-class letter after the cents (`12.50A`). */
+const PREFIX = String.raw`(?:(?:RM|Rs\.?|INR|SGD|MYR|USD|GBP|EUR|AED|CHF|[£$€₹¥])\s?)?`;
+const SPACED = String.raw`\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?:[.,]\d+)?|`;
+const token = (spaced: boolean): RegExp =>
+  new RegExp(String.raw`(?<![\p{L}\d])([-(]|−)?${PREFIX}(${spaced ? SPACED : ''}\d(?:[\d.,'’]*\d)?)(?:(?<=[.,]\d\d)[ABCDEFHNTZ](?![\p{L}\d]))?(?![\p{L}\d])(?!\s?%)(-|\))?`, 'gu');
+const TOKEN = token(false);
+const TOKEN_SPACED = token(true);
 
 /**
  * One digit string to minor units. Both separators present: the last one is the decimal mark. One kind repeated: grouping only.
@@ -22,7 +31,7 @@ const TOKEN = /(?<![\p{L}\d])([-(]|−)?(?:[£$€₹¥]\s?)?(\d{1,3}(?:[ \u00a0
  * (then it groups thousands). More decimals than the currency has are refused unless they are zeros. Only ASCII digits are read.
  */
 export function parseDigits(raw: string, exponent: number, regionDecimal: '.' | ','): { minor: number; hasDecimal: boolean } | null {
-  const s = raw.replace(/['\s\u00a0\u202f]/g, '');
+  const s = raw.replace(/['\u2019\s\u00a0\u202f]/g, '');
   let int = s;
   let frac = '';
   const last = Math.max(s.lastIndexOf('.'), s.lastIndexOf(','));
@@ -67,8 +76,9 @@ export function findAmounts(text: string, exponent: number, region: string): Amo
   const masked = maskDatesAndTimes(text);
   const decimal = usesDecimalComma(region) ? ',' : '.';
   const out: AmountToken[] = [];
-  TOKEN.lastIndex = 0;
-  for (let m = TOKEN.exec(masked); m; m = TOKEN.exec(masked)) {
+  const pattern = SPACE_GROUP_REGIONS.has(region.toUpperCase()) ? TOKEN_SPACED : TOKEN;
+  pattern.lastIndex = 0;
+  for (let m = pattern.exec(masked); m; m = pattern.exec(masked)) {
     const p = parseDigits(m[2]!, exponent, decimal);
     if (!p || (exponent > 0 && !p.hasDecimal)) continue;
     const lead = m[1];

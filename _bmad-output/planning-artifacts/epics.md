@@ -639,6 +639,20 @@ Source contract: `ux-wmbugo-app-2026-11-07/DESIGN.md` (visuals/tokens) and `EXPE
 - **UX-DR114: Learned merchants under Settings › Capture.** Move SCR-28 from Money to Capture; Money holds Categories only. [Deviations row 15] (FR: §5.1, SCR-28)
 - **UX-DR115: Refund-net day header Spent.** Day header Spent is refund-net, floored at ₹0 (see UX-DR30). [Deviations row 16] (FR: TXN-006, FIN-028, BDG-006)
 
+### Accepted deviations (Epic 10 review, 2026-11-25)
+
+The product owner accepted the redesign of the Add sheet and the receipt review. Where these differ from UX-DR32, UX-DR36, UX-DR37, UX-DR66, DESIGN.md or the Epic 1 and Epic 10 acceptance criteria, this list wins.
+
+- Keypad keys are at least 48dp (was 56dp) and use the title type role.
+- The Add sheet shows the amount above the categories, then four quick categories as tiles with `More`; the keypad steps aside while the full list is open.
+- `Snap receipt` is a button beside the account chip, not the first chip of a row.
+- `Save & add another` reads `Save & add`, and `Add details` reads `Details`.
+- The receipt review shows categories as tiles and uses text two points smaller.
+- The unsure total reads `Check the total, then tap it to confirm`, and the Not itemised hint explains the amount and how to split it.
+- Saved receipt lines are kept as the record of the paper receipt; later edits to the entry do not change them.
+- A receipt read in another currency can be corrected to the profile currency; saving a foreign amount is still deferred.
+- A tax already included in the item prices is shown and not added again.
+
 ### FR Coverage Map
 
 - FIN-001: Epic 1 - Integer minor-unit money with exponent-aware shared formatter

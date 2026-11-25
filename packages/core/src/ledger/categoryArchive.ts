@@ -80,8 +80,10 @@ export async function previewCategory(ctx: Pick<WriterContext, 'query'>, categor
   const ids = family.map((c) => c.id);
   const live = Number((await ctx.query(`SELECT COUNT(DISTINCT t.id) FROM split s JOIN "transaction" t ON t.id = s.transaction_id WHERE s.category_id IN (${marks(ids.length)}) AND t.removed_at IS NULL`, ids))[0]![0]);
   const splits = Number((await ctx.query(`SELECT COUNT(*) FROM split WHERE category_id IN (${marks(ids.length)})`, ids))[0]![0]);
+  // A receipt line holds its category too, so a category only a line names is in use.
+  const receiptLines = Number((await ctx.query(`SELECT COUNT(*) FROM receipt_item WHERE category_id IN (${marks(ids.length)})`, ids))[0]![0]);
   const ending = await budgetsEndingWith(ctx, ids);
-  return { name: me.name, entries: live, subcategories: family.length - 1, splits, isSystem: isSystemCategory(me.id), archived: me.archived, endingBudgets: ending.map((b) => b.name) };
+  return { name: me.name, entries: live, subcategories: family.length - 1, splits: splits + receiptLines, isSystem: isSystemCategory(me.id), archived: me.archived, endingBudgets: ending.map((b) => b.name) };
 }
 
 export interface RemapEntry {
@@ -214,6 +216,8 @@ export interface MergeResult {
   readonly movedEntries: number;
   /** Where each moved split was, so Undo can put every one back. */
   readonly previous: readonly { splitId: string; categoryId: string }[];
+  /** The same for the saved receipt lines that moved. */
+  readonly previousItems: readonly { itemId: string; categoryId: string }[];
   readonly archivedIds: readonly string[];
   readonly targetId: string;
 }
@@ -262,6 +266,7 @@ export const MergeCategory: UseCase<{ fromId: string; intoId: string }, MergeRes
     const before = await fingerprint(ctx, txIds);
     const now = ctx.nowMs();
     for (const s of splits) await ctx.execute('UPDATE split SET category_id = ? WHERE id = ?', [target!.id, s.id]);
+    const items = (await ctx.query(`SELECT id, category_id FROM receipt_item WHERE category_id IN (${marks(ids.length)}) ORDER BY id`, ids)).map((r) => ({ itemId: String(r[0]), categoryId: String(r[1]) }));
     await ctx.execute(`UPDATE receipt_item SET category_id = ? WHERE category_id IN (${marks(ids.length)})`, [target!.id, ...ids]);
     for (const tx of txIds) {
       await ctx.execute('UPDATE "transaction" SET updated_at = ? WHERE id = ?', [now, tx]);
@@ -280,12 +285,12 @@ export const MergeCategory: UseCase<{ fromId: string; intoId: string }, MergeRes
     ctx.emit('CategoriesChanged', { categoryIds: [...archived, target!.id] });
     const ended = await endBudgets(ctx, archived);
     if (ended.length > 0) ctx.emit('BudgetsChanged', { budgetIds: ended });
-    return ok({ movedSplits: splits.length, movedEntries: txIds.length, previous: splits.map((s) => ({ splitId: s.id, categoryId: s.categoryId })), archivedIds: archived, targetId: target!.id });
+    return ok({ movedSplits: splits.length, movedEntries: txIds.length, previous: splits.map((s) => ({ splitId: s.id, categoryId: s.categoryId })), previousItems: items, archivedIds: archived, targetId: target!.id });
   },
 };
 
 /** Undo of a merge: every split goes back where it was and the merged categories return, in one step. */
-export const UndoMergeCategory: UseCase<{ previous: readonly { splitId: string; categoryId: string }[]; archivedIds: readonly string[]; targetId: string }, { restored: number }, CategoryActionError> = {
+export const UndoMergeCategory: UseCase<{ previous: readonly { splitId: string; categoryId: string }[]; previousItems?: readonly { itemId: string; categoryId: string }[]; archivedIds: readonly string[]; targetId: string }, { restored: number }, CategoryActionError> = {
   name: 'UndoMergeCategory',
   async execute(ctx, input) {
     const all = await loadAll(ctx);
@@ -307,6 +312,7 @@ export const UndoMergeCategory: UseCase<{ previous: readonly { splitId: string; 
       txIds.add(String(row[0]));
       restored += 1;
     }
+    for (const p of input.previousItems ?? []) await ctx.execute('UPDATE receipt_item SET category_id = ? WHERE id = ? AND category_id = ?', [p.categoryId, p.itemId, input.targetId]);
     for (const tx of txIds) {
       await ctx.execute('UPDATE "transaction" SET updated_at = ? WHERE id = ?', [now, tx]);
       ctx.touch('transaction', tx, { edited: true, fields: 'category', mergeUndo: true });

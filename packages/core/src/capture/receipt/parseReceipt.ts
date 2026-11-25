@@ -1,6 +1,7 @@
 import type { OcrResult } from '../../ports/OcrEngine';
 import { err, ok, type Result } from '../../shared/result';
 import { getCurrency, SUPPORTED_CURRENCIES } from '../../shared/currency';
+import { taxIsIncluded } from '../../ledger/allocateReceipt';
 import { findAmounts, maskDatesAndTimes, type AmountToken } from './amounts';
 import { groupLines, type Line } from './lines';
 import type { Certainty, ParseReceiptOptions, ReceiptCharge, ReceiptDraft, ReceiptField, ReceiptItem } from './types';
@@ -9,12 +10,14 @@ import type { Certainty, ParseReceiptOptions, ReceiptCharge, ReceiptDraft, Recei
 export const SURE_CONFIDENCE = 0.8;
 
 const SUBTOTAL = /sub\s*-?\s*total|zwischensumme|sous-total|subtotale|subtotal/i;
-const TOTAL = /\b(grand\s*total|total\s*ttc|amount\s*due|net\s*amount|balance\s*due|to\s*pay|total|summe|gesamt|totale|importe|totaal|gesamtbetrag|gesamtsumme|razem|summa|celkem|összesen|jumlah)\b|المجموع|الإجمالي|الاجمالي|कुल/i;
+const TOTAL = /(?<![\p{L}\d])(grand\s*total|total\s*ttc|amount\s*due|net\s*amount|balance\s*due|to\s*pay|total|summe|gesamt|totale|importe|totaal|gesamtbetrag|gesamtsumme|razem|summa|celkem|összesen|jumlah)(?![\p{L}\d])|المجموع|الإجمالي|الاجمالي|कुल/iu;
+/** Words that may stand before a total word on the bill's own total line. Anything else there reads as a product name ("Colgate Total"). */
+const TOTAL_LEAD = /^(?:grand|net|bill|invoice|order|final|sales?|food|amount|your|the|payable|rounded|sum|montant|importe|inr|usd|gbp|eur|sgd|myr|aed|rs)$/i;
 /**
  * India's split GST words are read even when the engine glues them to a neighbour ("420.00CGST25%", "420@SGST2.%"): there is no word boundary
- * before them then, and no other word contains them.
+ * before them then. A letter before them means they are part of another word ("BigStack").
  */
-const TAX = /cgst|sgst|igst|utgst|\b(vat|mwst|tva|iva|hst|gst|cess|sales\s*tax|tax)\b/i;
+const TAX = /(?<!\p{L})(?:cgst|sgst|igst|utgst)|\b(vat|mwst|tva|iva|hst|gst|cess|sales\s*tax|tax)\b/iu;
 /** A fee line starts with its word ("Delivery 2.00", "Service 10%"); "Room service sandwich" is an item. */
 const FEE = /^\s*(service|delivery|packing)\b|\bservice\s*charge\b/i;
 const DISCOUNT = /\b(discount|savings?|promo|member|rabatt|remise)\b/i;
@@ -23,7 +26,7 @@ const CONTACT = /(@|www\.|https?:|\.com\b|\b(tel|phone|ph|mob|fax|gstin|vat\s*no
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 const MONTH_FIRST = new Set(['US']);
 
-type Kind = 'subtotal' | 'total' | 'tax' | 'fee' | 'discount' | 'info' | 'generic';
+type Kind = 'subtotal' | 'total' | 'paid' | 'tax' | 'fee' | 'discount' | 'info' | 'generic';
 /** "Total savings", "Total VAT" and the like are tallies, not the bill total: they are read for nothing. */
 const TALLY = /total\s+(savings?|saved|vat|tax|gst|discount|items?|qty|quantity|sales\s*tax)\b/i;
 
@@ -47,8 +50,13 @@ const letterStats = (text: string): { latin: number; other: number } => {
   return { latin, other };
 };
 
+/** What was handed over. It is the bill total only when no other total is printed. */
+const PAID = /total\s+(paid|tendered|received)\b/i;
+const ROUNDING = /\bround(ing|ed)?\s*(off|adj)/i;
+
 const classify = (text: string): Kind => {
   if (TALLY.test(text)) return 'info';
+  if (PAID.test(text)) return 'paid';
   if (SUBTOTAL.test(text)) return 'subtotal';
   if (TOTAL.test(text)) return 'total';
   if (TAX.test(text)) return 'tax';
@@ -63,6 +71,46 @@ const pad = (n: number): string => String(n).padStart(2, '0');
 
 const daysIn = (y: number, m: number): number => new Date(Date.UTC(y, m, 0)).getUTCDate();
 const validDate = (y: number, m: number, d: number): boolean => m >= 1 && m <= 12 && d >= 1 && d <= daysIn(y, m);
+
+/** Whether a total word stands with at most the usual words before it. */
+const plainTotal = (text: string): boolean => {
+  const at = TOTAL.exec(text);
+  if (!at) return false;
+  return (text.slice(0, at.index).match(/\p{L}+/gu) ?? []).every((w) => TOTAL_LEAD.test(w));
+};
+
+/**
+ * A total word inside a product name is an item when the bill's own total or subtotal is printed further down. A paid line counts as the
+ * total only when it is the only one.
+ */
+const settleKinds = (rows: readonly Row[]): Row[] => {
+  const anchors = rows.filter((r) => r.amounts.length > 0 && (r.kind === 'subtotal' || (r.kind === 'total' && plainTotal(r.line.text))));
+  const lastAnchor = anchors.length > 0 ? anchors[anchors.length - 1]!.index : -1;
+  const hasTotal = rows.some((r) => r.amounts.length > 0 && r.kind === 'total');
+  return rows.map((r): Row => {
+    if (r.kind === 'total' && r.index < lastAnchor && !plainTotal(r.line.text)) return { ...r, kind: 'generic' };
+    if (r.kind === 'paid') return { ...r, kind: hasTotal ? 'info' : 'total' };
+    return r;
+  });
+};
+
+/**
+ * Where the items end: at the block of tax, fee and rounding lines that leads into the first subtotal or total. A fee printed between two
+ * items therefore does not cut the list. With neither, the first tax or fee line ends it.
+ */
+const itemsEnd = (rows: readonly Row[]): number => {
+  let at = rows.findIndex((r) => r.amounts.length > 0 && (r.kind === 'subtotal' || r.kind === 'total'));
+  if (at === -1) {
+    const charge = rows.findIndex((r) => r.amounts.length > 0 && (r.kind === 'tax' || r.kind === 'fee'));
+    return charge === -1 ? rows.length : charge;
+  }
+  while (at > 0) {
+    const prev = rows[at - 1]!;
+    if (!(prev.kind === 'tax' || prev.kind === 'fee' || prev.kind === 'info' || ROUNDING.test(prev.line.text))) break;
+    at--;
+  }
+  return at;
+};
 
 /** A printed label with the amount stripped, for tax, fee and discount rows. */
 const labelOf = (line: Line, tok: AmountToken | undefined): string => {
@@ -145,14 +193,15 @@ export function parseReceipt(ocr: OcrResult, opts: ParseReceiptOptions): Result<
   const lines = groupLines(ocr.blocks, ocr.width, ocr.height);
   if (lines.length === 0) return err('UNREADABLE');
 
-  const rows: Row[] = lines.map((line, index) => {
+  const classified: Row[] = lines.map((line, index) => {
     const { latin, other } = letterStats(line.text);
     return { line, index, kind: classify(line.text), amounts: findAmounts(line.text, exponent, opts.region), latinLetters: latin, otherLetters: other };
   });
-  if (!rows.some((r) => r.amounts.length > 0)) return err('UNREADABLE');
+  if (!classified.some((r) => r.amounts.length > 0)) return err('UNREADABLE');
 
-  const summaryStart = rows.findIndex((r) => r.amounts.length > 0 && (r.kind === 'subtotal' || r.kind === 'total' || r.kind === 'tax' || r.kind === 'fee'));
-  const itemEnd = summaryStart === -1 ? rows.length : summaryStart;
+  const rows = settleKinds(classified);
+  const itemEnd = itemsEnd(rows);
+  const firstTotal = rows.findIndex((r) => r.amounts.length > 0 && r.kind === 'total');
 
   const items: ReceiptItem[] = [];
   const itemDiscounts = new Map<number, number>();
@@ -198,6 +247,9 @@ export function parseReceipt(ocr: OcrResult, opts: ParseReceiptOptions): Result<
           const prev = rows[r.index - 1];
           if (isItemRow(prev)) itemDiscounts.set(r.index, -tok.minor);
           else discounts.push({ label: labelOf(r.line, tok), value: -tok.minor, certainty: conf });
+        } else if (tok.minor < 0 && r.index < firstTotal) {
+          // A coupon or voucher between the subtotal and the total, printed without a discount word.
+          discounts.push({ label: labelOf(r.line, tok), value: -tok.minor, certainty: conf });
         } else if (isItemRow(r)) {
           const before = r.line.text.slice(0, tok.start);
           let name = before.replace(/\s*[x×]\s*\d+\s*$/i, '');
@@ -224,6 +276,8 @@ export function parseReceipt(ocr: OcrResult, opts: ParseReceiptOptions): Result<
 
   const itemsNet = itemsWithDiscount.reduce((s, i) => s + i.amountMinor - i.discountMinor, 0);
 
+  const sum = (charges: readonly ReceiptCharge[]): number => charges.reduce((s, c) => s + c.value, 0);
+
   // Total: the last amount on a line with a total keyword; two different candidates, or a sum that does not add up, make it unsure.
   let total: ReceiptField<number>;
   if (totals.length > 0) {
@@ -233,7 +287,9 @@ export function parseReceipt(ocr: OcrResult, opts: ParseReceiptOptions): Result<
     const base = subtotal.value ?? (itemsWithDiscount.length > 0 ? itemsNet : null);
     if (base !== null) {
       const expected = base + taxes.reduce((s, t) => s + t.value, 0) + fees.reduce((s, t) => s + t.value, 0) - discounts.reduce((s, t) => s + t.value, 0);
-      if (expected !== last.minor) certainty = 'unsure';
+      // Prices that already include the tax add up to the total without it.
+      const included = itemsWithDiscount.length > 0 && taxes.length > 0 && taxIsIncluded(itemsNet, sum(fees), sum(discounts), last.minor);
+      if (expected !== last.minor && !included) certainty = 'unsure';
     }
     total = { value: last.minor, certainty };
   } else if (itemsWithDiscount.length > 0) total = { value: itemsNet, certainty: 'unsure' };

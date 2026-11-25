@@ -70,6 +70,8 @@ class PaddleOcrTest {
     val dir = File("src/main/assets/ocr")
     val det = File(dir, "ch_PP-OCRv4_det_infer.onnx")
     val rec = File(dir, "ch_PP-OCRv4_rec_infer.onnx")
+    // CI fetches the models first, so there a missing one is a failure; a developer without them skips this test.
+    if (System.getenv("CI") != null) assertTrue("models not fetched", det.exists() && rec.exists())
     assumeTrue("models not fetched (node scripts/fetch-ocr-models.mjs)", det.exists() && rec.exists())
     val ids = listOf("01-india-in", "02-india-in", "11-us-canada-us", "12-us-canada-us", "21-uk-europe-eu", "26-uk-europe-uk", "31-gulf-se-asia-gulf", "37-gulf-se-asia-sg")
       .filter { File("../../../../fixtures/receipts/synthetic/$it.png").exists() }

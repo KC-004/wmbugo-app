@@ -2,6 +2,7 @@ import type { OcrBlock, OcrResult } from '../../ports/OcrEngine';
 import { findAmounts, parseDigits } from './amounts';
 import { groupLines } from './lines';
 import { parseReceipt, SURE_CONFIDENCE } from './parseReceipt';
+import { allocateReceipt } from '../../ledger/allocateReceipt';
 
 const blk = (text: string, left: number, top: number, right: number, bottom: number, confidence: number | null = 0.97): OcrBlock => ({
   text,
@@ -366,5 +367,70 @@ describe('UNREADABLE', () => {
     expect(parseReceipt({ width: 100, height: 100, blocks: [] }, GB)).toEqual({ ok: false, code: 'UNREADABLE' });
     expect(parseReceipt(rows([['Hello there'], ['Thank you']]), GB)).toEqual({ ok: false, code: 'UNREADABLE' });
     expect(parseReceipt(rows([['   ']]), GB)).toEqual({ ok: false, code: 'UNREADABLE' });
+  });
+});
+
+describe('Epic 10 review fixes', () => {
+  const read = (entries: readonly (readonly [string, string?])[], o = GB) => parse(rows([['Shop Name'], ...entries]), o);
+
+  it('keeps a quantity apart from the price where a space does not group thousands', () => {
+    expect(findAmounts('Basmati rice 1 649.00', 2, 'IN').map((a) => a.minor)).toEqual([64900]);
+    expect(findAmounts('Eggs 10 250.00', 2, 'IN').map((a) => a.minor)).toEqual([25000]);
+  });
+
+  it.each([
+    ['RM12.50', 'MY', 1250],
+    ['Rs450.00', 'IN', 45000],
+    ['Bread 12.50A', 'GB', 1250],
+    ['Total 1’234.50', 'CH', 123450],
+  ])('reads %s', (text, region, minor) => {
+    expect(findAmounts(text, 2, region).map((a) => a.minor)).toEqual([minor]);
+  });
+
+  it('does not read a litre size as an amount with a tax letter', () => {
+    expect(findAmounts('Milk 1.50L', 2, 'GB')).toHaveLength(0);
+  });
+
+  it('reads a product with a total word as an item, and keeps the items after it', () => {
+    const d = read([['Colgate Total', '3.50'], ['Bread', '2.00'], ['Total', '5.50']]);
+    expect(d.items.map((i) => i.name)).toEqual(['Colgate Total', 'Bread']);
+    expect(d.total).toEqual({ value: 550, certainty: 'sure' });
+  });
+
+  it('keeps the items after a fee printed between them', () => {
+    const d = read([['Tea', '2.00'], ['Delivery', '1.00'], ['Bread', '2.00'], ['Total', '5.00']]);
+    expect(d.items.map((i) => i.name)).toEqual(['Tea', 'Bread']);
+    expect(d.fees.map((f) => f.value)).toEqual([100]);
+  });
+
+  it('does not read a word containing a GST word as tax, and reads UTGST and Cess', () => {
+    expect(read([['BigStack chips', '3.50'], ['Total', '3.50']]).taxes).toHaveLength(0);
+    expect(read([['Tea', '10.00'], ['UTGST', '0.25'], ['350@UTGST2%', '0.25'], ['Cess', '0.10'], ['Total', '10.60']]).taxes.map((t) => t.value)).toEqual([25, 25, 10]);
+  });
+
+  it('does not take what was paid as the bill total, but uses it when it is the only total', () => {
+    expect(read([['Bread', '2.00'], ['Total', '2.00'], ['Total paid', '10.00']]).total.value).toBe(200);
+    expect(read([['Bread', '2.00'], ['Total paid', '2.00']]).total.value).toBe(200);
+  });
+
+  it('matches a total word that starts with an accented letter', () => {
+    expect(read([['Kenyer', '4.00'], ['Összesen', '4.00']]).total.value).toBe(400);
+  });
+
+  it('counts a coupon between the subtotal and the total as a discount', () => {
+    const d = read([['Bread', '5.00'], ['Subtotal', '5.00'], ['Coupon', '-2.00'], ['Total', '3.00']]);
+    expect(d.discounts.map((x) => x.value)).toEqual([200]);
+  });
+
+  it('makes a keyword discount between two items the first item own discount', () => {
+    const d = read([['Jacket', '50.00'], ['Member discount', '5.00'], ['Shirt', '20.00'], ['Total', '65.00']]);
+    expect(d.items.map((i) => i.discountMinor)).toEqual([500, 0]);
+    expect(d.discounts).toHaveLength(0);
+  });
+
+  it('does not add a tax the prices already include', () => {
+    const d = read([['Bread', '6.90'], ['Total', '6.90'], ['VAT included', '1.15']]);
+    expect(d.total).toEqual({ value: 690, certainty: 'sure' });
+    expect(allocateReceipt(d, [null], 'cat_food')).toMatchObject({ state: 'reconciled', taxIncluded: true });
   });
 });

@@ -146,6 +146,21 @@ android {
     }
 }
 
+// A release build without the receipt-reading models would ship with scanning permanently unavailable, so it fails instead.
+tasks.register("checkOcrModels") {
+    def models = ["ch_PP-OCRv4_det_infer.onnx": 4745517L, "ch_PP-OCRv4_rec_infer.onnx": 10857958L]
+    def dir = file("src/main/assets/ocr")
+    doLast {
+        models.each { name, bytes ->
+            def model = new File(dir, name)
+            if (!model.exists() || model.length() != bytes) {
+                throw new GradleException("OCR model ${name} is missing or incomplete. Run: node scripts/fetch-ocr-models.mjs")
+            }
+        }
+    }
+}
+tasks.matching { it.name ==~ /pre.*ReleaseBuild/ }.configureEach { dependsOn "checkOcrModels" }
+
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")

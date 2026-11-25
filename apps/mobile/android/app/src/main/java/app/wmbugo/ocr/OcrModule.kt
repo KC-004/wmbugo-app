@@ -11,24 +11,32 @@ import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.uimanager.ViewManager
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * `WmbugoOcr` (Story 10.10): reads one receipt image with the bundled PaddleOCR models, on its own thread (AD-16). The models live in the
  * APK's assets (`ocr/`), so nothing is downloaded and nothing leaves the phone. When a model is missing or will not load, the call rejects
- * with `E_UNAVAILABLE`; the JS adapter turns that into `OCR_UNAVAILABLE`.
+ * with `E_UNAVAILABLE`; the JS adapter turns that into `OCR_UNAVAILABLE`. A bad image or a read that fails rejects with `E_IMAGE` or
+ * `E_FAILED`, which can be tried again.
  */
 class OcrModule(ctx: ReactApplicationContext) : ReactContextBaseJavaModule(ctx) {
   private val worker = Executors.newSingleThreadExecutor { r -> Thread(null, r, "wmbugo-ocr", 16L * 1024 * 1024) }
-  private val cancel = AtomicBoolean(false)
+  /** The stop flag of the newest read. Each read has its own, so a new one never revives a cancelled one. */
+  private val current = AtomicReference<AtomicBoolean?>(null)
 
   override fun getName() = "WmbugoOcr"
 
   /** Resolves `{ width, height, blocks: [{ text, left, top, right, bottom, confidence }] }` in the image's own pixels. */
   @ReactMethod
   fun recognise(path: String, promise: Promise) {
-    cancel.set(false)
+    val cancelled = AtomicBoolean(false)
+    current.getAndSet(cancelled)?.set(true)
     worker.execute {
       try {
+        if (cancelled.get()) {
+          promise.reject("E_CANCELLED", "Cancelled")
+          return@execute
+        }
         val assets = reactApplicationContext.assets
         val detBytes: ByteArray
         val recBytes: ByteArray
@@ -49,13 +57,16 @@ class OcrModule(ctx: ReactApplicationContext) : ReactContextBaseJavaModule(ctx) 
         val image = RgbImage(bitmap.width, bitmap.height, IntArray(pixels.size) { pixels[it] and 0xFFFFFF })
         bitmap.recycle()
         // The sessions are closed as soon as the scan ends, so the native heap does not stay large (S3 section 6).
+        val engine = try {
+          PaddleOcr(detBytes, recBytes)
+        } catch (e: Throwable) {
+          promise.reject("E_UNAVAILABLE", e.message ?: "The OCR models will not load", e)
+          return@execute
+        }
         val blocks = try {
-          PaddleOcr(detBytes, recBytes).use { it.recognise(image) { cancel.get() } }
+          engine.use { it.recognise(image) { cancelled.get() } }
         } catch (e: OcrCancelled) {
           promise.reject("E_CANCELLED", "Cancelled")
-          return@execute
-        } catch (e: Throwable) {
-          promise.reject("E_UNAVAILABLE", e.message ?: "The OCR engine failed", e)
           return@execute
         }
         val list = Arguments.createArray()
@@ -75,7 +86,8 @@ class OcrModule(ctx: ReactApplicationContext) : ReactContextBaseJavaModule(ctx) 
         out.putArray("blocks", list)
         promise.resolve(out)
       } catch (e: Throwable) {
-        promise.reject("E_UNAVAILABLE", e.message ?: "The OCR engine failed", e)
+        // Out of memory included: this read failed, the engine may well work on the next one.
+        promise.reject("E_FAILED", e.message ?: "The read failed", e)
       }
     }
   }
@@ -83,7 +95,7 @@ class OcrModule(ctx: ReactApplicationContext) : ReactContextBaseJavaModule(ctx) 
   /** Stops a running read between two lines. */
   @ReactMethod
   fun cancel(promise: Promise) {
-    cancel.set(true)
+    current.get()?.set(true)
     promise.resolve(null)
   }
 

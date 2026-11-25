@@ -28,26 +28,33 @@ export interface OcrUnavailable {
   readonly detail?: string;
 }
 
+/** The engine runs, but this read failed (a bad image, not enough memory). Trying again may work. */
+export interface OcrFailed {
+  readonly code: 'OCR_FAILED';
+  readonly detail?: string;
+}
+
 /** The caller aborted through the signal. */
 export interface OcrCancelled {
   readonly code: 'CANCELLED';
 }
 
-export type OcrFailure = OcrUnavailable | OcrCancelled;
+export type OcrFailure = OcrUnavailable | OcrFailed | OcrCancelled;
 
 export const OCR_UNAVAILABLE = 'OCR_UNAVAILABLE' as const;
+export const OCR_FAILED = 'OCR_FAILED' as const;
 export const CANCELLED = 'CANCELLED' as const;
 
 /** True for the typed failures an engine rejects with. */
 export function isOcrFailure(e: unknown): e is OcrFailure {
-  return typeof e === 'object' && e !== null && ((e as { code?: unknown }).code === OCR_UNAVAILABLE || (e as { code?: unknown }).code === CANCELLED);
+  return typeof e === 'object' && e !== null && [OCR_UNAVAILABLE, OCR_FAILED, CANCELLED].includes((e as { code?: unknown }).code as never);
 }
 
 export interface OcrEngine {
   /**
    * Rejects with an `OcrFailure`: `OCR_UNAVAILABLE` when the engine cannot run, `CANCELLED` when `signal` aborts. Blocks are line-level (one block per
    * printed line or line fragment), axis-aligned, in no guaranteed order: the parser orders them. An empty `blocks` list is a valid result (no text found); width and height are always above 0. If `signal` is already aborted on entry the
-   * engine rejects with `CANCELLED` without starting inference. Any other runtime error is mapped to `OCR_UNAVAILABLE` by the adapter.
+   * engine rejects with `CANCELLED` without starting inference. `OCR_FAILED` when one read fails; the adapter maps any other runtime error to it.
    */
   recognise(image: FileRef, signal: AbortSignal): Promise<OcrResult>;
 }

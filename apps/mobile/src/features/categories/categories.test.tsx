@@ -94,7 +94,7 @@ function fakeApi(initial = seedRows()) {
     const row = state.rows.find((c) => c.id === fromId)!;
     state.rows = state.rows.filter((c) => c.id !== fromId);
     closed.archived.push(row);
-    return { ok: true as const, value: { movedSplits: used.get(fromId) ?? 0, movedEntries: used.get(fromId) ?? 0, previous: [], archivedIds: [fromId], targetId: intoId } };
+    return { ok: true as const, value: { movedSplits: used.get(fromId) ?? 0, movedEntries: used.get(fromId) ?? 0, previous: [], previousItems: [], archivedIds: [fromId], targetId: intoId } };
   });
   const undoMerge = jest.fn(async () => ({ ok: true as const, value: { restored: 0 } }));
   const remove = jest.fn(async (id: string) => {

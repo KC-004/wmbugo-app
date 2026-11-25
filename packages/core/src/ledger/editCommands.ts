@@ -193,6 +193,9 @@ async function sourceKinds(ctx: WriterContext, id: string): Promise<string[]> {
   return (await ctx.query('SELECT source_kind FROM source_record WHERE transaction_id = ?', [id])).map((r) => String(r[0]));
 }
 
+/** Sources the person started themselves: typed entries and receipts they chose to scan. Their entries are deleted, never rejected (Story 10.4). */
+export const isUserInitiated = (sourceKind: string): boolean => sourceKind === 'manual' || sourceKind === 'receipt';
+
 async function removable(ctx: WriterContext, id: string): Promise<{ snapshot: TxSnapshot; kinds: string[] } | RemoveError> {
   const snapshot = await snapshotTx(ctx, id);
   if (!snapshot) return 'ENTRY_NOT_FOUND';
@@ -213,7 +216,7 @@ export const DeleteEntry: UseCase<{ transactionId: string }, { snapshot: TxSnaps
   async execute(ctx, input) {
     const r = await removable(ctx, input.transactionId);
     if (typeof r === 'string') return err(r);
-    if (r.kinds.some((k) => k !== 'manual')) return err('USE_REJECT');
+    if (r.kinds.some((k) => !isUserInitiated(k))) return err('USE_REJECT');
     const now = ctx.nowMs();
     await ctx.execute("UPDATE \"transaction\" SET status = 'excluded', removed_at = ?, removal_kind = 'deleted', updated_at = ? WHERE id = ?", [now, now, input.transactionId]);
     ctx.touch('transaction', input.transactionId, { removed: 'deleted' });
@@ -228,7 +231,7 @@ export const RejectEntry: UseCase<{ transactionId: string }, { snapshot: TxSnaps
   async execute(ctx, input) {
     const r = await removable(ctx, input.transactionId);
     if (typeof r === 'string') return err(r);
-    if (r.kinds.length === 0 || r.kinds.every((k) => k === 'manual')) return err('USE_DELETE');
+    if (r.kinds.every(isUserInitiated)) return err('USE_DELETE');
     const now = ctx.nowMs();
     await ctx.execute("UPDATE \"transaction\" SET status = 'excluded', capture_resolution = 'rejected', removed_at = ?, removal_kind = 'rejected', updated_at = ? WHERE id = ?", [now, now, input.transactionId]);
     ctx.touch('transaction', input.transactionId, { removed: 'rejected' });

@@ -88,6 +88,13 @@ describe('reading (Story 10.6)', () => {
     expect(await readPhoto(b.api, PHOTO, new AbortController().signal)).toEqual({ kind: 'failed', reason: 'unavailable' });
   });
 
+  it('offers another try when one read fails', async () => {
+    const { api } = fakeApi({ engine: createOcrEngine(() => ({ recognise: async () => Promise.reject(Object.assign(new Error('out of memory'), { code: 'E_FAILED' })), cancel: async () => undefined })) });
+    expect(await readPhoto(api, PHOTO, new AbortController().signal)).toEqual({ kind: 'failed', reason: 'unreadable' });
+    const gone = fakeApi({ engine: createOcrEngine(() => ({ recognise: async () => Promise.reject(Object.assign(new Error('no models'), { code: 'E_UNAVAILABLE' })), cancel: async () => undefined })) });
+    expect(await readPhoto(gone.api, PHOTO, new AbortController().signal)).toEqual({ kind: 'failed', reason: 'unavailable' });
+  });
+
   it('gives up after the time limit', async () => {
     const never: OcrEngine = { recognise: (_i, s) => new Promise((_r, rej) => s.addEventListener('abort', () => rej({ code: CANCELLED }))) };
     const { api } = fakeApi({ engine: never, timeoutMs: 20 });

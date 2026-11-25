@@ -71,6 +71,7 @@ export async function readPhoto(api: ScanApi, photo: PendingPhoto, signal: Abort
     if (signal.aborted) return { kind: 'cancelled' };
     if (limit.signal.aborted) return { kind: 'failed', reason: 'timeout' };
     if (isOcrFailure(e) && e.code === 'CANCELLED') return { kind: 'cancelled' };
+    if (isOcrFailure(e) && e.code === 'OCR_FAILED') return { kind: 'failed', reason: 'unreadable' };
     return { kind: 'failed', reason: 'unavailable' };
   } finally {
     clearTimeout(timer);

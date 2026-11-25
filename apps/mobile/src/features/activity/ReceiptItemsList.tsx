@@ -23,6 +23,7 @@ export function ReceiptItemsList({ items, currency, locale }: { items: readonly 
         style={[styles.row, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
         <Text style={[textStyle('body-medium'), { color: theme.color('text-primary') }]}>{copy.receiptReview.items.replace('{n}', String(items.length))}</Text>
       </Pressable>
+      {open ? <Text testID="detail-items-note" style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{copy.receiptReview.itemsRecord}</Text> : null}
       {open
         ? items.map((it, i) => (
             <View key={it.lineIndex} testID={`detail-item-${i}`} accessible accessibilityLabel={`${it.name}, ${moneyText(it.allocatedMinor, currency, locale)}, ${it.categoryName}`} style={styles.item}>

@@ -47,7 +47,7 @@ export function ClearKey({ onPress }: { onPress: () => void }) {
   const { focused, onFocus, onBlur } = useFocusRing(true);
   return (
     <FocusRing focused={focused} onGlass radius={20}>
-      <Pressable testID="key-clear" {...controlA11y({ label: copy.add.clear, role: 'button' })} hitSlop={4} onPress={onPress} onFocus={onFocus} onBlur={onBlur} style={[styles.round, { borderColor: resolveColor('dark', 'border-hairline'), backgroundColor: resolveColor('dark', 'bg-surface') }]}>
+      <Pressable testID="key-clear" {...controlA11y({ label: copy.add.clear, role: 'button' })} hitSlop={8} onPress={onPress} onFocus={onFocus} onBlur={onBlur} style={[styles.round, { borderColor: resolveColor('dark', 'border-hairline'), backgroundColor: resolveColor('dark', 'bg-surface') }]}>
         <Icon icon={X} size={16} tint={theme.color('on-glass-primary')} />
       </Pressable>
     </FocusRing>

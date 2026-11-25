@@ -69,6 +69,8 @@ export const createSaveReceipt = (deps: { readonly suggester?: CategorySuggester
       if (allocation.state === 'mismatch') return err('RECEIPT_MISMATCH');
 
       const today = toLocalDate(ctx.nowMs(), tz);
+      // A misread year must not file the expense in a later period.
+      if (today.ok && d.date.value > today.value) return err('DATE_INVALID');
       let at = ctx.nowMs();
       if (!today.ok || today.value !== d.date.value) {
         // A time that is not HH:mm is ignored: the receipt then counts as 12:00.
@@ -112,7 +114,7 @@ export const createSaveReceipt = (deps: { readonly suggester?: CategorySuggester
       }
       // Saved with no category of its own: it stays under "Add a category" until the person picks one.
       if (input.mainCategoryId === UNCATEGORISED_ID && allocation.items.every((i) => i.categoryId === UNCATEGORISED_ID)) {
-        await ctx.execute('UPDATE "transaction" SET category_set_by = NULL WHERE id = ?', [transactionId]);
+        await ctx.execute('UPDATE "transaction" SET needs_category = 1, category_set_by = NULL WHERE id = ?', [transactionId]);
       }
       for (const it of allocation.items) {
         const src = d.items[it.index]!;

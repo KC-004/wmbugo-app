@@ -771,3 +771,7 @@ Skeleton (`skeleton`; the main app's loading indicator, never a spinner), coin-f
 | Use the boat illustration for empty / relief moments | Boat or phrases on the calm hero; boat as app icon |
 | Show a skeleton, then fade in | Spinners in the main app |
 | Keep teal only in Phase 1 | Accent picker |
+
+## Accepted deviations (2026-11-25)
+
+The Add sheet and receipt review were redesigned. See "Accepted deviations" in `planning-artifacts/epics.md`; it wins over this document.

@@ -117,6 +117,26 @@ describe('the receipt camera (Story 10.7)', () => {
     expect(texts(r)).toContain('The camera could not take the photo. Nothing was saved.');
   });
 
+  it('says when the camera session fails', async () => {
+    perms.permissionState.mockResolvedValue('granted');
+    const { r } = mount();
+    await settle();
+    act(() => (lastProps as unknown as { onError: () => void }).onError());
+    expect(texts(r)).toContain('The camera is not working. Choose a photo instead.');
+  });
+
+  it('the light is off again after a photo is taken and retaken', async () => {
+    perms.permissionState.mockResolvedValue('granted');
+    const { r } = mount();
+    await settle();
+    act(() => fire(r, 'camera-light', 'onValueChange', true));
+    await act(async () => fire(r, 'camera-shutter'));
+    await settle();
+    act(() => fire(r, 'camera-retake'));
+    await settle();
+    expect(lastProps).toMatchObject({ torch: false });
+  });
+
   it('Choose a photo and Close leave without writing anything', async () => {
     perms.permissionState.mockResolvedValue('granted');
     const { r, onPickPhoto, onClose } = mount();

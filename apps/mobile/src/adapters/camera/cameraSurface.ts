@@ -9,6 +9,8 @@ export interface CameraSurfaceHandle {
 export interface CameraSurfaceProps {
   torch: boolean;
   active: boolean;
+  /** The camera session failed. */
+  onError?: () => void;
 }
 
 export type CameraSurface = ForwardRefExoticComponent<CameraSurfaceProps & RefAttributes<CameraSurfaceHandle>>;

@@ -3,7 +3,7 @@ import { foreignMoneyText } from '../../shared/ui/moneyText';
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { categoryFits, parseAmountInput, type ReviewItem, type ReviewSide } from '@wmbugo/core';
+import { categoryFits, parseAmountInput, type ReviewItem, type ReviewSide, isUserInitiated } from '@wmbugo/core';
 import { announce } from '../../shared/a11y/announce';
 import { copy } from '../../shared/copy';
 import { currencySymbol } from '../../shared/currencySymbol';
@@ -168,7 +168,7 @@ export function ReviewQueueScreen({
               onApprove={() => void decide(item.id, copy.review.approved, () => api.approve(item.id))}
               onEdit={() => onEdit(item.id)}
               onRemove={() => {
-                const kind = item.sourceKind === 'manual' ? 'delete' : 'reject';
+                const kind = isUserInitiated(item.sourceKind) ? 'delete' : 'reject';
                 void decide(item.id, kind === 'delete' ? copy.detail.deleted : copy.detail.rejected, () => api.remove(item.id, kind));
               }}
               onConfirmForeign={(amountMinor, accountId) => void decide(item.id, copy.review.approved, () => api.confirmForeign(item.id, amountMinor, accountId))}
@@ -239,7 +239,7 @@ function ReviewCard({
   const { fontScale } = useWindowDimensions();
   const [text, setText] = useState('');
   const [accountId, setAccountId] = useState<string | null>(data.accounts[0]?.id ?? null);
-  const captured = item.sourceKind !== 'manual';
+  const captured = !isUserInitiated(item.sourceKind);
   const removeLabel = captured ? copy.detail.reject : copy.detail.delete;
   const symbol = currencySymbol(data.currency, data.locale);
   const parsed = parseAmountInput(text, data.exponent);

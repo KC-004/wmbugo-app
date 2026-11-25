@@ -3,7 +3,7 @@ import { useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowsLeftRight, DotsThree } from 'phosphor-react-native';
-import { captureStateOf, captureStatusLabel, longDate, parseAmountInput, type RecoveryKind, type TransactionDetail } from '@wmbugo/core';
+import { captureStateOf, captureStatusLabel, longDate, parseAmountInput, type RecoveryKind, type TransactionDetail, isUserInitiated } from '@wmbugo/core';
 import { minorToInput } from '../../shared/minorInput';
 import { amountLabel, type AmountKind } from '../../shared/a11y/labels';
 import { copy } from '../../shared/copy';
@@ -328,7 +328,7 @@ export function TransactionDetailScreen({
 
   let body = null;
   if (d && data) {
-    const captured = d.sourceKind !== 'manual';
+    const captured = !isUserInitiated(d.sourceKind);
     const title = d.merchant ?? d.category?.name ?? (d.type === 'transfer' ? copy.detail.typeTransfer : TYPE_LABEL[d.type]);
     const direction = d.type === 'income' || d.type === 'refund' ? 'income' : d.type === 'expense' ? 'expense' : 'neutral';
     const accountText = d.type === 'transfer' ? `${d.from?.name ?? ''} → ${d.to?.name ?? ''}` : (d.from ?? d.to)?.name ?? null;

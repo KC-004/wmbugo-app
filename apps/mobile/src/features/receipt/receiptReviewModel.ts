@@ -31,7 +31,10 @@ export const setDate = (s: ReviewState, date: string): ReviewState => ({ ...s, d
 export const setTotal = (s: ReviewState, totalMinor: number): ReviewState => ({ ...s, totalConfirmed: true, draft: { ...s.draft, total: sure(totalMinor) } });
 export const confirmTotal = (s: ReviewState): ReviewState => ({ ...s, totalConfirmed: true });
 export const setSubtotal = (s: ReviewState, minor: number): ReviewState => ({ ...s, draft: { ...s.draft, subtotal: sure(minor) } });
-export const setAccount = (s: ReviewState, accountId: string): ReviewState => ({ ...s, accountId });
+/** Null is Cash while no Cash account exists. */
+export const setAccount = (s: ReviewState, accountId: string | null): ReviewState => ({ ...s, accountId });
+/** The person says which currency the receipt is in. */
+export const setCurrency = (s: ReviewState, code: string): ReviewState => ({ ...s, draft: { ...s.draft, currency: sure(code) } });
 
 export function setCharge(s: ReviewState, kind: ChargeKind, index: number, minor: number): ReviewState {
   const list: readonly ReceiptCharge[] = s.draft[kind];

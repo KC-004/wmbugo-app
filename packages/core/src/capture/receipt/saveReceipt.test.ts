@@ -8,7 +8,8 @@ import { LedgerWriter } from '../../writer/ledgerWriter';
 import { AddAccount, openingBalanceShape } from '../../ledger/accountCommands';
 import { RemoveEntry } from '../../ledger/entryCommands';
 import { PurgeEntry } from '../../ledger/purge';
-import { DeleteCategory, MergeCategory } from '../../ledger/categoryArchive';
+import { DeleteCategory, MergeCategory, UndoMergeCategory } from '../../ledger/categoryArchive';
+import { DeleteEntry, RejectEntry } from '../../ledger/editCommands';
 import { UNCATEGORISED_ID } from '../../ledger/categories';
 import { NOT_ITEMISED_MEMO } from '../../ledger/splits';
 import { SubmitCapture } from '../submitCapture';
@@ -250,5 +251,44 @@ describe('SaveReceipt (Story 10.4)', () => {
     expect((await writer.run(PurgeEntry, { transactionId: id }, 'system')).ok).toBe(true);
     expect((await db.query('SELECT COUNT(*) FROM "transaction" WHERE id = ?', [id]))[0]![0]).toBe(0);
     expect((await db.query('SELECT COUNT(*) FROM receipt_item'))[0]![0]).toBe(0);
+  });
+});
+
+describe('SaveReceipt after the Epic 10 review', () => {
+  const q = async (db: Awaited<ReturnType<typeof setup>>['db'], sql: string, id: string) => (await db.query(sql, [id]))[0]!;
+
+  it('marks a receipt saved with no category as needing one, and lets it be deleted rather than rejected', async () => {
+    const { db, writer, accountId } = await setup();
+    const r = await writer.run(SaveReceipt, base(accountId, { mainCategoryId: UNCATEGORISED_ID, itemCategories: [null, null] }), 'user');
+    if (!r.ok) throw new Error(r.code);
+    expect((await q(db, 'SELECT needs_category FROM "transaction" WHERE id = ?', r.value.transactionId))[0]).toBe(1);
+    expect(await writer.run(RejectEntry, { transactionId: r.value.transactionId }, 'user')).toMatchObject({ ok: false, code: 'USE_DELETE' });
+    expect(await writer.run(DeleteEntry, { transactionId: r.value.transactionId }, 'user')).toMatchObject({ ok: true });
+  });
+
+  it('refuses a date after today', async () => {
+    const { writer, accountId } = await setup();
+    expect(await writer.run(SaveReceipt, base(accountId, { draft: draft({ date: '2026-11-09', discounts: [600] }) }), 'user')).toMatchObject({ ok: false, code: 'DATE_INVALID' });
+  });
+
+  it('splits one category that is not the main one under that category, and reads each item icon and colour back', async () => {
+    const { db, writer, accountId } = await setup();
+    const r = await writer.run(SaveReceipt, base(accountId, { itemCategories: ['cat_food', 'cat_food'] }), 'user');
+    if (!r.ok) throw new Error(r.code);
+    expect(await db.query('SELECT category_id, amount_minor FROM split WHERE transaction_id = ?', [r.value.transactionId])).toEqual([['cat_food', 5400]]);
+    const seed = await q(db, 'SELECT icon, color_token FROM category WHERE id = ?', 'cat_food');
+    const items = mapReceiptItems(await db.query(RECEIPT_ITEMS_SQL, [r.value.transactionId]));
+    expect([items[0]!.categoryIcon, items[0]!.categoryColor]).toEqual([seed[0], seed[1]]);
+  });
+
+  it('undoing a category merge puts the receipt lines back', async () => {
+    const { db, writer, accountId } = await setup();
+    const r = await writer.run(SaveReceipt, base(accountId), 'user');
+    if (!r.ok) throw new Error(r.code);
+    const merged = await writer.run(MergeCategory, { fromId: 'cat_shopping', intoId: 'cat_food' }, 'user');
+    if (!merged.ok) throw new Error(merged.code);
+    const undone = await writer.run(UndoMergeCategory, merged.value, 'user');
+    expect(undone.ok).toBe(true);
+    expect(await db.query("SELECT category_id FROM receipt_item WHERE name = 'Soap'")).toEqual([['cat_shopping']]);
   });
 });

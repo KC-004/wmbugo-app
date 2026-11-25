@@ -6,9 +6,10 @@
 //
 // The files are PaddleOCR PP-OCRv4 (Apache-2.0) as converted by the RapidOCR project. They are pinned by SHA-256, kept out of git
 // (apps/mobile/android/app/src/main/assets/ocr is ignored) and packaged into the APK, so the app itself never downloads anything.
-// A build made without them still works: receipt reading then says it is unavailable.
+// A debug build made without them still works (receipt reading then says it is unavailable); a release build fails.
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -23,8 +24,7 @@ export const MODELS = [
 
 const sha = (buf) => createHash('sha256').update(buf).digest('hex');
 
-function verify(m) {
-  const file = join(OCR_DIR, m.name);
+function verify(m, file = join(OCR_DIR, m.name)) {
   if (!existsSync(file)) return 'missing';
   const buf = readFileSync(file);
   return buf.length === m.bytes && sha(buf) === m.sha256 ? 'ok' : 'wrong';
@@ -39,8 +39,12 @@ async function main() {
       mkdirSync(OCR_DIR, { recursive: true });
       const res = await fetch(`${BASE}/${m.name}`);
       if (!res.ok) throw new Error(`${m.name}: HTTP ${res.status}`);
-      writeFileSync(join(OCR_DIR, m.name), Buffer.from(await res.arrayBuffer()));
-      state = verify(m);
+      // Outside the assets until its hash is checked, so an unverified file is never packaged.
+      const part = join(tmpdir(), `${m.name}.${process.pid}.part`);
+      writeFileSync(part, Buffer.from(await res.arrayBuffer()));
+      state = verify(m, part);
+      if (state === 'ok') copyFileSync(part, join(OCR_DIR, m.name));
+      rmSync(part, { force: true });
     }
     console.log(`${state === 'ok' ? 'ok ' : 'FAIL'} ${m.name} (${state})`);
     if (state !== 'ok') bad++;

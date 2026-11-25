@@ -100,6 +100,9 @@ export interface ReceiptApi {
   undoAttach(undo: AttachReceiptUndo): Promise<{ ok: boolean }>;
 }
 
+/** How many categories show before `More`, as on the Add sheet. */
+const QUICK_COUNT = 4;
+
 /** The last confirmed expenses with the account and the biggest category of each, newest first. */
 const SHOP_HISTORY_SQL = `SELECT t.original_description, p.account_id,
   (SELECT s.category_id FROM split s WHERE s.transaction_id = t.id ORDER BY s.amount_minor DESC LIMIT 1)
@@ -115,7 +118,7 @@ export const realReceiptApi: ReceiptApi = {
     const categories = mapCategoryRows(await db.query(CATEGORY_LIST_SQL)).filter((c) => categoryFits(c.kind, 'expense'));
     const counts = new Map((await db.query(CATEGORY_USE_SQL)).map((r) => [String(r[0]), Number(r[1])] as const));
     const byId = new Map(categories.map((c) => [c.id, c]));
-    const quick = rankCategories(categories, counts).map((c) => byId.get(c.id)).filter((c): c is CategoryRow => c !== undefined);
+    const quick = rankCategories(categories, counts).map((c) => byId.get(c.id)).filter((c): c is CategoryRow => c !== undefined).slice(0, QUICK_COUNT);
     const accounts = mapAccountRows(await db.query(ACCOUNT_LIST_SQL)).filter((a) => a.status === 'active');
     const cash = accounts.find((a) => a.type === 'cash') ?? null;
 

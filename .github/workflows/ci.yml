@@ -57,6 +57,14 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # The models are pinned by hash and kept out of git; release builds refuse to run without them.
+      - name: Receipt reading models
+        run: node scripts/fetch-ocr-models.mjs
+
+      - name: Native receipt reading tests
+        working-directory: apps/mobile/android
+        run: ./gradlew --no-daemon :app:testNosmsDebugUnitTest --tests "app.wmbugo.ocr.*"
+
       - name: Release builds (nosms + sms)
         working-directory: apps/mobile/android
         run: ./gradlew --no-daemon assembleNosmsRelease assembleSmsRelease

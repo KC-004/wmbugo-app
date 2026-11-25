@@ -3,7 +3,7 @@ import { BackHandler, Pressable, ScrollView, StyleSheet, Text, TextInput, View }
 import { useQueryClient } from '@tanstack/react-query';
 import { CaretDown, CaretRight, CaretUp, Warning } from 'phosphor-react-native';
 import { applyKey, parseAmountInput, UNCATEGORISED_ID, type KeypadKey, type ReceiptDraft } from '@wmbugo/core';
-import { controlA11y } from '../../shared/a11y/labels';
+import { amountLabel, controlA11y } from '../../shared/a11y/labels';
 import { copy } from '../../shared/copy';
 import { useSheet } from '../../shared/feedback/SheetHost';
 import { useToast } from '../../shared/feedback/ToastHost';
@@ -24,6 +24,7 @@ function textStyle(role: TypeRole) {
 import { Amount } from '../../shared/ui/Amount';
 import { Button } from '../../shared/ui/Button';
 import { Chip } from '../../shared/ui/Chip';
+import { FocusRing, useFocusRing } from '../../shared/ui/FocusRing';
 import { moneyText } from '../../shared/ui/moneyText';
 import { ScreenFrame } from '../../shared/ui/ScreenFrame';
 import { TopBar } from '../../shared/ui/TopBar';
@@ -37,7 +38,7 @@ import type { ReceiptMatch } from '@wmbugo/core';
 import type { AttachTarget } from './receiptApi';
 import type { PendingPhoto } from '../../adapters/files/receiptFiles';
 import { realReceiptApi, type ReceiptApi, type ReceiptContext } from './receiptApi';
-import { addItem, confirmTotal, editItem, initialReview, removeItem, saveInput, setAccount, setCharge, setDate, setItemCategory, setMainCategory, setMerchant, setSubtotal, setTotal, viewOf, type ChargeKind, type ReviewState } from './receiptReviewModel';
+import { addItem, confirmTotal, editItem, initialReview, removeItem, saveInput, setAccount, setCharge, setCurrency, setDate, setItemCategory, setMainCategory, setMerchant, setSubtotal, setTotal, viewOf, type ChargeKind, type ReviewState } from './receiptReviewModel';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 
@@ -181,6 +182,28 @@ function Row({ label, value, onPress, testID, a11yLabel, warn, children }: { lab
   );
 }
 
+/** An item's category as a button under its name; what it shows is what TalkBack reads. */
+function ItemCategoryButton({ testID, label, unset, onPress, children }: { testID: string; label: string; unset: boolean; onPress: () => void; children?: ReactNode }) {
+  const theme = useTheme();
+  const { focused, onFocus, onBlur } = useFocusRing();
+  return (
+    <FocusRing focused={focused} radius={layout.touchMin / 2} style={styles.itemCategoryRing}>
+      <Pressable testID={testID} {...controlA11y({ label, role: 'button', hint: copy.receiptReview.changeCategory })} onPress={onPress} onFocus={onFocus} onBlur={onBlur} style={[styles.itemCategory, { borderColor: unset ? theme.color('semantic-warning') : theme.color('accent-primary') }]}>
+        {children}
+        <Text style={[textStyle('caption'), { color: theme.color('text-primary') }]}>{label}</Text>
+        <Icon icon={CaretDown} size={12} tint={theme.color('text-secondary')} />
+      </Pressable>
+    </FocusRing>
+  );
+}
+
+/** The quick categories, with the chosen one in the last place when it is not among them. */
+const withSelected = (quick: readonly CategoryRow[], all: readonly CategoryRow[], selectedId: string): readonly CategoryRow[] => {
+  const chosen = all.find((c) => c.id === selectedId);
+  if (!chosen || quick.some((c) => c.id === selectedId)) return quick;
+  return [...quick.slice(0, -1), chosen];
+};
+
 /**
  * The receipt review (SCR-23, Story 10.4): what was read, every field correctable, the allocation rerunning after each edit, and one Save.
  * It is opened with a `ReceiptDraft`; the photo arrives with the photo flow (Story 10.6).
@@ -249,10 +272,13 @@ export function ReceiptReviewScreen({ draft, photo, attachTo, onDiscardPhoto, ap
   }, [api, ctx, matchKey, attachTo]);
 
   const discardRef = useRef<(() => void) | null>(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   // Android back asks the same question as the Back arrow: nothing is saved unless the person says so.
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      discardRef.current?.();
+      // Before the review has loaded there is nothing to keep, so Back just closes.
+      (discardRef.current ?? closeRef.current)();
       return true;
     });
     return () => sub.remove();
@@ -426,25 +452,26 @@ export function ReceiptReviewScreen({ draft, photo, attachTo, onDiscardPhoto, ap
 
   const chargeRows = (kind: ChargeKind, label: string) =>
     d[kind].map((c, i) => (
-      <Row key={`${kind}-${i}`} testID={`row-${kind}-${i}`} label={`${label}${c.label && c.label.toLowerCase() !== label.toLowerCase() ? ` · ${c.label}` : ''}`} a11yLabel={copy.receiptReview.editField.replace('{field}', label)} value={<Amount amountMinor={c.value} currency={ctx.currency} direction={kind === 'discounts' ? 'income' : 'neutral'} locale={ctx.locale} />} onPress={() => editAmount(`edit-${kind}-${i}`, label, c.value, copy.common.save, (m) => update((s) => setCharge(s, kind, i, m)), true)} />
+      <Row key={`${kind}-${i}`} testID={`row-${kind}-${i}`} label={`${kind === 'taxes' && view.allocation.taxIncluded ? copy.receiptReview.taxIncluded : label}${c.label && c.label.toLowerCase() !== label.toLowerCase() ? ` · ${c.label}` : ''}`} a11yLabel={readValue(label, money(c.value))} value={<Amount amountMinor={c.value} currency={ctx.currency} direction={kind === 'discounts' ? 'income' : 'neutral'} locale={ctx.locale} />} onPress={() => editAmount(`edit-${kind}-${i}`, label, c.value, copy.common.save, (m) => update((s) => setCharge(s, kind, i, m)), true)} />
     ));
 
   const mismatchText = copy.receiptReview.mismatch.replace('{read}', money(view.readMinor)).replace('{total}', money(total ?? 0));
   const blockedReason = view.blocked === 'total' ? copy.receiptReview.saveHintTotal : view.blocked === 'mismatch' ? copy.receiptReview.saveHintMismatch : undefined;
   const dateText = view.date;
-  const chips = (showAll ? ctx.categories : ctx.quick).map((c) => <CategoryCell key={c.id} category={c} wide selected={state.mainCategoryId === c.id} onPress={() => update((s) => setMainCategory(s, c.id))} />);
+  // Spoken as "7 Nov"; another year is said too.
+  const spokenDate = isRealDate(dateText) ? `${Number(dateText.slice(8, 10))} ${MONTHS[Number(dateText.slice(5, 7)) - 1]}${dateText.slice(0, 4) === ctx.todayLocal.slice(0, 4) ? '' : ` ${dateText.slice(0, 4)}`}` : dateText;
+  const readValue = (field: string, value: string) => copy.receiptReview.editValue.replace('{field}', field).replace('{value}', value);
+  const foreign = d.currency.value !== null && d.currency.value.trim().toUpperCase() !== ctx.currency;
+  // Cash is a choice of its own while no Cash account exists yet: saving with it creates one.
+  const accountChoices: readonly { id: string | null; name: string }[] = [...ctx.accounts, ...(ctx.cashAccountId === null ? [{ id: null, name: copy.receiptReview.cash }] : [])];
+  const shownCategories = showAll ? ctx.categories : withSelected(ctx.quick, ctx.categories, state.mainCategoryId);
+  const chips = shownCategories.map((c) => <CategoryCell key={c.id} category={c} wide onGlass={false} selected={state.mainCategoryId === c.id} onPress={() => update((s) => setMainCategory(s, c.id))} />);
 
   return (
     <ScreenFrame testID="receipt-review">
       <TopBar title={copy.receiptReview.title} onBack={discard} backTestID="receipt-close" />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text testID="receipt-intro" style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{copy.receiptReview.intro}</Text>
-        {photo ? (
-        <View testID="receipt-thumb" accessible accessibilityLabel={copy.receiptReview.thumbMissing} style={[styles.thumb, { backgroundColor: theme.color('bg-surface'), borderColor: theme.color('border-hairline') }]}>
-          <Text style={[textStyle('caption'), { color: theme.color('text-secondary') }]}>{copy.receiptReview.thumbMissing}</Text>
-        </View>
-        ) : null}
-
         {splitting ? (
           <Text testID="split-header" accessibilityRole="header" style={[textStyle('body-medium'), { color: theme.color('text-primary') }]}>{splitHeader}</Text>
         ) : null}
@@ -460,12 +487,12 @@ export function ReceiptReviewScreen({ draft, photo, attachTo, onDiscardPhoto, ap
             ))}
           </View>
         ) : null}
-        <Row testID="row-merchant" label={copy.receiptReview.merchant} a11yLabel={copy.receiptReview.editField.replace('{field}', copy.receiptReview.merchant)} value={<Text style={[textStyle('body-medium'), { color: theme.color('text-primary') }]}>{d.merchant.value ?? copy.receiptReview.merchantMissing}</Text>} onPress={() => editText('edit-merchant', copy.receiptReview.merchant, d.merchant.value ?? '', 120, (v) => update((s) => setMerchant(s, v)))} />
+        <Row testID="row-merchant" label={copy.receiptReview.merchant} a11yLabel={readValue(copy.receiptReview.merchant, d.merchant.value ?? copy.receiptReview.merchantMissing)} value={<Text style={[textStyle('body-medium'), { color: theme.color('text-primary') }]}>{d.merchant.value ?? copy.receiptReview.merchantMissing}</Text>} onPress={() => editText('edit-merchant', copy.receiptReview.merchant, d.merchant.value ?? '', 120, (v) => update((s) => setMerchant(s, v)))} />
 
         <Row
           testID="row-date"
           label={copy.receiptReview.date}
-          a11yLabel={view.dateUncertain ? copy.receiptReview.dateReadout.replace('{date}', dateText) : copy.receiptReview.dateReadoutSure.replace('{date}', dateText)}
+          a11yLabel={view.dateUncertain ? copy.receiptReview.dateReadout.replace('{date}', spokenDate) : copy.receiptReview.dateReadoutSure.replace('{date}', spokenDate)}
           value={
             <View style={styles.inline}>
               {view.dateUncertain ? <Icon icon={Warning} tint={theme.color('semantic-warning')} /> : null}
@@ -473,15 +500,22 @@ export function ReceiptReviewScreen({ draft, photo, attachTo, onDiscardPhoto, ap
               {view.dateUncertain ? <Text testID="date-unsure" style={[textStyle('caption'), { color: theme.color('semantic-warning') }]}>{copy.receiptReview.dateUnsure}</Text> : null}
             </View>
           }
-          onPress={() => editText('edit-date', copy.receiptReview.date, dateText, 10, (v) => update((s) => setDate(s, v)), 'numbers-and-punctuation', (v) => (isRealDate(v.trim()) ? null : copy.receiptReview.dateInvalid))}
+          onPress={() => editText('edit-date', copy.receiptReview.date, dateText, 10, (v) => update((s) => setDate(s, v)), 'numbers-and-punctuation', (v) => (!isRealDate(v.trim()) ? copy.receiptReview.dateInvalid : v.trim() > ctx.todayLocal ? copy.receiptReview.dateFuture : null))}
         />
+
+        {foreign ? (
+          <>
+            <Row testID="row-currency" warn label={copy.receiptReview.currency} a11yLabel={copy.receiptReview.currencyReadout.replace('{currency}', d.currency.value ?? '').replace('{profile}', ctx.currency)} value={<Text style={[textStyle('body-medium'), { color: theme.color('semantic-warning') }]}>{d.currency.value}</Text>} onPress={() => { setError(null); update((s) => setCurrency(s, ctx.currency)); }} />
+            <Text testID="currency-hint" style={[textStyle('caption'), { color: theme.color('semantic-warning') }]}>{copy.receiptReview.currencyHint.replace(/\{profile\}/g, ctx.currency)}</Text>
+          </>
+        ) : null}
 
         <Text style={[textStyle('label'), { color: theme.color('text-secondary') }]}>{copy.receiptReview.paidWith}</Text>
         <View style={styles.wrap}>
           {picking ? (
-            ctx.accounts.map((a) => <Chip key={a.id} variant="paid-with" label={a.name} testID={`account-option-${a.id}`} selected={a.id === state.accountId} onPress={() => { update((s) => setAccount(s, a.id)); setPicking(false); }} />)
+            accountChoices.map((a) => <Chip key={a.id ?? 'cash'} variant="paid-with" label={a.name} testID={`account-option-${a.id ?? 'cash'}`} selected={a.id === state.accountId} onPress={() => { update((s) => setAccount(s, a.id)); setPicking(false); }} />)
           ) : (
-            <Chip variant="paid-with" label={accountName} selected testID="paid-with-chip" onPress={() => ctx.accounts.length > 1 && setPicking(true)} />
+            <Chip variant="paid-with" label={accountName} selected testID="paid-with-chip" onPress={() => accountChoices.some((a) => a.id !== state.accountId) && setPicking(true)} />
           )}
         </View>
 
@@ -493,7 +527,7 @@ export function ReceiptReviewScreen({ draft, photo, attachTo, onDiscardPhoto, ap
 
         <Text accessibilityRole="header" style={[textStyle('label'), { color: theme.color('text-secondary') }]}>{copy.receiptReview.categoryTotals}</Text>
         {view.categoryRows.map((r) => (
-          <Row key={r.categoryId} testID={`total-${r.categoryId}`} label={catName(r.categoryId)} a11yLabel={copy.receiptReview.categoryTotalReadout.replace('{name}', catName(r.categoryId)).replace('{amount}', money(r.amountMinor))} value={<Amount amountMinor={r.amountMinor} currency={ctx.currency} direction="expense" locale={ctx.locale} />} />
+          <Row key={r.categoryId} testID={`total-${r.categoryId}`} label={catName(r.categoryId)} a11yLabel={copy.receiptReview.categoryTotalReadout.replace('{name}', catName(r.categoryId)).replace('{amount}', amountLabel({ amountMinor: r.amountMinor, currency: ctx.currency, locale: ctx.locale, inline: true }))} value={<Amount amountMinor={r.amountMinor} currency={ctx.currency} direction="expense" locale={ctx.locale} />} />
         ))}
         {view.allocation.notItemised > 0 ? (
           <View testID="not-itemised" accessible accessibilityLabel={`${copy.receiptReview.notItemisedRow.replace('{amount}', money(view.allocation.notItemised))}. ${copy.receiptReview.notItemisedHint}`} style={[styles.row, styles.grey, { borderColor: theme.color('border-hairline') }]}>
@@ -533,11 +567,9 @@ export function ReceiptReviewScreen({ draft, photo, attachTo, onDiscardPhoto, ap
                     </View>
                     <Amount amountMinor={it.allocatedAmount} currency={ctx.currency} direction="expense" locale={ctx.locale} />
                   </Pressable>
-                  <Pressable testID={`item-chip-${it.index}`} {...controlA11y({ label: catName(it.categoryId), role: 'button', hint: copy.receiptReview.changeCategory })} hitSlop={8} onPress={() => pickCategory(it.index)} style={[styles.itemCategory, { borderColor: it.categoryId === UNCATEGORISED_ID ? theme.color('semantic-warning') : theme.color('accent-primary') }]}>
+                  <ItemCategoryButton testID={`item-chip-${it.index}`} label={it.categoryId === UNCATEGORISED_ID ? copy.receiptReview.chooseCategory : copy.receiptReview.categoryFor.replace('{name}', catName(it.categoryId))} unset={it.categoryId === UNCATEGORISED_ID} onPress={() => pickCategory(it.index)}>
                     {it.categoryId === UNCATEGORISED_ID ? null : <CategoryChip categoryId={it.categoryId} icon={catOf(it.categoryId)?.icon ?? 'Tag'} colour={catOf(it.categoryId)?.colorToken ?? 'cat-sky'} size={20} />}
-                    <Text style={[textStyle('caption'), { color: theme.color('text-primary') }]}>{it.categoryId === UNCATEGORISED_ID ? copy.receiptReview.chooseCategory : copy.receiptReview.categoryFor.replace('{name}', catName(it.categoryId))}</Text>
-                    <Icon icon={CaretDown} size={12} tint={theme.color('text-secondary')} />
-                  </Pressable>
+                  </ItemCategoryButton>
                 </View>
               );
             })}
@@ -550,7 +582,7 @@ export function ReceiptReviewScreen({ draft, photo, attachTo, onDiscardPhoto, ap
           </View>
         ) : null}
 
-        {d.subtotal.value !== null ? <Row testID="row-subtotal" label={copy.receiptReview.subtotal} a11yLabel={copy.receiptReview.editField.replace('{field}', copy.receiptReview.subtotal)} value={<Amount amountMinor={d.subtotal.value} currency={ctx.currency} direction="neutral" locale={ctx.locale} />} onPress={() => editAmount('edit-subtotal', copy.receiptReview.subtotal, d.subtotal.value, copy.common.save, (m) => update((s) => setSubtotal(s, m)), true)} /> : null}
+        {d.subtotal.value !== null ? <Row testID="row-subtotal" label={copy.receiptReview.subtotal} a11yLabel={readValue(copy.receiptReview.subtotal, money(d.subtotal.value))} value={<Amount amountMinor={d.subtotal.value} currency={ctx.currency} direction="neutral" locale={ctx.locale} />} onPress={() => editAmount('edit-subtotal', copy.receiptReview.subtotal, d.subtotal.value, copy.common.save, (m) => update((s) => setSubtotal(s, m)), true)} /> : null}
         {chargeRows('taxes', copy.receiptReview.tax)}
         {chargeRows('fees', copy.receiptReview.fees)}
         {chargeRows('discounts', copy.receiptReview.discount)}
@@ -600,14 +632,14 @@ export function ReceiptReviewScreen({ draft, photo, attachTo, onDiscardPhoto, ap
 
 const styles = StyleSheet.create({
   content: { padding: 12, gap: 6, paddingBottom: 16 },
-  thumb: { height: 72, borderWidth: 1, borderRadius: radii.md, alignItems: 'center', justifyContent: 'center' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: radii.md, paddingHorizontal: 12, minHeight: 44, paddingVertical: 4 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: radii.md, paddingHorizontal: 12, minHeight: layout.touchMin, paddingVertical: 4 },
   grey: { opacity: 0.8 },
   addItem: { gap: 4 },
   itemsCard: { borderWidth: 1, borderRadius: radii.md, paddingHorizontal: 12, paddingVertical: 4 },
   itemRow: { paddingVertical: 6 },
-  itemTop: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 36 },
-  itemCategory: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', minHeight: 32, borderWidth: 1, borderRadius: 16, paddingLeft: 6, paddingRight: 10, marginTop: 2 },
+  itemTop: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: layout.touchMin },
+  itemCategoryRing: { alignSelf: 'flex-start' },
+  itemCategory: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: layout.touchMin, borderWidth: 1, borderRadius: layout.touchMin / 2, paddingLeft: 8, paddingRight: 12 },
   value: { alignItems: 'flex-end', flexShrink: 1 },
   inline: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
